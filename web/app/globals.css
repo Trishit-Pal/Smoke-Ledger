@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Light theme ── */
+:root {
+  --bg: #F6F7F9;
+  --bg-elevated: #FFFFFF;
+  --card: #FFFFFF;
+  --border: #E1E5EB;
+  --text: #0B0F14;
+  --text-muted: #5A6673;
+  --text-faint: #A9B3BF;
+  --accent: #2FA39B;
+  --accent-soft: #E4F3F1;
+}
+
+/* ── Dark theme ── */
+.dark {
+  --bg: #0B0F14;
+  --bg-elevated: #11161D;
+  --card: #1A2029;
+  --border: #232B35;
+  --text: #E6EAEF;
+  --text-muted: #A9B3BF;
+  --text-faint: #5A6673;
+  --accent: #2FA39B;
+  --accent-soft: #163230;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* Scroll snap for carousels */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-start {
+    scroll-snap-align: start;
+  }
+  /* Hide scrollbar visually but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* Focus ring */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+}

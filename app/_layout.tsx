@@ -1,0 +1,160 @@
+import React, { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
+import { View, ActivityIndicator } from 'react-native';
+import { useSession } from '@/store/session';
+import { useAuth } from '@/store/auth';
+import { useTheme } from '@/hooks/useTheme';
+import { track } from '@/services/analytics';
+import { AnalyticsEvents } from '@/constants/events';
+import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/Button';
+import { spacing } from '@/constants/theme';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { toSafeErrorMessage } from '@/lib/errors';
+
+export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const boot = useSession((s) => s.boot);
+  const resetSession = useSession((s) => s.reset);
+  const setSession = useAuth((s) => s.setSession);
+  const setAuthInitialized = useAuth((s) => s.setInitialized);
+  const theme = useTheme();
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setError(
+        'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env (see .env.example) and restart Expo.',
+      );
+      setAuthInitialized(true);
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = getSupabase();
+
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        setSession(session);
+        setAuthInitialized(true);
+        if (session) {
+          await boot();
+          await track(AnalyticsEvents.APP_OPENED, { first_open: false });
+        } else {
+          resetSession();
+        }
+        if (!cancelled) setReady(true);
+      } catch (e) {
+        if (!cancelled) {
+          setError(toSafeErrorMessage(e, 'dependency_failure'));
+          setAuthInitialized(true);
+        }
+      }
+    };
+
+    void init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      if (event === 'SIGNED_OUT' || !session) {
+        resetSession();
+        setReady(true);
+        return;
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        try {
+          await boot();
+          setReady(true);
+        } catch (e) {
+          setError(toSafeErrorMessage(e, 'dependency_failure'));
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [boot, resetSession, setAuthInitialized, setSession]);
+
+  if (error) {
+    const canRetry = isSupabaseConfigured();
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.bg,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: spacing.lg,
+          gap: spacing.md,
+        }}
+      >
+        <Text variant="bodyStrong" color={theme.danger}>
+          Could not start Smoke Ledger
+        </Text>
+        <Text variant="small" muted style={{ textAlign: 'center' }}>
+          {error}
+        </Text>
+        {canRetry ? (
+          <Button
+            title="Try again"
+            onPress={async () => {
+              setError(null);
+              setReady(false);
+              try {
+                await boot();
+                setReady(true);
+              } catch (e) {
+                setError(toSafeErrorMessage(e, 'dependency_failure'));
+              }
+            }}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.bg,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary label="App">
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.bg },
+          }}
+        >
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="auth/reset-password" />
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="log/new" options={{ presentation: 'modal' }} />
+        </Stack>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}

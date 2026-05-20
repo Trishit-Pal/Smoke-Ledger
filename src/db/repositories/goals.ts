@@ -1,0 +1,141 @@
+import type { Goal, GoalType } from '@/types';
+import { makeId } from '@/lib/id';
+import { todayIst } from '@/lib/date';
+import { getSupabase } from '@/lib/supabase';
+import { mapDbError, requireUserId } from '@/db/repositories/_supabase';
+import {
+  GoalSchema,
+  GoalStatusSchema,
+  IdSchema,
+  parseOrThrow,
+} from '@/lib/validation';
+
+type Row = {
+  id: string;
+  user_id: string;
+  type: GoalType;
+  target_value: number;
+  current_baseline: number | null;
+  start_date: string;
+  end_date: string | null;
+  status: Goal['status'];
+  meta_json: Record<string, unknown> | string | null;
+  created_at: string;
+};
+
+function rowToGoal(r: Row): Goal {
+  let meta: Record<string, unknown> | null = null;
+  const raw = r.meta_json;
+  if (raw == null) {
+    meta = null;
+  } else if (typeof raw === 'string') {
+    try {
+      meta = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      meta = null;
+    }
+  } else {
+    meta = raw;
+  }
+  return {
+    id: r.id,
+    type: r.type,
+    targetValue: Number(r.target_value),
+    currentBaseline: r.current_baseline != null ? Number(r.current_baseline) : null,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    status: r.status,
+    meta,
+    createdAt: r.created_at,
+  };
+}
+
+export async function listActiveGoals(): Promise<Goal[]> {
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  if (error) throw mapDbError(error);
+  return (data as Row[]).map(rowToGoal);
+}
+
+export async function listAllGoals(): Promise<Goal[]> {
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw mapDbError(error);
+  return (data as Row[]).map(rowToGoal);
+}
+
+export async function createGoal(input: {
+  type: GoalType;
+  targetValue: number;
+  currentBaseline?: number | null;
+  startDate?: string;
+  endDate?: string | null;
+  meta?: Record<string, unknown> | null;
+}): Promise<Goal> {
+  const validated = parseOrThrow(
+    GoalSchema,
+    {
+      type: input.type,
+      targetValue: input.targetValue,
+      currentBaseline: input.currentBaseline ?? null,
+      startDate: input.startDate ?? todayIst(),
+      endDate: input.endDate ?? null,
+      meta: input.meta ?? null,
+    },
+    'goal',
+  );
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const id = makeId('gol');
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('goals')
+    .insert({
+      id,
+      user_id: userId,
+      type: validated.type,
+      target_value: validated.targetValue,
+      current_baseline: validated.currentBaseline ?? null,
+      start_date: validated.startDate,
+      end_date: validated.endDate ?? null,
+      status: 'active',
+      meta_json: validated.meta ?? null,
+      created_at: now,
+    })
+    .select('*')
+    .single();
+  if (error) throw mapDbError(error);
+  return rowToGoal(data as Row);
+}
+
+export async function setGoalStatus(id: string, status: Goal['status']): Promise<void> {
+  parseOrThrow(IdSchema, id, 'goal_id');
+  parseOrThrow(GoalStatusSchema, status, 'goal_status');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { error } = await supabase
+    .from('goals')
+    .update({ status })
+    .eq('user_id', userId)
+    .eq('id', id);
+  if (error) throw mapDbError(error);
+}
+
+export async function deleteGoal(id: string): Promise<void> {
+  parseOrThrow(IdSchema, id, 'goal_id');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { error } = await supabase.from('goals').delete().eq('user_id', userId).eq('id', id);
+  if (error) throw mapDbError(error);
+}

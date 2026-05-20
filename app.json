@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Smoke Ledger",
+    "slug": "smoke-ledger-india",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "scheme": "smokeledger",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F14"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.smokeledger.india"
+    },
+    "android": {
+      "package": "app.smokeledger.india",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0F14"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

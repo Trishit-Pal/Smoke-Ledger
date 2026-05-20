@@ -1,0 +1,16 @@
+# Smoke Ledger — Supabase local config. For production, link with `supabase link`.
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "smoke-ledger-local"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 500
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true

@@ -1,0 +1,46 @@
+// India-aware formatters.
+
+export function formatInr(value: number | null | undefined, opts?: { compact?: boolean }): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  const n = Math.round(value * 100) / 100;
+  const negative = n < 0;
+  const abs = Math.abs(n);
+  if (opts?.compact && abs >= 1000) {
+    const compact =
+      abs >= 10_000_000
+        ? `${(abs / 10_000_000).toFixed(1)}Cr`
+        : abs >= 100_000
+        ? `${(abs / 100_000).toFixed(1)}L`
+        : `${(abs / 1000).toFixed(1)}k`;
+    return `${negative ? '-' : ''}₹${compact}`;
+  }
+  // Indian numbering: 1,00,000
+  const [intPart, frac] = abs.toFixed(2).split('.');
+  let withCommas: string;
+  if (intPart.length <= 3) {
+    withCommas = intPart;
+  } else {
+    const last3 = intPart.slice(-3);
+    const rest = intPart.slice(0, -3);
+    withCommas = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last3;
+  }
+  const fracTrim = frac === '00' ? '' : `.${frac}`;
+  return `${negative ? '-' : ''}₹${withCommas}${fracTrim}`;
+}
+
+export function formatCompactInt(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+export function formatDelta(pct: number): string {
+  if (!Number.isFinite(pct)) return '—';
+  const rounded = Math.round(pct * 10) / 10;
+  const sign = rounded > 0 ? '+' : '';
+  return `${sign}${rounded}%`;
+}
+
+export function pluralize(n: number, one: string, many: string): string {
+  return n === 1 ? one : many;
+}

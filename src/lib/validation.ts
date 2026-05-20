@@ -1,0 +1,273 @@
+// Centralized Zod validation schemas for every user-influenced input that
+// can reach the database. Every repository write MUST run input through the
+// matching schema before issuing a parameterized statement.
+//
+// Schemas here are the single source of truth. Keep them in sync with
+// `src/types/index.ts` and any CHECK constraints declared in the SQL schema
+// (see `src/db/migrations/002_hardening.ts` for idempotent indexes). If you add a new enum value,
+// update the DB CHECK and the Zod enum together.
+
+import { z } from 'zod';
+
+import { CONTEXT_OPTIONS } from '@/constants/contexts';
+import { MOOD_OPTIONS } from '@/constants/moods';
+import { TRIGGER_OPTIONS } from '@/constants/triggers';
+
+/* ---------- Primitive / shared ---------- */
+
+export const YmdSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
+  .refine(
+    (v) => {
+      const [y, m, d] = v.split('-').map(Number);
+      if (!y || !m || !d) return false;
+      if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+      // Round-trip via Date.UTC to reject "2025-02-30".
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      return (
+        dt.getUTCFullYear() === y &&
+        dt.getUTCMonth() === m - 1 &&
+        dt.getUTCDate() === d
+      );
+    },
+    { message: 'Must be a valid calendar date' },
+  );
+
+export const IsoUtcSchema = z
+  .string()
+  .datetime({ offset: true, message: 'Must be an ISO-8601 datetime' });
+
+export const IdSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
+
+/** Soft limit to keep notes from being abused as a blob store. */
+const NotesSchema = z
+  .string()
+  .max(500, 'Notes limited to 500 characters')
+  .transform((s) => s.replace(/\u0000/g, '').trim())
+  .nullable();
+
+/** Common string sanitizer: strips nulls + trims + enforces length. */
+const BoundedString = (max: number) =>
+  z
+    .string()
+    .transform((s) => s.replace(/\u0000/g, '').trim())
+    .pipe(z.string().min(1).max(max));
+
+/* ---------- Enum tuples ---------- */
+
+const TRIGGER_TAGS = TRIGGER_OPTIONS.map((t) => t.value) as [string, ...string[]];
+const MOOD_VALUES = MOOD_OPTIONS.map((m) => m.value) as [string, ...string[]];
+const CONTEXT_TAGS = CONTEXT_OPTIONS.map((c) => c.value) as [string, ...string[]];
+
+export const PurchaseModeSchema = z.enum(['single', 'pack', 'carton', 'custom']);
+export const PriceSourceSchema = z.enum(['exact', 'estimated', 'inferred', 'unknown']);
+export const BrandCategorySchema = z.enum([
+  'budget',
+  'regular',
+  'premium',
+  'imported',
+  'other',
+]);
+export const GoalTypeSchema = z.enum([
+  'daily_cap',
+  'spend_cap_daily',
+  'no_smoke_window',
+  'reduction_target',
+  'weekly_target',
+  'quit_date',
+]);
+export const GoalStatusSchema = z.enum(['active', 'paused', 'completed', 'abandoned']);
+export const ReminderKindSchema = z.enum(['daily_summary', 'craving_check', 'goal_nudge', 'quit_streak']);
+
+export const TriggerTagSchema = z.enum(TRIGGER_TAGS);
+export const MoodSchema = z.enum(MOOD_VALUES);
+export const ContextTagSchema = z.enum(CONTEXT_TAGS);
+
+/* ---------- Cigarette log ---------- */
+
+export const CigaretteLogSchema = z
+  .object({
+    brandId: IdSchema.nullable(),
+    brandNameSnap: BoundedString(100).nullable(),
+    variantSnap: BoundedString(100).nullable(),
+    quantity: z.number().int().min(1).max(100),
+    purchaseMode: PurchaseModeSchema,
+    packSize: z.number().int().min(1).max(100).nullable(),
+    totalPriceInr: z.number().min(0).max(10_000).nullable(),
+    unitPriceInr: z.number().min(0).max(2_000).nullable(),
+    priceSource: PriceSourceSchema,
+    triggerTag: TriggerTagSchema.nullable(),
+    moodBefore: MoodSchema.nullable(),
+    moodAfter: MoodSchema.nullable(),
+    craving: z.number().int().min(0).max(10).nullable(),
+    contextTag: ContextTagSchema.nullable(),
+    notes: NotesSchema,
+    tsUtc: IsoUtcSchema,
+    localDate: YmdSchema.optional(),
+    localHour: z.number().int().min(0).max(23).optional(),
+  })
+  .strict();
+
+export type CigaretteLogInput = z.infer<typeof CigaretteLogSchema>;
+
+export const CigaretteLogPatchSchema = CigaretteLogSchema.partial().strict();
+
+/* ---------- Goals ---------- */
+
+export const GoalSchema = z
+  .object({
+    type: GoalTypeSchema,
+    targetValue: z.number().positive().max(1_000),
+    currentBaseline: z.number().min(0).max(1_000).nullable().optional(),
+    startDate: YmdSchema,
+    endDate: YmdSchema.nullable().optional(),
+    meta: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (g) => !g.endDate || g.endDate >= g.startDate,
+    { message: 'endDate must be on or after startDate', path: ['endDate'] },
+  );
+
+export type GoalInput = z.infer<typeof GoalSchema>;
+
+/* ---------- Brands ---------- */
+
+export const BrandSchema = z
+  .object({
+    name: BoundedString(100),
+    category: BrandCategorySchema,
+    isFavorite: z.boolean().optional(),
+  })
+  .strict();
+
+export type BrandInput = z.infer<typeof BrandSchema>;
+
+export const BrandVariantSchema = z
+  .object({
+    name: BoundedString(100),
+    defaultPackSize: z.number().int().min(1).max(100),
+    avgPriceInr: z.number().min(0).max(2_000).nullable(),
+  })
+  .strict();
+
+export type BrandVariantInput = z.infer<typeof BrandVariantSchema>;
+
+/* ---------- Security / auth ---------- */
+
+export const PinSchema = z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits');
+
+/* ---------- Profile ---------- */
+
+export const ProfileSchema = z
+  .object({
+    baselinePerDay: z.number().min(0).max(200).nullable().optional(),
+    baselineWindowDays: z.number().int().min(1).max(365).optional(),
+    discreetMode: z.boolean().optional(),
+    appLockEnabled: z.boolean().optional(),
+    hideTotalsOnHome: z.boolean().optional(),
+    onboardedAt: IsoUtcSchema.nullable().optional(),
+  })
+  .strict();
+
+export type ProfileInput = z.infer<typeof ProfileSchema>;
+
+/** Partial profile updates (repository / settings). */
+export const ProfilePatchSchema = ProfileSchema.partial().strict();
+
+/* ---------- Import envelope ---------- */
+
+export const ImportLogSchema = CigaretteLogSchema.extend({
+  id: IdSchema,
+  localDate: YmdSchema,
+  localHour: z.number().int().min(0).max(23),
+  createdAt: IsoUtcSchema,
+  updatedAt: IsoUtcSchema,
+}).strict();
+
+export const ImportBrandSchema = z
+  .object({
+    id: IdSchema,
+    name: BoundedString(100),
+    category: BrandCategorySchema,
+    isSeed: z.boolean(),
+    isFavorite: z.boolean(),
+    createdAt: IsoUtcSchema,
+    updatedAt: IsoUtcSchema,
+    variants: z
+      .array(
+        z
+          .object({
+            id: IdSchema,
+            brandId: IdSchema,
+            name: BoundedString(100),
+            defaultPackSize: z.number().int().min(1).max(100),
+            avgPriceInr: z.number().min(0).max(2_000).nullable(),
+            lastPriceInr: z.number().min(0).max(2_000).nullable(),
+            lastPricedAt: IsoUtcSchema.nullable(),
+          })
+          .strict(),
+      )
+      .max(500),
+  })
+  .strict();
+
+export const ImportGoalSchema = z
+  .object({
+    id: IdSchema,
+    type: GoalTypeSchema,
+    targetValue: z.number().positive().max(1_000),
+    currentBaseline: z.number().nullable(),
+    startDate: YmdSchema,
+    endDate: YmdSchema.nullable(),
+    status: GoalStatusSchema,
+    meta: z.record(z.unknown()).nullable(),
+    createdAt: IsoUtcSchema,
+  })
+  .strict();
+
+export const ImportProfileSchema = z
+  .object({
+    baselinePerDay: z.number().min(0).max(200).nullable(),
+    baselineWindowDays: z.number().int().min(1).max(365),
+    currency: z.literal('INR'),
+    discreetMode: z.boolean(),
+    appLockEnabled: z.boolean(),
+    hideTotalsOnHome: z.boolean(),
+    onboardedAt: IsoUtcSchema.nullable(),
+  })
+  .strict();
+
+export const EXPORT_SCHEMA_VERSION = 2 as const;
+
+export const ImportEnvelopeSchema = z
+  .object({
+    version: z.literal(EXPORT_SCHEMA_VERSION),
+    exportedAt: IsoUtcSchema,
+    profile: ImportProfileSchema,
+    brands: z.array(ImportBrandSchema).max(1_000),
+    logs: z.array(ImportLogSchema).max(10_000),
+    goals: z.array(ImportGoalSchema).max(500),
+    settings: z.record(z.unknown()).optional(),
+  })
+  .strict();
+
+export type ImportEnvelope = z.infer<typeof ImportEnvelopeSchema>;
+
+/* ---------- Helpers ---------- */
+
+/**
+ * Validate and return parsed output, or throw a sanitized Error.
+ * Zod's default error dumps the whole input — we scrub it so nothing leaks
+ * into logs or analytics.
+ */
+export function parseOrThrow<T>(schema: z.ZodType<T>, input: unknown, label: string): T {
+  const r = schema.safeParse(input);
+  if (r.success) return r.data;
+  const issues = r.error.issues
+    .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+    .slice(0, 5)
+    .join('; ');
+  throw new Error(`Validation failed for ${label}: ${issues}`);
+}
