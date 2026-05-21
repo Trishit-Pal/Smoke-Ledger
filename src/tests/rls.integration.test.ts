@@ -125,4 +125,59 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     });
     expect(error).toBeNull();
   });
+
+  // ── H1: compliance.delete tamper-resistance ────────────────────────────────
+
+  it('H1: blocks authenticated INSERT with user_id=NULL and category=compliance.delete', async () => {
+    // Authenticated users must not be able to insert null-user compliance rows;
+    // only service-role (edge functions) may do so.
+    const { error } = await clientA.from('error_events').insert({
+      user_id: null,
+      category: 'compliance.delete',
+      message: 'tamper attempt',
+    });
+    expect(error).toBeTruthy();
+  });
+
+  it('H1: blocks authenticated INSERT with user_id=auth.uid() and category=compliance.delete', async () => {
+    // The CHECK constraint (category = compliance.delete IMPLIES user_id IS NULL)
+    // prevents user-owned compliance.delete rows.  Even if RLS INSERT check were
+    // relaxed, the DB-level constraint fires second.
+    const { error } = await clientA.from('error_events').insert({
+      user_id: userAId,
+      category: 'compliance.delete',
+      message: 'tamper attempt via check constraint',
+    });
+    expect(error).toBeTruthy();
+  });
+
+  it('H1: SELECT returns zero compliance.delete rows for authenticated user', async () => {
+    // Rows with user_id = NULL are not visible through the RLS SELECT policy
+    // (which requires user_id = auth.uid()).
+    const { data, error } = await clientA
+      .from('error_events')
+      .select('id')
+      .eq('category', 'compliance.delete');
+    expect(error).toBeNull();
+    expect(data).toHaveLength(0);
+  });
+
+  it('H1: authenticated DELETE on error_events affects 0 rows (RLS default-deny)', async () => {
+    // No DELETE policy is defined for authenticated role, so RLS denies silently
+    // (Supabase/PostgREST returns success with count 0, not an error).
+    // Insert a probe row first so there is something to try to delete.
+    await clientA.from('error_events').insert({
+      user_id: userAId,
+      category: 'test.delete.probe',
+      message: 'rls delete probe',
+    });
+
+    const { error, count } = await clientA
+      .from('error_events')
+      .delete({ count: 'exact' })
+      .eq('category', 'test.delete.probe');
+    expect(error).toBeNull();
+    // RLS default-deny means 0 rows matched / deleted for authenticated role.
+    expect(count).toBe(0);
+  });
 });

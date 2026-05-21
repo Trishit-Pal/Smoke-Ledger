@@ -100,3 +100,4 @@ Client errors are captured in `error_events` via `src/lib/logger.ts` and web/mob
 
 - **Erase data**: product tables wiped; auth kept; audit rows anonymized (`user_id` null, hashed id in props)
 - **Delete account**: auth user removed; cascades product data; compliance delete event retained
+- **Audit retention (H1)**: `error_events` rows with `category = 'compliance.delete'` survive both operations. Three layers enforce tamper-resistance: (1) RLS INSERT policy blocks authenticated users from writing compliance.delete rows; (2) no DELETE/UPDATE policy for authenticated role (RLS default-deny); (3) DB CHECK constraint `error_events_compliance_delete_null_user_check` ensures `user_id IS NULL` whenever `category = 'compliance.delete'`. Only service-role (edge functions) may insert these rows.
