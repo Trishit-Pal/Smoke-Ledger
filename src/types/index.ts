@@ -26,10 +26,12 @@ export type TriggerTag =
   | 'work_break'
   | 'other';
 
+export type BrandCategory = 'budget' | 'regular' | 'premium' | 'imported' | 'other';
+
 export interface Brand {
   id: string;
   name: string;
-  category: 'budget' | 'regular' | 'premium' | 'imported' | 'other';
+  category: BrandCategory;
   isSeed: boolean;
   isFavorite: boolean;
   createdAt: string;
@@ -90,7 +92,7 @@ export interface Goal {
   createdAt: string;
 }
 
-export type OnboardingStep = 'privacy' | 'setup' | 'baseline' | 'brands' | 'goal' | 'done';
+export type OnboardingStep = 'privacy' | 'usage' | 'setup' | 'baseline' | 'brands' | 'goal' | 'done';
 
 export interface UserProfile {
   baselinePerDay: number | null;

@@ -1,13 +1,14 @@
 import * as React from 'react';
 import Link from 'next/link';
+import { PublicPageShell } from '@web/components/layout/PublicPageShell';
 import { Card } from '@web/components/ui/Card';
 import { Text } from '@web/components/ui/Text';
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 
 export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-bg text-text">
-      <main className="max-w-2xl mx-auto p-lg md:p-xl flex flex-col gap-lg">
+    <PublicPageShell>
+      <main className="max-w-2xl mx-auto p-lg md:p-xl pb-16 flex flex-col gap-lg">
         <header className="flex flex-col gap-sm">
           <Text variant="caption" muted>
             SUPPORT
@@ -51,6 +52,6 @@ export default function SupportPage() {
           </div>
         </Card>
       </main>
-    </div>
+    </PublicPageShell>
   );
 }

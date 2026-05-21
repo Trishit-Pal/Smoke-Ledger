@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { spacing } from '@/constants/theme';
 import { setSetting } from '@/db/repositories/settings';
+import { setOnboardingStep } from '@/db/repositories/profile';
 
 const DAILY_BUCKETS = [
   { id: 'lt5', label: '< 5', value: 3 },
@@ -88,6 +89,7 @@ export default function Setup() {
               const bucket = DAILY_BUCKETS.find((b) => b.id === daily);
               if (bucket) await setSetting('onboarding.typicalDaily', bucket.value);
               if (pref) await setSetting('onboarding.purchasePref', pref);
+              await setOnboardingStep('baseline');
               router.push('/onboarding/baseline');
             }}
           />

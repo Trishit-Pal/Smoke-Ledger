@@ -17,7 +17,8 @@ const PAGE_SIZE = 5000;
  */
 export async function exportAccountData(): Promise<AccountExportPayload> {
   const supabase = getSupabase();
-  let cursor = 0;
+  let cursorTs: string | null = null;
+  let cursorId: string | null = null;
   let merged: AccountExportPayload | null = null;
   let page = 0;
 
@@ -25,14 +26,19 @@ export async function exportAccountData(): Promise<AccountExportPayload> {
     const { data, error } = await supabase.rpc('export_account_data', {
       p_from: null,
       p_to: null,
-      p_cursor: cursor,
+      p_cursor_ts: cursorTs,
+      p_cursor_id: cursorId,
       p_limit: PAGE_SIZE,
     });
     if (error) throw new AppError('dependency_failure', error.message);
     if (!data || typeof data !== 'object') {
       throw new AppError('internal_error', 'Unexpected export payload.');
     }
-    const chunk = data as AccountExportPayload;
+    const chunk = data as AccountExportPayload & {
+      hasMore?: boolean;
+      nextCursorTs?: string | null;
+      nextCursorId?: string | null;
+    };
     if (!chunk.version || !chunk.exportedAt) {
       throw new AppError('internal_error', 'Export payload is missing required metadata.');
     }
@@ -44,9 +50,10 @@ export async function exportAccountData(): Promise<AccountExportPayload> {
       merged.logs = [...(merged.logs ?? []), ...nextLogs];
     }
 
-    const batchLen = Array.isArray(chunk.logs) ? chunk.logs.length : 0;
-    if (batchLen < PAGE_SIZE) break;
-    cursor += batchLen;
+    if (!chunk.hasMore) break;
+    if (!chunk.nextCursorTs || !chunk.nextCursorId) break;
+    cursorTs = chunk.nextCursorTs;
+    cursorId = chunk.nextCursorId;
     page += 1;
   }
 

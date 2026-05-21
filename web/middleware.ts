@@ -1,6 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
+import {
+  applyAuthCookiePolicy,
+  hardenCookieOptions,
+  isRememberMeEnabled,
+  isSupabaseAuthCookie,
+  REMEMBER_ME_COOKIE,
+  type AuthCookieOptions,
+} from '@web/lib/supabase/cookieOptions';
 
 const AUTH_ROUTES = ['/login', '/signup', '/reset'];
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support'];
@@ -30,24 +38,24 @@ function isRecoveryRoute(pathname: string): boolean {
 type CookieOptions = {
   name: string;
   value: string;
-  options?: {
-    domain?: string;
-    expires?: Date;
-    httpOnly?: boolean;
-    maxAge?: number;
-    path?: string;
-    sameSite?: 'lax' | 'strict' | 'none' | boolean;
-    secure?: boolean;
-  };
+  options?: AuthCookieOptions;
 };
 
-function hardenCookieOptions<T extends CookieOptions['options']>(opts: T): T {
-  return {
-    ...(opts ?? {}),
-    sameSite: opts?.sameSite ?? 'lax',
-    secure: opts?.secure ?? IS_PROD,
-    path: opts?.path ?? '/',
-  } as T;
+function resolveRememberMe(request: NextRequest): boolean {
+  return isRememberMeEnabled(request.cookies.get(REMEMBER_ME_COOKIE)?.value);
+}
+
+function setAuthCookie(
+  response: NextResponse,
+  name: string,
+  value: string,
+  options: AuthCookieOptions | undefined,
+  rememberMe: boolean,
+): void {
+  const policy = isSupabaseAuthCookie(name)
+    ? applyAuthCookiePolicy(options, rememberMe)
+    : hardenCookieOptions(options);
+  response.cookies.set(name, value, policy);
 }
 
 function buildSecurityHeaders(nonce: string, requestHeaders: Headers) {
@@ -73,8 +81,8 @@ export async function middleware(request: NextRequest) {
     return res;
   };
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!supabaseUrl || !supabaseAnonKey) {
     if (IS_PROD) {
       console.error('[middleware] Supabase env missing; refusing protected routes.');
@@ -84,6 +92,8 @@ export async function middleware(request: NextRequest) {
     }
     return finalize(NextResponse.redirect(new URL('/login', request.url)));
   }
+
+  const rememberMe = resolveRememberMe(request);
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -95,7 +105,7 @@ export async function middleware(request: NextRequest) {
         response = NextResponse.next({ request: { headers: requestHeaders } });
         for (const [k, v] of Object.entries(securityHeaders)) response.headers.set(k, v);
         toSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, hardenCookieOptions(options)),
+          setAuthCookie(response, name, value, options, rememberMe),
         );
       },
     },
@@ -177,18 +187,20 @@ export async function middleware(request: NextRequest) {
   if (!onboarded && isOnboardingRoute(pathname)) {
     const ORDER: Record<string, number> = {
       '/onboarding/privacy': 0,
+      '/onboarding/usage': 1,
       '/onboarding/setup': 1,
-      '/onboarding/baseline': 2,
-      '/onboarding/goal': 3,
-      '/onboarding/brands': 4,
+      '/onboarding/baseline': 1,
+      '/onboarding/goal': 2,
+      '/onboarding/brands': 3,
     };
     const stepIndex: Record<string, number> = {
       privacy: 0,
+      usage: 1,
       setup: 1,
-      baseline: 2,
-      goal: 3,
-      brands: 4,
-      done: 5,
+      baseline: 1,
+      goal: 2,
+      brands: 3,
+      done: 4,
     };
     const requestedRoute = Object.keys(ORDER).find(
       (r) => pathname === r || pathname.startsWith(`${r}/`),

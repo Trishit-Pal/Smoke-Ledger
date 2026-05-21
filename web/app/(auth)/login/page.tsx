@@ -12,8 +12,13 @@ import { Input } from '@web/components/ui/Input';
 import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
 import { LEGAL_LINKS } from '@web/lib/legal';
-import { toSafeErrorMessage } from '@/lib/errors';
+import {
+  isLoginHintStatus,
+  loginHintMessage,
+  toAuthErrorMessage,
+} from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
+import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 
 const emailSchema = z.string().email('Enter a valid email');
 const phoneSchema = z
@@ -62,6 +67,7 @@ function LoginPageInner() {
   const [otpSent, setOtpSent] = React.useState(false);
   const [otpLoading, setOtpLoading] = React.useState(false);
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [rememberMe, setRememberMe] = React.useState(false);
   const captchaRequired = isCaptchaConfigured();
   const captchaReady = !captchaRequired || !!captchaToken;
 
@@ -90,17 +96,55 @@ function LoginPageInner() {
       setSubmitError('Please complete the security check.');
       return;
     }
-    const { error } = await getSupabase().auth.signInWithPassword({
-      email: values.email.trim(),
-      password: values.password,
-      options: captchaToken ? { captchaToken } : undefined,
-    });
-    if (error) {
-      setSubmitError(toSafeErrorMessage(error, 'authentication_error'));
+    setRememberMePreference(rememberMe);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: values.email.trim(),
+          password: values.password,
+          rememberMe,
+          ...(captchaToken ? { captchaToken } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
+        const code = body.code ?? '';
+        if (code === 'email_not_confirmed') {
+          setSubmitError(body.message ?? toAuthErrorMessage({ code: 'email_not_confirmed' }));
+        } else if (code === 'invalid_credentials') {
+          let message = body.message ?? toAuthErrorMessage({ code: 'invalid_credentials' });
+          try {
+            const hintRes = await fetch('/api/auth/login-hint', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: values.email.trim() }),
+            });
+            if (hintRes.ok) {
+              const hintBody = (await hintRes.json()) as { status?: unknown };
+              if (isLoginHintStatus(hintBody.status)) {
+                message = loginHintMessage(hintBody.status);
+              }
+            }
+          } catch {
+            // Fall back to generic invalid-credentials copy.
+          }
+          setSubmitError(message);
+        } else {
+          setSubmitError(body.message ?? toAuthErrorMessage({ code }));
+        }
+        setCaptchaToken(null);
+        return;
+      }
+
+      window.location.assign(nextPath);
+    } catch {
+      setSubmitError('Unable to sign in. Please try again.');
       setCaptchaToken(null);
-      return;
     }
-    router.replace(nextPath);
   };
 
   const callbackRedirectTo = React.useMemo(() => {
@@ -122,6 +166,7 @@ function LoginPageInner() {
     }
     setOtpLoading(true);
     try {
+      setRememberMePreference(rememberMe);
       const { error } = await getSupabase().auth.signInWithOtp({
         email: parsed.data,
         options: {
@@ -158,6 +203,7 @@ function LoginPageInner() {
     }
     setOtpLoading(true);
     try {
+      setRememberMePreference(rememberMe);
       const { error } = await getSupabase().auth.signInWithOtp({
         phone: parsed.data,
         options: {
@@ -196,7 +242,7 @@ function LoginPageInner() {
         type: 'sms',
       });
       if (error) {
-        setOtpError(toSafeErrorMessage(error, 'authentication_error'));
+        setOtpError(toAuthErrorMessage(error));
         return;
       }
       router.replace(nextPath);
@@ -238,7 +284,7 @@ function LoginPageInner() {
                 : 'border-border text-text-muted hover:text-text'
             }`}
           >
-            Email OTP
+            Email link
           </button>
           <button
             type="button"
@@ -281,6 +327,16 @@ function LoginPageInner() {
 
             {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
 
+            <label className="flex items-start gap-sm text-small text-text-muted cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>Keep me signed in on this device</span>
+            </label>
+
             {submitError ? (
               <Text
                 variant="small"
@@ -305,6 +361,10 @@ function LoginPageInner() {
 
         {mode === 'email_otp' ? (
           <div className="flex flex-col gap-md">
+            <Text variant="caption" muted>
+              We email a one-click sign-in link (not a numeric code). Use an account that already
+              exists, or create one on the signup page.
+            </Text>
             <Input
               label="Email"
               type="email"
@@ -315,7 +375,7 @@ function LoginPageInner() {
             />
             {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
             <Button
-              title={otpLoading ? 'Sending…' : 'Send OTP sign-in link'}
+              title={otpLoading ? 'Sending…' : 'Send sign-in link'}
               variant="secondary"
               fullWidth
               loading={otpLoading}
@@ -367,6 +427,18 @@ function LoginPageInner() {
               </>
             )}
           </div>
+        ) : null}
+
+        {mode !== 'password' ? (
+          <label className="flex items-start gap-sm text-small text-text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>Keep me signed in on this device</span>
+          </label>
         ) : null}
 
         {otpInfo ? (

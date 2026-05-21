@@ -9,7 +9,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
 import { getSetting } from '@/db/repositories/settings';
-import { updateProfile } from '@/db/repositories/profile';
+import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
 
 export default function Baseline() {
   const router = useRouter();
@@ -63,6 +63,7 @@ export default function Baseline() {
               baselinePerDay: n,
               baselineWindowDays: window,
             });
+            await setOnboardingStep('goal');
             router.push('/onboarding/goal');
           }}
         />

@@ -3,14 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import {
   History,
   LayoutDashboard,
-  Moon,
   Plus,
   Settings,
-  Sun,
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@web/components/ui/cn';
@@ -34,12 +31,6 @@ const NAV: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname() ?? '';
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-
-  const currentTheme = theme === 'system' ? resolvedTheme : theme;
-  const isDark = currentTheme === 'dark';
 
   return (
     <aside className="hidden md:flex flex-col w-60 h-screen sticky top-0 bg-bg border-r border-border px-md py-lg">
@@ -72,26 +63,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      <div className="mt-auto pt-lg border-t border-border">
-        <button
-          type="button"
-          onClick={() => setTheme(isDark ? 'light' : 'dark')}
-          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="w-full flex items-center gap-sm px-md py-sm rounded-md text-body text-text-muted hover:bg-card hover:text-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {mounted ? (
-            isDark ? (
-              <Sun className="w-5 h-5" aria-hidden />
-            ) : (
-              <Moon className="w-5 h-5" aria-hidden />
-            )
-          ) : (
-            <span className="w-5 h-5 inline-block" aria-hidden />
-          )}
-          <span>{mounted ? (isDark ? 'Light mode' : 'Dark mode') : 'Theme'}</span>
-        </button>
-      </div>
     </aside>
   );
 }

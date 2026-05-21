@@ -1,10 +1,18 @@
-// Compliance audit service. Calls the SECURITY DEFINER `record_audit_event`
-// RPC, which performs server-side redaction and size bounding. We additionally
-// strip PII keys client-side as defense in depth so a misuse of this wrapper
-// cannot accidentally exfiltrate sensitive values.
+// Compliance audit service. Web posts to /api/audit (Next.js → audit-record Edge
+// Function). Mobile invokes audit-record directly. Client-side redaction is
+// defense in depth before the server allowlist + insert.
 
 import { getSupabase } from '@/lib/supabase';
 import { AppError } from '@/lib/errors';
+
+function isNextWebClient(): boolean {
+  return typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+}
+
+/** Supabase gateway and Next.js may surface 204 as 200 on success. */
+export function isAuditSuccessStatus(status: number): boolean {
+  return status === 204 || status === 200;
+}
 
 const PII_KEY_DENYLIST = new Set<string>([
   'password',
@@ -121,21 +129,53 @@ export function redactAuditProps(props: Record<string, unknown> | undefined | nu
   return out;
 }
 
+async function postAuditToEdge(
+  eventType: string,
+  eventCategory: string,
+  safeProps: Record<string, unknown>,
+): Promise<void> {
+  const supabase = getSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    throw new AppError('authentication_error', 'audit_not_signed_in');
+  }
+
+  const { error } = await supabase.functions.invoke('audit-record', {
+    body: {
+      event_type: eventType,
+      event_category: eventCategory,
+      props: safeProps,
+    },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (error) {
+    throw new AppError('dependency_failure', `audit_failed:${error.message}`);
+  }
+}
+
 export async function recordAuditEvent<K extends AuditEventType>(
   eventType: K,
   eventCategory: AuditEventCategory = 'account',
   props?: K extends keyof AuditEventPropsMap ? AuditEventPropsMap[K] : Record<string, unknown>,
 ): Promise<void> {
   const safeProps = redactAuditProps(props as Record<string, unknown> | undefined);
-  const supabase = getSupabase();
-  const { error } = await supabase.rpc('record_audit_event', {
-    p_event_type: eventType,
-    p_event_category: eventCategory,
-    p_props: safeProps,
-  });
-  if (error) {
-    // Audit failures should never block product flow. Surface via a typed
-    // error so callers can log without crashing.
-    throw new AppError('dependency_failure', `audit_failed:${error.message}`);
+
+  if (isNextWebClient()) {
+    const res = await fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventType, eventCategory, props: safeProps }),
+    });
+    if (isAuditSuccessStatus(res.status)) return;
+    if (res.status === 429) {
+      throw new AppError('rate_limited', 'audit_rate_limited');
+    }
+    if (res.status === 401) {
+      throw new AppError('authentication_error', 'audit_not_signed_in');
+    }
+    throw new AppError('dependency_failure', `audit_failed:${res.status}`);
   }
+
+  await postAuditToEdge(eventType, eventCategory, safeProps);
 }

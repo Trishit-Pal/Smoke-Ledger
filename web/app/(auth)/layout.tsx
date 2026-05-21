@@ -1,10 +1,12 @@
 import * as React from 'react';
 import Link from 'next/link';
+import { GoToHomepageLink } from '@web/components/layout/GoToHomepageLink';
 import { LEGAL_LINKS } from '@web/lib/legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-lg">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-lg relative">
+      <GoToHomepageLink />
       <div className="w-full max-w-sm">
         <div className="text-center mb-xl">
           <h1 className="text-h1 font-bold text-text">Smoke Ledger</h1>

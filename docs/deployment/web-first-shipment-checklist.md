@@ -36,8 +36,9 @@
 - [ ] Recovery redirects include:
   - `/reset-password`
 - [ ] Email confirmation and password reset are enabled.
+- [ ] Custom SMTP configured (see [auth-email-delivery.md](./auth-email-delivery.md)) — do not rely on built-in mail for production.
 - [ ] OTP providers are configured as needed:
-  - email OTP/magic-link enabled
+  - email magic-link enabled (Login → Email link tab)
   - SMS OTP provider configured for phone authentication
 
 ## 4. App Validation

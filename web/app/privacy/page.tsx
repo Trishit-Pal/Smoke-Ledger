@@ -36,8 +36,9 @@ const sections = [
   {
     title: 'Data retention and deletion',
     body: [
-      'Account content remains until you erase it or delete your account.',
-      'You can request full export and full deletion from in-app account controls. Deletion removes your authentication account and associated product rows, subject to narrow legal retention obligations.',
+      'Account content remains until you erase it or delete your account from Settings.',
+      'Erase data wipes product tables and resets onboarding while keeping your login. Audit rows are anonymized (user link removed, hashed identifier retained) for abuse prevention.',
+      'Delete account removes your Supabase Auth identity and cascades product data. A compliance delete record may be retained in anonymized form for incident response.',
       'Security logs are retained only for as long as required for abuse prevention, compliance, and incident response.',
     ],
   },

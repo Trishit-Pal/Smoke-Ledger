@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
+import { toSafeErrorMessage } from '@/lib/errors';
 
 export default function ResetPasswordScreen() {
   const theme = useTheme();
@@ -34,6 +35,8 @@ export default function ResetPasswordScreen() {
       const redirectTo = Linking.createURL('/auth/callback');
       await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo });
       setMsg('If an account exists for that email, a reset link is on its way.');
+    } catch (e) {
+      setErr(toSafeErrorMessage(e, 'authentication_error'));
     } finally {
       setLoading(false);
     }

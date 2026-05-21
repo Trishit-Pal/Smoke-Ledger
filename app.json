@@ -4,9 +4,11 @@
     "slug": "smoke-ledger-india",
     "version": "0.2.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "smokeledger",
     "userInterfaceStyle": "automatic",
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0B0F14"
     },
@@ -17,6 +19,7 @@
     "android": {
       "package": "app.smokeledger.india",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0F14"
       }
     },

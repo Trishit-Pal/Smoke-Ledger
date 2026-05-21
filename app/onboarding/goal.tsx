@@ -11,6 +11,7 @@ import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
 import { spacing } from '@/constants/theme';
 import { createGoal } from '@/db/repositories/goals';
+import { setOnboardingStep } from '@/db/repositories/profile';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import type { GoalType } from '@/types';
@@ -78,7 +79,10 @@ export default function GoalSetup() {
             <Button
               title="Skip"
               variant="ghost"
-              onPress={() => router.push('/onboarding/brands')}
+              onPress={async () => {
+                await setOnboardingStep('brands');
+                router.push('/onboarding/brands');
+              }}
               style={{ flex: 1 }}
             />
             <Button
@@ -91,6 +95,7 @@ export default function GoalSetup() {
                 if (!Number.isFinite(n)) return;
                 await createGoal({ type, targetValue: n });
                 await track(AnalyticsEvents.GOAL_CREATED, { type });
+                await setOnboardingStep('brands');
                 router.push('/onboarding/brands');
               }}
             />

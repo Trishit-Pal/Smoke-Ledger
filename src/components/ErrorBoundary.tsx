@@ -1,4 +1,5 @@
 import React from 'react';
+import { logClientError } from '@/lib/logger';
 import { View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +22,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren<{ lab
 
   componentDidCatch(error: Error) {
     if (__DEV__) console.warn('[ErrorBoundary]', error);
+    void logClientError(error, { category: 'mobile.boundary', route: this.props.label });
   }
 
   reset = () => this.setState({ error: null });
@@ -34,7 +36,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren<{ lab
             <Text variant="h2">Something went wrong</Text>
             <Text variant="small" muted>
               {this.props.label ? `${this.props.label} — ` : ''}
-              {this.state.error.message || 'Unknown error.'} You can try again without losing your data.
+              Something unexpected happened. You can try again without losing your data.
             </Text>
             <Button title="Try again" onPress={this.reset} />
           </View>

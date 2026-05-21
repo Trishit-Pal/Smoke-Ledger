@@ -113,4 +113,54 @@ describe('evaluateGoal', () => {
     expect(p.valueCurrent).toBe(9);
     expect(p.isOnTrack).toBe(true);
   });
+
+  it('reduction_target compares rolling average to baseline', () => {
+    const goal = baseGoal({
+      type: 'reduction_target',
+      targetValue: 5,
+      currentBaseline: 10,
+      startDate: '2025-04-01',
+    });
+    const mk = (date: string, qty: number) => ({
+      id: `l-${date}`,
+      tsUtc: `${date}T12:00:00.000Z`,
+      localDate: date,
+      localHour: 12,
+      brandId: null,
+      brandNameSnap: null,
+      variantSnap: null,
+      quantity: qty,
+      purchaseMode: 'single' as const,
+      packSize: null,
+      totalPriceInr: null,
+      unitPriceInr: null,
+      priceSource: 'unknown' as const,
+      triggerTag: null,
+      moodBefore: null,
+      moodAfter: null,
+      craving: null,
+      contextTag: null,
+      notes: null,
+      createdAt: '',
+      updatedAt: '',
+    });
+    const logs = Array.from({ length: 7 }, (_, i) => mk(`2025-04-${12 + i}`, 6));
+    const p = evaluateGoal(goal, logs, '2025-04-18');
+    expect(p.valueCurrent).toBeGreaterThan(0);
+    expect(p.unit).toBe('sticks');
+  });
+
+  it('quit_date tracks elapsed days toward end date', () => {
+    const goal = baseGoal({
+      type: 'quit_date',
+      targetValue: 30,
+      currentBaseline: 10,
+      startDate: '2025-04-01',
+      endDate: '2025-04-30',
+    });
+    const p = evaluateGoal(goal, [], '2025-04-15');
+    expect(p.valueTarget).toBeGreaterThan(0);
+    expect(p.unit).toBe('days');
+    expect(p.label).toContain('2025-04-30');
+  });
 });

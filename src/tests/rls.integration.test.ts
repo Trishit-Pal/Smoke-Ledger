@@ -93,4 +93,36 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     const cleanup = await clientA.from('cigarette_logs').delete().eq('id', id);
     expect(cleanup.error).toBeNull();
   });
+
+  it('prevents user B from calling record_audit_event RPC after revoke', async () => {
+    const { error } = await clientB.rpc('record_audit_event', {
+      p_event_type: 'consent_accepted',
+      p_event_category: 'compliance',
+      p_props: {},
+    });
+    expect(error).toBeTruthy();
+    expect(
+      error?.code === '42501' ||
+        error?.message?.toLowerCase().includes('permission') ||
+        error?.message?.toLowerCase().includes('denied'),
+    ).toBe(true);
+  });
+
+  it('allows user A to select own audit_events', async () => {
+    const { data, error } = await clientA
+      .from('audit_events')
+      .select('id, event_type')
+      .limit(5);
+    expect(error).toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  it('allows user A to insert own error_events', async () => {
+    const { error } = await clientA.from('error_events').insert({
+      user_id: userAId,
+      category: 'test.client',
+      message: 'integration probe',
+    });
+    expect(error).toBeNull();
+  });
 });

@@ -1,8 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
-
-const IS_PROD = process.env.NODE_ENV === 'production';
+import {
+  applyAuthCookiePolicy,
+  hardenCookieOptions,
+  isRememberMeEnabled,
+  isSupabaseAuthCookie,
+  REMEMBER_ME_COOKIE,
+  type AuthCookieOptions,
+} from '@web/lib/supabase/cookieOptions';
 
 // Explicit allowlist of internal destinations for the ?next= parameter.
 // Anything not on this list (or matching a wildcard tail) falls back to the
@@ -31,23 +37,19 @@ function sanitizeNextPath(raw: string | null): string | null {
   return null;
 }
 
-type CookieOptions = {
-  domain?: string;
-  expires?: Date;
-  httpOnly?: boolean;
-  maxAge?: number;
-  path?: string;
-  sameSite?: 'lax' | 'strict' | 'none' | boolean;
-  secure?: boolean;
-};
+type CookieOptions = AuthCookieOptions;
 
-function hardenCookieOptions(opts: CookieOptions | undefined): CookieOptions {
-  return {
-    ...(opts ?? {}),
-    sameSite: opts?.sameSite ?? 'lax',
-    secure: opts?.secure ?? IS_PROD,
-    path: opts?.path ?? '/',
-  };
+function setAuthCookie(
+  response: NextResponse,
+  name: string,
+  value: string,
+  options: CookieOptions | undefined,
+  rememberMe: boolean,
+): void {
+  const policy = isSupabaseAuthCookie(name)
+    ? applyAuthCookiePolicy(options, rememberMe)
+    : hardenCookieOptions(options);
+  response.cookies.set(name, value, policy);
 }
 
 function redirectWithCookies(source: NextResponse, target: URL): NextResponse {
@@ -72,6 +74,7 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+  const rememberMe = isRememberMeEnabled(request.cookies.get(REMEMBER_ME_COOKIE)?.value);
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -86,7 +89,7 @@ export async function GET(request: NextRequest) {
         }[],
       ) {
         toSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, hardenCookieOptions(options)),
+          setAuthCookie(response, name, value, options, rememberMe),
         );
       },
     },

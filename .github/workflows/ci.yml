@@ -63,3 +63,57 @@ jobs:
         env:
           E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
           E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+
+  db-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Start Supabase local DB
+        run: npx supabase db start
+
+      - name: Apply migrations smoke
+        run: npx supabase db reset --no-seed
+
+      - name: Run SQL smoke assertions
+        run: |
+          DB_URL=$(npx supabase status --output json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.DB_URL||j.db_url||'');})")
+          psql "$DB_URL" -f scripts/sql/smoke.sql
+
+      - name: Stop Supabase local DB
+        if: always()
+        run: npx supabase stop --no-backup
+
+  rls-integration:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.E2E_SUPABASE_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: RLS integration tests
+        run: npm test -- rls.integration.test.ts
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
+          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}

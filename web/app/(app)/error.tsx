@@ -5,6 +5,7 @@ import { Button } from '@web/components/ui/Button';
 import { Card } from '@web/components/ui/Card';
 import { Text } from '@web/components/ui/Text';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { logClientError } from '@/lib/logger';
 
 export default function AppError({
   error,
@@ -13,6 +14,10 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  React.useEffect(() => {
+    void logClientError(error, { category: 'web.boundary.app', digest: error.digest });
+  }, [error]);
+
   return (
     <div className="max-w-2xl mx-auto p-lg">
       <Card>

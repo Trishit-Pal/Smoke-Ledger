@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { logClientError } from '@/lib/logger';
 import Link from 'next/link';
 import { Card } from '@web/components/ui/Card';
 import { Button } from '@web/components/ui/Button';
@@ -13,8 +14,10 @@ interface Props {
 
 export default function GlobalError({ error, reset }: Props): React.ReactElement {
   React.useEffect(() => {
-    // Surface the boundary in development; in production we rely on the
-    // logger.ts pipeline. We never echo the raw error to the user.
+    void logClientError(error, {
+      category: 'web.boundary.global',
+      digest: error.digest,
+    });
     if (process.env.NODE_ENV !== 'production') {
       // eslint-disable-next-line no-console
       console.error('[boundary] global', error);

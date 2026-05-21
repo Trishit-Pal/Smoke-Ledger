@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { saveComplianceConsents } from '@/db/repositories/profile';
+import { saveComplianceConsents, setOnboardingStep } from '@/db/repositories/profile';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_URLS, LEGAL_VERSIONS } from '@/lib/legal';
@@ -151,6 +151,7 @@ export default function Privacy() {
                   termsVersion: LEGAL_VERSIONS.terms,
                   privacyVersion: LEGAL_VERSIONS.privacy,
                 });
+                await setOnboardingStep('setup');
                 router.push('/onboarding/setup');
               } catch (e) {
                 Alert.alert('Consent not saved', toSafeErrorMessage(e, 'dependency_failure'));

@@ -271,6 +271,34 @@ export async function inferUnitPriceForVariant(
     }
   }
 
-  if (!nums.length) return null;
+  if (!nums.length) {
+    const catalogUnit = await inferUnitPriceFromCatalog(variantSnap, brandId);
+    if (catalogUnit != null) return catalogUnit;
+    return null;
+  }
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100;
+}
+
+async function inferUnitPriceFromCatalog(
+  variantSnap: string | null,
+  brandId: string | null,
+): Promise<number | null> {
+  if (!brandId || !variantSnap) return null;
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('brand_variants')
+    .select('avg_price_inr, default_pack_size, price_count')
+    .eq('user_id', userId)
+    .eq('brand_id', brandId)
+    .eq('name', variantSnap)
+    .maybeSingle();
+  if (error) throw mapDbError(error);
+  if (!data?.avg_price_inr || !data.default_pack_size) return null;
+  const packOrUnit = Number(data.avg_price_inr);
+  const packSize = Number(data.default_pack_size);
+  if (!Number.isFinite(packOrUnit) || packSize <= 0) return null;
+  const unit =
+    Number(data.price_count) > 0 ? packOrUnit : packOrUnit / packSize;
+  return Math.round(unit * 100) / 100;
 }

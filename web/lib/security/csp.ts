@@ -10,9 +10,20 @@
  *   clickjacking, base-tag hijack, and form-action redirects.
  */
 export function buildCsp(nonce: string): string {
-  const supabaseHost = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/^https?:\/\//, '');
-  const supabaseHttp = supabaseHost ? `https://${supabaseHost}` : 'https://*.supabase.co';
-  const supabaseWs = supabaseHost ? `wss://${supabaseHost}` : 'wss://*.supabase.co';
+  const rawSupabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+  let supabaseHttp = 'https://*.supabase.co';
+  let supabaseWs = 'wss://*.supabase.co';
+  if (rawSupabaseUrl) {
+    try {
+      const parsed = new URL(rawSupabaseUrl);
+      supabaseHttp = parsed.origin;
+      supabaseWs = parsed.origin.replace(/^http/i, 'ws');
+    } catch {
+      const host = rawSupabaseUrl.replace(/^https?:\/\//, '');
+      supabaseHttp = host ? `https://${host}` : supabaseHttp;
+      supabaseWs = host ? `wss://${host}` : supabaseWs;
+    }
+  }
 
   // Cloudflare Turnstile (captcha) is opt-in via NEXT_PUBLIC_TURNSTILE_SITE_KEY.
   // When unset, we do not relax CSP at all.

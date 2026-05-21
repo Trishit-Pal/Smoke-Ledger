@@ -13,12 +13,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sb.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setInitialized(true);
-      if (session) boot().catch(() => {});
+      if (session) {
+        boot().catch(() => {});
+      }
     });
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) boot().catch(() => {});
-      else reset();
+      if (session) {
+        boot().catch(() => {});
+      } else reset();
     });
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

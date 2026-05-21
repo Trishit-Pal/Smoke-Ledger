@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Plus,
   ScrollText,
   Settings,
   TrendingUp,
@@ -22,10 +21,9 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/log', label: 'Log', icon: Plus },
+  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/log', label: 'History', icon: ScrollText },
   { href: '/trends', label: 'Trends', icon: TrendingUp },
-  { href: '/history', label: 'History', icon: ScrollText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

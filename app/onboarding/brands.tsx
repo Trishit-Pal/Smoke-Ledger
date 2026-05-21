@@ -8,6 +8,9 @@ import { Chip } from '@/components/ui/Chip';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
 import { listBrands, toggleFavorite } from '@/db/repositories/brands';
+import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
+import { setSetting } from '@/db/repositories/settings';
+import { recordAuditEvent } from '@/services/audit';
 import type { Brand } from '@/types';
 import { useSession } from '@/store/session';
 
@@ -55,7 +58,14 @@ export default function BrandsPick() {
           size="lg"
           onPress={async () => {
             await refresh();
-            router.push('/onboarding/notifications');
+            const now = new Date().toISOString();
+            await Promise.all([
+              updateProfile({ onboardedAt: now }),
+              setSetting('consent.onboardingCompletedAt', now),
+            ]);
+            await setOnboardingStep('done');
+            await recordAuditEvent('onboarding_completed', 'compliance', {});
+            router.replace('/(tabs)');
           }}
         />
       </View>

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
-import { toSafeErrorMessage } from '@/lib/errors';
+import { toAuthErrorMessage } from '@/lib/auth-errors';
 
 export default function LoginScreen() {
   const theme = useTheme();
@@ -32,7 +32,7 @@ export default function LoginScreen() {
         password,
       });
       if (error) {
-        setErr(toSafeErrorMessage(error, 'authentication_error'));
+        setErr(toAuthErrorMessage(error));
         return;
       }
       if (

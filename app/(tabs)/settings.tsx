@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Switch, Alert, Linking, Share } from 'react-native';
+import { View, Switch, Alert, Linking } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -35,6 +37,7 @@ export default function Settings() {
   const theme = useTheme();
   const router = useRouter();
   const profile = useSession((s) => s.profile);
+  const booted = useSession((s) => s.booted);
   const refreshProfile = useSession((s) => s.refreshProfile);
   const refreshBrands = useSession((s) => s.refreshBrands);
   const boot = useSession((s) => s.boot);
@@ -105,10 +108,21 @@ export default function Settings() {
     setBusy(true);
     try {
       const payload = await exportAccountData();
-      await Share.share({
-        title: 'Smoke Ledger export',
-        message: JSON.stringify(payload, null, 2),
-      });
+      const json = JSON.stringify(payload, null, 2);
+      const path = `${FileSystem.cacheDirectory}smoke-ledger-export-${new Date().toISOString().slice(0, 10)}.json`;
+      await FileSystem.writeAsStringAsync(path, json, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(path, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export Smoke Ledger data',
+        });
+      } else {
+        Alert.alert(
+          'Export ready',
+          'Sharing is unavailable on this device. The export file was saved to app cache.',
+        );
+      }
       await track(AnalyticsEvents.EXPORT_REQUESTED, { format: 'json' });
     } catch (e) {
       Alert.alert('Export failed', toSafeErrorMessage(e, 'dependency_failure'));
@@ -227,7 +241,26 @@ export default function Settings() {
     );
   };
 
-  if (!profile) return null;
+  if (!booted) {
+    return (
+      <Screen>
+        <Text variant="small" muted>
+          Loading settings…
+        </Text>
+      </Screen>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Screen>
+        <Text variant="small" muted>
+          Could not load your profile. Pull to refresh or sign in again.
+        </Text>
+        <Button title="Retry" onPress={() => void refreshProfile()} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

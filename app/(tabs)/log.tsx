@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -14,17 +14,24 @@ import { success } from '@/lib/haptics';
 import { formatInr } from '@/lib/format';
 import { formatTime, todayIst } from '@/lib/date';
 import { sticksOn, spendOn } from '@/domain/calc';
+import { toSafeErrorMessage } from '@/lib/errors';
+import { isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 
 export default function LogTab() {
   const router = useRouter();
   const logs = useSession((s) => s.logs);
+  const profile = useSession((s) => s.profile);
   const refreshLogs = useSession((s) => s.refreshLogs);
+  const discreet = isDiscreetMode(profile);
+  const [error, setError] = useState<string | null>(null);
 
   const today = todayIst();
   const todayLogs = logs.filter((l) => l.localDate === today).slice(0, 12);
 
   const quickAdd = async (quantity: number) => {
-    const last = logs[0];
+    try {
+      setError(null);
+      const last = logs[0];
     const now = new Date().toISOString();
     const unit = last?.unitPriceInr ?? null;
     await createLog({
@@ -48,10 +55,15 @@ export default function LogTab() {
     await track(AnalyticsEvents.QUICK_ADD_USED, {});
     success();
     await refreshLogs();
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'dependency_failure'));
+    }
   };
 
   const repeatLast = async () => {
-    const last = logs[0];
+    try {
+      setError(null);
+      const last = logs[0];
     if (!last) {
       router.push('/log/new');
       return;
@@ -78,6 +90,9 @@ export default function LogTab() {
     await track(AnalyticsEvents.REPEAT_LAST_USED, {});
     success();
     await refreshLogs();
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'dependency_failure'));
+    }
   };
 
   return (
@@ -110,9 +125,15 @@ export default function LogTab() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text variant="h3">Today</Text>
           <Text variant="caption" muted>
-            {sticksOn(logs, today)} sticks · {formatInr(spendOn(logs, today))}
+            {maskCount(sticksOn(logs, today), discreet)} sticks ·{' '}
+            {maskInr(spendOn(logs, today), discreet, (n) => formatInr(n))}
           </Text>
         </View>
+        {error ? (
+          <Text variant="small" color="var(--danger, #C85A54)">
+            {error}
+          </Text>
+        ) : null}
         {todayLogs.length === 0 ? (
           <Card>
             <Text variant="small" muted>
@@ -124,14 +145,16 @@ export default function LogTab() {
             <Card key={l.id} padded>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text variant="bodyStrong">{l.brandNameSnap ?? 'Unlogged brand'}</Text>
+                  <Text variant="bodyStrong">{maskBrandName(l.brandNameSnap ?? 'Unlogged brand', discreet)}</Text>
                   <Text variant="small" muted>
-                    {l.variantSnap ? `${l.variantSnap} · ` : ''}
-                    {l.quantity} × {l.purchaseMode}
+                    {l.variantSnap && !discreet ? `${l.variantSnap} · ` : ''}
+                    {discreet ? '•••' : `${l.quantity} × ${l.purchaseMode}`}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text variant="bodyStrong">{formatInr(l.totalPriceInr)}</Text>
+                  <Text variant="bodyStrong">
+                    {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
+                  </Text>
                   <Text variant="small" muted>
                     {formatTime(l.tsUtc)}
                   </Text>

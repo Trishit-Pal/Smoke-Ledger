@@ -24,6 +24,7 @@ import {
 } from '@/domain/calc';
 import { daysAgoIst, todayIst } from '@/lib/date';
 import { formatInr } from '@/lib/format';
+import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
 const WINDOWS = [
   { days: 1, label: '1d' },
@@ -36,6 +37,10 @@ const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function Trends() {
   const logs = useSession((s) => s.logs);
+  const profile = useSession((s) => s.profile);
+  const discreet = isDiscreetMode(profile);
+  const fmtSpend = (n: number, compact = false) =>
+    maskInr(n, discreet, (v) => formatInr(v, compact ? { compact: true } : undefined));
   const [windowDays, setWindowDays] = useState<number>(30);
   const today = todayIst();
   const start = daysAgoIst(windowDays - 1);
@@ -102,7 +107,7 @@ export default function Trends() {
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="small" muted>Total spend</Text>
-                  <Text variant="bodyStrong">{formatInr(totalSpend)}</Text>
+                  <Text variant="bodyStrong">{fmtSpend(totalSpend)}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="small" muted>Avg sticks/day</Text>
@@ -110,7 +115,7 @@ export default function Trends() {
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="small" muted>Avg spend/day</Text>
-                  <Text variant="bodyStrong">{formatInr(avgSpend)}</Text>
+                  <Text variant="bodyStrong">{fmtSpend(avgSpend)}</Text>
                 </View>
               </View>
             </Card>
@@ -138,14 +143,14 @@ export default function Trends() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="bodyStrong">Daily spend</Text>
                   <Text variant="caption" muted>
-                    AVG {formatInr(avgSpend)} / DAY
+                    AVG {fmtSpend(avgSpend)} / DAY
                   </Text>
                 </View>
                 <Reveal dependencyKey={dep}>
                   <BarChart
                     data={spendSeries}
                     height={160}
-                    formatY={(v) => formatInr(v, { compact: true })}
+                    formatY={(v) => fmtSpend(v, true)}
                     showLabels={false}
                   />
                 </Reveal>
@@ -217,7 +222,7 @@ export default function Trends() {
                   <Reveal dependencyKey={dep}>
                     <Donut
                       slices={brandMix.slice(0, 5).map((b) => ({ label: b.brand, value: b.spendInr }))}
-                      centerValue={formatInr(brandMix.reduce((a, b) => a + b.spendInr, 0), { compact: true })}
+                      centerValue={fmtSpend(brandMix.reduce((a, b) => a + b.spendInr, 0), true)}
                       centerLabel="TOTAL"
                     />
                   </Reveal>
@@ -229,7 +234,7 @@ export default function Trends() {
                       >
                         <Text variant="small">{`${idx + 1}. ${b.brand}`}</Text>
                         <Text variant="small" muted>
-                          {formatInr(b.spendInr)} · {Math.round(b.share * 100)}%
+                          {fmtSpend(b.spendInr)} · {discreet ? '••' : `${Math.round(b.share * 100)}%`}
                         </Text>
                       </View>
                     ))}

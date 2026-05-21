@@ -10,7 +10,7 @@ import { Card } from '@web/components/ui/Card';
 import { Input } from '@web/components/ui/Input';
 import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
-import { LEGAL_LINKS } from '@web/lib/legal';
+import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 
@@ -38,11 +38,85 @@ const schema = z
   });
 type FormValues = z.infer<typeof schema>;
 
+function emailRedirectTo(): string | undefined {
+  return typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+}
+
+function SignupEmailSuccess({ email }: { email: string }) {
+  const [resendLoading, setResendLoading] = React.useState(false);
+  const [resendInfo, setResendInfo] = React.useState<string | null>(null);
+  const [resendError, setResendError] = React.useState<string | null>(null);
+
+  const onResend = async () => {
+    setResendLoading(true);
+    setResendInfo(null);
+    setResendError(null);
+    try {
+      const { error } = await getSupabase().auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: emailRedirectTo() },
+      });
+      if (error) {
+        setResendError(toSafeErrorMessage(error, 'dependency_failure'));
+        return;
+      }
+      setResendInfo('If your account is pending confirmation, we sent another email.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-md text-center">
+        <Text variant="h2">Check your email</Text>
+        <Text variant="small" muted>
+          We sent a confirmation link to <span className="text-text">{email}</span>. Open it to
+          continue — the next step captures your privacy and consent preferences.
+        </Text>
+        <Text variant="caption" muted className="text-left">
+          Did not arrive? Check spam or Promotions, wait a few minutes, then tap resend below. If
+          you still do not receive mail, contact support — your project may need custom email
+          settings on the server.
+        </Text>
+        <Button
+          title={resendLoading ? 'Sending…' : 'Resend confirmation email'}
+          variant="secondary"
+          fullWidth
+          loading={resendLoading}
+          onPress={onResend}
+          disabled={resendLoading}
+        />
+        {resendInfo ? (
+          <Text variant="small" muted role="status">
+            {resendInfo}
+          </Text>
+        ) : null}
+        {resendError ? (
+          <Text variant="small" color="var(--danger, #C85A54)" role="alert">
+            {resendError}
+          </Text>
+        ) : null}
+        <Link
+          href={`mailto:${LEGAL_COPY.supportEmail}`}
+          className="text-accent text-small font-medium hover:opacity-80"
+        >
+          Contact support
+        </Link>
+        <Link href="/login" className="text-accent text-small font-medium hover:opacity-80">
+          Back to sign in
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 export default function SignupPage() {
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [otpSignupError, setOtpSignupError] = React.useState<string | null>(null);
   const [otpSignupLoading, setOtpSignupLoading] = React.useState(false);
-  const [success, setSuccess] = React.useState(false);
+  const [successEmail, setSuccessEmail] = React.useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
   const captchaRequired = isCaptchaConfigured();
   const captchaReady = !captchaRequired || !!captchaToken;
@@ -62,13 +136,12 @@ export default function SignupPage() {
       setSubmitError('Please complete the security check.');
       return;
     }
-    const emailRedirectTo =
-      typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+    const trimmedEmail = values.email.trim();
     const { error } = await getSupabase().auth.signUp({
-      email: values.email.trim(),
+      email: trimmedEmail,
       password: values.password,
       options: {
-        emailRedirectTo,
+        emailRedirectTo: emailRedirectTo(),
         ...(captchaToken ? { captchaToken } : {}),
       },
     });
@@ -77,7 +150,7 @@ export default function SignupPage() {
       setCaptchaToken(null);
       return;
     }
-    setSuccess(true);
+    setSuccessEmail(trimmedEmail);
   };
 
   const onSignupWithOtp = async () => {
@@ -93,13 +166,11 @@ export default function SignupPage() {
     }
     setOtpSignupLoading(true);
     try {
-      const emailRedirectTo =
-        typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
       const { error } = await getSupabase().auth.signInWithOtp({
         email: parsed.data,
         options: {
           shouldCreateUser: true,
-          emailRedirectTo,
+          emailRedirectTo: emailRedirectTo(),
           ...(captchaToken ? { captchaToken } : {}),
         },
       });
@@ -108,27 +179,14 @@ export default function SignupPage() {
         setCaptchaToken(null);
         return;
       }
-      setSuccess(true);
+      setSuccessEmail(parsed.data);
     } finally {
       setOtpSignupLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <Card>
-        <div className="flex flex-col gap-md text-center">
-          <Text variant="h2">Check your email</Text>
-          <Text variant="small" muted>
-            We sent a confirmation link to your inbox. Confirm your email to continue. The next step
-            captures your privacy and consent preferences.
-          </Text>
-          <Link href="/login" className="text-accent text-small font-medium hover:opacity-80 mt-md">
-            Back to sign in
-          </Link>
-        </div>
-      </Card>
-    );
+  if (successEmail) {
+    return <SignupEmailSuccess email={successEmail} />;
   }
 
   return (
@@ -215,7 +273,7 @@ export default function SignupPage() {
         />
         <Button
           type="button"
-          title={otpSignupLoading ? 'Sending OTP…' : 'Sign up with email OTP'}
+          title={otpSignupLoading ? 'Sending link…' : 'Sign up with email link'}
           variant="secondary"
           fullWidth
           loading={otpSignupLoading}

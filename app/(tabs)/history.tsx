@@ -11,6 +11,7 @@ import { Reveal } from '@/components/anim/Reveal';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/store/session';
+import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 import { formatInr } from '@/lib/format';
 import { formatIndianDate, formatTime } from '@/lib/date';
 import { triggerLabel } from '@/constants/triggers';
@@ -31,7 +32,9 @@ function CravingDots({ craving }: { craving: number | null }) {
 export default function History() {
   const theme = useTheme();
   const logs = useSession((s) => s.logs);
+  const profile = useSession((s) => s.profile);
   const removeLog = useSession((s) => s.removeLog);
+  const discreet = isDiscreetMode(profile);
   const [filter, setFilter] = useState<'all' | 'priced' | 'tagged'>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -103,7 +106,8 @@ export default function History() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text variant="h3">{formatIndianDate(date)}</Text>
                   <Text variant="small" muted>
-                    {daySticks} sticks · {formatInr(daySpend)}
+                    {discreet ? '••• sticks' : `${daySticks} sticks`} ·{' '}
+                    {maskInr(daySpend, discreet, (n) => formatInr(n))}
                   </Text>
                 </View>
                 <Card padded={false}>
@@ -121,14 +125,15 @@ export default function History() {
                         >
                           <View style={{ padding: spacing.md, gap: 4 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                              <Text variant="bodyStrong">{l.brandNameSnap ?? 'Unlogged brand'}</Text>
+                              <Text variant="bodyStrong">{maskBrandName(l.brandNameSnap ?? 'Unlogged brand', discreet)}</Text>
                               <Text variant="small" muted>
                                 {formatTime(l.tsUtc)}
                               </Text>
                             </View>
                             <Text variant="small" muted>
                               {l.variantSnap ? `${l.variantSnap} · ` : ''}
-                              {l.quantity} × {l.purchaseMode} · {formatInr(l.totalPriceInr)}
+                              {discreet ? '•••' : `${l.quantity} × ${l.purchaseMode}`} ·{' '}
+                              {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
                             </Text>
                             {l.triggerTag || l.contextTag ? (
                               <Text variant="caption" color={theme.accent}>

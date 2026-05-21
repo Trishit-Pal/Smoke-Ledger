@@ -53,7 +53,7 @@ export default function OnboardingGoalPage() {
     <div className="flex flex-col gap-lg">
       <header className="flex flex-col gap-sm">
         <Text variant="caption" muted>
-          STEP 3 OF 4
+          STEP 2 OF 3
         </Text>
         <Text variant="display">Pick one small goal</Text>
         <Text variant="small" muted>

@@ -10,7 +10,7 @@ extra_search_path = ["public", "extensions"]
 max_rows = 500
 
 [db]
-major_version = 15
+major_version = 17
 
 [auth]
 enabled = true

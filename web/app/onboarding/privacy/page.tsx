@@ -51,8 +51,8 @@ export default function OnboardingPrivacyPage() {
         termsVersion: LEGAL_VERSIONS.terms,
         privacyVersion: LEGAL_VERSIONS.privacy,
       });
-      await setOnboardingStep('setup');
-      router.push('/onboarding/setup');
+      await setOnboardingStep('usage');
+      router.push('/onboarding/usage');
     } catch (e) {
       setError(toSafeErrorMessage(e, 'dependency_failure'));
     } finally {

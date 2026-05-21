@@ -25,9 +25,10 @@ npm run dev
 - Configure Supabase Auth redirect URLs to include:
   - `https://<your-domain>/auth/callback`
   - `https://<your-domain>/login`
-- If using OTP:
-  - enable Email OTP / magic link in Supabase Auth
-  - enable Phone provider (Twilio/MessageBird/Vonage/etc.) for SMS OTP
+- Configure auth email delivery (custom SMTP recommended): see [../docs/deployment/auth-email-delivery.md](../docs/deployment/auth-email-delivery.md)
+- If using email sign-in links:
+  - enable Email provider in Supabase Auth
+  - Login → **Email link** tab sends a magic link, not a numeric code
 - Ensure legal routes are live:
   - `/privacy`
   - `/terms`

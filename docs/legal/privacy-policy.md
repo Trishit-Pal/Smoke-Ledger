@@ -19,8 +19,10 @@ Effective date: 2026-05-19
 - Respond to support, export, correction, and deletion requests.
 
 ## Retention
-- Product data is retained until the user erases it or deletes the account.
-- Security/audit data is retained for abuse prevention and incident response windows.
+- Product data (logs, brands, goals, settings) is retained until you **erase data** or **delete your account**.
+- **Erase data** (Settings): wipes product tables and resets your profile for re-onboarding. Your login is kept. Audit rows are anonymized (`user_id` removed, hashed identifier in props) for abuse-prevention counts.
+- **Delete account** (Settings): removes your Supabase Auth identity and cascades product data. A compliance delete event may be retained in anonymized form for incident response.
+- Security/audit data is retained for abuse prevention and incident response windows per operational policy.
 
 ## Sharing
 - Data is processed by hosting providers required to run the service.

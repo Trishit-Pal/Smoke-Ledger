@@ -1,7 +1,9 @@
 import * as React from 'react';
 import Link from 'next/link';
+import { PublicPageShell } from '@web/components/layout/PublicPageShell';
 import { Card } from '@web/components/ui/Card';
 import { Text } from '@web/components/ui/Text';
+import { LEGAL_LINKS } from '@web/lib/legal';
 
 export interface LegalSection {
   title: string;
@@ -17,8 +19,8 @@ interface LegalDocumentProps {
 
 export function LegalDocument({ title, subtitle, effectiveDate, sections }: LegalDocumentProps) {
   return (
-    <div className="min-h-screen bg-bg text-text">
-      <main className="max-w-3xl mx-auto p-lg md:p-xl flex flex-col gap-lg">
+    <PublicPageShell>
+      <main className="max-w-3xl mx-auto p-lg md:p-xl pb-16 flex flex-col gap-lg">
         <header className="flex flex-col gap-sm">
           <Text variant="caption" muted>
             LEGAL
@@ -50,13 +52,13 @@ export function LegalDocument({ title, subtitle, effectiveDate, sections }: Lega
             <Text variant="small" muted>
               Need help with account data requests?
             </Text>
-            <Link href="/support" className="text-small font-semibold text-accent hover:opacity-80">
+            <Link href={LEGAL_LINKS.support} className="text-small font-semibold text-accent hover:opacity-80">
               Contact support
             </Link>
           </div>
         </Card>
       </main>
-    </div>
+    </PublicPageShell>
   );
 }
 

@@ -8,6 +8,16 @@ import Constants from 'expo-constants';
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl as string | undefined;
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined;
 
+if (
+  Platform.OS === 'web' &&
+  process.env.NODE_ENV === 'production' &&
+  typeof window !== 'undefined'
+) {
+  throw new Error(
+    'Expo web production auth is disabled. Use the Next.js web app at your hosted URL for sign-in and sync.',
+  );
+}
+
 const storeKey = 'sl.supabase.auth';
 
 const storageAdapter = Platform.OS === 'web'
@@ -21,6 +31,12 @@ const storageAdapter = Platform.OS === 'web'
       setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
       removeItem: (key: string) => SecureStore.deleteItemAsync(key),
     };
+
+if (Platform.OS === 'web' && process.env.NODE_ENV !== 'production') {
+  console.warn(
+    '[Smoke Ledger] Expo web stores auth tokens in AsyncStorage. Use the Next.js app for production web.',
+  );
+}
 
 let client: SupabaseClient | null = null;
 

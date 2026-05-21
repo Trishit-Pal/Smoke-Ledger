@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@web/components/ui/Card';
 import { Chip } from '@web/components/ui/Chip';
+import { Input } from '@web/components/ui/Input';
 import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
 import { listBrands, toggleFavorite } from '@/db/repositories/brands';
@@ -11,8 +12,31 @@ import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
 import { useSession } from '@/store/session';
-import type { Brand } from '@/types';
+import type { Brand, BrandCategory } from '@/types';
 import { toSafeErrorMessage } from '@/lib/errors';
+
+const CATEGORIES: { id: BrandCategory | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'budget', label: 'Budget' },
+  { id: 'regular', label: 'Regular' },
+  { id: 'premium', label: 'Premium' },
+  { id: 'imported', label: 'Imported' },
+];
+
+const TOP_BRAND_NAMES = new Set([
+  'Gold Flake',
+  'Classic',
+  'Marlboro',
+  'Wills',
+  'Navy Cut',
+  'Capstan',
+  'Four Square',
+  'Red & White',
+  'Camel',
+  'Parliament',
+  'Kent',
+  'Winston',
+]);
 
 export default function OnboardingBrandsPage() {
   const router = useRouter();
@@ -23,6 +47,8 @@ export default function OnboardingBrandsPage() {
   const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState('');
+  const [category, setCategory] = React.useState<BrandCategory | 'all'>('all');
 
   React.useEffect(() => {
     void (async () => {
@@ -37,6 +63,22 @@ export default function OnboardingBrandsPage() {
       }
     })();
   }, []);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return brands.filter((brand) => {
+      if (category !== 'all' && brand.category !== category) return false;
+      if (!q) return true;
+      return brand.name.toLowerCase().includes(q);
+    });
+  }, [brands, query, category]);
+
+  const topPicks = React.useMemo(
+    () => filtered.filter((b) => TOP_BRAND_NAMES.has(b.name)).slice(0, 16),
+    [filtered],
+  );
+
+  const displayList = query.trim() ? filtered : topPicks.length > 0 ? topPicks : filtered.slice(0, 16);
 
   const onFinish = async () => {
     setSubmitting(true);
@@ -62,26 +104,45 @@ export default function OnboardingBrandsPage() {
     <div className="flex flex-col gap-lg">
       <header className="flex flex-col gap-sm">
         <Text variant="caption" muted>
-          STEP 4 OF 4
+          STEP 3 OF 3
         </Text>
         <Text variant="display">Favorite brands</Text>
         <Text variant="small" muted>
-          Pick the brands you use most so quick-log stays fast.
+          Pick a few for one-tap logging. Search or filter if you don&apos;t see yours.
         </Text>
       </header>
+
+      <Input
+        label="Search brands"
+        type="search"
+        placeholder="e.g. Gold Flake, Marlboro"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      <div className="flex flex-wrap gap-sm">
+        {CATEGORIES.map((item) => (
+          <Chip
+            key={item.id}
+            label={item.label}
+            selected={category === item.id}
+            onPress={() => setCategory(item.id)}
+          />
+        ))}
+      </div>
 
       <Card>
         {loading ? (
           <Text variant="small" muted>
             Loading brands…
           </Text>
-        ) : brands.length === 0 ? (
+        ) : displayList.length === 0 ? (
           <Text variant="small" muted>
-            No brands found. You can continue and add custom brands later.
+            No brands match. You can add custom brands in Settings after onboarding.
           </Text>
         ) : (
           <div className="flex flex-wrap gap-sm">
-            {brands.map((brand) => (
+            {displayList.map((brand) => (
               <Chip
                 key={brand.id}
                 label={brand.name}

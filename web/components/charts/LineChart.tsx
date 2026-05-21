@@ -1,6 +1,4 @@
-'use client';
-
-import * as React from 'react';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 import {
   CartesianGrid,
   Line,
@@ -28,6 +26,7 @@ export function LineChart({
   strokeColor,
 }: LineChartProps) {
   const stroke = strokeColor ?? 'var(--accent)';
+  const reduced = useReduceMotion();
 
   return (
     <div style={{ width: '100%', height }}>
@@ -70,7 +69,7 @@ export function LineChart({
             strokeWidth={2}
             dot={{ r: 2.5, fill: stroke, stroke }}
             activeDot={{ r: 4 }}
-            isAnimationActive
+            isAnimationActive={!reduced}
           />
         </RLineChart>
       </ResponsiveContainer>

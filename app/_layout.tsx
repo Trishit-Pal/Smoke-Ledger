@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -14,6 +15,8 @@ import { spacing } from '@/constants/theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -49,10 +52,12 @@ export default function RootLayout() {
           resetSession();
         }
         if (!cancelled) setReady(true);
+        SplashScreen.hideAsync().catch(() => {});
       } catch (e) {
         if (!cancelled) {
           setError(toSafeErrorMessage(e, 'dependency_failure'));
           setAuthInitialized(true);
+          SplashScreen.hideAsync().catch(() => {});
         }
       }
     };
@@ -70,6 +75,7 @@ export default function RootLayout() {
         try {
           await boot();
           setReady(true);
+          SplashScreen.hideAsync().catch(() => {});
         } catch (e) {
           setError(toSafeErrorMessage(e, 'dependency_failure'));
         }

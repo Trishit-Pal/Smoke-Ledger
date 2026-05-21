@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 export interface DonutSlice {
   label: string;
@@ -19,6 +20,7 @@ export interface DonutProps {
 const PALETTE = ['#2FA39B', '#4C7CD9', '#D99A2B', '#C85A54', '#8A6FC2', '#4CAF84'];
 
 export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutProps) {
+  const reduced = useReduceMotion();
   const safeSlices = slices.filter((s) => s.value > 0);
   const inner = Math.round(size * 0.6);
   const outer = Math.round(size * 0.85);
@@ -34,7 +36,7 @@ export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutPro
             innerRadius={inner / 2}
             outerRadius={outer / 2}
             stroke="none"
-            isAnimationActive
+            isAnimationActive={!reduced}
           >
             {safeSlices.map((slice, idx) => (
               <Cell

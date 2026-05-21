@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 import {
   Bar,
   BarChart as RBarChart,
@@ -32,6 +33,7 @@ export function BarChart({
   emphasizeLast = true,
 }: BarChartProps) {
   const lastIndex = data.length - 1;
+  const reduced = useReduceMotion();
 
   return (
     <div style={{ width: '100%', height }}>
@@ -71,7 +73,7 @@ export function BarChart({
             labelStyle={{ color: 'var(--text-muted)' }}
             formatter={(v: number) => (formatY ? formatY(v) : v)}
           />
-          <Bar dataKey="value" fill={ACCENT} radius={[4, 4, 0, 0]}>
+          <Bar dataKey="value" fill={ACCENT} radius={[4, 4, 0, 0]} isAnimationActive={!reduced}>
             {data.map((_, i) => (
               <Cell
                 key={i}

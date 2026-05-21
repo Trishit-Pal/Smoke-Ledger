@@ -61,6 +61,10 @@ export async function syncDefaultBrandCatalog(): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.rpc('sync_default_brand_catalog');
   if (error) throw mapDbError(error);
+  const { error: refreshErr } = await supabase.rpc('refresh_seed_prices_from_catalog');
+  if (refreshErr && !refreshErr.message.includes('does not exist')) {
+    throw mapDbError(refreshErr);
+  }
 }
 
 export async function listBrands(): Promise<Brand[]> {
