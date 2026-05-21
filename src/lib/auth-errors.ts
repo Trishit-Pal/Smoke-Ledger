@@ -1,18 +1,5 @@
 import { toSafeErrorMessage } from '@/lib/errors';
 
-export type LoginHintStatus = 'not_found' | 'unconfirmed' | 'exists';
-
-export function loginHintMessage(status: LoginHintStatus): string {
-  switch (status) {
-    case 'not_found':
-      return 'No account with this email. Create one or check the address.';
-    case 'exists':
-      return 'Incorrect password. Try again or reset it.';
-    case 'unconfirmed':
-      return 'This email is registered but not confirmed. Check your inbox.';
-  }
-}
-
 export function getAuthErrorCode(error: unknown): string {
   return readAuthErrorCode(error);
 }
@@ -51,6 +38,3 @@ export function toAuthErrorMessage(error: unknown): string {
   return toSafeErrorMessage(error, 'authentication_error');
 }
 
-export function isLoginHintStatus(value: unknown): value is LoginHintStatus {
-  return value === 'not_found' || value === 'unconfirmed' || value === 'exists';
-}

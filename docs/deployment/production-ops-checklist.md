@@ -56,10 +56,8 @@ Deploy **edge functions before** client builds that stop calling `record_audit_e
 
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` (server-only, **not** `NEXT_PUBLIC_*`) — powers `/api/auth/login-hint` for explicit login errors; omit to fall back to generic invalid-credentials copy
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` (server-only, **not** `NEXT_PUBLIC_*`) — required by `/api/auth/login` and the account-deletion edge function
 - [ ] `NEXT_PUBLIC_SUPPORT_EMAIL` (legal pages)
-
-**Login hint tradeoff:** explicit “no account” vs “wrong password” messages enable account enumeration. The login-hint route rate-limits by IP (~10/min). Disable or omit the service role key if you prefer generic copy only.
 
 **Session cookies:** Password login uses `POST /api/auth/login` so httpOnly auth cookies respect remember-me. Default is session-only (logout when browser closes). Users who check “Keep me signed in” get persistent auth cookies via `sl_remember_me=1`.
 

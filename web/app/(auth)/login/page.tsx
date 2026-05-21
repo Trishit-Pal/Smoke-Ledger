@@ -13,8 +13,6 @@ import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
 import { LEGAL_LINKS } from '@web/lib/legal';
 import {
-  isLoginHintStatus,
-  loginHintMessage,
   toAuthErrorMessage,
 } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
@@ -110,23 +108,7 @@ function LoginPageInner() {
         if (code === 'email_not_confirmed') {
           setSubmitError(body.message ?? toAuthErrorMessage({ code: 'email_not_confirmed' }));
         } else if (code === 'invalid_credentials') {
-          let message = body.message ?? toAuthErrorMessage({ code: 'invalid_credentials' });
-          try {
-            const hintRes = await fetch('/api/auth/login-hint', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: values.email.trim() }),
-            });
-            if (hintRes.ok) {
-              const hintBody = (await hintRes.json()) as { status?: unknown };
-              if (isLoginHintStatus(hintBody.status)) {
-                message = loginHintMessage(hintBody.status);
-              }
-            }
-          } catch {
-            // Fall back to generic invalid-credentials copy.
-          }
-          setSubmitError(message);
+          setSubmitError(body.message ?? toAuthErrorMessage({ code: 'invalid_credentials' }));
         } else {
           setSubmitError(body.message ?? toAuthErrorMessage({ code }));
         }

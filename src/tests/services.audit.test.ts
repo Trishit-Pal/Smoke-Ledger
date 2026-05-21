@@ -1,7 +1,5 @@
 import { isAuditSuccessStatus, redactAuditProps } from '@/services/audit';
 import {
-  isLoginHintStatus,
-  loginHintMessage,
   toAuthErrorMessage,
 } from '@/lib/auth-errors';
 
@@ -63,18 +61,5 @@ describe('toAuthErrorMessage', () => {
     expect(toAuthErrorMessage({ code: 'too_many_requests', message: 'Rate limit exceeded' })).toContain(
       'Too many attempts',
     );
-  });
-});
-
-describe('loginHintMessage', () => {
-  it('returns explicit copy for each hint status', () => {
-    expect(loginHintMessage('not_found')).toContain('No account');
-    expect(loginHintMessage('exists')).toContain('Incorrect password');
-    expect(loginHintMessage('unconfirmed')).toContain('not confirmed');
-  });
-
-  it('validates hint status values', () => {
-    expect(isLoginHintStatus('exists')).toBe(true);
-    expect(isLoginHintStatus('unknown')).toBe(false);
   });
 });
