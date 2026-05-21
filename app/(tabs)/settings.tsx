@@ -153,7 +153,7 @@ export default function Settings() {
       const brand = await createBrand(brandName, newCategory);
       await upsertVariant(brand.id, variantName, packSize, avgPrice);
       await refreshBrands();
-      await track(AnalyticsEvents.BRAND_CREATED, { brand_name: brandName });
+      await track(AnalyticsEvents.BRAND_CREATED, { category: newCategory, is_seed: false });
       setNewBrandName('');
       setNewVariantName('Regular');
       setNewPackSize('20');
