@@ -70,7 +70,25 @@
       "**/src/tests/**/*.test.ts"
     ],
     "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^@web/(.*)$": "<rootDir>/web/$1",
+      "^next/server$": "<rootDir>/src/tests/__mocks__/next-server.ts",
+      "^next/navigation$": "<rootDir>/src/tests/__mocks__/next-navigation.ts"
+    },
+    "moduleDirectories": ["node_modules", "web/node_modules"],
+    "globals": {
+      "ts-jest": {
+        "tsconfig": {
+          "strict": true,
+          "baseUrl": ".",
+          "paths": {
+            "@/*": ["./src/*"],
+            "@app/*": ["./app/*"],
+            "@web/*": ["./web/*"]
+          },
+          "skipLibCheck": true
+        }
+      }
     }
   },
   "private": true

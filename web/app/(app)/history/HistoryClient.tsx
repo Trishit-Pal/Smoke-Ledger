@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatInr } from '@/lib/format';
 import { formatIndianDate, formatTime } from '@/lib/date';
 import type { CigaretteLog, UserProfile } from '@/types';
+import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 import { Card } from '@web/components/ui/Card';
 import { Text } from '@web/components/ui/Text';
@@ -39,9 +40,16 @@ function groupLogs(logs: CigaretteLog[]): Group[] {
 export interface HistoryClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+  /**
+   * Pagination cursor from the server. Non-null means there are older logs beyond
+   * the initial 200-row / 60-day SSR window. A future "load more" feature should
+   * use this cursor to fetch the next page via a server action or API route.
+   * Currently accepted but not yet wired to a load-more UI (C1 scope boundary).
+   */
+  nextCursor?: LogCursor | null;
 }
 
-export function HistoryClient({ profile, logs }: HistoryClientProps) {
+export function HistoryClient({ profile, logs, nextCursor: _nextCursor }: HistoryClientProps) {
   const router = useRouter();
   const discreet = isDiscreetMode(profile);
 

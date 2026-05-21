@@ -42,7 +42,7 @@ Create `web/.env.local` and set:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_SUPPORT_EMAIL` (recommended for legal/support pages)
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only, **not** `NEXT_PUBLIC_*`) — optional; powers `/api/auth/login-hint` for explicit “no account” vs “wrong password” messages. Omit to fall back to generic invalid-credentials copy.
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only, **not** `NEXT_PUBLIC_*`) — required by `/api/auth/login` and the account-deletion edge function.
 
 Optional: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` for Cloudflare Turnstile on login/signup (see [production ops checklist](docs/deployment/production-ops-checklist.md)).
 
