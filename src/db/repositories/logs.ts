@@ -13,6 +13,7 @@ import {
 import { getSupabase } from '@/lib/supabase';
 import { requireUserId, mapDbError } from '@/db/repositories/_supabase';
 import { AppError } from '@/lib/errors';
+import { logClientError } from '@/lib/logger';
 
 type Row = {
   id: string;
@@ -81,6 +82,69 @@ export type LogDraft = Omit<
 };
 
 export const MAX_LIST_LOGS = 5_000;
+/** Default page size for the legacy `listLogs` helper — triggers a warning when hit. */
+export const PAGE_SIZE_DEFAULT = 200;
+
+export interface LogCursor {
+  ts: string;
+  id: string;
+}
+
+export interface ListLogsPageOpts {
+  fromDate?: string;
+  toDate?: string;
+  brandId?: string;
+  triggerTag?: string;
+  cursor?: LogCursor | null;
+  limit?: number;
+}
+
+export interface LogPage {
+  logs: CigaretteLog[];
+  nextCursor: LogCursor | null;
+}
+
+/**
+ * Keyset-paginated log listing. Callers that need the full history window
+ * should loop over pages via `nextCursor`.
+ */
+export async function listLogsPage(opts?: ListLogsPageOpts): Promise<LogPage> {
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  if (opts?.fromDate) parseOrThrow(YmdSchema, opts.fromDate, 'from_date');
+  if (opts?.toDate) parseOrThrow(YmdSchema, opts.toDate, 'to_date');
+  if (opts?.brandId) parseOrThrow(IdSchema, opts.brandId, 'brand_id');
+  const limit = Math.max(1, Math.min(opts?.limit ?? PAGE_SIZE_DEFAULT, MAX_LIST_LOGS));
+
+  const { data, error } = await supabase.rpc('list_logs_page', {
+    p_user_id: userId,
+    p_from_date: opts?.fromDate ?? null,
+    p_to_date: opts?.toDate ?? null,
+    p_brand_id: opts?.brandId ?? null,
+    p_trigger_tag: opts?.triggerTag ?? null,
+    p_cursor_ts: opts?.cursor?.ts ?? null,
+    p_cursor_id: opts?.cursor?.id ?? null,
+    p_limit: limit,
+  });
+  if (error) throw mapDbError(error);
+
+  const payload = data as {
+    logs: Row[];
+    nextCursorTs: string | null;
+    nextCursorId: string | null;
+    hasMore: boolean;
+  };
+
+  const logs = (Array.isArray(payload.logs) ? payload.logs : []).map((r) =>
+    rowToLog(r as unknown as Row),
+  );
+  const nextCursor =
+    payload.hasMore && payload.nextCursorTs && payload.nextCursorId
+      ? { ts: payload.nextCursorTs, id: payload.nextCursorId }
+      : null;
+
+  return { logs, nextCursor };
+}
 
 export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
   const supabase = getSupabase();
@@ -184,6 +248,12 @@ export async function getLog(id: string): Promise<CigaretteLog | null> {
   return data ? rowToLog(data as Row) : null;
 }
 
+/**
+ * Legacy list helper — returns a flat array for callers that don't need
+ * pagination. Defaults to `PAGE_SIZE_DEFAULT` rows and emits a warning via
+ * `logClientError` when the result is capped, signalling that the caller
+ * should migrate to `listLogsPage`.
+ */
 export async function listLogs(opts?: {
   fromDate?: string;
   toDate?: string;
@@ -191,21 +261,23 @@ export async function listLogs(opts?: {
   brandId?: string;
   triggerTag?: string;
 }): Promise<CigaretteLog[]> {
-  const supabase = getSupabase();
-  const userId = await requireUserId();
-  if (opts?.fromDate) parseOrThrow(YmdSchema, opts.fromDate, 'from_date');
-  if (opts?.toDate) parseOrThrow(YmdSchema, opts.toDate, 'to_date');
-  if (opts?.brandId) parseOrThrow(IdSchema, opts.brandId, 'brand_id');
-  const limit = Math.max(1, Math.min(opts?.limit ?? MAX_LIST_LOGS, MAX_LIST_LOGS));
-  let q = supabase.from('cigarette_logs').select('*').eq('user_id', userId);
-  if (opts?.fromDate) q = q.gte('local_date', opts.fromDate);
-  if (opts?.toDate) q = q.lte('local_date', opts.toDate);
-  if (opts?.brandId) q = q.eq('brand_id', opts.brandId);
-  if (opts?.triggerTag) q = q.eq('trigger_tag', opts.triggerTag);
-  q = q.order('ts_utc', { ascending: false }).limit(limit);
-  const { data, error } = await q;
-  if (error) throw mapDbError(error);
-  return (data as Row[]).map(rowToLog);
+  const limit = Math.max(1, Math.min(opts?.limit ?? PAGE_SIZE_DEFAULT, MAX_LIST_LOGS));
+  const { logs, nextCursor } = await listLogsPage({
+    fromDate: opts?.fromDate,
+    toDate: opts?.toDate,
+    brandId: opts?.brandId,
+    triggerTag: opts?.triggerTag,
+    limit,
+  });
+
+  if (nextCursor !== null) {
+    void logClientError(
+      `listLogs hit the page cap (${limit} rows). Switch to listLogsPage for full history.`,
+      { category: 'listLogs.pagination_hint' },
+    );
+  }
+
+  return logs;
 }
 
 export async function getLastLog(): Promise<CigaretteLog | null> {
