@@ -2,6 +2,10 @@
 
 Run after linking Supabase (`supabase link`) and before treating production as ready.
 
+## 0. Dev environment note (C4 audit)
+
+- If your local Supabase DB was initialized before the C4 audit fix, `user_profiles.baseline_per_day` may still be `double precision`. Run `ALTER TABLE public.user_profiles ALTER COLUMN baseline_per_day TYPE numeric(5,2);` or reset the local DB with `supabase db reset`.
+
 ## 1. Database migrations
 
 ```bash

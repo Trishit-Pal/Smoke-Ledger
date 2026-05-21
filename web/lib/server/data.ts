@@ -12,7 +12,8 @@ import type {
 
 type ProfileRow = {
   id: string;
-  baseline_per_day: number | null;
+  // supabase-js returns Postgres `numeric` columns as strings; we coerce in mapProfile.
+  baseline_per_day: string | number | null;
   baseline_window_days: number;
   currency: string;
   discreet_mode: boolean;
@@ -62,7 +63,8 @@ type VarRow = {
 
 function mapProfile(row: ProfileRow): UserProfile {
   return {
-    baselinePerDay: row.baseline_per_day,
+    // numeric(5,2) is returned as a string by the pg driver; coerce to JS number.
+    baselinePerDay: row.baseline_per_day != null ? Number(row.baseline_per_day) : null,
     baselineWindowDays: row.baseline_window_days,
     currency: row.currency as UserProfile['currency'],
     discreetMode: row.discreet_mode,

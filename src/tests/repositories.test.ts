@@ -13,6 +13,7 @@ jest.mock('@/lib/logger', () => ({
 
 import { mapDbError } from '@/db/repositories/_supabase';
 import { listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
+import { getProfile } from '@/db/repositories/profile';
 import { AppError } from '@/lib/errors';
 import { getSupabase } from '@/lib/supabase';
 import { logClientError } from '@/lib/logger';
@@ -292,5 +293,93 @@ describe('listLogs', () => {
 
     // Assert
     expect(mockLogClientError).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getProfile — C4 audit: numeric(5,2) coercion
+// ---------------------------------------------------------------------------
+//
+// Postgres `numeric` columns are returned as strings by the pg driver (and thus
+// by supabase-js). The row mapper must coerce `baseline_per_day` to a JS number
+// so that downstream savings math (`Math.max(0, baselinePerDay - s.sticks)`) and
+// Zod validation (`z.number()`) continue to work correctly.
+//
+// REGRESSION NOTE: supabase-js does NOT auto-cast `numeric` → JS number the way
+// it does for `int4` / `float8`. Always use `Number()` when mapping numeric columns.
+// ---------------------------------------------------------------------------
+
+function makeProfileRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'user-123',
+    baseline_per_day: null,
+    baseline_window_days: 30,
+    currency: 'INR',
+    discreet_mode: false,
+    app_lock_enabled: false,
+    hide_totals_on_home: false,
+    onboarded_at: null,
+    ...overrides,
+  };
+}
+
+function stubSupabaseProfile(row: Record<string, unknown> | null, error: unknown = null) {
+  const chain = {
+    from: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: row, error }),
+  };
+  mockGetSupabase.mockReturnValue(chain);
+}
+
+describe('getProfile — baseline_per_day numeric coercion (C4)', () => {
+  beforeEach(() => {
+    mockGetSupabase.mockReset();
+  });
+
+  it('coerces a string "10.50" (pg numeric) to JS number 10.5', async () => {
+    // Arrange — simulate pg driver returning numeric as string
+    stubSupabaseProfile(makeProfileRow({ baseline_per_day: '10.50' }));
+
+    // Act
+    const profile = await getProfile();
+
+    // Assert — must be JS number, not string
+    expect(typeof profile.baselinePerDay).toBe('number');
+    expect(profile.baselinePerDay).toBe(10.5);
+  });
+
+  it('preserves fractional baseline through the mapping round-trip (e.g. 7.5)', async () => {
+    // Arrange — supabase-js returns "7.50" for numeric(5,2) storing 7.5
+    stubSupabaseProfile(makeProfileRow({ baseline_per_day: '7.50' }));
+
+    // Act
+    const profile = await getProfile();
+
+    // Assert — fractional value must survive the coercion without drift
+    expect(profile.baselinePerDay).toBe(7.5);
+  });
+
+  it('maps null baseline_per_day to null (no coercion error)', async () => {
+    // Arrange
+    stubSupabaseProfile(makeProfileRow({ baseline_per_day: null }));
+
+    // Act
+    const profile = await getProfile();
+
+    // Assert
+    expect(profile.baselinePerDay).toBeNull();
+  });
+
+  it('handles a numeric value already returned as JS number (defensive — double precision fallback)', async () => {
+    // Arrange — e.g. a local dev DB still has double precision; driver returns number
+    stubSupabaseProfile(makeProfileRow({ baseline_per_day: 15 }));
+
+    // Act
+    const profile = await getProfile();
+
+    // Assert — Number(15) === 15, so this is safe either way
+    expect(profile.baselinePerDay).toBe(15);
   });
 });

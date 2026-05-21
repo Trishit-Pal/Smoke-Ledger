@@ -7,7 +7,8 @@ export type { OnboardingStep };
 
 type Row = {
   id: string;
-  baseline_per_day: number | null;
+  // supabase-js returns Postgres `numeric` columns as strings; we coerce in rowToProfile.
+  baseline_per_day: string | number | null;
   baseline_window_days: number;
   currency: string;
   discreet_mode: boolean;
@@ -25,7 +26,8 @@ type Row = {
 
 function rowToProfile(r: Row): UserProfile {
   return {
-    baselinePerDay: r.baseline_per_day,
+    // numeric(5,2) is returned as a string by the pg driver; coerce to JS number.
+    baselinePerDay: r.baseline_per_day != null ? Number(r.baseline_per_day) : null,
     baselineWindowDays: r.baseline_window_days,
     currency: r.currency as UserProfile['currency'],
     discreetMode: r.discreet_mode,

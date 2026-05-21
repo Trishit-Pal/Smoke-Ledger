@@ -36,7 +36,7 @@ REVOKE ALL ON ALL TABLES IN SCHEMA smoke_seed FROM PUBLIC;
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.user_profiles (
   id uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  baseline_per_day double precision,
+  baseline_per_day numeric(5,2), -- C4 audit: changed from double precision pre-launch; existing dev DBs need manual ALTER or reset
   baseline_window_days int NOT NULL DEFAULT 30,
   currency text NOT NULL DEFAULT 'INR',
   discreet_mode boolean NOT NULL DEFAULT false,
