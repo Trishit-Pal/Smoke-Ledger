@@ -41,6 +41,62 @@ type Row = {
   client_op_id?: string | null;
 };
 
+/**
+ * Shape returned by the `list_logs_page` RPC's `jsonb_build_object` — camelCase keys,
+ * mirroring the SQL function in 20260521000000_audit_export_ops.sql (lines 431–451).
+ * Do NOT use `Row` here: `.from('cigarette_logs').select('*')` returns snake_case columns,
+ * but the RPC serialises each row through jsonb_build_object with explicit camelCase keys.
+ */
+type RpcLogRow = {
+  id: string;
+  tsUtc: string;
+  localDate: string;
+  localHour: number;
+  brandId: string | null;
+  brandNameSnap: string | null;
+  variantSnap: string | null;
+  quantity: number;
+  purchaseMode: string;
+  packSize: number | null;
+  totalPriceInr: number | null;
+  unitPriceInr: number | null;
+  priceSource: string;
+  triggerTag: string | null;
+  moodBefore: string | null;
+  moodAfter: string | null;
+  craving: number | null;
+  contextTag: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function rpcRowToLog(r: RpcLogRow): CigaretteLog {
+  return {
+    id: r.id,
+    tsUtc: r.tsUtc,
+    localDate: r.localDate,
+    localHour: r.localHour,
+    brandId: r.brandId,
+    brandNameSnap: r.brandNameSnap,
+    variantSnap: r.variantSnap,
+    quantity: r.quantity,
+    purchaseMode: r.purchaseMode as CigaretteLog['purchaseMode'],
+    packSize: r.packSize,
+    totalPriceInr: r.totalPriceInr != null ? Number(r.totalPriceInr) : null,
+    unitPriceInr: r.unitPriceInr != null ? Number(r.unitPriceInr) : null,
+    priceSource: r.priceSource as CigaretteLog['priceSource'],
+    triggerTag: (r.triggerTag as CigaretteLog['triggerTag']) ?? null,
+    moodBefore: (r.moodBefore as CigaretteLog['moodBefore']) ?? null,
+    moodAfter: (r.moodAfter as CigaretteLog['moodAfter']) ?? null,
+    craving: r.craving,
+    contextTag: (r.contextTag as CigaretteLog['contextTag']) ?? null,
+    notes: r.notes,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
 function rowToLog(r: Row): CigaretteLog {
   return {
     id: r.id,
@@ -129,15 +185,13 @@ export async function listLogsPage(opts?: ListLogsPageOpts): Promise<LogPage> {
   if (error) throw mapDbError(error);
 
   const payload = data as {
-    logs: Row[];
+    logs: RpcLogRow[];
     nextCursorTs: string | null;
     nextCursorId: string | null;
     hasMore: boolean;
   };
 
-  const logs = (Array.isArray(payload.logs) ? payload.logs : []).map((r) =>
-    rowToLog(r as unknown as Row),
-  );
+  const logs = (Array.isArray(payload.logs) ? payload.logs : []).map(rpcRowToLog);
   const nextCursor =
     payload.hasMore && payload.nextCursorTs && payload.nextCursorId
       ? { ts: payload.nextCursorTs, id: payload.nextCursorId }
@@ -261,7 +315,7 @@ export async function listLogs(opts?: {
   brandId?: string;
   triggerTag?: string;
 }): Promise<CigaretteLog[]> {
-  const limit = Math.max(1, Math.min(opts?.limit ?? PAGE_SIZE_DEFAULT, MAX_LIST_LOGS));
+  const limit = Math.max(1, Math.min(opts?.limit ?? PAGE_SIZE_DEFAULT, PAGE_SIZE_DEFAULT));
   const { logs, nextCursor } = await listLogsPage({
     fromDate: opts?.fromDate,
     toDate: opts?.toDate,

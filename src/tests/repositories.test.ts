@@ -164,6 +164,61 @@ describe('listLogsPage', () => {
     // Act & Assert
     await expect(listLogsPage()).rejects.toBeInstanceOf(AppError);
   });
+
+  it('maps camelCase RPC payload to CigaretteLog with tsUtc populated (not undefined)', async () => {
+    // Arrange — RPC returns the camelCase shape produced by jsonb_build_object in the SQL.
+    // This test guards against regressions where the cast was Row[] (snake_case), which
+    // caused every field to resolve to undefined at runtime.
+    const rpc = makeRpcMock({
+      logs: [makeLogRow('log_cc', '2026-03-15T08:30:00Z')],
+      nextCursorTs: null,
+      nextCursorId: null,
+      hasMore: false,
+    });
+    stubSupabase(rpc);
+
+    // Act
+    const result = await listLogsPage();
+
+    // Assert — all mapped fields must be populated from the camelCase source
+    expect(result.logs).toHaveLength(1);
+    const log = result.logs[0];
+    expect(log.id).toBe('log_cc');
+    expect(log.tsUtc).toBe('2026-03-15T08:30:00Z');
+    expect(log.localDate).toBe('2026-03-15');
+    expect(log.localHour).toBe(12);
+    expect(log.quantity).toBe(1);
+    expect(log.purchaseMode).toBe('loose');
+    expect(log.priceSource).toBe('none');
+    expect(log.createdAt).toBe('2026-03-15T08:30:00Z');
+    expect(log.updatedAt).toBe('2026-03-15T08:30:00Z');
+    // None of these should be undefined (the snake_case cast bug)
+    expect(log.tsUtc).not.toBeUndefined();
+    expect(log.localDate).not.toBeUndefined();
+    expect(log.purchaseMode).not.toBeUndefined();
+    expect(log.priceSource).not.toBeUndefined();
+  });
+
+  it('returns null nextCursor and does not paginate when hasMore is true but cursor fields are null', async () => {
+    // Arrange — malformed SQL response: hasMore signals more rows exist but the cursor
+    // fields are null (indicates a SQL bug). The repository must not return a cursor
+    // that would cause the pagination loop to spin with a null cursor.
+    const rpc = makeRpcMock({
+      logs: [makeLogRow('log_m', '2026-05-01T00:00:00Z')],
+      nextCursorTs: null,
+      nextCursorId: null,
+      hasMore: true,
+    });
+    stubSupabase(rpc);
+
+    // Act
+    const result = await listLogsPage();
+
+    // Assert — nextCursor must be null despite hasMore being true, so the caller
+    // stops paginating and does not enter an infinite loop.
+    expect(result.nextCursor).toBeNull();
+    expect(result.logs).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
