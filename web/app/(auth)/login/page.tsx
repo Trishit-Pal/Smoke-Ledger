@@ -19,6 +19,7 @@ import {
 } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
+import { sanitizeNextPath } from '@web/lib/auth/redirect';
 
 const emailSchema = z.string().email('Enter a valid email');
 const phoneSchema = z
@@ -31,13 +32,6 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 type AuthMode = 'password' | 'email_otp' | 'phone_otp';
-
-function sanitizeNextPath(raw: string | null): string {
-  if (!raw) return '/dashboard';
-  if (!raw.startsWith('/')) return '/dashboard';
-  if (raw.startsWith('//')) return '/dashboard';
-  return raw;
-}
 
 export default function LoginPage() {
   // useSearchParams forces a client boundary at the leaf; wrap in Suspense to
