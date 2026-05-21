@@ -15,14 +15,22 @@ import { ALLOWED_NEXT_PATHS } from '@web/lib/auth/redirect';
 // callback routing. These extend (not replace) the client-side allowlist
 // with routes that are only reachable after a Supabase callback, never
 // from a user-supplied ?next= on a page navigation.
-const CALLBACK_ONLY_PATHS = new Set<string>(['/reset-password']);
+const CALLBACK_ONLY_PATHS: ReadonlySet<string> = new Set(['/reset-password']);
 
 // Onboarding routes are allowed as ?next= targets within the callback so
 // the server can hop to the correct onboarding step after email verification.
 // They are intentionally excluded from the client-side ALLOWED_NEXT_PATHS.
-const NEXT_ALLOWLIST_PREFIX = ['/onboarding/'];
+const ONBOARDING_PREFIX = '/onboarding/';
 
-function sanitizeNextPath(raw: string | null): string | null {
+/**
+ * Validates `raw` against all three callback-side allowlists and returns the
+ * normalised pathname if permitted, or null if not.
+ *
+ * Returning the pathname (not `raw`) allows callers to make routing decisions
+ * (e.g. `startsWith('/onboarding/')`) without re-parsing. The redirect itself
+ * uses the original `raw` so query strings are preserved.
+ */
+function extractAllowedCallbackPathname(raw: string | null): string | null {
   if (!raw) return null;
   if (!raw.startsWith('/')) return null;
   if (raw.startsWith('//')) return null;
@@ -40,8 +48,24 @@ function sanitizeNextPath(raw: string | null): string | null {
   // Then check callback-only exact paths (e.g. /reset-password).
   if (CALLBACK_ONLY_PATHS.has(pathname)) return pathname;
   // Finally allow onboarding prefix for internal server-side hops.
-  if (NEXT_ALLOWLIST_PREFIX.some((p) => pathname.startsWith(p))) return pathname;
+  if (pathname.startsWith(ONBOARDING_PREFIX)) return pathname;
   return null;
+}
+
+/**
+ * Returns the original `raw` value (preserving query string and hash) when
+ * the path is on the callback-side allowlist, or null otherwise.
+ *
+ * Using `raw` rather than the normalised pathname ensures that legitimate
+ * deep-links such as `/log?ref=widget` survive the redirect intact.
+ *
+ * @internal Exported only for unit-testing — not part of the public route API.
+ */
+export function _sanitizeCallbackNextPath(raw: string | null): string | null {
+  const pathname = extractAllowedCallbackPathname(raw);
+  if (pathname === null) return null;
+  // Safe: extractAllowedCallbackPathname only returns non-null when raw is non-null.
+  return raw!;
 }
 
 type CookieOptions = AuthCookieOptions;
@@ -72,7 +96,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const tokenHash = requestUrl.searchParams.get('token_hash');
   const type = requestUrl.searchParams.get('type') as EmailOtpType | null;
-  let nextPath = sanitizeNextPath(requestUrl.searchParams.get('next'));
+  let nextPath = _sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -154,9 +178,15 @@ export async function GET(request: NextRequest) {
   );
   const onboarded = !!profile?.onboarded_at;
 
+  // Routing decisions use the normalised pathname to avoid issues with query
+  // strings (e.g. `/reset-password?hint=x` must still trigger the recovery
+  // flow). The actual redirect target uses `nextPath` (the original raw value)
+  // so query strings like `?ref=widget` are preserved in the final URL.
+  const nextPathname = nextPath ? new URL(nextPath, 'https://x').pathname : null;
+
   // Recovery flow always wins so the user can finish setting a new password.
-  if (nextPath === '/reset-password') {
-    return redirectWithCookies(response, new URL('/reset-password', requestUrl.origin));
+  if (nextPathname === '/reset-password') {
+    return redirectWithCookies(response, new URL(nextPath!, requestUrl.origin));
   }
 
   if (!hasRequiredConsents) {
@@ -165,8 +195,8 @@ export async function GET(request: NextRequest) {
 
   if (!onboarded) {
     // Allow explicit onboarding hops; otherwise start at privacy.
-    if (nextPath && nextPath.startsWith('/onboarding/')) {
-      return redirectWithCookies(response, new URL(nextPath, requestUrl.origin));
+    if (nextPathname && nextPathname.startsWith(ONBOARDING_PREFIX)) {
+      return redirectWithCookies(response, new URL(nextPath!, requestUrl.origin));
     }
     return redirectWithCookies(response, new URL('/onboarding/privacy', requestUrl.origin));
   }

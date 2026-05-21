@@ -38,28 +38,15 @@ describe('ALLOWED_NEXT_PATHS', () => {
 // ---------------------------------------------------------------------------
 describe('sanitizeNextPath', () => {
   // --- allowed paths ---
-  it('passes /dashboard through unchanged', () => {
-    expect(sanitizeNextPath('/dashboard')).toBe('/dashboard');
-  });
-
-  it('passes /log through unchanged', () => {
-    expect(sanitizeNextPath('/log')).toBe('/log');
-  });
-
-  it('passes /history through unchanged', () => {
-    expect(sanitizeNextPath('/history')).toBe('/history');
-  });
-
-  it('passes /trends through unchanged', () => {
-    expect(sanitizeNextPath('/trends')).toBe('/trends');
-  });
-
-  it('passes /settings through unchanged', () => {
-    expect(sanitizeNextPath('/settings')).toBe('/settings');
-  });
-
-  it('passes /log/new through unchanged', () => {
-    expect(sanitizeNextPath('/log/new')).toBe('/log/new');
+  it.each([
+    '/dashboard',
+    '/log',
+    '/log/new',
+    '/history',
+    '/trends',
+    '/settings',
+  ])('passes %s through unchanged', (path) => {
+    expect(sanitizeNextPath(path)).toBe(path);
   });
 
   it('preserves querystring on an allowed path', () => {

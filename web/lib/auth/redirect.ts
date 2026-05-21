@@ -30,12 +30,50 @@ export const ALLOWED_NEXT_PATHS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Returns true when `raw` resolves to an allowed post-auth path.
+ * Validates `raw` against the shared allowlist and returns the normalised
+ * pathname if allowed, or null if not.
  *
- * Uses the same logic as `sanitizeNextPath` so the two are always in sync.
+ * This is the single source of truth for the allowlist check. Both
+ * `sanitizeNextPath` and `isAllowedNextPath` delegate to this function so
+ * the two are guaranteed to stay in sync without an empty-string sentinel.
+ *
+ * @internal Not part of the public module API — use the exported helpers.
+ */
+function extractAllowedPathname(raw: string | null): string | null {
+  if (!raw) return null;
+
+  // Reject anything that doesn't open with a single slash.
+  if (!raw.startsWith('/')) return null;
+
+  // Reject protocol-relative URLs (//evil.com).
+  if (raw.startsWith('//')) return null;
+
+  // Reject values containing ASCII control characters (CR, LF, NUL, etc.).
+  // These can be used for HTTP response splitting when the path is placed in
+  // a Location header.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(raw)) return null;
+
+  // Normalise path traversal sequences by parsing as a relative URL.
+  // We use a dummy origin so the URL constructor accepts relative paths.
+  let normalizedPathname: string;
+  try {
+    const parsed = new URL(raw, 'https://x');
+    normalizedPathname = parsed.pathname;
+  } catch {
+    return null;
+  }
+
+  if (!ALLOWED_NEXT_PATHS.has(normalizedPathname)) return null;
+
+  return normalizedPathname;
+}
+
+/**
+ * Returns true when `raw` resolves to an allowed post-auth path.
  */
 export function isAllowedNextPath(raw: string | null): boolean {
-  return sanitizeNextPath(raw, '') !== '';
+  return extractAllowedPathname(raw) !== null;
 }
 
 /**
@@ -60,32 +98,9 @@ export function sanitizeNextPath(
   raw: string | null,
   fallback: string = '/dashboard',
 ): string {
-  if (!raw) return fallback;
-
-  // Reject anything that doesn't open with a single slash.
-  if (!raw.startsWith('/')) return fallback;
-
-  // Reject protocol-relative URLs (//evil.com).
-  if (raw.startsWith('//')) return fallback;
-
-  // Reject values containing ASCII control characters (CR, LF, NUL, etc.).
-  // These can be used for HTTP response splitting when the path is placed in
-  // a Location header.
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f\x7f]/.test(raw)) return fallback;
-
-  // Normalise path traversal sequences by parsing as a relative URL.
-  // We use a dummy origin so the URL constructor accepts relative paths.
-  let normalizedPathname: string;
-  try {
-    const parsed = new URL(raw, 'https://x');
-    normalizedPathname = parsed.pathname;
-  } catch {
-    return fallback;
-  }
-
-  if (!ALLOWED_NEXT_PATHS.has(normalizedPathname)) return fallback;
-
+  const pathname = extractAllowedPathname(raw);
+  if (pathname === null) return fallback;
   // The path is safe — return the original value so query/hash are preserved.
-  return raw;
+  // Type assertion is safe: extractAllowedPathname only returns non-null when raw is non-null.
+  return raw!;
 }
