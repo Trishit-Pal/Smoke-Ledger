@@ -7,8 +7,6 @@ import type {
   BrandVariant,
   CigaretteLog,
   Goal,
-  PurchaseMode,
-  PriceSource,
   UserProfile,
 } from '@/types';
 
@@ -28,30 +26,6 @@ type ProfileRow = {
   health_disclaimer_version: string | null;
   data_processing_consent_at: string | null;
   marketing_consent_at: string | null;
-};
-
-type LogRow = {
-  id: string;
-  ts_utc: string;
-  local_date: string;
-  local_hour: number;
-  brand_id: string | null;
-  brand_name_snap: string | null;
-  variant_snap: string | null;
-  quantity: number;
-  purchase_mode: PurchaseMode;
-  pack_size: number | null;
-  total_price_inr: number | null;
-  unit_price_inr: number | null;
-  price_source: PriceSource;
-  trigger_tag: string | null;
-  mood_before: string | null;
-  mood_after: string | null;
-  craving: number | null;
-  context_tag: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 type GoalRow = {
@@ -105,32 +79,6 @@ function mapProfile(row: ProfileRow): UserProfile {
   };
 }
 
-function mapLog(row: LogRow): CigaretteLog {
-  return {
-    id: row.id,
-    tsUtc: row.ts_utc,
-    localDate: row.local_date,
-    localHour: row.local_hour,
-    brandId: row.brand_id,
-    brandNameSnap: row.brand_name_snap,
-    variantSnap: row.variant_snap,
-    quantity: row.quantity,
-    purchaseMode: row.purchase_mode,
-    packSize: row.pack_size,
-    totalPriceInr: row.total_price_inr != null ? Number(row.total_price_inr) : null,
-    unitPriceInr: row.unit_price_inr != null ? Number(row.unit_price_inr) : null,
-    priceSource: row.price_source,
-    triggerTag: (row.trigger_tag as CigaretteLog['triggerTag']) ?? null,
-    moodBefore: (row.mood_before as CigaretteLog['moodBefore']) ?? null,
-    moodAfter: (row.mood_after as CigaretteLog['moodAfter']) ?? null,
-    craving: row.craving,
-    contextTag: (row.context_tag as CigaretteLog['contextTag']) ?? null,
-    notes: row.notes,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
 function mapGoal(row: GoalRow): Goal {
   let meta: Record<string, unknown> | null = null;
   const raw = row.meta_json;
@@ -179,17 +127,137 @@ export const getServerProfile = cache(async (): Promise<UserProfile> => {
   return mapProfile(data as ProfileRow);
 });
 
+/** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
+const SERVER_LOGS_PAGE_SIZE = 200;
+
+export interface LogCursor {
+  ts: string;
+  id: string;
+}
+
+export interface LogPage {
+  logs: CigaretteLog[];
+  nextCursor: LogCursor | null;
+}
+
+/** Raw payload shape returned by the `list_logs_page` RPC. */
+type RpcLogRow = {
+  id: string;
+  tsUtc: string;
+  localDate: string;
+  localHour: number;
+  brandId: string | null;
+  brandNameSnap: string | null;
+  variantSnap: string | null;
+  quantity: number;
+  purchaseMode: string;
+  packSize: number | null;
+  totalPriceInr: number | null;
+  unitPriceInr: number | null;
+  priceSource: string;
+  triggerTag: string | null;
+  moodBefore: string | null;
+  moodAfter: string | null;
+  craving: number | null;
+  contextTag: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type RpcListLogsPagePayload = {
+  logs: RpcLogRow[];
+  nextCursorTs: string | null;
+  nextCursorId: string | null;
+  hasMore: boolean;
+};
+
+function mapRpcLog(row: RpcLogRow): CigaretteLog {
+  return {
+    id: row.id,
+    tsUtc: row.tsUtc,
+    localDate: row.localDate,
+    localHour: row.localHour,
+    brandId: row.brandId,
+    brandNameSnap: row.brandNameSnap,
+    variantSnap: row.variantSnap,
+    quantity: row.quantity,
+    purchaseMode: row.purchaseMode as CigaretteLog['purchaseMode'],
+    packSize: row.packSize,
+    totalPriceInr: row.totalPriceInr != null ? Number(row.totalPriceInr) : null,
+    unitPriceInr: row.unitPriceInr != null ? Number(row.unitPriceInr) : null,
+    priceSource: row.priceSource as CigaretteLog['priceSource'],
+    triggerTag: (row.triggerTag as CigaretteLog['triggerTag']) ?? null,
+    moodBefore: (row.moodBefore as CigaretteLog['moodBefore']) ?? null,
+    moodAfter: (row.moodAfter as CigaretteLog['moodAfter']) ?? null,
+    craving: row.craving,
+    contextTag: (row.contextTag as CigaretteLog['contextTag']) ?? null,
+    notes: row.notes,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Keyset-paginated server-side log fetch backed by the `list_logs_page` RPC.
+ * Prefer this over `getServerLogs` for any view that may display large date ranges.
+ */
+export async function getServerLogsPage(opts?: {
+  fromDate?: string;
+  toDate?: string;
+  brandId?: string;
+  triggerTag?: string;
+  cursor?: LogCursor | null;
+  limit?: number;
+}): Promise<LogPage> {
+  const supabase = createClient();
+  const userId = await requireServerUserId();
+  const limit = Math.max(1, Math.min(opts?.limit ?? SERVER_LOGS_PAGE_SIZE, 5000));
+
+  const { data, error } = await supabase.rpc('list_logs_page', {
+    p_user_id: userId,
+    p_from_date: opts?.fromDate ?? null,
+    p_to_date: opts?.toDate ?? null,
+    p_brand_id: opts?.brandId ?? null,
+    p_trigger_tag: opts?.triggerTag ?? null,
+    p_cursor_ts: opts?.cursor?.ts ?? null,
+    p_cursor_id: opts?.cursor?.id ?? null,
+    p_limit: limit,
+  });
+  if (error) throw new Error(error.message);
+
+  const payload = data as RpcListLogsPagePayload;
+  const logs = (Array.isArray(payload.logs) ? payload.logs : []).map(mapRpcLog);
+  const nextCursor =
+    payload.hasMore && payload.nextCursorTs && payload.nextCursorId
+      ? { ts: payload.nextCursorTs, id: payload.nextCursorId }
+      : null;
+
+  return { logs, nextCursor };
+}
+
+/**
+ * Flat-array log fetch capped at `SERVER_LOGS_PAGE_SIZE` (200) rows.
+ * Delegates to `getServerLogsPage` so all reads go through the RPC.
+ * If the result is capped and more rows exist, a server-side warning is emitted
+ * to signal that the caller should migrate to `getServerLogsPage`.
+ */
 export const getServerLogs = cache(
   async (opts?: { fromDate?: string; limit?: number }): Promise<CigaretteLog[]> => {
-    const supabase = createClient();
-    const userId = await requireServerUserId();
-    const limit = Math.max(1, Math.min(opts?.limit ?? 5000, 5000));
-    let q = supabase.from('cigarette_logs').select('*').eq('user_id', userId);
-    if (opts?.fromDate) q = q.gte('local_date', opts.fromDate);
-    q = q.order('ts_utc', { ascending: false }).limit(limit);
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
-    return (data as LogRow[]).map(mapLog);
+    const limit = Math.max(1, Math.min(opts?.limit ?? SERVER_LOGS_PAGE_SIZE, SERVER_LOGS_PAGE_SIZE));
+    const { logs, nextCursor } = await getServerLogsPage({
+      fromDate: opts?.fromDate,
+      limit,
+    });
+
+    if (nextCursor !== null) {
+      console.warn(
+        `[getServerLogs] Result capped at ${limit} rows — more data exists. ` +
+          'Consider paginating via getServerLogsPage instead.',
+      );
+    }
+
+    return logs;
   },
 );
 
@@ -267,7 +335,7 @@ export async function getDashboardData() {
   const fromDate = daysAgoIst(60);
   const [profile, logs, goals, brands] = await Promise.all([
     getServerProfile(),
-    getServerLogs({ fromDate, limit: 5000 }),
+    getServerLogs({ fromDate }),
     getServerGoals(),
     getServerBrandsWithVariants(),
   ]);
@@ -278,25 +346,41 @@ export async function getLogPageData() {
   const today = daysAgoIst(0);
   const [profile, logs] = await Promise.all([
     getServerProfile(),
-    getServerLogs({ fromDate: today, limit: 500 }),
+    getServerLogs({ fromDate: today }),
   ]);
   return { profile, logs };
 }
 
+/**
+ * CONCERN: History pagination is partially implemented.
+ * The initial SSR render is capped at 200 rows over a 60-day rolling window via
+ * `getServerLogsPage`. The `nextCursor` is passed to `HistoryClient` so it can
+ * be threaded into a future "load more" / infinite-scroll flow, but that client-
+ * side wiring is not in C1's scope. Full unbounded history requires a follow-up
+ * task to add a paginated fetch action and load-more UI in HistoryClient.
+ */
 export async function getHistoryPageData() {
-  const fromDate = daysAgoIst(365);
-  const [profile, logs] = await Promise.all([
+  const fromDate = daysAgoIst(60);
+  const [profile, { logs, nextCursor }] = await Promise.all([
     getServerProfile(),
-    getServerLogs({ fromDate, limit: 5000 }),
+    getServerLogsPage({ fromDate, limit: SERVER_LOGS_PAGE_SIZE }),
   ]);
-  return { profile, logs };
+  return { profile, logs, nextCursor };
 }
 
+/**
+ * CONCERN: Trends data is capped at 200 rows over a 90-day rolling window.
+ * The Trends client supports a "Year" window but that window is now bounded by
+ * what the server provides. Full year aggregation requires server-side daily
+ * summaries (a `daily_summary` materialized view), which is a separate plan
+ * item outside C1's scope. The 90-day cap prevents egress blowout on the free
+ * tier while the aggregation work is pending.
+ */
 export async function getTrendsPageData() {
-  const fromDate = daysAgoIst(365);
+  const fromDate = daysAgoIst(90);
   const [profile, logs] = await Promise.all([
     getServerProfile(),
-    getServerLogs({ fromDate, limit: 5000 }),
+    getServerLogs({ fromDate }),
   ]);
   return { profile, logs };
 }
