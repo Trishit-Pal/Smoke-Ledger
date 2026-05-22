@@ -39,6 +39,8 @@ Full email troubleshooting: [docs/deployment/auth-email-delivery.md](./auth-emai
 
 Set on **both** `delete-account` and `audit-record`:
 
+> **Audit rate limit (M4):** `audit-record` defaults to **10 events/min per user**. To raise it for a specific deployment set `AUDIT_RATE_LIMIT_MAX` (e.g. `30`) in the edge function's secrets. Violations are logged to stdout as `audit_rate_limit_exceeded` with a hashed user id.
+
 | Secret | Purpose |
 |--------|---------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Admin insert / delete (auto when linked) |

@@ -145,6 +145,7 @@ CREATE TABLE public.usage_events (
 CREATE INDEX idx_logs_user_local_date ON public.cigarette_logs (user_id, local_date DESC);
 CREATE INDEX idx_logs_user_created ON public.cigarette_logs (user_id, created_at DESC);
 CREATE INDEX idx_logs_user_brand ON public.cigarette_logs (user_id, brand_id);
+CREATE INDEX idx_logs_brand ON public.cigarette_logs (brand_id);
 CREATE INDEX idx_variants_user_brand ON public.brand_variants (user_id, brand_id);
 CREATE INDEX idx_goals_user_status ON public.goals (user_id, status);
 CREATE INDEX idx_usage_user_ts ON public.usage_events (user_id, ts DESC);

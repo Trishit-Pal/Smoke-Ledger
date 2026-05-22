@@ -71,4 +71,9 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'unexpected RLS policy error_events_update — must remain absent (H1)';
   END IF;
+
+  -- M2: single-column brand_id index must exist for brand-breakdown query plans.
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_logs_brand') THEN
+    RAISE EXCEPTION 'idx_logs_brand index missing (M2)';
+  END IF;
 END $$;
