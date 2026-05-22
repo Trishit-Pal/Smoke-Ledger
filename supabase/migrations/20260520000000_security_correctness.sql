@@ -954,3 +954,75 @@ GRANT EXECUTE ON FUNCTION public.create_log_with_rate_limit(
   text, text, text, int, text, text,
   text
 ) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 11. v_daily_summary_user + get_daily_summary RPC (F1a: Trends Year view)
+-- ---------------------------------------------------------------------------
+--
+-- Problem: TrendsClient had a "Year" period chip that silently showed only 90
+-- days of raw logs (the egress cap). Pulling 365 days of raw rows (up to 5000+)
+-- was unacceptable on the free tier.
+--
+-- Solution: a thin view over cigarette_logs that pre-aggregates per (user, day).
+-- The RPC wraps the view with a 366-day guard, auth check, and date-range params
+-- so the Year view fetches at most 365 lightweight summary rows instead of raw logs.
+--
+-- Security note: Views are SECURITY INVOKER by default in Postgres.
+-- RLS on cigarette_logs therefore applies automatically when an authenticated
+-- user queries this view — they can only see their own aggregated rows.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW public.v_daily_summary_user AS
+SELECT
+  user_id,
+  local_date,
+  COUNT(*)::int                                  AS sticks,
+  COALESCE(SUM(total_price_inr), 0)::numeric    AS total_spend_inr,
+  CASE
+    WHEN COUNT(*) FILTER (WHERE unit_price_inr IS NOT NULL) > 0
+    THEN AVG(unit_price_inr) FILTER (WHERE unit_price_inr IS NOT NULL)
+    ELSE NULL
+  END                                            AS avg_unit_price_inr
+FROM public.cigarette_logs
+GROUP BY user_id, local_date;
+
+-- Grant SELECT so PostgREST exposes the view to authenticated sessions.
+-- RLS on the underlying cigarette_logs table still applies (SECURITY INVOKER).
+GRANT SELECT ON public.v_daily_summary_user TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_daily_summary (p_from date, p_to date)
+RETURNS TABLE (local_date date, sticks int, total_spend_inr numeric, avg_unit_price_inr numeric)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  uid uuid := auth.uid();
+BEGIN
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'not authenticated' USING ERRCODE = '42501';
+  END IF;
+  -- Bound the range to prevent unbounded scans. 366-day cap covers the full Year view.
+  IF p_to < p_from THEN
+    RAISE EXCEPTION 'p_to must be >= p_from' USING ERRCODE = '22023';
+  END IF;
+  IF (p_to - p_from) > 366 THEN
+    RAISE EXCEPTION 'date range > 366 days' USING ERRCODE = '22023';
+  END IF;
+  -- Note: local_date is stored as text (YYYY-MM-DD). The cast to ::date lets us
+  -- compare against the date params without relying on implicit text ordering.
+  RETURN QUERY
+    SELECT
+      v.local_date::date,
+      v.sticks,
+      v.total_spend_inr,
+      v.avg_unit_price_inr
+    FROM public.v_daily_summary_user v
+    WHERE v.user_id = uid
+      AND v.local_date::date >= p_from
+      AND v.local_date::date <= p_to
+    ORDER BY v.local_date DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_daily_summary(date, date) TO authenticated;

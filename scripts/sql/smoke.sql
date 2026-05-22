@@ -87,4 +87,21 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'brand_variants.brand_id FK to brands must be ON DELETE RESTRICT (M7)';
   END IF;
+
+  -- F1a: daily summary view must exist.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_views
+    WHERE schemaname = 'public' AND viewname = 'v_daily_summary_user'
+  ) THEN
+    RAISE EXCEPTION 'missing view v_daily_summary_user (F1a)';
+  END IF;
+
+  -- F1a: get_daily_summary RPC must exist.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'get_daily_summary'
+  ) THEN
+    RAISE EXCEPTION 'missing function get_daily_summary (F1a)';
+  END IF;
 END $$;

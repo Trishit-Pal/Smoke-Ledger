@@ -8,10 +8,12 @@ import { formatIndianDate, formatTime } from '@/lib/date';
 import type { CigaretteLog, UserProfile } from '@/types';
 import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
+import { Button } from '@web/components/ui/Button';
 import { Card } from '@web/components/ui/Card';
 import { Text } from '@web/components/ui/Text';
 import { EmptyState } from '@web/components/ui/EmptyState';
 import { Header } from '@web/components/layout/Header';
+import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
   date: string;
@@ -41,19 +43,46 @@ export interface HistoryClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
   /**
-   * Pagination cursor from the server. Non-null means there are older logs beyond
-   * the initial 200-row / 60-day SSR window. A future "load more" feature should
-   * use this cursor to fetch the next page via a server action or API route.
-   * Currently accepted but not yet wired to a load-more UI (C1 scope boundary).
+   * Initial pagination cursor from the SSR fetch. Non-null means there are
+   * older logs beyond the initial 200-row / 60-day window. The "Load older"
+   * button uses this to drive the `fetchMoreHistoryLogs` server action; once
+   * the action returns `null` for `nextCursor`, the button hides itself.
    */
   nextCursor?: LogCursor | null;
 }
 
-export function HistoryClient({ profile, logs, nextCursor: _nextCursor }: HistoryClientProps) {
+export function HistoryClient({
+  profile,
+  logs: initialLogs,
+  nextCursor: initialCursor,
+}: HistoryClientProps) {
   const router = useRouter();
   const discreet = isDiscreetMode(profile);
 
+  // F1b: keep accumulated logs + cursor in state so the "Load older" button
+  // can append additional pages without a full route navigation. Initial
+  // values come from the SSR-provided props so the first paint is unchanged.
+  const [logs, setLogs] = React.useState<CigaretteLog[]>(initialLogs);
+  const [cursor, setCursor] = React.useState<LogCursor | null>(initialCursor ?? null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [isPending, startTransition] = React.useTransition();
+
   const groups = React.useMemo(() => groupLogs(logs), [logs]);
+
+  const handleLoadMore = React.useCallback(() => {
+    if (!cursor || isPending) return;
+    const requestedCursor = cursor;
+    setLoadError(null);
+    startTransition(async () => {
+      try {
+        const result = await fetchMoreHistoryLogs(requestedCursor);
+        setLogs((prev) => [...prev, ...result.logs]);
+        setCursor(result.nextCursor);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load older entries.');
+      }
+    });
+  }, [cursor, isPending]);
 
   return (
     <div className="max-w-3xl mx-auto p-lg flex flex-col gap-lg pb-32">
@@ -107,6 +136,30 @@ export function HistoryClient({ profile, logs, nextCursor: _nextCursor }: Histor
               </ul>
             </Card>
           ))}
+
+          {cursor !== null ? (
+            <div className="flex flex-col items-center gap-xs pt-md">
+              {loadError ? (
+                <Text variant="caption" color="var(--danger, #C85A54)" role="alert">
+                  {loadError}
+                </Text>
+              ) : null}
+              <Button
+                title={isPending ? 'Loading…' : 'Load older entries'}
+                onPress={handleLoadMore}
+                variant="ghost"
+                size="md"
+                disabled={isPending}
+                loading={isPending}
+              />
+            </div>
+          ) : groups.length > 0 ? (
+            <div className="pt-md text-center">
+              <Text variant="caption" muted>
+                You&apos;ve reached the end of your history.
+              </Text>
+            </div>
+          ) : null}
         </div>
       )}
 

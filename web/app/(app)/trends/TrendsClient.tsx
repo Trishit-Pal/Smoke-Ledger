@@ -21,7 +21,8 @@ import { Header } from '@web/components/layout/Header';
 import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
-import type { CigaretteLog, UserProfile } from '@/types';
+import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
+import type { DailySummary } from '@web/lib/server/data';
 
 type WindowDays = 1 | 7 | 30 | 365;
 
@@ -36,20 +37,61 @@ const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export interface TrendsClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+  dailySummary: DailySummary[];
 }
 
-export function TrendsClient({ profile, logs }: TrendsClientProps) {
+/**
+ * Chart accuracy matrix (F1a):
+ *
+ * Chart #1 — daily sticks line + spend bars:
+ *   Year view (365d): FULL YEAR accurate — driven by `dailySummary` (server-side aggregate).
+ *   Day/Week/Month views: use raw `logs` as before.
+ *
+ * Charts #2–#5 — hour distribution, day-of-week, brand spend mix, mood×trigger matrix,
+ *   day×hour heatmap: still driven by raw `logs` (90-day cap).
+ *   Year view will display the same 90-day window as Month view for these breakdowns.
+ *   Known limitation tracked as: F1 follow-on: full-Year breakdowns.
+ */
+
+/**
+ * Returns a DailyStat array appropriate for the sticks/spend time-series charts.
+ *
+ * For windowDays === 365, transforms the pre-aggregated `dailySummary` (365 rows from
+ * the server-side RPC) into DailyStat shape — giving true full-year accuracy without
+ * pulling raw logs.
+ *
+ * For narrower windows (1/7/30), falls back to `dailyStats(logs, ...)` to retain the
+ * full raw-log path (including hour-level granularity if any future chart needs it).
+ */
+function pickDailyStats(
+  windowDays: WindowDays,
+  logs: CigaretteLog[],
+  dailySummary: DailySummary[],
+  startYmd: string,
+  today: string,
+): DailyStat[] {
+  if (windowDays === 365) {
+    // Filter summary to the 365-day window and map to DailyStat shape.
+    return dailySummary
+      .filter((r) => r.localDate >= startYmd && r.localDate <= today)
+      .map((r) => ({ date: r.localDate, sticks: r.sticks, spendInr: r.totalSpendInr }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return dailyStats(logs, startYmd, today);
+}
+
+export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps) {
   const discreet = isDiscreetMode(profile);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(30);
 
   const today = todayIst();
   const startYmd = daysAgoIst(windowDays - 1);
 
-  const dependencyKey = `${windowDays}-${logs.length}`;
+  const dependencyKey = `${windowDays}-${logs.length}-${dailySummary.length}`;
 
   const currentStats = React.useMemo(
-    () => dailyStats(logs, startYmd, today),
-    [logs, startYmd, today],
+    () => pickDailyStats(windowDays, logs, dailySummary, startYmd, today),
+    [windowDays, logs, dailySummary, startYmd, today],
   );
 
   const previousStart = React.useMemo(
@@ -57,10 +99,11 @@ export function TrendsClient({ profile, logs }: TrendsClientProps) {
     [startYmd, windowDays],
   );
   const previousEnd = React.useMemo(() => dayShift(startYmd, -1), [startYmd]);
-  const previousStats = React.useMemo(
-    () => dailyStats(logs, previousStart, previousEnd),
-    [logs, previousStart, previousEnd],
-  );
+  const previousStats = React.useMemo(() => {
+    // Previous period comparison always uses raw logs (only the current period
+    // uses dailySummary for Year; prior-year comparison is out of F1a scope).
+    return dailyStats(logs, previousStart, previousEnd);
+  }, [logs, previousStart, previousEnd]);
 
   const sticksLine = React.useMemo(() => {
     return currentStats.map((s) => ({
@@ -245,6 +288,11 @@ export function TrendsClient({ profile, logs }: TrendsClientProps) {
               <Reveal dependencyKey={dependencyKey}>
                 <Heatmap logs={logs} startYmd={startYmd} endYmd={today} />
               </Reveal>
+              {windowDays === 365 && (
+                <Text variant="caption" muted className="mt-sm">
+                  Showing last 90 days (longer history coming soon)
+                </Text>
+              )}
             </Card>
           </FadeSlideIn>
 
@@ -257,6 +305,11 @@ export function TrendsClient({ profile, logs }: TrendsClientProps) {
               <Reveal dependencyKey={dependencyKey}>
                 <BarChart data={hourBars} height={160} />
               </Reveal>
+              {windowDays === 365 && (
+                <Text variant="caption" muted className="mt-sm">
+                  Showing last 90 days (longer history coming soon)
+                </Text>
+              )}
             </Card>
           </FadeSlideIn>
 
@@ -269,6 +322,11 @@ export function TrendsClient({ profile, logs }: TrendsClientProps) {
               <Reveal dependencyKey={dependencyKey}>
                 <BarChart data={dowBars} height={160} />
               </Reveal>
+              {windowDays === 365 && (
+                <Text variant="caption" muted className="mt-sm">
+                  Showing last 90 days (longer history coming soon)
+                </Text>
+              )}
             </Card>
           </FadeSlideIn>
 
@@ -281,6 +339,11 @@ export function TrendsClient({ profile, logs }: TrendsClientProps) {
               <Reveal dependencyKey={dependencyKey}>
                 <MoodTriggerMatrix logs={logs} />
               </Reveal>
+              {windowDays === 365 && (
+                <Text variant="caption" muted className="mt-sm">
+                  Showing last 90 days (longer history coming soon)
+                </Text>
+              )}
             </Card>
           </FadeSlideIn>
 
