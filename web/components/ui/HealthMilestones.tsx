@@ -85,7 +85,19 @@ export function HealthMilestones({ lastSmokeIso }: HealthMilestonesProps) {
           </p>
           {progress.current ? (
             <span className="text-caption uppercase text-text-faint mt-xs">
-              Source: {progress.current.source}
+              Source:{' '}
+              {progress.current.sourceUrl ? (
+                <a
+                  href={progress.current.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-text"
+                >
+                  {progress.current.source}
+                </a>
+              ) : (
+                progress.current.source
+              )}
             </span>
           ) : null}
         </div>
@@ -110,6 +122,11 @@ export function HealthMilestones({ lastSmokeIso }: HealthMilestonesProps) {
           );
         })}
       </div>
+
+      <p className="text-caption text-text-muted italic">
+        General health information from public-health institutions. Not medical
+        advice — consult a clinician for personal guidance.
+      </p>
     </Card>
   );
 }
