@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
@@ -35,12 +35,30 @@ export function HealthMilestones({ lastSmokeIso }: HealthMilestonesProps) {
               {p.current ? p.current.body : 'Your last log resets the recovery clock. The first milestone is at 20 minutes smoke-free.'}
             </Text>
             {p.current ? (
-              <Text variant="caption" muted>
-                Source — {p.current.source}
-              </Text>
+              p.current.sourceUrl ? (
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() => {
+                    void Linking.openURL(p.current!.sourceUrl!);
+                  }}
+                >
+                  <Text variant="caption" muted style={{ textDecorationLine: 'underline' }}>
+                    Source — {p.current.source}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text variant="caption" muted>
+                  Source — {p.current.source}
+                </Text>
+              )
             ) : null}
           </View>
         </View>
+
+        <Text variant="caption" muted style={{ fontStyle: 'italic' }}>
+          General health information from public-health institutions. Not
+          medical advice — consult a clinician for personal guidance.
+        </Text>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {HEALTH_MILESTONES.map((m) => {

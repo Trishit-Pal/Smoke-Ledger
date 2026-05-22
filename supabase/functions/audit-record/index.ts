@@ -8,7 +8,10 @@ import {
   redactAuditProps,
 } from '../_shared/auditAllowlist.ts';
 import { sha256Hex } from '../_shared/hash.ts';
+import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+
+const log = createLogger('audit-record');
 
 const ENV = (Deno.env.get('ENVIRONMENT') ?? Deno.env.get('ENV') ?? 'production').toLowerCase();
 const IS_PROD = ENV === 'production';
@@ -101,12 +104,10 @@ serve(async (req) => {
     });
     if (!allowed) {
       const userIdHash = await sha256Hex(`${user.id}:${Deno.env.get('AUDIT_PEPPER') ?? ''}`);
-      console.warn(JSON.stringify({
-        level: 'warn',
-        event: 'audit_rate_limit_exceeded',
+      log.warn('rate_limit_exceeded', {
         user_id_hash: userIdHash,
         request_id: requestId,
-      }));
+      });
       return json({ error: 'rate_limited', request_id: requestId }, 429, origin);
     }
 
@@ -151,13 +152,16 @@ serve(async (req) => {
     });
 
     if (insertErr) {
-      console.error('audit-record insert failed', requestId, insertErr.message);
+      log.error('insert_failed', {
+        request_id: requestId,
+        error: String(insertErr.message).slice(0, 200),
+      });
       return json({ error: 'insert_failed', request_id: requestId }, 500, origin);
     }
 
     return new Response(null, { status: 204, headers: corsHeaders(origin) });
   } catch (e) {
-    console.error('audit-record internal error', {
+    log.error('internal_error', {
       request_id: requestId,
       message: e instanceof Error ? String(e.message).slice(0, 200) : 'unknown',
     });

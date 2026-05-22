@@ -22,7 +22,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sha256Hex } from '../_shared/hash.ts';
+import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+
+const log = createLogger('delete-account');
 
 // ---------------- env ----------------
 
@@ -181,7 +184,10 @@ serve(async (req) => {
       });
     } catch (auditErr) {
       // Audit is best-effort; do not abort the user-requested deletion.
-      console.warn('delete-account: audit insert failed', requestId, auditErr);
+      log.warn('audit_insert_failed', {
+        request_id: requestId,
+        error: auditErr instanceof Error ? String(auditErr.message).slice(0, 200) : 'unknown',
+      });
     }
 
     const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -198,7 +204,7 @@ serve(async (req) => {
 
     return json({ ok: true, request_id: requestId }, 200, origin);
   } catch (e) {
-    console.error('delete-account internal error', {
+    log.error('internal_error', {
       request_id: requestId,
       name: e instanceof Error ? e.name : 'Unknown',
       message: e instanceof Error ? String(e.message).slice(0, 200) : 'unknown',

@@ -48,7 +48,18 @@ async function getKv(kind: string): Promise<Kv | null> {
     kv = await Deno.openKv();
     return kv;
   } catch (e) {
-    console.warn(`${kind}: rate-limit failing closed — KV unavailable`, e);
+    // Same JSON shape as createLogger() in _shared/log.ts so ops dashboards
+    // can pivot on `event` without caring whether the line came from a
+    // function or a shared helper. We don't import createLogger here to keep
+    // the dependency direction shallow (rateLimit.ts shouldn't depend on log.ts).
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        function: kind,
+        event: 'rate_limit_kv_unavailable',
+        error: e instanceof Error ? String(e.message).slice(0, 200) : 'unknown',
+      }),
+    );
     return null;
   }
 }
