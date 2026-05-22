@@ -1,54 +1,83 @@
 # Smoke Ledger
 
-Web-first smoking reduction and cessation support product with shared Expo mobile client and a single hosted Supabase backend.
+Smoke Ledger helps you track smoking, see what it costs, and work toward cutting back or quitting — on your terms. The web app in `web/` is the main experience; an Expo mobile client in `app/` shares the same backend. Built for adults (18+). It supports behavior tracking and cessation goals — not diagnosis or medical treatment.
 
-## Product Position
+## What you get
 
-- Primary launch surface: Next.js web (`web/`).
-- Secondary client: Expo mobile (`app/`), using the same backend contracts.
-- Audience: adults (18+).
-- Scope: behavior tracking and cessation support, not diagnosis or medical treatment.
+- **One-tap logging** — record a cigarette in seconds, with brand and context when you want them.
+- **Daily dashboard** — today’s count, spend, and progress at a glance.
+- **Trends** — spot patterns over days and weeks.
+- **Goals, history, and export** — deeper tools inside the app after you sign up.
+- **India-first** — INR pricing, local brand catalog with 2026 MRP data.
+- **Private and ad-free** — your data stays yours; no third-party ad SDKs.
 
-## Architecture
+## The web experience
 
-- **Frontend (web)**: Next.js 14 App Router in `web/`.
-- **Frontend (mobile)**: Expo Router in `app/`.
-- **Backend**: Supabase Auth + Postgres + RLS + Edge Functions.
-- **Shared logic**: `src/domain` (pure calculations), `src/db/repositories` (data access), `src/lib/validation` (input validation).
+When you open `/`, you get the full marketing page: a hero (“Know every stick. Spend less. Quit on your terms.”), trust highlights, how-it-works steps, privacy and FAQ sections, and three live-style previews — **quick log**, **dashboard**, and **trends** — using demo data, not your account. Goals, history, and export are mentioned on the page but live inside the signed-in app.
 
-## Prerequisites
+Every page has a sun/moon button in the **top-right** to switch dark or light mode. Your choice is saved in the browser under `smoke-ledger-theme` and survives refresh. Dark is the default; there is no “follow system” option.
 
-- Node.js 20+
-- npm 10+
-- Supabase CLI
-- Supabase project (free tier is sufficient for development)
+On privacy, terms, support, and auth pages, a small **Go to Homepage** link sits **bottom-right** so you can always get back to `/`. It is hidden on the landing page itself.
 
-## Environment Setup
+## How it’s built
 
-### Root env (Expo/shared client)
+One Supabase project powers everything: Auth, Postgres with row-level security, and Edge Functions. Shared business logic lives in `src/` so web and mobile stay aligned.
 
-1. Copy `.env.example` to `.env` (or run `npm run setup:env`).
-2. Set:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - `EXPO_PUBLIC_WEB_BASE_URL` (hosted legal/support pages for mobile links)
+- **Web** — Next.js 14 App Router (`web/`)
+- **Mobile** — Expo Router (`app/`)
+- **Backend** — Supabase Auth + Postgres + RLS + Edge Functions
+- **Shared code** — `src/domain` (calculations), `src/db/repositories` (data access), `src/lib/validation` (input checks)
 
-Never place `service_role` keys in client env files.
+## Getting started
 
-### Web env
+You’ll need Node.js 20+, npm 10+, the Supabase CLI, and a Supabase project (the free tier is fine for development).
 
-Create `web/.env.local` and set:
+### Environment
+
+**Root (Expo / shared client)**
+
+Copy `.env.example` to `.env` (or run `npm run setup:env`), then set:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_WEB_BASE_URL` — hosted legal/support URLs for mobile deep links
+
+Never put `service_role` keys in client env files.
+
+**Web**
+
+Create `web/.env.local`:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_SUPPORT_EMAIL` (recommended for legal/support pages)
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only, **not** `NEXT_PUBLIC_*`) — required by `/api/auth/login` and the account-deletion edge function.
+- `NEXT_PUBLIC_SUPPORT_EMAIL` — recommended for legal/support pages
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only (**not** `NEXT_PUBLIC_*`); required by `/api/auth/login` and the account-deletion edge function
 
-Optional: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` for Cloudflare Turnstile on login/signup (see [production ops checklist](docs/deployment/production-ops-checklist.md)).
+Optional: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` for Cloudflare Turnstile on login/signup ([production ops checklist](docs/deployment/production-ops-checklist.md)).
 
-## Database Setup
+### Install and run
 
-Apply migrations in order:
+```bash
+npm install
+```
+
+**Web** (from `web/`):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+**Mobile**:
+
+```bash
+npm run start
+```
+
+## Database and backend
+
+Apply migrations in this order:
 
 1. `supabase/migrations/20250426120000_initial_schema.sql`
 2. `supabase/migrations/20260504000000_enhancements.sql`
@@ -58,157 +87,108 @@ Apply migrations in order:
 6. `supabase/migrations/20260521000000_audit_export_ops.sql`
 7. `supabase/migrations/20260601000000_catalog_2026_refresh.sql` — 2026 MRP updates + `refresh_seed_prices_from_catalog` RPC
 
-Run from repo root:
+From the repo root:
 
 ```bash
 npm run db:push
 npm run verify:backend
 ```
 
-`verify:backend` checks core RPCs (including `sync_default_brand_catalog` and `refresh_seed_prices_from_catalog`). If a catalog RPC is missing, re-run `db:push`. Catalog price sources: [docs/catalog/2026-cigarette-mrp-sources.md](docs/catalog/2026-cigarette-mrp-sources.md).
+`verify:backend` smoke-checks core RPCs, including `sync_default_brand_catalog` and `refresh_seed_prices_from_catalog`. If a catalog RPC is missing, run `db:push` again. Price sources: [docs/catalog/2026-cigarette-mrp-sources.md](docs/catalog/2026-cigarette-mrp-sources.md).
 
-Full production checklist: [docs/deployment/production-ops-checklist.md](docs/deployment/production-ops-checklist.md).
-
-## Edge Function Setup
-
-Deploy account deletion and audit functions:
+Deploy Edge Functions (account deletion and audit):
 
 ```bash
 npm run functions:deploy:all
 npm run verify:backend
 ```
 
-Verify function secrets in Supabase dashboard:
+In the Supabase dashboard, confirm function secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Enable email auth and password reset under Auth providers.
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+For signup confirmation, magic links, and SMTP setup, see [auth email delivery](docs/deployment/auth-email-delivery.md). Full production checklist: [production ops checklist](docs/deployment/production-ops-checklist.md).
 
-Enable email auth and password reset in Supabase Auth providers.
+## Security and auth
 
-For signup confirmation and magic-link delivery (SMTP, rate limits, dashboard checks), see [docs/deployment/auth-email-delivery.md](docs/deployment/auth-email-delivery.md).
+Product data requires authentication. RLS is on for exposed tables; policies and repository queries keep each user’s data isolated. Input validation is centralized in `src/lib/validation.ts`. Account deletion goes through an authenticated Edge Function with admin delete.
 
-## Local Development
+**Web login and sessions**
 
-Install dependencies:
+Password login uses `POST /api/auth/login` so httpOnly Supabase cookies follow the remember-me policy — not a client-only `signInWithPassword`. Remember me is off by default: unchecked means session cookies (gone when the browser closes); checked sets persistent cookies via `sl_remember_me=1`. Email-link and phone OTP flows are unchanged; sessions exchange through `/auth/callback`.
 
-```bash
-npm install
-```
+Brand catalog sync runs at most **once per browser tab** per catalog version (`CATALOG_SYNC_VERSION` in `src/lib/catalogVersion.ts`). Bump that version when catalog migrations change.
 
-Run mobile:
+**Data rights**
 
-```bash
-npm run start
-```
+Users can export or erase in-app data, or request full account deletion (auth identity plus app data). Export and erase use server-side RPCs: `export_account_data`, `erase_account_data`.
 
-Run web:
+**Optional RLS integration test**
 
-```bash
-cd web
-npm install
-npm run dev
-```
-
-## Scripts
-
-### Root
-
-- `npm run start` — Expo dev server
-- `npm run typecheck` — TypeScript checks
-- `npm run test` — Jest unit tests
-- `npm run lint` — ESLint
-- `npm run db:push` — push Supabase migrations
-- `npm run verify:backend` — post-push RPC and edge-function smoke checks
-- `npm run functions:deploy:delete-account` — deploy delete-account function
-
-### Web (`web/`)
-
-- `npm run dev` — Next.js dev server
-- `npm run build` — production build
-- `npm run start` — production server
-- `npm run typecheck` — TypeScript checks
-- `npm run lint` — ESLint
-- `npm run test:e2e` — Playwright E2E (requires Supabase + test user for authenticated specs)
-- `npm run test:e2e:smoke` — auth redirect + security smoke subset
-
-## Legal and Compliance Endpoints
-
-Deploy these public routes and link them in app/store metadata:
-
-- `/privacy` — Privacy Policy
-- `/terms` — Terms of Service
-- `/support` — Support and data rights contact
-
-Public pages (legal, support, auth) include a fixed **Go to Homepage** link (bottom-right) that navigates to `/` via Next.js App Router. The landing page (`/`) showcases product features with interactive demo previews.
-
-Canonical documents in repository:
-
-- `docs/legal/privacy-policy.md`
-- `docs/legal/terms-of-service.md`
-
-## Data and Security Baseline
-
-- Authentication required for all product data.
-- RLS enabled on exposed tables.
-- Per-user isolation enforced in policies and repository queries.
-- Input validation centralized in `src/lib/validation.ts`.
-- Account deletion uses an authenticated Edge Function and admin delete.
-- No third-party ad SDKs.
-
-### Web auth and sessions
-
-- **Password login** uses `POST /api/auth/login` so httpOnly Supabase auth cookies respect the remember-me policy (not client-only `signInWithPassword`).
-- **Remember me** is off by default. Unchecked → session cookies (logout when browser closes). Checked → persistent cookies via `sl_remember_me=1`.
-- Email-link and phone OTP flows unchanged; session exchange via `/auth/callback`.
-- Brand catalog sync runs at most **once per browser tab** per catalog version (`CATALOG_SYNC_VERSION` in `src/lib/catalogVersion.ts`); bump the version when catalog migrations change.
-
-### Optional RLS integration test
-
-`src/tests/rls.integration.test.ts` verifies cross-user isolation with two authenticated test accounts.
-
-Set these env vars before running `npm test`:
+`src/tests/rls.integration.test.ts` checks cross-user isolation with two test accounts. Set before `npm test`:
 
 - `E2E_SUPABASE_URL`
 - `E2E_SUPABASE_ANON_KEY`
-- `E2E_USER_A_EMAIL`
-- `E2E_USER_A_PASSWORD`
-- `E2E_USER_B_EMAIL`
-- `E2E_USER_B_PASSWORD`
+- `E2E_USER_A_EMAIL` / `E2E_USER_A_PASSWORD`
+- `E2E_USER_B_EMAIL` / `E2E_USER_B_PASSWORD`
 
-If env vars are not set, the RLS integration suite is skipped.
+The suite skips if these are unset.
 
-### Optional Playwright E2E (web)
+**Optional Playwright E2E (web)**
 
-From `web/`, with the dev server started by Playwright or already running:
+Smoke tests cover the landing page, auth fields, legal routes, the homepage link, and the theme toggle on `/` and `/login`:
 
 ```bash
 cd web
 npm run test:e2e:smoke
 ```
 
-For authenticated flows and session-cookie checks (`e2e/security.spec.ts`, `e2e/authenticated-flows.spec.ts`), set:
+For authenticated flows and session-cookie checks (`e2e/security.spec.ts`, `e2e/authenticated-flows.spec.ts`), also set:
 
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `E2E_SUPABASE_*` equivalents in CI)
-- `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` (or `E2E_USER_A_*` for multi-user RLS jobs)
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `E2E_SUPABASE_*` in CI)
+- `E2E_LOGIN_EMAIL` / `E2E_LOGIN_PASSWORD` (or `E2E_USER_A_*` for multi-user jobs)
 
-Specs skip automatically when credentials are missing.
+Specs skip when credentials are missing.
 
-## Deletion and Export Policy
+## Scripts
 
-- Users can erase in-app data or request full account deletion.
-- Deletion removes auth identity plus associated app data.
-- Export and erase flows use server-side RPC operations (`export_account_data`, `erase_account_data`).
+Handy commands from the repo root:
 
-## Medical Disclaimer
+- `npm run start` — Expo dev server
+- `npm run typecheck` — TypeScript checks
+- `npm run test` — Jest unit tests
+- `npm run lint` — ESLint
+- `npm run db:push` — push Supabase migrations
+- `npm run verify:backend` — post-push RPC and edge-function checks
+- `npm run functions:deploy:delete-account` — deploy delete-account function
 
-Smoke Ledger is cessation support software for behavior tracking. It is not a medical device and does not provide diagnosis, treatment, or emergency services.
+From `web/`:
+
+- `npm run dev` — Next.js dev server
+- `npm run build` — production build
+- `npm run start` — production server
+- `npm run typecheck` — TypeScript checks
+- `npm run lint` — ESLint
+- `npm run test:e2e` — full Playwright suite (needs Supabase + test user for auth specs)
+- `npm run test:e2e:smoke` — public-page and security smoke subset
+
+## Legal pages
+
+Ship and link these in app and store metadata:
+
+- `/privacy` — Privacy Policy
+- `/terms` — Terms of Service
+- `/support` — Support and data-rights contact
+
+Canonical source files in the repo: `docs/legal/privacy-policy.md`, `docs/legal/terms-of-service.md`.
 
 ## Troubleshooting
 
-- **Windows + OneDrive install issues:** if `npm install` fails with EPERM, try `npm install --ignore-scripts` temporarily, then run `npm run typecheck` and `npm run test`.
-- **ESLint optional native resolver warnings:** this repo relies on TypeScript (`tsc`) as import truth.
+- **Windows + OneDrive:** if `npm install` fails with EPERM, try `npm install --ignore-scripts`, then run `npm run typecheck` and `npm run test`.
+- **ESLint resolver warnings:** TypeScript (`tsc`) is the source of truth for imports here.
 
-## Legacy Notes
+## Disclaimer
 
-Legacy SQLite references remain in source history, but Supabase Postgres migrations in `supabase/migrations/` are the active schema source of truth.
+Smoke Ledger is cessation support software for behavior tracking. It is not a medical device and does not provide diagnosis, treatment, or emergency services.
+
+## Legacy note
+
+Older SQLite references may appear in history, but Supabase Postgres migrations in `supabase/migrations/` are the active schema source of truth.
