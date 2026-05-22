@@ -60,7 +60,12 @@ CREATE TABLE public.brands (
 CREATE TABLE public.brand_variants (
   id text PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  brand_id text NOT NULL REFERENCES public.brands (id) ON DELETE CASCADE,
+  -- M7 audit: was ON DELETE CASCADE. Deleting a brand that still has variants now
+  -- raises a foreign-key-violation (23503) the repository converts to a `conflict`
+  -- AppError so the UI can prompt the user to delete the variants first or merge
+  -- the brand. Cascading via auth.users above stays — account deletion is a
+  -- different intent and must purge variants too.
+  brand_id text NOT NULL REFERENCES public.brands (id) ON DELETE RESTRICT,
   name text NOT NULL,
   default_pack_size int NOT NULL DEFAULT 10,
   avg_price_inr numeric,

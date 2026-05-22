@@ -46,7 +46,9 @@ Set on **both** `delete-account` and `audit-record`:
 | `SUPABASE_SERVICE_ROLE_KEY` | Admin insert / delete (auto when linked) |
 | `SUPABASE_ANON_KEY` | JWT verification |
 | `ALLOWED_ORIGINS` | Comma-separated web origins (no `*` in production) |
-| `AUDIT_PEPPER` | Same random secret on both functions; hashes user id in audit/error retention |
+| `AUDIT_PEPPER` | Same random secret on both functions; hashes user id in audit/error retention. **Rotation procedure:** [docs/runbooks/audit-pepper-rotation.md](../runbooks/audit-pepper-rotation.md) (M1) |
+
+OAuth CSRF model (M6): the web auth callback relies on Supabase SDK's PKCE flow rather than explicit OAuth `state` validation. Rationale and verification steps at [docs/architecture/oauth-csrf.md](../architecture/oauth-csrf.md).
 
 Deploy order:
 

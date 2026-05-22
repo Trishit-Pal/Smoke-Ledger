@@ -103,10 +103,11 @@ jobs:
     #
     # Concurrency: serialise runs that target the same ref so two PRs
     # cannot race against the shared CI Supabase project.  cancel-in-progress
-    # is false because the tests clean up probe rows inside each it() block;
-    # killing a run mid-flight would leave orphaned rows and corrupt the next
-    # run's assertions.  If queue depth becomes a problem, flip to true and
-    # add an afterAll cleanup hook.
+    # is false because tests clean up probe rows both inline in each it() block
+    # AND in an afterAll() hook (added in H5).  An interrupted run will skip
+    # the afterAll cleanup, leaving probe rows that the next run treats as
+    # noise; flipping to true is therefore acceptable if queue depth becomes
+    # the bigger problem, at the cost of some test-row leakage between runs.
     concurrency:
       group: rls-integration-${{ github.ref }}
       cancel-in-progress: false

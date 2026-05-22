@@ -12,6 +12,7 @@ jest.mock('@/lib/logger', () => ({
 }));
 
 import { mapDbError } from '@/db/repositories/_supabase';
+import { deleteBrand } from '@/db/repositories/brands';
 import { listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
 import { getProfile } from '@/db/repositories/profile';
 import { AppError } from '@/lib/errors';
@@ -381,5 +382,76 @@ describe('getProfile — baseline_per_day numeric coercion (C4)', () => {
 
     // Assert — Number(15) === 15, so this is safe either way
     expect(profile.baselinePerDay).toBe(15);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteBrand — M7 audit: ON DELETE RESTRICT surfaces a `conflict` error
+// ---------------------------------------------------------------------------
+//
+// Schema change in 20250426120000_initial_schema.sql swapped brand_variants.brand_id
+// from ON DELETE CASCADE to ON DELETE RESTRICT. Deleting a brand that still has
+// variants now raises Postgres 23503 (foreign_key_violation). The repository must
+// translate that to AppError code `conflict` (not the generic `validation_error`
+// that mapDbError would otherwise produce) so the UI can offer the user a clear
+// next action: delete the variants first, or merge into another brand.
+// ---------------------------------------------------------------------------
+
+function stubBrandDelete(error: unknown) {
+  // supabase-js PostgrestBuilder is a thenable: every chain method returns the
+  // builder, and awaiting it resolves with { data, error }. We build a single
+  // self-referential builder that resolves to the supplied error envelope.
+  const builder: Record<string, unknown> = {
+    then: (resolve: (v: { error: unknown }) => void) => resolve({ error }),
+  };
+  builder.from = jest.fn(() => builder);
+  builder.delete = jest.fn(() => builder);
+  builder.eq = jest.fn(() => builder);
+  mockGetSupabase.mockReturnValue(builder);
+}
+
+describe('deleteBrand — M7 ON DELETE RESTRICT surfaces conflict', () => {
+  beforeEach(() => {
+    mockGetSupabase.mockReset();
+    // requireUserId is mocked at module load to resolve 'user-123'.
+  });
+
+  it('translates Postgres 23503 (foreign_key_violation) to AppError code conflict', async () => {
+    // Arrange — simulate the FK violation that brand_variants RESTRICT raises
+    stubBrandDelete({
+      code: '23503',
+      message:
+        'update or delete on table "brands" violates foreign key constraint "brand_variants_brand_id_fkey" on table "brand_variants"',
+    });
+
+    // Act + Assert
+    await expect(deleteBrand('brd_abc123')).rejects.toBeInstanceOf(AppError);
+    try {
+      await deleteBrand('brd_abc123');
+      throw new Error('expected deleteBrand to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AppError);
+      expect((e as AppError).code).toBe('conflict');
+      expect((e as AppError).message).toContain('brand_has_variants');
+    }
+  });
+
+  it('propagates other Postgres errors via mapDbError (not all errors are conflict)', async () => {
+    // Arrange — simulate an unrelated permission error
+    stubBrandDelete({ code: '42501', message: 'permission denied' });
+
+    // Act + Assert — 42501 maps to authorization_error in mapDbError, not conflict
+    try {
+      await deleteBrand('brd_abc123');
+      throw new Error('expected deleteBrand to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AppError);
+      expect((e as AppError).code).toBe('authorization_error');
+    }
+  });
+
+  it('resolves successfully when no error is returned', async () => {
+    stubBrandDelete(null);
+    await expect(deleteBrand('brd_abc123')).resolves.toBeUndefined();
   });
 });

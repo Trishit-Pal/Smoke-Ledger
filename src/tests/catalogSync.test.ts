@@ -68,4 +68,22 @@ describe('catalogSync', () => {
     await expect(maybeSyncDefaultBrandCatalog(storage)).rejects.toThrow('rpc failed');
     expect(storage.getItem(CATALOG_SYNC_STORAGE_KEY)).toBeNull();
   });
+
+  it('maybeSyncDefaultBrandCatalog retries cleanly after a transient failure (M5)', async () => {
+    // Simulates the "flaky network" scenario the audit flagged: the first call
+    // fails (e.g., RPC partial-write then connection drop), and the next
+    // session retries. The DB-side RPC is idempotent by SELECT-then-INSERT
+    // on (user_id, lower(name)) so a retry cannot create duplicates — see the
+    // contract documented on maybeSyncDefaultBrandCatalog.
+    const storage = makeStorage();
+    mockSync.mockRejectedValueOnce(new Error('network blip'));
+
+    await expect(maybeSyncDefaultBrandCatalog(storage)).rejects.toThrow('network blip');
+    expect(storage.getItem(CATALOG_SYNC_STORAGE_KEY)).toBeNull();
+
+    await maybeSyncDefaultBrandCatalog(storage);
+
+    expect(mockSync).toHaveBeenCalledTimes(2);
+    expect(storage.getItem(CATALOG_SYNC_STORAGE_KEY)).toBe(CATALOG_SYNC_VERSION);
+  });
 });

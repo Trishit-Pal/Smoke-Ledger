@@ -31,7 +31,16 @@ function getSessionStorage(): CatalogSyncStorage | null {
   }
 }
 
-/** Sync default brand catalog at most once per tab session per catalog version. */
+/**
+ * Sync default brand catalog at most once per tab session per catalog version.
+ *
+ * Flaky-network safety: the RPC `sync_default_brand_catalog` is idempotent by
+ * design — `sync_catalog_for_user` looks up each brand by `(user_id,
+ * lower(name))` and each variant by `(user_id, brand_id, lower(name))` before
+ * inserting. A failed call that left some rows inserted is recoverable by
+ * simply calling again; no duplicates result. Storage is only marked after a
+ * successful await, so the next session retries on transient failure.
+ */
 export async function maybeSyncDefaultBrandCatalog(
   storageOverride?: CatalogSyncStorage | null,
 ): Promise<void> {
