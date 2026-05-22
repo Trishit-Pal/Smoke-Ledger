@@ -17,10 +17,25 @@ import { ALLOWED_NEXT_PATHS } from '@web/lib/auth/redirect';
 // from a user-supplied ?next= on a page navigation.
 const CALLBACK_ONLY_PATHS: ReadonlySet<string> = new Set(['/reset-password']);
 
-// Onboarding routes are allowed as ?next= targets within the callback so
-// the server can hop to the correct onboarding step after email verification.
-// They are intentionally excluded from the client-side ALLOWED_NEXT_PATHS.
-const ONBOARDING_PREFIX = '/onboarding/';
+// Onboarding routes are allowed as ?next= targets within the callback so the
+// server can hop to the correct onboarding step after email verification. They
+// are intentionally excluded from the client-side ALLOWED_NEXT_PATHS.
+//
+// F2 audit: this was previously a `startsWith('/onboarding/')` prefix match,
+// which let any string under /onboarding/ through (including unrecognised paths
+// that don't correspond to a real page). Switched to an explicit Set so adding
+// a future onboarding route requires an explicit allowlist update — defense in
+// depth against latent chained-redirect vectors if an onboarding page ever
+// consumes `?next=` itself. Must stay in sync with web/app/onboarding/**/page.tsx.
+const ONBOARDING_PATHS: ReadonlySet<string> = new Set([
+  '/onboarding',
+  '/onboarding/baseline',
+  '/onboarding/brands',
+  '/onboarding/goal',
+  '/onboarding/privacy',
+  '/onboarding/setup',
+  '/onboarding/usage',
+]);
 
 /**
  * Validates `raw` against all three callback-side allowlists and returns the
@@ -47,8 +62,8 @@ function extractAllowedCallbackPathname(raw: string | null): string | null {
   if (ALLOWED_NEXT_PATHS.has(pathname)) return pathname;
   // Then check callback-only exact paths (e.g. /reset-password).
   if (CALLBACK_ONLY_PATHS.has(pathname)) return pathname;
-  // Finally allow onboarding prefix for internal server-side hops.
-  if (pathname.startsWith(ONBOARDING_PREFIX)) return pathname;
+  // Finally allow explicit onboarding paths for internal server-side hops.
+  if (ONBOARDING_PATHS.has(pathname)) return pathname;
   return null;
 }
 
@@ -195,7 +210,7 @@ export async function GET(request: NextRequest) {
 
   if (!onboarded) {
     // Allow explicit onboarding hops; otherwise start at privacy.
-    if (nextPathname && nextPathname.startsWith(ONBOARDING_PREFIX)) {
+    if (nextPathname && ONBOARDING_PATHS.has(nextPathname)) {
       return redirectWithCookies(response, new URL(nextPath!, requestUrl.origin));
     }
     return redirectWithCookies(response, new URL('/onboarding/privacy', requestUrl.origin));
