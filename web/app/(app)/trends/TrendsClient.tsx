@@ -1,5 +1,47 @@
 'use client';
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  Trends — "Quiet editorial · the analysis spread"
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  Aesthetic direction: Trends is the analysis spread of the same publication —
+ *  the page where the daily ledger zooms out and the charts become editorial
+ *  graphics rather than dashboard widgets. The period selector (Day · Week ·
+ *  Month · Year) becomes a small-caps text run separated by middots, no chip
+ *  pills. The headline pair under the masthead echoes Dashboard's hero numeral
+ *  but is anchored to the selected period total — a slow mirror, not today's
+ *  pulse. Charts shed their Card chrome and live flush with the typography,
+ *  each headed by an editorial caption and a one-sentence deck describing
+ *  what it says. A single ink-panel section (brand mix donut) carries the
+ *  page's one moment of dramatic contrast.
+ *
+ *  Period chips are now text buttons. Active period is set in --text and
+ *  underlined; inactive ones in --text-muted. Keyboard focusable, aria-pressed
+ *  reflects the selection.
+ *
+ *  Motion: .editorial-stage choreography. Index allocation:
+ *    0 = masthead, 1 = period chips, 2 = headline pair,
+ *    3..9 = chart sections (in source order), 10 = end-mark.
+ *
+ *  Chart accuracy matrix (F1a):
+ *
+ *  Chart #1 — daily sticks line + spend bars:
+ *    Year view (365d): FULL YEAR accurate — driven by `dailySummary` (server-side aggregate).
+ *    Day/Week/Month views: use raw `logs` as before.
+ *
+ *  Charts #2–#5 — hour distribution, day-of-week, brand spend mix, mood×trigger matrix,
+ *    day×hour heatmap: still driven by raw `logs` (90-day cap).
+ *    Year view will display the same 90-day window as Month view for these breakdowns.
+ *    Known limitation tracked as: F1 follow-on: full-Year breakdowns.
+ *
+ *  Discreet mode (isDiscreetMode(profile)) masks INR values via maskInr; the
+ *  headline sticks numeral collapses to "•••" when totals are hidden.
+ *
+ *  Data path is unchanged. The pickDailyStats helper (F1a) and previousStats
+ *  comparison are preserved.
+ */
+
 import * as React from 'react';
 import {
   dailyStats,
@@ -12,21 +54,21 @@ import { todayIst, daysAgoIst } from '@/lib/date';
 import { formatDelta, formatInr } from '@/lib/format';
 import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
-import { Card } from '@web/components/ui/Card';
-import { Chip } from '@web/components/ui/Chip';
-import { Text } from '@web/components/ui/Text';
-import { EmptyState } from '@web/components/ui/EmptyState';
-import { FadeSlideIn, Reveal } from '@web/components/anim/dynamic';
-import { Header } from '@web/components/layout/Header';
 import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
+import { Reveal } from '@web/components/anim/dynamic';
 import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
 
 type WindowDays = 1 | 7 | 30 | 365;
 
-const PERIOD_OPTIONS: { label: string; days: WindowDays }[] = [
+interface PeriodOption {
+  label: string;
+  days: WindowDays;
+}
+
+const PERIOD_OPTIONS: PeriodOption[] = [
   { label: 'Day', days: 1 },
   { label: 'Week', days: 7 },
   { label: 'Month', days: 30 },
@@ -39,19 +81,6 @@ export interface TrendsClientProps {
   logs: CigaretteLog[];
   dailySummary: DailySummary[];
 }
-
-/**
- * Chart accuracy matrix (F1a):
- *
- * Chart #1 — daily sticks line + spend bars:
- *   Year view (365d): FULL YEAR accurate — driven by `dailySummary` (server-side aggregate).
- *   Day/Week/Month views: use raw `logs` as before.
- *
- * Charts #2–#5 — hour distribution, day-of-week, brand spend mix, mood×trigger matrix,
- *   day×hour heatmap: still driven by raw `logs` (90-day cap).
- *   Year view will display the same 90-day window as Month view for these breakdowns.
- *   Known limitation tracked as: F1 follow-on: full-Year breakdowns.
- */
 
 /**
  * Returns a DailyStat array appropriate for the sticks/spend time-series charts.
@@ -71,13 +100,62 @@ function pickDailyStats(
   today: string,
 ): DailyStat[] {
   if (windowDays === 365) {
-    // Filter summary to the 365-day window and map to DailyStat shape.
     return dailySummary
       .filter((r) => r.localDate >= startYmd && r.localDate <= today)
       .map((r) => ({ date: r.localDate, sticks: r.sticks, spendInr: r.totalSpendInr }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
   return dailyStats(logs, startYmd, today);
+}
+
+/** Tone for delta percentage: terracotta for up, teal for down (positive),
+ *  neutral for stable. Never alarm red. Mirrors Dashboard. */
+function deltaTone(deltaPct: number): 'up' | 'down' | 'flat' {
+  if (!Number.isFinite(deltaPct)) return 'flat';
+  if (deltaPct > 2) return 'up';
+  if (deltaPct < -2) return 'down';
+  return 'flat';
+}
+
+function deltaColor(tone: 'up' | 'down' | 'flat'): string {
+  if (tone === 'up') return 'var(--warn-earth)';
+  if (tone === 'down') return 'var(--accent)';
+  return 'var(--text-muted)';
+}
+
+/** Editorial label for the masthead — pairs the static word "Trends" with the
+ *  selected period. Reads as a section title in the publication. */
+function windowLabel(days: WindowDays): string {
+  switch (days) {
+    case 1:
+      return 'Today';
+    case 7:
+      return 'This week';
+    case 30:
+      return 'This month';
+    case 365:
+      return 'This year';
+  }
+}
+
+/** One-line deck describing the headline pair, voiced honestly. */
+function headlineDeck(opts: {
+  sticks: number;
+  windowDays: WindowDays;
+  avg: number;
+  deltaPct: number;
+  hidden: boolean;
+}): string {
+  if (opts.hidden) return 'Period totals — hidden.';
+  if (opts.sticks === 0) {
+    if (opts.windowDays === 1) return 'Nothing logged today.';
+    return `Nothing logged across the last ${opts.windowDays} days.`;
+  }
+  const delta = formatDelta(opts.deltaPct);
+  if (opts.windowDays === 1) {
+    return `${opts.sticks} ${opts.sticks === 1 ? 'cigarette' : 'cigarettes'} today, ${delta} vs the day before.`;
+  }
+  return `${opts.sticks} ${opts.sticks === 1 ? 'cigarette' : 'cigarettes'} across ${opts.windowDays} days. Average ${opts.avg.toFixed(1)} per day, ${delta} vs the period before.`;
 }
 
 export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps) {
@@ -100,24 +178,28 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
   );
   const previousEnd = React.useMemo(() => dayShift(startYmd, -1), [startYmd]);
   const previousStats = React.useMemo(() => {
-    // Previous period comparison always uses raw logs (only the current period
+    // Previous-period comparison always uses raw logs (only the current period
     // uses dailySummary for Year; prior-year comparison is out of F1a scope).
     return dailyStats(logs, previousStart, previousEnd);
   }, [logs, previousStart, previousEnd]);
 
-  const sticksLine = React.useMemo(() => {
-    return currentStats.map((s) => ({
-      label: s.date.slice(5),
-      value: s.sticks,
-    }));
-  }, [currentStats]);
+  const sticksLine = React.useMemo(
+    () =>
+      currentStats.map((s) => ({
+        label: s.date.slice(5),
+        value: s.sticks,
+      })),
+    [currentStats],
+  );
 
-  const spendBars = React.useMemo(() => {
-    return currentStats.map((s) => ({
-      label: s.date.slice(5),
-      value: Math.round(s.spendInr),
-    }));
-  }, [currentStats]);
+  const spendBars = React.useMemo(
+    () =>
+      currentStats.map((s) => ({
+        label: s.date.slice(5),
+        value: Math.round(s.spendInr),
+      })),
+    [currentStats],
+  );
 
   const hours = React.useMemo(
     () => hourDistribution(logs, startYmd, today),
@@ -180,95 +262,200 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
     };
   }, [currentStats, previousStats, windowDays]);
 
+  const stickTone = deltaTone(summary.stickDeltaPct);
+  const spendTone = deltaTone(summary.spendDeltaPct);
+  const stickToneColor = deltaColor(stickTone);
+  const spendToneColor = deltaColor(spendTone);
+
+  const hasData = logs.length > 0;
+  const periodLabel = windowLabel(windowDays);
+  const isYear = windowDays === 365;
+
+  // Editorial-stage CSS-variable indexing helper.
+  const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
+
+  // Index allocation: 0 masthead, 1 chips, 2 headline pair,
+  // 3..9 sections (sticks, spend, heatmap, hours, dow, mood, brand-mix), 10 end-mark.
+  const TRAILING_INDEX = 10;
+
   return (
-    <div className="max-w-3xl mx-auto p-lg flex flex-col gap-xl pb-32">
-      <FadeSlideIn index={0}>
-        <Header title="Trends" subtitle="Patterns in your data" />
-      </FadeSlideIn>
+    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+      {/* Atmospheric paper noise — purely decorative, behind everything. */}
+      <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <FadeSlideIn index={1}>
-        <div className="flex gap-sm">
-          {PERIOD_OPTIONS.map((period) => (
-            <Chip
-              key={period.days}
-              label={period.label}
-              selected={windowDays === period.days}
-              onPress={() => setWindowDays(period.days)}
+      <div className="editorial-stage flex flex-col gap-xxl">
+        {/* ─────────────── Masthead ─────────────── */}
+        <header style={idx(0)} className="flex flex-col gap-sm">
+          <div className="flex items-center gap-md">
+            <span
+              aria-hidden
+              className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
+              style={idx(0)}
             />
-          ))}
-        </div>
-      </FadeSlideIn>
+            <span className="editorial-caption nums-tabular">
+              Trends · {periodLabel}
+            </span>
+            <span
+              aria-hidden
+              className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
+              style={idx(0)}
+            />
+          </div>
+          <p className="text-small text-text-muted text-center italic">
+            The week, the month, the year — in one read.
+          </p>
+        </header>
 
-      {logs.length === 0 ? (
-        <EmptyState
-          title="No data to chart yet"
-          description="Once you log a few cigarettes, charts and patterns will appear here."
-        />
-      ) : (
-        <>
-          <FadeSlideIn index={2}>
-            <Card>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-md">
-                <div>
-                  <Text variant="caption" muted>
-                    Sticks
-                  </Text>
-                  <Text variant="bodyStrong">
+        {/* ─────────────── Period selector — small-caps text run ─────────────── */}
+        <nav
+          style={idx(1)}
+          aria-label="Select trend period"
+          className="flex items-center justify-center"
+        >
+          <ul className="flex items-center gap-sm flex-wrap justify-center">
+            {PERIOD_OPTIONS.map((period, i) => {
+              const isActive = windowDays === period.days;
+              return (
+                <li key={period.days} className="flex items-center gap-sm">
+                  <button
+                    type="button"
+                    onClick={() => setWindowDays(period.days)}
+                    aria-pressed={isActive}
+                    className="editorial-caption focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm transition-colors"
+                    style={{
+                      color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                      textDecoration: isActive ? 'underline' : 'none',
+                      textDecorationColor: 'var(--rule-strong)',
+                      textUnderlineOffset: '4px',
+                      textDecorationThickness: '1px',
+                      padding: '6px 4px',
+                      minHeight: '32px',
+                    }}
+                  >
+                    {period.label}
+                  </button>
+                  {i < PERIOD_OPTIONS.length - 1 ? (
+                    <span aria-hidden className="text-text-faint" style={{ fontSize: 11 }}>
+                      ·
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {hasData ? (
+          <>
+            {/* ─────────────── Headline pair — the period in one number ─────────────── */}
+            <section
+              style={idx(2)}
+              aria-labelledby="period-heading"
+              className="flex flex-col gap-lg"
+            >
+              <h2 id="period-heading" className="sr-only">
+                {periodLabel} totals
+              </h2>
+
+              <div className="flex items-end justify-between gap-lg flex-wrap">
+                <div className="flex flex-col">
+                  <span className="editorial-caption mb-sm">Sticks · {periodLabel.toLowerCase()}</span>
+                  <div
+                    className="editorial-numeral editorial-headline-rise nums-tabular"
+                    aria-label={
+                      discreet
+                        ? 'Period sticks total hidden'
+                        : `${summary.sticks} ${summary.sticks === 1 ? 'cigarette' : 'cigarettes'} across the period`
+                    }
+                  >
                     {discreet ? '•••' : summary.sticks}
-                  </Text>
-                  <Text variant="small" muted>
-                    {formatDelta(summary.stickDeltaPct)} vs previous
-                  </Text>
+                  </div>
+                  <span
+                    className="text-small nums-tabular mt-xs"
+                    style={{ color: stickToneColor }}
+                    aria-label={`Sticks change: ${formatDelta(summary.stickDeltaPct)} vs previous period`}
+                  >
+                    {formatDelta(summary.stickDeltaPct)}
+                    <span className="text-text-faint"> vs previous</span>
+                  </span>
                 </div>
-                <div>
-                  <Text variant="caption" muted>
-                    Spend
-                  </Text>
-                  <Text variant="bodyStrong">
-                    {maskInr(summary.spend, discreet, (n) => formatInr(n))}
-                  </Text>
-                  <Text variant="small" muted>
-                    {formatDelta(summary.spendDeltaPct)} vs previous
-                  </Text>
-                </div>
-                <div>
-                  <Text variant="caption" muted>
-                    Avg/day sticks
-                  </Text>
-                  <Text variant="bodyStrong">
-                    {discreet ? '•••' : summary.avgSticksPerDay.toFixed(1)}
-                  </Text>
-                </div>
-                <div>
-                  <Text variant="caption" muted>
-                    Avg/day spend
-                  </Text>
-                  <Text variant="bodyStrong">
-                    {maskInr(summary.avgSpendPerDay, discreet, (n) => formatInr(n))}
-                  </Text>
+                <div className="flex flex-col items-end text-right ml-auto pb-sm">
+                  <span className="editorial-caption mb-sm">Spend</span>
+                  <div
+                    className="editorial-numeral--small nums-tabular"
+                    aria-label={
+                      discreet
+                        ? 'Period spend hidden'
+                        : `Spent ${formatInr(summary.spend)} across the period`
+                    }
+                  >
+                    {maskInr(summary.spend, discreet, (n) => formatInr(n, { compact: true }))}
+                  </div>
+                  <span
+                    className="text-small nums-tabular mt-xs"
+                    style={{ color: spendToneColor }}
+                    aria-label={`Spend change: ${formatDelta(summary.spendDeltaPct)} vs previous period`}
+                  >
+                    {formatDelta(summary.spendDeltaPct)}
+                    <span className="text-text-faint"> vs previous</span>
+                  </span>
                 </div>
               </div>
-            </Card>
-          </FadeSlideIn>
 
-          {/* Daily sticks line */}
-          <FadeSlideIn index={3}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Daily sticks
-              </Text>
+              <p className="text-body text-text-muted max-w-[44ch]">
+                {headlineDeck({
+                  sticks: summary.sticks,
+                  windowDays,
+                  avg: summary.avgSticksPerDay,
+                  deltaPct: summary.stickDeltaPct,
+                  hidden: discreet,
+                })}
+              </p>
+
+              {isYear ? (
+                <p className="text-caption text-text-faint italic">
+                  — Year-accurate: the sticks &amp; spend lines below are summed from
+                  the server-side daily summary.
+                </p>
+              ) : null}
+            </section>
+
+            {/* ─────────────── Daily sticks — the line ─────────────── */}
+            <section style={idx(3)} aria-labelledby="sticks-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="sticks-heading" className="editorial-caption">
+                  Daily sticks
+                </h2>
+                <span className="text-caption text-text-faint nums-tabular">
+                  {windowDays} {windowDays === 1 ? 'day' : 'days'}
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
-                <LineChart data={sticksLine} height={180} />
+                <LineChart
+                  data={sticksLine}
+                  height={180}
+                  strokeColor={stickToneColor}
+                />
               </Reveal>
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                {summary.sticks === 0
+                  ? 'A flat line. Nothing logged in this window.'
+                  : summary.avgSticksPerDay < 1
+                    ? 'A sparse week — most days quiet.'
+                    : `Around ${summary.avgSticksPerDay.toFixed(1)} a day, on average.`}
+              </p>
+            </section>
 
-          {/* Daily spend */}
-          <FadeSlideIn index={4}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Daily spend
-              </Text>
+            {/* ─────────────── Daily spend — bars ─────────────── */}
+            <section style={idx(4)} aria-labelledby="spend-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="spend-heading" className="editorial-caption">
+                  Daily spend
+                </h2>
+                <span className="text-caption text-text-faint nums-tabular">
+                  {maskInr(summary.spend, discreet, (n) => formatInr(n, { compact: true }))} total
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
                 <AnimatedBarChart
                   data={spendBars}
@@ -276,131 +463,225 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   formatY={(v) => formatInr(v, { compact: true })}
                 />
               </Reveal>
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                {summary.spend === 0
+                  ? 'Nothing spent in this window.'
+                  : `Average ${maskInr(summary.avgSpendPerDay, discreet, (n) => formatInr(n, { compact: true }))} a day. The bars are the texture.`}
+              </p>
+            </section>
 
-          {/* Heatmap */}
-          <FadeSlideIn index={5}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Day × hour heatmap
-              </Text>
+            {/* ─────────────── Day × hour heatmap ─────────────── */}
+            <section style={idx(5)} aria-labelledby="heatmap-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="heatmap-heading" className="editorial-caption">
+                  Day × hour
+                </h2>
+                <span className="text-caption text-text-faint">
+                  When the week breathes
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
                 <Heatmap logs={logs} startYmd={startYmd} endYmd={today} />
               </Reveal>
-              {windowDays === 365 && (
-                <Text variant="caption" muted className="mt-sm">
-                  Showing last 90 days (longer history coming soon)
-                </Text>
-              )}
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                The grid reads top-down by weekday, left-right by hour. Dark
+                squares are where the habit lives.
+              </p>
+              {isYear ? (
+                <p className="text-caption text-text-faint italic">
+                  — Showing the last 90 days. Longer history coming soon.
+                </p>
+              ) : null}
+            </section>
 
-          {/* Time of day */}
-          <FadeSlideIn index={6}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Time of day
-              </Text>
+            {/* ─────────────── Time of day ─────────────── */}
+            <section style={idx(6)} aria-labelledby="hour-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="hour-heading" className="editorial-caption">
+                  Time of day
+                </h2>
+                <span className="text-caption text-text-faint">
+                  24-hour distribution
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
                 <BarChart data={hourBars} height={160} />
               </Reveal>
-              {windowDays === 365 && (
-                <Text variant="caption" muted className="mt-sm">
-                  Showing last 90 days (longer history coming soon)
-                </Text>
-              )}
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                Mornings and evenings tend to spike. Quiet hours are the ones
+                worth keeping.
+              </p>
+              {isYear ? (
+                <p className="text-caption text-text-faint italic">
+                  — Showing the last 90 days. Longer history coming soon.
+                </p>
+              ) : null}
+            </section>
 
-          {/* Day of week */}
-          <FadeSlideIn index={7}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Day of week
-              </Text>
+            {/* ─────────────── Day of week ─────────────── */}
+            <section style={idx(7)} aria-labelledby="dow-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="dow-heading" className="editorial-caption">
+                  Day of week
+                </h2>
+                <span className="text-caption text-text-faint">
+                  Mon — Sun
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
                 <BarChart data={dowBars} height={160} />
               </Reveal>
-              {windowDays === 365 && (
-                <Text variant="caption" muted className="mt-sm">
-                  Showing last 90 days (longer history coming soon)
-                </Text>
-              )}
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                The shape of your week. Weekends and weekdays rarely match.
+              </p>
+              {isYear ? (
+                <p className="text-caption text-text-faint italic">
+                  — Showing the last 90 days. Longer history coming soon.
+                </p>
+              ) : null}
+            </section>
 
-          {/* Mood × Trigger */}
-          <FadeSlideIn index={8}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Mood × trigger
-              </Text>
+            {/* ─────────────── Mood × trigger ─────────────── */}
+            <section style={idx(8)} aria-labelledby="mood-heading" className="flex flex-col gap-md">
+              <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
+                <h2 id="mood-heading" className="editorial-caption">
+                  Mood × trigger
+                </h2>
+                <span className="text-caption text-text-faint">
+                  Where it tends to start
+                </span>
+              </div>
               <Reveal dependencyKey={dependencyKey}>
                 <MoodTriggerMatrix logs={logs} />
               </Reveal>
-              {windowDays === 365 && (
-                <Text variant="caption" muted className="mt-sm">
-                  Showing last 90 days (longer history coming soon)
-                </Text>
-              )}
-            </Card>
-          </FadeSlideIn>
+              <p className="text-small text-text-muted italic max-w-[48ch]">
+                A grid of feelings against situations. The dense cells are the
+                pattern.
+              </p>
+              {isYear ? (
+                <p className="text-caption text-text-faint italic">
+                  — Showing the last 90 days. Longer history coming soon.
+                </p>
+              ) : null}
+            </section>
 
-          {/* Brand spend donut */}
-          <FadeSlideIn index={9}>
-            <Card>
-              <Text variant="caption" muted className="mb-sm">
-                Brand spend (top 5)
-              </Text>
-              {donutSlices.length === 0 ? (
-                <Text variant="small" muted>
-                  No priced logs in this window.
-                </Text>
-              ) : (
-                <Reveal dependencyKey={dependencyKey}>
-                  <div className="flex flex-col sm:flex-row items-center gap-lg">
-                    <Donut
-                      slices={donutSlices}
-                      size={160}
-                      centerLabel="TOTAL"
-                      centerValue={formatInr(totalSpend, { compact: true })}
-                    />
-                    <ul className="flex-1 w-full flex flex-col gap-sm">
-                      {brandMix.map((b, idx) => (
-                        <li key={b.brand} className="flex items-center justify-between">
-                          <div className="flex items-center gap-sm min-w-0">
+            {/* ─────────────── Brand spend — ink-panel donut ───────────────
+                This is the one editorial contrast on the page. A colored donut
+                set on the dark ink surface reads as the visual climax of the
+                spread — the rest is paper, this is ink. */}
+            <section style={idx(9)} aria-labelledby="brand-heading">
+              <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
+                <div className="flex items-baseline justify-between gap-md">
+                  <h2
+                    id="brand-heading"
+                    className="editorial-caption"
+                    style={{ color: 'var(--ink-surface-muted)' }}
+                  >
+                    Brand spend · top 5
+                  </h2>
+                  <span
+                    className="text-caption nums-tabular"
+                    style={{ color: 'var(--ink-surface-muted)' }}
+                  >
+                    {maskInr(totalSpend, discreet, (n) => formatInr(n, { compact: true }))}
+                  </span>
+                </div>
+
+                {donutSlices.length === 0 ? (
+                  <p className="text-small italic" style={{ color: 'var(--ink-surface-muted)' }}>
+                    No priced logs in this window.
+                  </p>
+                ) : (
+                  <Reveal dependencyKey={dependencyKey}>
+                    <div className="flex flex-col sm:flex-row items-center gap-lg">
+                      <Donut
+                        slices={donutSlices}
+                        size={160}
+                        centerLabel="TOTAL"
+                        centerValue={maskInr(totalSpend, discreet, (n) =>
+                          formatInr(n, { compact: true }),
+                        )}
+                      />
+                      <ul className="flex-1 w-full flex flex-col">
+                        {brandMix.map((b, i) => (
+                          <li
+                            key={b.brand}
+                            className="flex items-center justify-between py-sm"
+                            style={{
+                              borderTop: i === 0 ? 'none' : '1px solid var(--ink-surface-rule)',
+                            }}
+                          >
+                            <div className="flex items-center gap-sm min-w-0">
+                              <span
+                                aria-hidden
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{
+                                  backgroundColor: [
+                                    '#2FA39B',
+                                    '#4C7CD9',
+                                    '#D99A2B',
+                                    '#C85A54',
+                                    '#8A6FC2',
+                                  ][i % 5],
+                                }}
+                              />
+                              <span
+                                className="text-small truncate"
+                                style={{ color: 'var(--ink-surface-text)' }}
+                              >
+                                {b.brand}
+                              </span>
+                            </div>
                             <span
-                              aria-hidden
-                              className="w-3 h-3 rounded-sm shrink-0"
-                              style={{
-                                backgroundColor: [
-                                  '#2FA39B',
-                                  '#4C7CD9',
-                                  '#D99A2B',
-                                  '#C85A54',
-                                  '#8A6FC2',
-                                ][idx % 5],
-                              }}
-                            />
-                            <Text variant="small" className="truncate">
-                              {b.brand}
-                            </Text>
-                          </div>
-                          <Text variant="small" muted>
-                            {formatInr(b.spendInr, { compact: true })} ·{' '}
-                            {Math.round(b.share * 100)}%
-                          </Text>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </Reveal>
-              )}
-            </Card>
-          </FadeSlideIn>
-        </>
-      )}
+                              className="text-small nums-tabular"
+                              style={{ color: 'var(--ink-surface-muted)' }}
+                            >
+                              {maskInr(b.spendInr, discreet, (n) =>
+                                formatInr(n, { compact: true }),
+                              )}
+                              <span style={{ color: 'var(--ink-surface-muted)' }}> · </span>
+                              {Math.round(b.share * 100)}%
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Reveal>
+                )}
+                {isYear ? (
+                  <p
+                    className="text-caption italic"
+                    style={{ color: 'var(--ink-surface-muted)' }}
+                  >
+                    — Showing the last 90 days. Longer history coming soon.
+                  </p>
+                ) : null}
+              </div>
+            </section>
+
+            {/* ─────────────── End-mark ─────────────── */}
+            <footer
+              style={idx(TRAILING_INDEX)}
+              className="rule-hair pt-md flex items-center justify-center"
+            >
+              <span className="text-caption text-text-faint italic">
+                Numbers are a slow mirror.
+              </span>
+            </footer>
+          </>
+        ) : (
+          /* ─────────────── Empty state — a quiet invitation ─────────────── */
+          <section style={idx(2)} className="rule-hair pt-lg flex flex-col gap-sm">
+            <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
+              No data to chart yet.
+            </p>
+            <p className="text-body text-text-muted max-w-[40ch]">
+              Once you log a few cigarettes, the charts and patterns of your
+              week will print here.
+            </p>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
