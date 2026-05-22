@@ -21,6 +21,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { sha256Hex } from '../_shared/hash.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 // ---------------- env ----------------
 
@@ -71,57 +73,6 @@ function clientIp(req: Request): string {
   return 'unknown';
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', buf);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// ---------------- rate limit ----------------
-
-type Kv = Awaited<ReturnType<typeof Deno.openKv>>;
-
-let kv: Kv | null = null;
-async function getKv(): Promise<Kv | null> {
-  if (kv) return kv;
-  try {
-    kv = await Deno.openKv();
-    return kv;
-  } catch (e) {
-    console.warn('delete-account: KV unavailable, rate-limit failing closed (KV unavailable)', e);
-    return null;
-  }
-}
-
-async function checkRateLimit(key: string): Promise<{ ok: boolean; remaining: number }> {
-  const store = await getKv();
-  // Fail-closed: KV unavailability must not silently disable abuse protection.
-  // A KV outage returns 429 (same path as an exhausted limit) until KV recovers.
-  if (!store) return { ok: false, remaining: 0 };
-  const k = ['delete-account', key];
-  const entry = await store.get<{ count: number; resetAt: number }>(k);
-  const now = Date.now();
-  if (!entry.value || entry.value.resetAt <= now) {
-    await store.set(
-      k,
-      { count: 1, resetAt: now + RATE_LIMIT_WINDOW_SEC * 1000 },
-      { expireIn: RATE_LIMIT_WINDOW_SEC * 1000 },
-    );
-    return { ok: true, remaining: RATE_LIMIT_MAX - 1 };
-  }
-  if (entry.value.count >= RATE_LIMIT_MAX) {
-    return { ok: false, remaining: 0 };
-  }
-  await store.set(
-    k,
-    { count: entry.value.count + 1, resetAt: entry.value.resetAt },
-    { expireIn: Math.max(1, entry.value.resetAt - now) },
-  );
-  return { ok: true, remaining: RATE_LIMIT_MAX - entry.value.count - 1 };
-}
-
 // ---------------- handler ----------------
 
 serve(async (req) => {
@@ -151,7 +102,12 @@ serve(async (req) => {
   }
 
   const ip = clientIp(req);
-  const ipRate = await checkRateLimit(`ip:${await sha256Hex(ip)}`);
+  const ipRate = await checkRateLimit({
+    kind: 'delete-account',
+    key: `ip:${await sha256Hex(ip)}`,
+    max: RATE_LIMIT_MAX,
+    windowSec: RATE_LIMIT_WINDOW_SEC,
+  });
   if (!ipRate.ok) {
     return json({ error: 'rate_limited', request_id: requestId }, 429, origin);
   }
@@ -180,7 +136,12 @@ serve(async (req) => {
 
     // Per-user rate limit (in addition to per-IP) so a single user cannot drain
     // their own quota from many IPs.
-    const userRate = await checkRateLimit(`user:${userId}`);
+    const userRate = await checkRateLimit({
+      kind: 'delete-account',
+      key: `user:${userId}`,
+      max: RATE_LIMIT_MAX,
+      windowSec: RATE_LIMIT_WINDOW_SEC,
+    });
     if (!userRate.ok) {
       return json({ error: 'rate_limited', request_id: requestId }, 429, origin);
     }
