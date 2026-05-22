@@ -56,14 +56,16 @@ async function getKv(): Promise<Kv | null> {
     kv = await Deno.openKv();
     return kv;
   } catch (e) {
-    console.warn('audit-record: KV unavailable, rate-limit disabled', e);
+    console.warn('audit-record: KV unavailable, rate-limit failing closed (KV unavailable)', e);
     return null;
   }
 }
 
 async function checkRateLimit(key: string): Promise<boolean> {
   const store = await getKv();
-  if (!store) return true;
+  // Fail-closed: KV unavailability must not silently disable abuse protection.
+  // A KV outage returns 429 (same path as an exhausted limit) until KV recovers.
+  if (!store) return false;
   const k = ['audit-record', key];
   const entry = await store.get<{ count: number; resetAt: number }>(k);
   const now = Date.now();

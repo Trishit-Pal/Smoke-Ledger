@@ -1,5 +1,10 @@
 // Privacy-aware analytics event schema.
 // Events are written to Supabase `usage_events` (RLS, per user). No third-party SDKs.
+//
+// Design rule: payloads must NOT carry UUIDs, per-row IDs, or user-input text.
+// Use aggregate/enum fields only so no downstream consumer can reconstruct timelines.
+
+import type { BrandCategory, GoalType } from '@/types';
 
 export const AnalyticsEvents = {
   APP_OPENED: 'app_opened',
@@ -33,15 +38,23 @@ export interface EventPayloadMap {
   };
   quick_add_used: Record<string, never>;
   repeat_last_used: Record<string, never>;
-  log_edited: { log_id: string };
-  log_deleted: { log_id: string };
-  goal_created: { type: string };
-  goal_progress_viewed: { goal_id: string };
-  insight_viewed: { insight_id: string };
+  // field_changed tracks WHICH kind of edit occurred, not which row.
+  // Pass undefined/omit when the edit site doesn't know the changed field.
+  log_edited: { field_changed?: 'quantity' | 'price' | 'time' | 'meta' | 'multiple' };
+  // Knowing a deletion occurred is enough; the row ID adds no analytics value.
+  log_deleted: Record<string, never>;
+  goal_created: { type: GoalType };
+  // goal_type replaces goal_id — identifies which kind of goal was viewed, not which row.
+  goal_progress_viewed: { goal_type: GoalType };
+  // insight_category replaces insight_id — per-session IDs are ephemeral random values
+  // (generated via makeId), not canonical seeds, so they constitute soft PII.
+  insight_viewed: { insight_category: 'time_of_day' | 'trigger' | 'trend' | 'brand' | 'dow' | 'onboarding' };
   report_viewed: { report: string };
   reminder_enabled: { kind: string };
   export_requested: { format: 'csv' | 'json' };
   discreet_mode_enabled: { enabled: boolean };
-  brand_created: { brand_name: string };
-  brand_favorited: { brand_id: string };
+  // category + is_seed replace brand_name (user-input text) and brand_id (UUID).
+  brand_created: { category: BrandCategory; is_seed: boolean };
+  // Same treatment: category + is_seed instead of brand_id UUID.
+  brand_favorited: { category: BrandCategory; is_seed: boolean };
 }

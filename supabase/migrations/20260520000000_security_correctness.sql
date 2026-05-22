@@ -224,12 +224,57 @@ $$;
 GRANT EXECUTE ON FUNCTION public.record_audit_event(text, text, jsonb) TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- 6. error_events: tighten and add length cap
+-- 6. error_events: tighten and add length cap; tamper-resistance for
+--    compliance.delete rows (H1 audit fix).
+--
+-- Tamper-resistance contract
+-- ──────────────────────────
+-- compliance.delete rows are written by the delete-account edge function using
+-- service_role with user_id = NULL.  They are forensic / DPDP audit evidence
+-- and must survive user purge.  Three layers enforce this:
+--
+--   a) INSERT policy: authenticated users may only insert rows where
+--      user_id = auth.uid() AND category <> 'compliance.delete'.
+--      Service-role bypasses RLS and may insert null-user compliance rows.
+--
+--   b) No DELETE policy for authenticated role → RLS default-deny.
+--      Explicit DROP ensures any previously created permissive policy is gone.
+--
+--   c) No UPDATE policy for authenticated role → RLS default-deny.
+--
+--   d) CHECK constraint: category = 'compliance.delete' IMPLIES user_id IS NULL.
+--      Prevents future code paths from accidentally inserting compliance.delete
+--      rows with a real user_id (which would then be visible to / deletable by
+--      that user via RLS).
 -- ---------------------------------------------------------------------------
 
 DROP POLICY IF EXISTS error_events_insert ON public.error_events;
+-- Authenticated users may only insert their own, non-compliance.delete rows.
+-- Service-role (edge functions) bypasses RLS and may insert null-user compliance rows.
 CREATE POLICY error_events_insert ON public.error_events FOR INSERT TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  WITH CHECK (user_id = auth.uid() AND category <> 'compliance.delete');
+
+-- Explicitly deny DELETE for authenticated users (belt-and-suspenders; RLS
+-- default-denies when no policy exists, but explicit DROP + no-recreate makes
+-- the intent auditable in migration history).
+DROP POLICY IF EXISTS error_events_delete ON public.error_events;
+-- (Intentionally do NOT recreate an authenticated DELETE policy.)
+
+-- Explicitly deny UPDATE for authenticated users.
+DROP POLICY IF EXISTS error_events_update ON public.error_events;
+-- (Intentionally do NOT recreate an authenticated UPDATE policy.)
+
+-- CHECK: compliance.delete rows MUST have user_id IS NULL.
+-- This closes the vector where future code might insert a user-owned
+-- compliance.delete row that would then be readable/deletable by that user.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'error_events_compliance_delete_null_user_check') THEN
+    ALTER TABLE public.error_events
+      ADD CONSTRAINT error_events_compliance_delete_null_user_check
+      CHECK (category <> 'compliance.delete' OR user_id IS NULL);
+  END IF;
+END$$;
 
 DO $$
 BEGIN

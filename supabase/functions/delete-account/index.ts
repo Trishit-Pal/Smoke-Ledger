@@ -9,9 +9,9 @@
 // 2. Recent re-auth gate: the caller must have signed in within the configured
 //    window (default 15 minutes). This blocks "lost-laptop" abuse from a stale
 //    refresh token escalating to account deletion.
-// 3. Per-IP rate-limit via Deno KV: 5 attempts / 10 minutes / IP. Falls open if
-//    KV is unavailable so a misconfigured environment cannot lock out legit
-//    users; logs the failure for follow-up.
+// 3. Per-IP rate-limit via Deno KV: 5 attempts / 10 minutes / IP. Fails CLOSED
+//    if KV is unavailable — a KV outage returns 429 rather than silently
+//    disabling abuse protection (defense-in-depth). Logs the event for ops.
 // 4. Origin allowlist: refuses unknown origins. Refuses `*` in production.
 // 5. Audit trail: writes an `account_deleted` event with the user's hashed id
 //    BEFORE calling `admin.deleteUser`. After delete the row remains with a
@@ -90,14 +90,16 @@ async function getKv(): Promise<Kv | null> {
     kv = await Deno.openKv();
     return kv;
   } catch (e) {
-    console.warn('delete-account: KV unavailable, rate-limit disabled', e);
+    console.warn('delete-account: KV unavailable, rate-limit failing closed (KV unavailable)', e);
     return null;
   }
 }
 
 async function checkRateLimit(key: string): Promise<{ ok: boolean; remaining: number }> {
   const store = await getKv();
-  if (!store) return { ok: true, remaining: RATE_LIMIT_MAX };
+  // Fail-closed: KV unavailability must not silently disable abuse protection.
+  // A KV outage returns 429 (same path as an exhausted limit) until KV recovers.
+  if (!store) return { ok: false, remaining: 0 };
   const k = ['delete-account', key];
   const entry = await store.get<{ count: number; resetAt: number }>(k);
   const now = Date.now();
