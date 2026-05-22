@@ -206,4 +206,98 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     // RLS default-deny means 0 rows matched / deleted for authenticated role.
     expect(count).toBe(0);
   });
+
+  // ── F1a: get_daily_summary RPC ─────────────────────────────────────────────
+
+  it('F1a: get_daily_summary returns rows in DESC date order for the calling user', async () => {
+    // Use a narrow recent range so the assertion is bounded regardless of how
+    // much real data exists in the test user's account. The view aggregates
+    // cigarette_logs, so even an empty user returns an empty array (not an error).
+    const today = new Date().toISOString().slice(0, 10);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const { data, error } = await clientA.rpc('get_daily_summary', {
+      p_from: sevenDaysAgo,
+      p_to: today,
+    });
+    expect(error).toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+
+    if (Array.isArray(data) && data.length > 1) {
+      // DESC means [0] is the newest. Confirm monotonic non-increasing.
+      for (let i = 1; i < data.length; i++) {
+        expect(String(data[i - 1].local_date) >= String(data[i].local_date)).toBe(true);
+      }
+    }
+  });
+
+  it('F1a: get_daily_summary rejects range > 366 days', async () => {
+    // 400 days back from today — exceeds the 366-day cap baked into the RPC.
+    const today = new Date().toISOString().slice(0, 10);
+    const fourHundredDaysAgo = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const { error } = await clientA.rpc('get_daily_summary', {
+      p_from: fourHundredDaysAgo,
+      p_to: today,
+    });
+    expect(error).toBeTruthy();
+    expect(error?.message?.toLowerCase()).toMatch(/366|range/);
+  });
+
+  it('F1a: get_daily_summary rejects p_to < p_from', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const { error } = await clientA.rpc('get_daily_summary', {
+      p_from: tomorrow,
+      p_to: today,
+    });
+    expect(error).toBeTruthy();
+  });
+
+  it('F1a: v_daily_summary_user view respects RLS — user B cannot see user A rows', async () => {
+    // The view is SECURITY INVOKER and the underlying cigarette_logs has RLS
+    // requiring user_id = auth.uid(). User B querying the view directly should
+    // never see user A's rows. We insert a probe log as A and confirm B sees
+    // zero rows for that local_date in the view.
+    const today = new Date().toISOString().slice(0, 10);
+    const probeId = `log_f1a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const localHour = new Date().getUTCHours();
+
+    const insertA = await clientA
+      .from('cigarette_logs')
+      .insert({
+        id: probeId,
+        user_id: userAId,
+        ts_utc: nowIso,
+        local_date: today,
+        local_hour: localHour,
+        quantity: 1,
+        purchase_mode: 'single',
+        price_source: 'unknown',
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+      .select('id')
+      .single();
+    expect(insertA.error).toBeNull();
+
+    try {
+      // B selecting the view directly with A's user_id filter must return [].
+      const { data, error } = await clientB
+        .from('v_daily_summary_user')
+        .select('user_id, local_date, sticks')
+        .eq('user_id', userAId)
+        .eq('local_date', today);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    } finally {
+      await clientA.from('cigarette_logs').delete().eq('id', probeId);
+    }
+  });
 });

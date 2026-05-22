@@ -370,21 +370,64 @@ export async function getHistoryPageData() {
   return { profile, logs, nextCursor };
 }
 
+// ---------------------------------------------------------------------------
+// Daily summary (F1a: Trends Year view egress fix)
+// ---------------------------------------------------------------------------
+
+export type DailySummary = {
+  localDate: string;       // YYYY-MM-DD
+  sticks: number;
+  totalSpendInr: number;   // numeric from Postgres → coerced via Number()
+  avgUnitPriceInr: number | null;
+};
+
 /**
- * CONCERN: Trends data is capped at 200 rows over a 90-day rolling window.
- * The Trends client supports a "Year" window but that window is now bounded by
- * what the server provides. Full year aggregation requires server-side daily
- * summaries (a `daily_summary` materialized view), which is a separate plan
- * item outside C1's scope. The 90-day cap prevents egress blowout on the free
- * tier while the aggregation work is pending.
+ * Fetches per-day aggregates via the `get_daily_summary` RPC.
+ *
+ * Auth + row-level isolation are enforced by the RPC's auth.uid() check and the
+ * SECURITY DEFINER wrapper. The underlying view is SECURITY INVOKER, so RLS on
+ * cigarette_logs applies automatically.
+ *
+ * Date params use `from`/`to` (matching RPC param names p_from/p_to).
+ */
+export const getServerDailySummary = cache(
+  async (opts: { from: string; to: string }): Promise<DailySummary[]> => {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('get_daily_summary', {
+      p_from: opts.from,
+      p_to: opts.to,
+    });
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      localDate: String(r.local_date),
+      sticks: Number(r.sticks),
+      // Postgres `numeric` is returned as a string by supabase-js (like baseline_per_day).
+      // Always coerce via Number() — mirrors the C4 fix pattern.
+      totalSpendInr: Number(r.total_spend_inr),
+      avgUnitPriceInr: r.avg_unit_price_inr != null ? Number(r.avg_unit_price_inr) : null,
+    }));
+  },
+);
+
+/**
+ * RESOLVED (F1a): Trends data now fetches both:
+ *   - 90 days of raw logs (200-row cap) for hour/dow/brand/mood charts
+ *   - 365 days of daily summaries via get_daily_summary RPC for the sticks/spend time series
+ *
+ * The Year view sticks+spend charts are now accurate over a full rolling year.
+ * Other charts (hour, dow, brand mix, mood-trigger matrix, heatmap) still use
+ * 90-day raw logs — tracked as F1 follow-on: full-Year breakdowns.
  */
 export async function getTrendsPageData() {
-  const fromDate = daysAgoIst(90);
-  const [profile, logs] = await Promise.all([
+  const fromDate90 = daysAgoIst(90);
+  const fromDate365 = daysAgoIst(365);
+  const today = daysAgoIst(0);
+  const [profile, logs, dailySummary] = await Promise.all([
     getServerProfile(),
-    getServerLogs({ fromDate }),
+    getServerLogs({ fromDate: fromDate90 }),    // raw logs, 90-day capped at 200 — for hour/dow/brand/mood charts
+    getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
   ]);
-  return { profile, logs };
+  return { profile, logs, dailySummary };
 }
 
 export async function getNewLogPageData() {
