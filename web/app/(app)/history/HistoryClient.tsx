@@ -1,18 +1,43 @@
 'use client';
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  History — "Quiet editorial · the printed ledger"
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  Aesthetic direction: History is the back-of-the-paper section of the daily
+ *  report — every entry, set in type, held together by hairline rules. There
+ *  are no Card containers: each day is a typographic movement headed by its
+ *  date in small caps with the day's stick count as a small editorial numeral
+ *  on the right. Entries within a day are a dl-like list of rows separated by
+ *  hairlines: the brand+variant in body weight, time+quantity captioned, the
+ *  price right-aligned in tabular figures.
+ *
+ *  The hero editorial numeral (.editorial-numeral) is reserved for the
+ *  Dashboard. History uses .editorial-numeral--small for day totals so it
+ *  reads as the Dashboard's sibling, not a copy.
+ *
+ *  Today and yesterday get a single Fraunces italic day-name label above the
+ *  numeric date — a small editorial flourish that helps the eye land on the
+ *  most recent activity without resorting to badges.
+ *
+ *  Motion: .editorial-stage staggers the masthead (0), then each day group
+ *  (1..N), then the load-more / end-mark line (last). Reduced-motion users
+ *  see everything immediately via the global @media rule in globals.css.
+ *
+ *  Data path is unchanged. The F1b load-more state machine (cursor +
+ *  useTransition + captured cursor at request time) is preserved exactly.
+ */
+
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatInr } from '@/lib/format';
-import { formatIndianDate, formatTime } from '@/lib/date';
+import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import dayjs from 'dayjs';
 import type { CigaretteLog, UserProfile } from '@/types';
 import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
-import { Button } from '@web/components/ui/Button';
-import { Card } from '@web/components/ui/Card';
-import { Text } from '@web/components/ui/Text';
-import { EmptyState } from '@web/components/ui/EmptyState';
-import { Header } from '@web/components/layout/Header';
 import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
@@ -37,6 +62,29 @@ function groupLogs(logs: CigaretteLog[]): Group[] {
     map.set(log.localDate, group);
   }
   return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Returns a short editorial label for "today" / "yesterday", null otherwise. */
+function relativeDayLabel(ymd: string, today: string, yesterday: string): string | null {
+  if (ymd === today) return 'Today';
+  if (ymd === yesterday) return 'Yesterday';
+  return null;
+}
+
+/** Compute a date-span subtitle for the masthead, e.g. "Mar — May 2026". When
+ *  the range spans a single month, collapses to "May 2026". */
+function dateSpanLabel(groups: Group[]): string | null {
+  if (groups.length === 0) return null;
+  // Groups are sorted DESC by date — index 0 is the newest, last is the oldest.
+  const newest = dayjs(groups[0]!.date);
+  const oldest = dayjs(groups[groups.length - 1]!.date);
+  if (newest.isSame(oldest, 'month')) {
+    return newest.format('MMM YYYY');
+  }
+  if (newest.isSame(oldest, 'year')) {
+    return `${oldest.format('MMM')} — ${newest.format('MMM YYYY')}`;
+  }
+  return `${oldest.format('MMM YYYY')} — ${newest.format('MMM YYYY')}`;
 }
 
 export interface HistoryClientProps {
@@ -69,6 +117,10 @@ export function HistoryClient({
 
   const groups = React.useMemo(() => groupLogs(logs), [logs]);
 
+  const today = React.useMemo(() => todayIst(), []);
+  const yesterday = React.useMemo(() => daysAgoIst(1), []);
+  const spanLabel = React.useMemo(() => dateSpanLabel(groups), [groups]);
+
   const handleLoadMore = React.useCallback(() => {
     if (!cursor || isPending) return;
     const requestedCursor = cursor;
@@ -84,89 +136,199 @@ export function HistoryClient({
     });
   }, [cursor, isPending]);
 
+  // Editorial-stage index helper: drives the stagger reveal via --ed-index.
+  const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
+
+  // Index allocation:
+  //   0 = masthead
+  //   1..N = day groups (one per day, in order)
+  //   N+1 = trailing affordance (load-more OR end-mark)
+  const trailingIndex = groups.length + 1;
+
   return (
-    <div className="max-w-3xl mx-auto p-lg flex flex-col gap-lg pb-32">
-      <Header title="History" subtitle="Every log entry" />
+    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+      {/* Atmospheric paper noise — purely decorative, behind everything. */}
+      <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      {groups.length === 0 ? (
-        <EmptyState
-          title="No history yet"
-          description="Start logging to build your timeline."
-          actionLabel="Add first log"
-          onAction={() => router.push('/log/new')}
-        />
-      ) : (
-        <div className="flex flex-col gap-md">
-          {groups.map((group) => (
-            <Card key={group.date} padded={false}>
-              <div className="px-lg py-md border-b border-border flex items-center justify-between gap-md">
-                <div className="flex flex-col">
-                  <Text variant="bodyStrong">{formatIndianDate(group.date)}</Text>
-                  <Text variant="caption" muted>
-                    {discreet ? '••• sticks' : `${group.totalSticks} sticks`}
-                  </Text>
-                </div>
-                <Text variant="bodyStrong">
-                  {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
-                </Text>
-              </div>
+      <div className="editorial-stage flex flex-col gap-xxl">
+        {/* ─────────────── Masthead ─────────────── */}
+        <header style={idx(0)} className="flex flex-col gap-sm">
+          <div className="flex items-center gap-md">
+            <span
+              aria-hidden
+              className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
+              style={idx(0)}
+            />
+            <span className="editorial-caption nums-tabular">
+              {spanLabel ? `History · ${spanLabel}` : 'History'}
+            </span>
+            <span
+              aria-hidden
+              className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
+              style={idx(0)}
+            />
+          </div>
+          <p className="text-small text-text-muted text-center italic">
+            The printed ledger
+          </p>
+        </header>
 
-              <ul className="divide-y divide-border">
-                {group.rows
-                  .sort((a, b) => b.tsUtc.localeCompare(a.tsUtc))
-                  .map((log) => (
-                    <li key={log.id} className="px-lg py-md flex items-center justify-between gap-md">
-                      <div className="min-w-0 flex flex-col">
-                        <Text variant="small" className="truncate">
-                          {maskBrandName(log.brandNameSnap ?? 'Unbranded', discreet)}
-                          {log.variantSnap && !discreet ? (
-                            <span className="text-text-muted"> · {log.variantSnap}</span>
-                          ) : null}
-                        </Text>
-                        <Text variant="caption" muted>
-                          {formatTime(log.tsUtc)} ·{' '}
-                          {discreet ? '•••' : `${log.quantity} stick${log.quantity > 1 ? 's' : ''}`}
-                        </Text>
-                      </div>
-                      <Text variant="small">
-                        {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
-                      </Text>
-                    </li>
-                  ))}
-              </ul>
-            </Card>
-          ))}
+        {groups.length === 0 ? (
+          /* ─────────────── Empty state — a quiet invitation ─────────────── */
+          <section style={idx(1)} className="rule-hair pt-lg flex flex-col gap-sm">
+            <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
+              No entries yet.
+            </p>
+            <p className="text-body text-text-muted max-w-[40ch]">
+              The first log opens the ledger. From there it remembers every
+              cigarette, every rupee, and the days you skipped.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push('/log/new')}
+              className="self-start mt-sm inline-flex items-center min-h-[44px] px-lg rounded-md bg-text text-bg font-medium text-body hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              Log your first
+            </button>
+          </section>
+        ) : (
+          <>
+            {/* ─────────────── Day groups — typographic ledger ─────────────── */}
+            {groups.map((group, gi) => {
+              const relLabel = relativeDayLabel(group.date, today, yesterday);
+              const sortedRows = [...group.rows].sort((a, b) =>
+                b.tsUtc.localeCompare(a.tsUtc),
+              );
+              return (
+                <section
+                  key={group.date}
+                  style={idx(gi + 1)}
+                  aria-labelledby={`day-${group.date}`}
+                  className="flex flex-col"
+                >
+                  {/* Day header — date + spend + sticks numeral, no Card. */}
+                  <div className="rule-hair-strong grid grid-cols-[1fr_auto] items-end gap-md pt-md pb-sm">
+                    <div className="flex flex-col gap-xs">
+                      {relLabel ? (
+                        <span
+                          className="editorial-headline italic text-text"
+                          style={{ fontSize: 'clamp(1rem,1.6vw,1.125rem)', lineHeight: 1 }}
+                        >
+                          {relLabel}
+                        </span>
+                      ) : null}
+                      <h2
+                        id={`day-${group.date}`}
+                        className="editorial-caption nums-tabular"
+                      >
+                        {formatIndianDate(group.date)}
+                      </h2>
+                      <span className="text-small text-text-muted nums-tabular">
+                        {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
+                        <span className="text-text-faint"> spent</span>
+                      </span>
+                    </div>
+                    <div
+                      className="editorial-numeral--small nums-tabular text-right"
+                      aria-label={
+                        discreet
+                          ? 'Day total hidden'
+                          : `${group.totalSticks} ${group.totalSticks === 1 ? 'cigarette' : 'cigarettes'} on this day`
+                      }
+                    >
+                      {discreet ? '••' : group.totalSticks}
+                      <span className="text-small text-text-faint font-sans ml-xs">
+                        {group.totalSticks === 1 ? 'stick' : 'sticks'}
+                      </span>
+                    </div>
+                  </div>
 
-          {cursor !== null ? (
-            <div className="flex flex-col items-center gap-xs pt-md">
+                  {/* Entries — hairline rows, no nested chrome. */}
+                  <dl className="flex flex-col">
+                    {sortedRows.map((log) => {
+                      const brand = maskBrandName(
+                        log.brandNameSnap ?? 'Unbranded',
+                        discreet,
+                      );
+                      const qtyText = discreet
+                        ? '•••'
+                        : `${log.quantity} stick${log.quantity > 1 ? 's' : ''}`;
+                      return (
+                        <div
+                          key={log.id}
+                          className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md"
+                        >
+                          <div className="min-w-0 flex flex-col">
+                            <dt className="text-body text-text truncate">
+                              {brand}
+                              {log.variantSnap && !discreet ? (
+                                <span className="text-text-muted">
+                                  {' · '}
+                                  {log.variantSnap}
+                                </span>
+                              ) : null}
+                            </dt>
+                            <dd className="text-small text-text-muted nums-tabular">
+                              <span className="nums-tabular">{formatTime(log.tsUtc)}</span>
+                              <span className="text-text-faint"> · </span>
+                              <span>{qtyText}</span>
+                            </dd>
+                          </div>
+                          <dd className="text-body text-text nums-tabular text-right">
+                            {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </section>
+              );
+            })}
+
+            {/* ─────────────── Trailing affordance — load more OR end-mark ───── */}
+            <footer
+              style={idx(trailingIndex)}
+              className="rule-hair pt-md flex flex-col items-center gap-sm"
+            >
               {loadError ? (
-                <Text variant="caption" color="var(--danger, #C85A54)" role="alert">
+                <p
+                  role="alert"
+                  className="text-small text-center"
+                  style={{ color: 'var(--warn-earth)' }}
+                >
                   {loadError}
-                </Text>
+                </p>
               ) : null}
-              <Button
-                title={isPending ? 'Loading…' : 'Load older entries'}
-                onPress={handleLoadMore}
-                variant="ghost"
-                size="md"
-                disabled={isPending}
-                loading={isPending}
-              />
-            </div>
-          ) : groups.length > 0 ? (
-            <div className="pt-md text-center">
-              <Text variant="caption" muted>
-                You&apos;ve reached the end of your history.
-              </Text>
-            </div>
-          ) : null}
-        </div>
-      )}
 
-      <div className="fixed right-lg bottom-20 md:bottom-lg">
+              {cursor !== null ? (
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={isPending}
+                  aria-busy={isPending}
+                  className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ textDecorationColor: 'var(--rule-strong)' }}
+                >
+                  {isPending ? 'Loading older entries…' : 'Load older entries →'}
+                </button>
+              ) : (
+                <span className="text-caption text-text-faint italic">
+                  End of the ledger.
+                </span>
+              )}
+            </footer>
+          </>
+        )}
+      </div>
+
+      {/* ─────────────── Persistent "New log" action ───────────────
+          The one explicit call-to-action on this page. Reshaped from the
+          accent-teal pill to the dark inverse used on the Dashboard empty
+          state — it stays distinct without breaking the editorial register. */}
+      <div className="fixed right-lg bottom-20 md:bottom-lg z-10">
         <Link
           href="/log/new"
-          className="h-12 px-lg rounded-pill bg-accent text-white font-semibold inline-flex items-center shadow-lg"
+          className="inline-flex items-center min-h-[44px] px-lg rounded-md bg-text text-bg font-medium text-body shadow-lg hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           New log
         </Link>
