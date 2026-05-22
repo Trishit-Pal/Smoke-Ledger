@@ -56,6 +56,7 @@ export function SettingsClient({
   const [newAvgPrice, setNewAvgPrice] = React.useState('');
   const [newCategory, setNewCategory] = React.useState<Brand['category']>('regular');
   const [error, setError] = React.useState<string | null>(null);
+  const [exportWarning, setExportWarning] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<BusyAction>(null);
   const [confirmAction, setConfirmAction] = React.useState<'erase' | 'delete' | null>(null);
 
@@ -129,6 +130,7 @@ export function SettingsClient({
   const onExportJson = async () => {
     setBusy('export-json');
     setError(null);
+    setExportWarning(null);
     try {
       const payload = await exportAccountData();
 
@@ -142,6 +144,11 @@ export function SettingsClient({
       anchor.remove();
       URL.revokeObjectURL(url);
       await track(AnalyticsEvents.EXPORT_REQUESTED, { format: 'json' });
+      if (payload.truncated) {
+        setExportWarning(
+          'This export includes your most recent entries only. Older entries beyond the export limit were not included. Contact support if you need a full historical export.',
+        );
+      }
     } catch (e) {
       setError(toSafeErrorMessage(e, 'dependency_failure'));
     } finally {
@@ -400,6 +407,12 @@ export function SettingsClient({
           />
         </div>
       </Card>
+
+      {exportWarning ? (
+        <Text variant="small" color="var(--warning, #B45309)">
+          {exportWarning}
+        </Text>
+      ) : null}
 
       {error ? (
         <Text variant="small" color="var(--danger, #C85A54)">

@@ -124,6 +124,12 @@ export default function Settings() {
         );
       }
       await track(AnalyticsEvents.EXPORT_REQUESTED, { format: 'json' });
+      if (payload.truncated) {
+        Alert.alert(
+          'Export may be incomplete',
+          'This file includes your most recent entries only. Older entries beyond the export limit were not included. Contact support if you need a full historical export.',
+        );
+      }
     } catch (e) {
       Alert.alert('Export failed', toSafeErrorMessage(e, 'dependency_failure'));
     } finally {

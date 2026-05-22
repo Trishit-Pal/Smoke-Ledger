@@ -81,6 +81,17 @@ For RLS integration job:
 - `E2E_USER_A_EMAIL` / `E2E_USER_A_PASSWORD`
 - `E2E_USER_B_EMAIL` / `E2E_USER_B_PASSWORD`
 
+## 6b. Export behaviour (H2 audit note)
+
+`exportAccountData()` paginates the `export_account_data` RPC up to **200 pages × 5 000 rows = 1 000 000 rows** before stopping. This covers roughly 270 years of use at 10 sticks/day and is considered sufficient for all realistic cases.
+
+The returned `AccountExportPayload` now carries a `truncated: boolean` field:
+
+- `false` — the RPC signalled `hasMore: false`; the export is complete.
+- `true` — the safety cap was reached before the RPC signalled done; the file covers only the most recent rows. Both the mobile (Alert) and web (inline warning text) UIs surface a human-readable notice when this happens; the download still proceeds.
+
+No action required at deployment. If a user reports a truncated export, advise them to contact support for a manual data extract via the service-role key.
+
 ## 7. Staging walkthrough
 
 1. Signup → confirm email → complete onboarding in order (no URL skipping)
