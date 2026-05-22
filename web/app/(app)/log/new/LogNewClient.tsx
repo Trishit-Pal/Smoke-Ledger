@@ -1,8 +1,30 @@
 'use client';
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  Log · New entry — writing one line into today's ledger
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  Form metaphor (deliberate): a single editorial spread where each field is
+ *  a hairline-row of typographic prefaces and controls, not a stacked stack
+ *  of Cards. The page is one focused single-action: write a line, save it,
+ *  return to where you came from.
+ *
+ *  Decision on the literal "fill-in-the-blanks" prose layout I considered:
+ *  rejected. With nine+ controls (brand, variant, mode, quantity, price,
+ *  trigger, mood-before, mood-after, craving, context, notes), the cognitive
+ *  cost of parsing a sentence where every other word is a picker outweighs
+ *  the typographic delight. The hairline-rows version is the editorial
+ *  language done quietly and well — small-caps caption, optional sublabel,
+ *  control, hairline beneath. That is the chosen form.
+ *
+ *  All data paths preserved: createLog, inferUnitPriceForVariant,
+ *  deriveUnitPrice, the trigger/mood/context/purchase-mode enums, and the
+ *  analytics emit are unchanged. Only the rendering changed.
+ */
+
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
 
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { deriveUnitPrice } from '@/domain/calc';
@@ -21,12 +43,6 @@ import type {
   TriggerTag,
 } from '@/types';
 
-import { Button } from '@web/components/ui/Button';
-import { Chip } from '@web/components/ui/Chip';
-import { Text } from '@web/components/ui/Text';
-import { Input } from '@web/components/ui/Input';
-import { FadeSlideIn } from '@web/components/anim/dynamic';
-
 const PURCHASE_MODES: { value: PurchaseMode; label: string }[] = [
   { value: 'single', label: 'Single' },
   { value: 'pack', label: 'Pack' },
@@ -38,6 +54,143 @@ const QUANTITY_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40];
 export interface LogNewClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
 }
+
+// ── Inline editorial primitives ───────────────────────────────────────────────
+
+interface FieldRowProps {
+  label: string;
+  sublabel?: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+  hint?: React.ReactNode;
+}
+
+/** A hairline-row form section: small-caps caption + optional sublabel + control. */
+function FieldRow({ label, sublabel, htmlFor, children, hint }: FieldRowProps) {
+  return (
+    <div className="rule-hair-strong pt-md pb-md flex flex-col gap-sm">
+      <div className="flex flex-col">
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="editorial-caption">
+            {label}
+          </label>
+        ) : (
+          <span className="editorial-caption">{label}</span>
+        )}
+        {sublabel ? (
+          <p className="text-small text-text-muted italic mt-xs">{sublabel}</p>
+        ) : null}
+      </div>
+      <div>{children}</div>
+      {hint ? <p className="text-caption text-text-faint nums-tabular">{hint}</p> : null}
+    </div>
+  );
+}
+
+interface ChoiceRunProps<T extends string | number> {
+  options: readonly { value: T; label: string }[];
+  value: T | null;
+  onSelect: (next: T | null) => void;
+  /** When true (default), clicking the active choice clears it. */
+  allowClear?: boolean;
+  /** Optional accessible group name. */
+  ariaLabel?: string;
+}
+
+/** Small-caps text choices separated by middots — the publication's chip
+ *  replacement. Used for purchase mode, trigger, mood, context, craving. */
+function ChoiceRun<T extends string | number>({
+  options,
+  value,
+  onSelect,
+  allowClear = true,
+  ariaLabel,
+}: ChoiceRunProps<T>) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap items-baseline">
+      {options.map((opt, i) => {
+        const active = opt.value === value;
+        return (
+          <React.Fragment key={String(opt.value)}>
+            {i > 0 ? (
+              <span aria-hidden className="text-text-faint mx-xs select-none">
+                ·
+              </span>
+            ) : null}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onSelect(active && allowClear ? null : opt.value)}
+              className={
+                'editorial-caption px-xs py-xs rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                (active
+                  ? 'text-text underline underline-offset-4 decoration-1'
+                  : 'text-text-muted hover:text-text')
+              }
+              style={active ? { textDecorationColor: 'var(--rule-strong)' } : undefined}
+            >
+              {opt.label}
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+interface EditorialPillRowProps<T> {
+  items: { key: string; label: React.ReactNode; selected: boolean; onPress: () => void }[];
+  ariaLabel: string;
+}
+
+/** Hairline-outline pill row that scrolls horizontally. Used for brand + variant
+ *  where the set can grow large and label content includes a star marker. */
+function EditorialPillRow({ items, ariaLabel }: EditorialPillRowProps<unknown>) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
+    >
+      {items.map((it) => (
+        <button
+          key={it.key}
+          type="button"
+          aria-pressed={it.selected}
+          onClick={it.onPress}
+          className={
+            'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+            (it.selected
+              ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
+              : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')
+          }
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Minimal editorial number/text input — hairline rule below, no boxed chrome. */
+const EditorialInput = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(function EditorialInput(props, ref) {
+  return (
+    <input
+      ref={ref}
+      {...props}
+      className={
+        'w-full bg-transparent border-0 border-b border-[var(--rule)] focus:border-[var(--text)] py-sm text-body text-text placeholder:text-text-faint outline-none transition-colors nums-tabular ' +
+        (props.className ?? '')
+      }
+    />
+  );
+});
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export function LogNewClient({ brands }: LogNewClientProps) {
   const router = useRouter();
@@ -56,7 +209,6 @@ export function LogNewClient({ brands }: LogNewClientProps) {
   const [notes, setNotes] = React.useState<string>('');
 
   const [showAdvanced, setShowAdvanced] = React.useState(false);
-
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -73,6 +225,8 @@ export function LogNewClient({ brands }: LogNewClientProps) {
     () => sortedBrands.find((b) => b.id === brandId) ?? null,
     [sortedBrands, brandId],
   );
+
+  const showPackInput = purchaseMode === 'pack' || purchaseMode === 'carton';
 
   const handleSave = async () => {
     try {
@@ -130,343 +284,305 @@ export function LogNewClient({ brands }: LogNewClientProps) {
     }
   };
 
-  const showPackInput = purchaseMode === 'pack' || purchaseMode === 'carton';
+  const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
-  let i = 0;
+  // ── Choice option sets ─────────────────────────────────────────────────────
+  const purchaseChoices = PURCHASE_MODES.map((m) => ({ value: m.value, label: m.label }));
+  const triggerChoices = TRIGGER_OPTIONS.map((t) => ({ value: t.value, label: t.label }));
+  const moodChoices = MOOD_OPTIONS.map((m) => ({ value: m.value, label: m.label }));
+  const contextChoices = CONTEXT_OPTIONS.map((c) => ({ value: c.value, label: c.label }));
+  const cravingChoices = Array.from({ length: 11 }, (_, n) => ({ value: n, label: String(n) }));
+  const quantityChoices = QUANTITY_OPTIONS.map((n) => ({ value: n, label: String(n) }));
+
   return (
-    <div className="max-w-2xl mx-auto p-lg flex flex-col gap-xl pb-32">
-      <FadeSlideIn index={i++}>
-        <div className="flex items-center justify-between">
-          <Text variant="display">Log smoke</Text>
+    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
+      <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
+
+      <div className="editorial-stage flex flex-col gap-xl">
+        {/* ── Masthead ── */}
+        <header style={idx(0)} className="flex flex-col gap-sm">
+          <div className="flex items-center gap-md">
+            <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
+            <span className="editorial-caption nums-tabular">Log · New entry</span>
+            <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
+          </div>
+          <p className="text-small text-text-muted text-center italic">
+            Write one line into today&apos;s ledger.
+          </p>
+        </header>
+
+        {/* ── Brand ── */}
+        <section style={idx(1)}>
+          <FieldRow
+            label="Brand"
+            sublabel={
+              sortedBrands.length === 0
+                ? 'No brands yet — add one from settings, or save without a brand.'
+                : 'Pick a brand from your catalog, or leave as none.'
+            }
+          >
+            {sortedBrands.length === 0 ? null : (
+              <EditorialPillRow
+                ariaLabel="Brand"
+                items={[
+                  {
+                    key: '__none__',
+                    label: 'None',
+                    selected: brandId === null,
+                    onPress: () => {
+                      setBrandId(null);
+                      setVariantName(null);
+                    },
+                  },
+                  ...sortedBrands.map((b) => ({
+                    key: b.id,
+                    label: b.isFavorite ? (
+                      <>
+                        <span aria-hidden className="mr-xs">
+                          ★
+                        </span>
+                        {b.name}
+                      </>
+                    ) : (
+                      b.name
+                    ),
+                    selected: brandId === b.id,
+                    onPress: () => {
+                      setBrandId(b.id);
+                      setVariantName(null);
+                    },
+                  })),
+                ]}
+              />
+            )}
+          </FieldRow>
+        </section>
+
+        {/* ── Variant (only if brand has them) ── */}
+        {selectedBrand && selectedBrand.variants.length > 0 ? (
+          <section style={idx(2)}>
+            <FieldRow label="Variant" sublabel="Tap again to deselect.">
+              <EditorialPillRow
+                ariaLabel="Variant"
+                items={selectedBrand.variants.map((v) => ({
+                  key: v.id,
+                  label: v.name,
+                  selected: variantName === v.name,
+                  onPress: () =>
+                    setVariantName((cur) => (cur === v.name ? null : v.name)),
+                }))}
+              />
+            </FieldRow>
+          </section>
+        ) : null}
+
+        {/* ── Quantity + Price (the always-visible essentials) ── */}
+        <section style={idx(3)} className="grid grid-cols-1 md:grid-cols-2 gap-x-xl">
+          <FieldRow label="Quantity" htmlFor="qty-input">
+            <EditorialInput
+              id="qty-input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              aria-label="Quantity"
+            />
+          </FieldRow>
+          <FieldRow
+            label="Price (INR)"
+            htmlFor="price-input"
+            sublabel="Optional — leave blank to estimate from your catalog."
+          >
+            <EditorialInput
+              id="price-input"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              placeholder="0"
+              value={priceText}
+              onChange={(e) => setPriceText(e.target.value)}
+              aria-label="Total price in rupees"
+            />
+          </FieldRow>
+        </section>
+
+        {/* ── Show / hide advanced ── */}
+        <section style={idx(4)}>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((s) => !s)}
+            aria-expanded={showAdvanced}
+            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            style={{ textDecorationColor: 'var(--rule-strong)' }}
+          >
+            {showAdvanced ? 'Hide trigger, mood, context, notes' : 'Add trigger, mood, context, notes'}
+          </button>
+        </section>
+
+        {/* ── Advanced ── */}
+        {showAdvanced ? (
+          <>
+            <section style={idx(5)}>
+              <FieldRow label="Purchase" sublabel="How this stick was bought.">
+                <ChoiceRun
+                  options={purchaseChoices}
+                  value={purchaseMode}
+                  onSelect={(v) => v != null && setPurchaseMode(v)}
+                  allowClear={false}
+                  ariaLabel="Purchase mode"
+                />
+              </FieldRow>
+            </section>
+
+            {showPackInput ? (
+              <section style={idx(6)}>
+                <FieldRow
+                  label="Pack size"
+                  htmlFor="pack-input"
+                  sublabel="Sticks in this pack or carton."
+                >
+                  <EditorialInput
+                    id="pack-input"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    placeholder="20"
+                    value={packSize}
+                    onChange={(e) => setPackSize(e.target.value)}
+                    aria-label="Pack size"
+                  />
+                </FieldRow>
+              </section>
+            ) : null}
+
+            <section style={idx(7)}>
+              <FieldRow label="Quantity (preset)" sublabel="Pick a common count, or type above.">
+                <ChoiceRun
+                  options={quantityChoices}
+                  value={Number(quantity) || null}
+                  onSelect={(v) => setQuantity(v == null ? '1' : String(v))}
+                  allowClear={false}
+                  ariaLabel="Quantity preset"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(8)}>
+              <FieldRow label="Trigger" sublabel="What prompted this stick?">
+                <ChoiceRun
+                  options={triggerChoices}
+                  value={triggerTag}
+                  onSelect={(v) => setTriggerTag((cur) => (cur === v ? null : (v as TriggerTag | null)))}
+                  ariaLabel="Trigger"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(9)}>
+              <FieldRow label="Mood before" sublabel="How you felt going in.">
+                <ChoiceRun
+                  options={moodChoices}
+                  value={moodBefore}
+                  onSelect={(v) => setMoodBefore((cur) => (cur === v ? null : (v as Mood | null)))}
+                  ariaLabel="Mood before"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(10)}>
+              <FieldRow label="Mood after" sublabel="And how you felt at the end.">
+                <ChoiceRun
+                  options={moodChoices}
+                  value={moodAfter}
+                  onSelect={(v) => setMoodAfter((cur) => (cur === v ? null : (v as Mood | null)))}
+                  ariaLabel="Mood after"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(11)}>
+              <FieldRow label="Craving (0–10)" sublabel="Honest scale — zero is none.">
+                <ChoiceRun
+                  options={cravingChoices}
+                  value={craving}
+                  onSelect={(v) => setCraving(v == null ? null : Number(v))}
+                  ariaLabel="Craving"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(12)}>
+              <FieldRow label="Context" sublabel="Where or with whom.">
+                <ChoiceRun
+                  options={contextChoices}
+                  value={contextTag}
+                  onSelect={(v) => setContextTag((cur) => (cur === v ? null : (v as ContextTag | null)))}
+                  ariaLabel="Context"
+                />
+              </FieldRow>
+            </section>
+
+            <section style={idx(13)}>
+              <FieldRow
+                label="Notes"
+                htmlFor="notes-input"
+                sublabel="Up to 500 characters. Honest writing helps you later."
+                hint={`${notes.length}/500`}
+              >
+                <textarea
+                  id="notes-input"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value.slice(0, 500))}
+                  rows={3}
+                  placeholder="A line about this one, if you want."
+                  className="w-full bg-transparent border-0 border-b border-[var(--rule)] focus:border-[var(--text)] py-sm text-body text-text placeholder:text-text-faint outline-none resize-none transition-colors"
+                />
+              </FieldRow>
+            </section>
+          </>
+        ) : null}
+
+        {/* ── Save + Cancel ── */}
+        <section style={idx(14)} className="flex flex-col items-center gap-sm pt-xl">
+          {error ? (
+            <p
+              role="alert"
+              className="text-small text-center mb-sm"
+              style={{ color: 'var(--warn-earth)' }}
+            >
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={submitting}
+            aria-busy={submitting}
+            className="inline-flex items-center justify-center min-h-[48px] min-w-[14rem] px-xl rounded-md bg-text text-bg font-medium text-body hover:opacity-90 transition-opacity disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            {submitting ? 'Saving…' : 'Save log'}
+          </button>
           <button
             type="button"
             onClick={() => router.back()}
-            aria-label="Cancel"
-            className="w-9 h-9 rounded-md border border-border bg-bg-elevated hover:bg-card flex items-center justify-center text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            style={{ textDecorationColor: 'var(--rule-strong)' }}
           >
-            <X className="w-4 h-4" aria-hidden />
+            Cancel
           </button>
-        </div>
-      </FadeSlideIn>
+        </section>
 
-      {/* Brand row */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Brand
-          </Text>
-          {sortedBrands.length === 0 ? (
-            <Text variant="small" faint>
-              No brands yet — add one from settings or save without a brand.
-            </Text>
-          ) : (
-            <div className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1">
-              <Chip
-                label="None"
-                selected={brandId === null}
-                onPress={() => {
-                  setBrandId(null);
-                  setVariantName(null);
-                }}
-              />
-              {sortedBrands.map((b) => (
-                <Chip
-                  key={b.id}
-                  label={b.isFavorite ? `★ ${b.name}` : b.name}
-                  selected={brandId === b.id}
-                  onPress={() => {
-                    setBrandId(b.id);
-                    setVariantName(null);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </FadeSlideIn>
-
-      {/* Variant grid */}
-      {selectedBrand && selectedBrand.variants.length > 0 ? (
-        <FadeSlideIn index={i++}>
-          <div>
-            <Text variant="caption" muted className="mb-sm">
-              Variant
-            </Text>
-            <div className="flex flex-wrap gap-sm">
-              {selectedBrand.variants.map((v) => (
-                <Chip
-                  key={v.id}
-                  label={v.name}
-                  selected={variantName === v.name}
-                  onPress={() =>
-                    setVariantName((cur) => (cur === v.name ? null : v.name))
-                  }
-                />
-              ))}
-            </div>
-          </div>
-        </FadeSlideIn>
-      ) : null}
-
-      {!showAdvanced ? (
-        <FadeSlideIn index={i++}>
-          <div className="grid grid-cols-2 gap-md">
-            <Input
-              label="Quantity"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-            <Input
-              label="Price (INR)"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="Optional"
-              hint="Leave blank to estimate from catalog"
-              value={priceText}
-              onChange={(e) => setPriceText(e.target.value)}
-            />
-          </div>
-          <Button
-            title={showAdvanced ? 'Hide advanced' : 'Show advanced options'}
-            variant="ghost"
-            fullWidth
-            className="mt-md"
-            onPress={() => setShowAdvanced(true)}
-          />
-        </FadeSlideIn>
-      ) : null}
-
-      {showAdvanced ? (
-        <>
-      {/* Purchase mode */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Purchase
-          </Text>
-          <div className="flex flex-wrap gap-sm">
-            {PURCHASE_MODES.map((m) => (
-              <Chip
-                key={m.value}
-                label={m.label}
-                selected={purchaseMode === m.value}
-                onPress={() => setPurchaseMode(m.value)}
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Quantity + pack size */}
-      <FadeSlideIn index={i++}>
-        <div className="grid grid-cols-2 gap-md">
-          <label className="flex flex-col gap-1 text-caption uppercase text-text-muted">
-            Quantity
-            <select
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full bg-bg-elevated border border-border rounded-md px-md py-sm text-body text-text"
-            >
-              {QUANTITY_OPTIONS.map((qty) => (
-                <option key={qty} value={String(qty)}>
-                  {qty}
-                </option>
-              ))}
-            </select>
-          </label>
-          {showPackInput ? (
-            <Input
-              label="Pack size"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              placeholder="20"
-              value={packSize}
-              onChange={(e) => setPackSize(e.target.value)}
-            />
-          ) : (
-            <Input
-              label="Price (INR)"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="0"
-              hint="Leave blank to estimate"
-              value={priceText}
-              onChange={(e) => setPriceText(e.target.value)}
-            />
-          )}
-        </div>
-        {showPackInput ? (
-          <div className="mt-md">
-            <Input
-              label="Price (INR)"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="0"
-              hint="Leave blank to estimate"
-              value={priceText}
-              onChange={(e) => setPriceText(e.target.value)}
-            />
-          </div>
-        ) : null}
-      </FadeSlideIn>
-
-      {/* Trigger */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Trigger
-          </Text>
-          <div className="flex flex-wrap gap-sm">
-            {TRIGGER_OPTIONS.map((t) => (
-              <Chip
-                key={t.value}
-                label={t.label}
-                selected={triggerTag === t.value}
-                onPress={() =>
-                  setTriggerTag((cur) => (cur === t.value ? null : t.value))
-                }
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Mood before */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Mood before
-          </Text>
-          <div className="flex flex-wrap gap-sm">
-            {MOOD_OPTIONS.map((m) => (
-              <Chip
-                key={m.value}
-                label={m.label}
-                selected={moodBefore === m.value}
-                onPress={() =>
-                  setMoodBefore((cur) => (cur === m.value ? null : m.value))
-                }
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Mood after */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Mood after
-          </Text>
-          <div className="flex flex-wrap gap-sm">
-            {MOOD_OPTIONS.map((m) => (
-              <Chip
-                key={m.value}
-                label={m.label}
-                selected={moodAfter === m.value}
-                onPress={() =>
-                  setMoodAfter((cur) => (cur === m.value ? null : m.value))
-                }
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Craving */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Craving (0–10)
-          </Text>
-          <div className="flex flex-wrap gap-xs">
-            {Array.from({ length: 11 }, (_, n) => (
-              <Chip
-                key={n}
-                label={String(n)}
-                selected={craving === n}
-                onPress={() => setCraving((cur) => (cur === n ? null : n))}
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Context */}
-      <FadeSlideIn index={i++}>
-        <div>
-          <Text variant="caption" muted className="mb-sm">
-            Context
-          </Text>
-          <div className="flex flex-wrap gap-sm">
-            {CONTEXT_OPTIONS.map((c) => (
-              <Chip
-                key={c.value}
-                label={c.label}
-                selected={contextTag === c.value}
-                onPress={() =>
-                  setContextTag((cur) => (cur === c.value ? null : c.value))
-                }
-              />
-            ))}
-          </div>
-        </div>
-      </FadeSlideIn>
-
-      {/* Notes */}
-      <FadeSlideIn index={i++}>
-        <Input
-          label="Notes"
-          multiline
-          rows={3}
-          placeholder="Optional"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </FadeSlideIn>
-
-          <Button
-            title="Hide advanced options"
-            variant="ghost"
-            fullWidth
-            className="mt-md"
-            onPress={() => setShowAdvanced(false)}
-          />
-        </>
-      ) : null}
-
-      <FadeSlideIn index={i++}>
-        <div className="flex flex-col gap-sm">
-          <Button
-            title={submitting ? 'Saving…' : 'Save log'}
-            variant="primary"
-            fullWidth
-            loading={submitting}
-            onPress={handleSave}
-          />
-          {error ? (
-            <Text
-              variant="small"
-              color="var(--danger, #C85A54)"
-              className="text-center"
-            >
-              {error}
-            </Text>
-          ) : null}
-        </div>
-      </FadeSlideIn>
+        {/* ── End-mark ── */}
+        <footer style={idx(15)} className="rule-hair pt-md text-center">
+          <span className="text-caption text-text-faint italic">
+            One line at a time.
+          </span>
+        </footer>
+      </div>
     </div>
   );
 }
