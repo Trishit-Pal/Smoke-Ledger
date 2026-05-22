@@ -95,7 +95,22 @@ jobs:
 
   rls-integration:
     runs-on: ubuntu-latest
-    if: ${{ secrets.E2E_SUPABASE_URL != '' }}
+    # No `if:` gate — this job is mandatory on every PR.
+    # Rationale: rls-integration is the sole automated safety net for
+    # cross-tenant data leakage.  Silently skipping it when secrets are
+    # absent defeats the purpose; a missing secret should block CI, not
+    # green-light it.
+    #
+    # Concurrency: serialise runs that target the same ref so two PRs
+    # cannot race against the shared CI Supabase project.  cancel-in-progress
+    # is false because tests clean up probe rows both inline in each it() block
+    # AND in an afterAll() hook (added in H5).  An interrupted run will skip
+    # the afterAll cleanup, leaving probe rows that the next run treats as
+    # noise; flipping to true is therefore acceptable if queue depth becomes
+    # the bigger problem, at the cost of some test-row leakage between runs.
+    concurrency:
+      group: rls-integration-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -107,6 +122,37 @@ jobs:
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Verify required E2E secrets
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
+          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+        run: |
+          missing=()
+          [ -z "$E2E_SUPABASE_URL" ]       && missing+=("E2E_SUPABASE_URL        — anon-accessible URL of the CI Supabase project")
+          [ -z "$E2E_SUPABASE_ANON_KEY" ]  && missing+=("E2E_SUPABASE_ANON_KEY   — anon/public API key of the CI Supabase project")
+          [ -z "$E2E_USER_A_EMAIL" ]        && missing+=("E2E_USER_A_EMAIL         — email of pre-created test user A on the CI project")
+          [ -z "$E2E_USER_A_PASSWORD" ]     && missing+=("E2E_USER_A_PASSWORD      — password of test user A")
+          [ -z "$E2E_USER_B_EMAIL" ]        && missing+=("E2E_USER_B_EMAIL         — email of pre-created test user B on the CI project")
+          [ -z "$E2E_USER_B_PASSWORD" ]     && missing+=("E2E_USER_B_PASSWORD      — password of test user B")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets for rls-integration job:"
+            printf '  - %s\n' "${missing[@]}"
+            echo ""
+            echo "See docs/deployment/production-ops-checklist.md section 6 for setup."
+            exit 1
+          fi
+          echo "All required secrets present."
+
+      - name: Verify CI project schema is current
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+        run: node scripts/verify-backend.mjs
 
       - name: RLS integration tests
         run: npm test -- rls.integration.test.ts

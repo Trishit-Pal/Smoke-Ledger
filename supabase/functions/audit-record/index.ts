@@ -17,11 +17,17 @@ const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
   .filter(Boolean);
 const allowAnyOrigin = allowedOrigins.includes('*');
 
-const RATE_LIMIT_MAX = Number.parseInt(Deno.env.get('AUDIT_RATE_LIMIT_MAX') ?? '60', 10);
+const RATE_LIMIT_MAX = Number.parseInt(Deno.env.get('AUDIT_RATE_LIMIT_MAX') ?? '10', 10);
 const RATE_LIMIT_WINDOW_SEC = Number.parseInt(
   Deno.env.get('AUDIT_RATE_LIMIT_WINDOW_SEC') ?? '60',
   10,
 );
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 function originAllowed(origin: string | null): boolean {
   if (!origin) return true;
@@ -132,6 +138,13 @@ serve(async (req) => {
 
     const allowed = await checkRateLimit(`user:${user.id}`);
     if (!allowed) {
+      const userIdHash = await sha256Hex(`${user.id}:${Deno.env.get('AUDIT_PEPPER') ?? ''}`);
+      console.warn(JSON.stringify({
+        level: 'warn',
+        event: 'audit_rate_limit_exceeded',
+        user_id_hash: userIdHash,
+        request_id: requestId,
+      }));
       return json({ error: 'rate_limited', request_id: requestId }, 429, origin);
     }
 

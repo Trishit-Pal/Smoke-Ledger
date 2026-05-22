@@ -43,6 +43,32 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
   });
 
   afterAll(async () => {
+    // Best-effort orphan cleanup: if any it() block crashes mid-flight before
+    // its inline cleanup runs, these deletes ensure the CI project stays
+    // self-healing across runs.
+    //
+    // Scope is intentionally narrow:
+    //   cigarette_logs — only rows whose id starts with 'log_rls_' (the prefix
+    //     every probe row in this file uses; real user rows never use it).
+    //   error_events   — only rows owned by userAId with category starting with
+    //     'test.' (the convention used by probe inserts in this file).
+    //     The 'compliance.delete' category is excluded because those rows are
+    //     inserted by the service role only and are not visible through RLS
+    //     anyway (SELECT returns 0 rows for authenticated users).
+    if (userAId) {
+      await clientA
+        .from('cigarette_logs')
+        .delete()
+        .like('id', 'log_rls_%')
+        .eq('user_id', userAId);
+
+      await clientA
+        .from('error_events')
+        .delete()
+        .eq('user_id', userAId)
+        .like('category', 'test.%');
+    }
+
     await clientA.auth.signOut();
     await clientB.auth.signOut();
   });

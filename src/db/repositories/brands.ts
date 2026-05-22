@@ -1,4 +1,5 @@
 import type { Brand, BrandVariant } from '@/types';
+import { AppError } from '@/lib/errors';
 import { makeId } from '@/lib/id';
 import { getSupabase } from '@/lib/supabase';
 import { mapDbError, requireUserId } from '@/db/repositories/_supabase';
@@ -236,7 +237,21 @@ export async function deleteBrand(id: string): Promise<void> {
   const supabase = getSupabase();
   const userId = await requireUserId();
   const { error } = await supabase.from('brands').delete().eq('user_id', userId).eq('id', id);
-  if (error) throw mapDbError(error);
+  if (error) {
+    // M7 audit: brand_variants.brand_id is ON DELETE RESTRICT, so a brand
+    // with active variants raises Postgres 23503 (foreign_key_violation).
+    // The generic mapDbError would label that `validation_error`, which is
+    // misleading for a delete-on-parent case. Surface a `conflict` instead so
+    // the UI can prompt the user to delete the variants first.
+    if ((error as { code?: string }).code === '23503') {
+      throw new AppError(
+        'conflict',
+        'brand_has_variants: delete the brand variants first, or merge the brand into another.',
+        error,
+      );
+    }
+    throw mapDbError(error);
+  }
 }
 
 /**

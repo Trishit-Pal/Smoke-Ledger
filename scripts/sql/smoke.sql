@@ -71,4 +71,20 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'unexpected RLS policy error_events_update — must remain absent (H1)';
   END IF;
+
+  -- M2: single-column brand_id index must exist for brand-breakdown query plans.
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_logs_brand') THEN
+    RAISE EXCEPTION 'idx_logs_brand index missing (M2)';
+  END IF;
+
+  -- M7: brand_variants.brand_id must be ON DELETE RESTRICT, not CASCADE.
+  -- pg_constraint.confdeltype: 'r' = RESTRICT, 'c' = CASCADE, 'n' = SET NULL, 'a' = NO ACTION.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.brand_variants'::regclass
+      AND confrelid = 'public.brands'::regclass
+      AND confdeltype = 'r'
+  ) THEN
+    RAISE EXCEPTION 'brand_variants.brand_id FK to brands must be ON DELETE RESTRICT (M7)';
+  END IF;
 END $$;
