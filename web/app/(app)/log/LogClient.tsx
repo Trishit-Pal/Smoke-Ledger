@@ -1,5 +1,20 @@
 'use client';
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  Log · the morning extract from the printed ledger
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  Sibling of History — shows the same hairline-row typography but scoped to
+ *  what was written today + the most recent thirty entries. The page exists
+ *  for two readers: someone who just logged something via QuickLog and wants
+ *  to verify the line landed correctly, and someone who wants to add a
+ *  detailed entry (the persistent "Write new entry" affordance up top).
+ *
+ *  This is intentionally a slim view. The deep ledger lives at /history.
+ *  Anything more substantial than "what did I just write?" belongs there.
+ */
+
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { todayIst, formatTime } from '@/lib/date';
@@ -8,16 +23,14 @@ import { triggerLabel } from '@/constants/triggers';
 import type { CigaretteLog, UserProfile } from '@/types';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 
-import { Card } from '@web/components/ui/Card';
-import { Button } from '@web/components/ui/Button';
-import { Text } from '@web/components/ui/Text';
-import { EmptyState } from '@web/components/ui/EmptyState';
-import { FadeSlideIn } from '@web/components/anim/dynamic';
-import { Header } from '@web/components/layout/Header';
-
 export interface LogClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+}
+
+function formatIndianDateShort(ymd: string): string {
+  const [, month, day] = ymd.split('-');
+  return `${day}/${month}`;
 }
 
 export function LogClient({ profile, logs }: LogClientProps) {
@@ -38,101 +51,195 @@ export function LogClient({ profile, logs }: LogClientProps) {
     [logs],
   );
 
+  const todayTotalSticks = React.useMemo(
+    () => todaysLogs.reduce((acc, l) => acc + l.quantity, 0),
+    [todaysLogs],
+  );
+  const todayTotalSpend = React.useMemo(
+    () => todaysLogs.reduce((acc, l) => acc + (l.totalPriceInr ?? 0), 0),
+    [todaysLogs],
+  );
+
+  const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
+
   return (
-    <div className="max-w-2xl mx-auto p-lg flex flex-col gap-xl">
-      <FadeSlideIn index={0}>
-        <Header
-          title="History"
-          subtitle="Today's timeline and recent entries"
-          rightSlot={
-            <Button
-              title="Add details"
-              variant="ghost"
-              size="sm"
-              onPress={() => router.push('/log/new')}
-            />
-          }
-        />
-      </FadeSlideIn>
+    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
+      <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      {todaysLogs.length === 0 ? (
-        <FadeSlideIn index={1}>
-          <EmptyState
-            title="Nothing logged today"
-            description="Use the Home tab to quick-log, or add a detailed entry."
-            actionLabel="Detailed log"
-            onAction={() => router.push('/log/new')}
-          />
-        </FadeSlideIn>
-      ) : (
-        <FadeSlideIn index={1}>
-          <Card>
-            <Text variant="caption" muted className="mb-md">
-              Today
-            </Text>
-            <ul className="flex flex-col gap-md">
-              {todaysLogs.map((log) => (
-                <li key={log.id} className="flex justify-between gap-md border-b border-border pb-md last:border-0 last:pb-0">
-                  <div>
-                    <Text variant="bodyStrong">
-                      {maskBrandName(log.brandNameSnap ?? 'Unknown', discreet)} · {log.quantity}
-                    </Text>
-                    <Text variant="small" muted>
-                      {formatTime(log.tsUtc)}
-                      {log.triggerTag ? ` · ${triggerLabel(log.triggerTag)}` : ''}
-                    </Text>
-                  </div>
-                  <Text variant="small" muted>
-                    {log.totalPriceInr != null
-                      ? maskInr(log.totalPriceInr, discreet, (n) =>
-                          formatInr(n, { compact: true }),
-                        )
-                      : '—'}
-                  </Text>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </FadeSlideIn>
-      )}
+      <div className="editorial-stage flex flex-col gap-xxl">
+        {/* ── Masthead ── */}
+        <header style={idx(0)} className="flex flex-col gap-sm">
+          <div className="flex items-center gap-md">
+            <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
+            <span className="editorial-caption nums-tabular">Log · Recent</span>
+            <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
+          </div>
+          <p className="text-small text-text-muted text-center italic">
+            What you&apos;ve written so far.
+          </p>
+          <div className="flex justify-center mt-sm">
+            <button
+              type="button"
+              onClick={() => router.push('/log/new')}
+              className="inline-flex items-center min-h-[44px] px-lg rounded-md bg-text text-bg font-medium text-body hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              Write a new entry
+            </button>
+          </div>
+        </header>
 
-      <FadeSlideIn index={2}>
-        <Card>
-          <Text variant="caption" muted className="mb-md">
-            Recent
-          </Text>
-          {recentLogs.length === 0 ? (
-            <Text variant="small" muted>
-              No entries yet.
-            </Text>
+        {/* ── Today ── */}
+        <section style={idx(1)} aria-labelledby="today-heading" className="flex flex-col">
+          <header className="rule-hair-strong grid grid-cols-[1fr_auto] items-baseline gap-md pt-md pb-md">
+            <div>
+              <h2 id="today-heading" className="editorial-caption">
+                Today
+              </h2>
+              <p className="text-small text-text-muted nums-tabular">
+                {todaysLogs.length === 0
+                  ? 'Nothing logged today.'
+                  : maskInr(todayTotalSpend, discreet, (n) =>
+                      formatInr(n, { compact: true }),
+                    )}
+              </p>
+            </div>
+            <div
+              className="editorial-numeral--small nums-tabular text-right"
+              aria-label={
+                discreet
+                  ? "Today's total: hidden"
+                  : `Today's total: ${todayTotalSticks} ${
+                      todayTotalSticks === 1 ? 'cigarette' : 'cigarettes'
+                    }`
+              }
+            >
+              {discreet ? '••' : todayTotalSticks}
+              <span className="text-small text-text-faint font-sans ml-xs">
+                {todayTotalSticks === 1 ? 'stick' : 'sticks'}
+              </span>
+            </div>
+          </header>
+
+          {todaysLogs.length === 0 ? (
+            <p className="text-body text-text-muted py-md max-w-[42ch]">
+              The home tab&apos;s quick-log is the fastest way in, or write a
+              detailed entry above.
+            </p>
           ) : (
-            <ul className="flex flex-col gap-sm">
-              {recentLogs.map((log) => (
-                <li key={log.id} className="flex justify-between gap-md text-small">
-                  <span>
-                    {formatIndianDateShort(log.localDate)} ·{' '}
-                    {maskBrandName(log.brandNameSnap ?? '—', discreet)} ×{log.quantity}
-                  </span>
-                  <span className="text-text-muted">
+            <ul>
+              {todaysLogs.map((log) => (
+                <li
+                  key={log.id}
+                  className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md"
+                >
+                  <div className="min-w-0">
+                    <p className="text-body text-text truncate">
+                      {maskBrandName(log.brandNameSnap ?? 'Unbranded', discreet)}
+                      {log.triggerTag && !discreet ? (
+                        <span className="text-text-muted">
+                          {' · '}
+                          {triggerLabel(log.triggerTag)}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-small text-text-muted nums-tabular">
+                      {formatTime(log.tsUtc)}
+                      {' · '}
+                      {discreet
+                        ? '•••'
+                        : `${log.quantity} stick${log.quantity > 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                  <p className="text-small text-text-muted nums-tabular text-right">
                     {log.totalPriceInr != null
                       ? maskInr(log.totalPriceInr, discreet, (n) =>
                           formatInr(n, { compact: true }),
                         )
                       : '—'}
-                  </span>
+                  </p>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-      </FadeSlideIn>
+        </section>
 
-      <Button title="Open full history" variant="secondary" fullWidth onPress={() => router.push('/history')} />
+        {/* ── Recent (last 30 entries) ── */}
+        {recentLogs.length > 0 ? (
+          <section style={idx(2)} aria-labelledby="recent-heading" className="flex flex-col">
+            <header className="rule-hair-strong pt-md pb-md">
+              <h2 id="recent-heading" className="editorial-caption">
+                The last thirty entries
+              </h2>
+              <p className="text-small text-text-muted italic">
+                Reverse chronological. The deeper archive is at{' '}
+                <button
+                  type="button"
+                  onClick={() => router.push('/history')}
+                  className="underline underline-offset-4 decoration-1 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+                  style={{ textDecorationColor: 'var(--rule-strong)' }}
+                >
+                  /history
+                </button>
+                .
+              </p>
+            </header>
+            <ul>
+              {recentLogs.map((log) => (
+                <li
+                  key={log.id}
+                  className="rule-hair grid grid-cols-[auto_1fr_auto] items-baseline gap-md py-sm"
+                >
+                  <span className="text-small text-text-faint nums-tabular w-[3rem]">
+                    {formatIndianDateShort(log.localDate)}
+                  </span>
+                  <span className="text-small text-text truncate">
+                    {maskBrandName(log.brandNameSnap ?? '—', discreet)}
+                    <span className="text-text-muted nums-tabular">
+                      {' '}
+                      ×{discreet ? '•' : log.quantity}
+                    </span>
+                  </span>
+                  <span className="text-small text-text-muted nums-tabular text-right">
+                    {log.totalPriceInr != null
+                      ? maskInr(log.totalPriceInr, discreet, (n) =>
+                          formatInr(n, { compact: true }),
+                        )
+                      : '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* ── Empty state ── */}
+        {recentLogs.length === 0 && todaysLogs.length === 0 ? (
+          <section style={idx(1)} className="rule-hair pt-lg flex flex-col gap-sm">
+            <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
+              Nothing logged yet.
+            </p>
+            <p className="text-body text-text-muted max-w-[42ch]">
+              One line is enough to start a record. Write your first entry
+              above, or use quick-log from the home tab.
+            </p>
+          </section>
+        ) : null}
+
+        {/* ── Footer ── */}
+        <footer style={idx(3)} className="rule-hair pt-md flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => router.push('/history')}
+            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            style={{ textDecorationColor: 'var(--rule-strong)' }}
+          >
+            Open the full archive →
+          </button>
+          <span className="text-caption text-text-faint italic">
+            The line gets written by you.
+          </span>
+        </footer>
+      </div>
     </div>
   );
-}
-
-function formatIndianDateShort(ymd: string): string {
-  const [, month, day] = ymd.split('-');
-  return `${day}/${month}`;
 }
