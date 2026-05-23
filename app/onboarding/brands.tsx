@@ -64,7 +64,13 @@ export default function BrandsPick() {
               setSetting('consent.onboardingCompletedAt', now),
             ]);
             await setOnboardingStep('done');
-            await recordAuditEvent('onboarding_completed', 'compliance', {});
+            // Audit is compliance bookkeeping, not a gate: a transient audit
+            // failure must never strand the user on the final onboarding step.
+            try {
+              await recordAuditEvent('onboarding_completed', 'compliance', {});
+            } catch (auditErr) {
+              console.warn('[onboarding] onboarding_completed audit failed', auditErr);
+            }
             router.replace('/(tabs)');
           }}
         />
