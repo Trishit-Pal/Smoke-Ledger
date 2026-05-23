@@ -32,72 +32,108 @@ export type LoginActionState = {
 
 export const initialLoginActionState: LoginActionState = { code: null, message: null };
 
+function isNextRedirectError(err: unknown): boolean {
+  // next/navigation's redirect() throws an Error whose digest starts with
+  // 'NEXT_REDIRECT'. This is the framework's signal — never swallow it.
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'digest' in err &&
+    typeof (err as { digest?: unknown }).digest === 'string' &&
+    (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  );
+}
+
 export async function signInWithPasswordAction(
   _prev: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return { code: 'server_misconfigured', message: 'Sign-in is temporarily unavailable.' };
-  }
+  let nextPathToRedirect: string | null = null;
 
-  const rememberMeRaw = formData.get('rememberMe');
-  const parsed = schema.safeParse({
-    email: formData.get('email'),
-    password: formData.get('password'),
-    rememberMe: rememberMeRaw === '1' || rememberMeRaw === 'on' || rememberMeRaw === 'true',
-    captchaToken: formData.get('captchaToken') || undefined,
-    next: formData.get('next'),
-  });
-  if (!parsed.success) {
-    return {
-      code: 'validation_error',
-      message: 'Check your email and password and try again.',
-    };
-  }
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { code: 'server_misconfigured', message: 'Sign-in is temporarily unavailable.' };
+    }
 
-  const { email, password, rememberMe = false, captchaToken } = parsed.data;
-  const nextPath = sanitizeNextPath(parsed.data.next ?? null);
+    const rememberMeRaw = formData.get('rememberMe');
+    const parsed = schema.safeParse({
+      email: formData.get('email'),
+      password: formData.get('password'),
+      rememberMe: rememberMeRaw === '1' || rememberMeRaw === 'on' || rememberMeRaw === 'true',
+      captchaToken: formData.get('captchaToken') || undefined,
+      next: formData.get('next'),
+    });
+    if (!parsed.success) {
+      return {
+        code: 'validation_error',
+        message: 'Check your email and password and try again.',
+      };
+    }
 
-  const cookieStore = cookies();
-  cookieStore.set(REMEMBER_ME_COOKIE, rememberMe ? '1' : '', {
-    path: '/',
-    maxAge: rememberMe ? ONE_YEAR_SEC : 0,
-    sameSite: 'lax',
-    secure: IS_PROD,
-  });
+    const { email, password, rememberMe = false, captchaToken } = parsed.data;
+    nextPathToRedirect = sanitizeNextPath(parsed.data.next ?? null);
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
+    const cookieStore = cookies();
+    try {
+      cookieStore.set(REMEMBER_ME_COOKIE, rememberMe ? '1' : '', {
+        path: '/',
+        maxAge: rememberMe ? ONE_YEAR_SEC : 0,
+        sameSite: 'lax',
+        secure: IS_PROD,
+      });
+    } catch {
+      // cookieStore.set() can throw in read-only contexts. Sign-in cookies
+      // are persisted via Supabase's setAll callback below, which also
+      // tolerates read-only contexts.
+    }
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(toSet: { name: string; value: string; options?: AuthCookieOptions }[]) {
+          try {
+            toSet.forEach(({ name, value, options }) => {
+              const policy = isSupabaseAuthCookie(name)
+                ? applyAuthCookiePolicy(options, rememberMe)
+                : hardenCookieOptions(options);
+              cookieStore.set(name, value, policy);
+            });
+          } catch {
+            // Same as above — read-only context tolerated; the middleware
+            // refreshes session cookies on the next request.
+          }
+        },
       },
-      setAll(toSet: { name: string; value: string; options?: AuthCookieOptions }[]) {
-        toSet.forEach(({ name, value, options }) => {
-          const policy = isSupabaseAuthCookie(name)
-            ? applyAuthCookiePolicy(options, rememberMe)
-            : hardenCookieOptions(options);
-          cookieStore.set(name, value, policy);
-        });
-      },
-    },
-  });
+    });
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
-    password,
-    options: captchaToken ? { captchaToken } : undefined,
-  });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
 
-  if (error) {
-    return {
-      code: getAuthErrorCode(error) || 'authentication_error',
-      message: toAuthErrorMessage(error),
-    };
+    if (error) {
+      return {
+        code: getAuthErrorCode(error) || 'authentication_error',
+        message: toAuthErrorMessage(error),
+      };
+    }
+  } catch (err) {
+    if (isNextRedirectError(err)) throw err;
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    // TEMPORARY: surface the actual error in the action state so production
+    // can be diagnosed without runtime-log access. Replace with a generic
+    // message once the underlying throw is identified and fixed.
+    return { code: 'diagnostic_error', message: `Sign-in failed: ${msg.slice(0, 300)}` };
   }
 
   // redirect() throws NEXT_REDIRECT so the client receives a 303 with the
-  // session cookies attached on the same response.
-  redirect(nextPath);
+  // session cookies attached on the same response. Calling it OUTSIDE the
+  // try/catch above guarantees the redirect signal is not swallowed.
+  if (nextPathToRedirect) redirect(nextPathToRedirect);
+  return { code: 'internal_error', message: 'Sign-in completed but no redirect target.' };
 }
