@@ -1,5 +1,42 @@
 import { test, expect } from '@playwright/test';
 
+const loginEmail = process.env.E2E_LOGIN_EMAIL;
+const loginPassword = process.env.E2E_LOGIN_PASSWORD;
+
+test('password sign-in submits via server action and lands on a post-auth route', async ({
+  page,
+  context,
+}) => {
+  test.skip(
+    !loginEmail || !loginPassword,
+    'Set E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD to run.',
+  );
+
+  await page.goto('/login?next=%2Fdashboard');
+  await page.getByLabel('Email').fill(loginEmail!);
+  await page.getByLabel('Password').fill(loginPassword!);
+
+  // The form must POST to the same /login URL (Next.js server action target).
+  // If the page ever regresses to a client fetch, this expectation fails
+  // because no document-level request fires.
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.request().method() === 'POST' && /\/login(\?|$)/.test(res.url()),
+      { timeout: 10_000 },
+    ),
+    page.getByRole('button', { name: /sign in/i }).click(),
+  ]);
+  expect([200, 303, 302]).toContain(response.status());
+
+  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15_000 });
+
+  const cookies = await context.cookies();
+  expect(
+    cookies.some((c) => /-auth-token($|\.)/.test(c.name)),
+    'expected an sb-…-auth-token cookie to be set after sign-in',
+  ).toBe(true);
+});
+
 test('landing page links are visible', async ({ page }) => {
   await page.goto('/');
   await expect(

@@ -3,8 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useFormState, useFormStatus } from 'react-dom';
 import { z } from 'zod';
 import { getSupabase } from '@web/lib/supabase/client';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
@@ -16,17 +15,17 @@ import { toAuthErrorMessage } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
+import {
+  initialLoginActionState,
+  signInWithPasswordAction,
+  type LoginActionState,
+} from './actions';
 
 const emailSchema = z.string().email('Enter a valid email');
 const phoneSchema = z
   .string()
   .regex(/^\+[1-9]\d{7,14}$/, 'Use E.164 format, e.g. +919876543210');
 
-const schema = z.object({
-  email: emailSchema,
-  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
-});
-type FormValues = z.infer<typeof schema>;
 type AuthMode = 'password' | 'email_otp' | 'phone_otp';
 
 const MODE_OPTIONS: { value: AuthMode; label: string }[] = [
@@ -87,6 +86,26 @@ const SECONDARY_CTA_STYLE: React.CSSProperties = {
   width: '100%',
 };
 
+function PasswordSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  const isInactive = pending || disabled;
+  return (
+    <button
+      type="submit"
+      disabled={isInactive}
+      className="focus-ring"
+      style={{
+        ...PRIMARY_CTA_STYLE,
+        marginTop: 16,
+        opacity: isInactive ? 0.45 : 1,
+        cursor: isInactive ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {pending ? 'Signing in…' : 'Sign in →'}
+    </button>
+  );
+}
+
 export default function LoginPage() {
   return (
     <React.Suspense fallback={<div style={{ minHeight: 320 }} />}>
@@ -118,7 +137,18 @@ function LoginPageInner() {
   const [resendInfo, setResendInfo] = React.useState<string | null>(null);
   const captchaRequired = isCaptchaConfigured();
   const captchaReady = !captchaRequired || !!captchaToken;
-  const isDev = process.env.NODE_ENV !== 'production';
+
+  const [passwordActionState, passwordFormAction] = useFormState<LoginActionState, FormData>(
+    signInWithPasswordAction,
+    initialLoginActionState,
+  );
+  const passwordEmailRef = React.useRef<HTMLInputElement>(null);
+
+  // Persist remember-me preference client-side whenever it changes, so it
+  // survives the full-page navigation triggered by the server action redirect.
+  React.useEffect(() => {
+    setRememberMePreference(rememberMe);
+  }, [rememberMe]);
 
   React.useEffect(() => {
     if (callbackError === 'invalid_or_expired_link') {
@@ -130,69 +160,18 @@ function LoginPageInner() {
     }
   }, [callbackError]);
 
-  const {
-    register,
-    handleSubmit,
-    getValues,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onSubmit',
-  });
-
+  const passwordError = passwordActionState.message ?? submitError;
   const showEmailNotConfirmedActions =
     callbackError === 'email_not_confirmed' ||
-    submitError === toAuthErrorMessage({ code: 'email_not_confirmed' });
+    passwordActionState.code === 'email_not_confirmed';
 
   const callbackRedirectTo = React.useMemo(() => {
     if (typeof window === 'undefined') return undefined;
     return `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
   }, [nextPath]);
 
-  const onSubmit = async (values: FormValues) => {
-    setSubmitError(null);
-    setResendInfo(null);
-    if (captchaRequired && !captchaToken) {
-      setSubmitError('Please complete the security check.');
-      return;
-    }
-    setRememberMePreference(rememberMe);
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: values.email.trim(),
-          password: values.password,
-          rememberMe,
-          ...(captchaToken ? { captchaToken } : {}),
-        }),
-      });
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
-        const code = body.code ?? '';
-        setSubmitError(body.message ?? toAuthErrorMessage({ code }));
-        setCaptchaToken(null);
-        return;
-      }
-
-      window.location.assign(nextPath);
-    } catch (err) {
-      if (isDev) console.warn('[login] fetch failed', err);
-      setSubmitError('Unable to sign in. Please try again.');
-      setCaptchaToken(null);
-    }
-  };
-
-  const onInvalid = (fieldErrors: typeof errors) => {
-    if (isDev) console.warn('[login] validation failed', fieldErrors);
-    setSubmitError('Please fix the highlighted fields above and try again.');
-  };
-
   const onResendConfirmation = async () => {
-    const email = getValues('email')?.trim();
+    const email = passwordEmailRef.current?.value?.trim();
     if (!email) {
       setSubmitError('Enter your email above, then tap resend.');
       return;
@@ -338,29 +317,41 @@ function LoginPageInner() {
 
       {mode === 'password' ? (
         <form
-          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          action={passwordFormAction}
           className="flex flex-col"
           style={{ gap: 0 }}
           noValidate
         >
-          <EditorialFieldRow label="Email" error={errors.email?.message ?? null} strong>
+          <input type="hidden" name="next" value={nextPath} />
+          <input type="hidden" name="rememberMe" value={rememberMe ? '1' : ''} />
+          {captchaToken ? (
+            <input type="hidden" name="captchaToken" value={captchaToken} />
+          ) : null}
+
+          <EditorialFieldRow label="Email" strong>
             <input
+              ref={passwordEmailRef}
               type="email"
+              name="email"
+              required
+              maxLength={320}
               autoComplete="email"
               placeholder="you@example.com"
               style={INPUT_STYLE}
               className="focus-ring"
-              {...register('email')}
             />
           </EditorialFieldRow>
-          <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
+          <EditorialFieldRow label="Password">
             <input
               type="password"
+              name="password"
+              required
+              minLength={8}
+              maxLength={128}
               autoComplete="current-password"
               placeholder="••••••••"
               style={INPUT_STYLE}
               className="focus-ring"
-              {...register('password')}
             />
           </EditorialFieldRow>
 
@@ -391,7 +382,7 @@ function LoginPageInner() {
             <span>Keep me signed in on this device</span>
           </label>
 
-          {submitError ? <InlineError message={submitError} /> : null}
+          {passwordError ? <InlineError message={passwordError} /> : null}
           {resendInfo ? <InlineInfo message={resendInfo} /> : null}
 
           {showEmailNotConfirmedActions ? (
@@ -406,19 +397,7 @@ function LoginPageInner() {
             </button>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={isSubmitting || !captchaReady}
-            className="focus-ring"
-            style={{
-              ...PRIMARY_CTA_STYLE,
-              marginTop: 16,
-              opacity: isSubmitting || !captchaReady ? 0.45 : 1,
-              cursor: isSubmitting || !captchaReady ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSubmitting ? 'Signing in…' : 'Sign in →'}
-          </button>
+          <PasswordSubmitButton disabled={!captchaReady} />
         </form>
       ) : null}
 
