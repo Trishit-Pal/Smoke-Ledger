@@ -8,6 +8,7 @@ import {
   BrandVariantSchema,
   IdSchema,
   parseOrThrow,
+  type BrandInput,
 } from '@/lib/validation';
 
 type BrandRow = {
@@ -99,7 +100,7 @@ export async function createBrand(
   name: string,
   category: Brand['category'] = 'regular',
 ): Promise<Brand> {
-  const input = parseOrThrow(BrandSchema, { name, category }, 'brand');
+  const input: BrandInput = parseOrThrow(BrandSchema, { name, category }, 'brand');
   const supabase = getSupabase();
   const userId = await requireUserId();
   const id = makeId('brd');

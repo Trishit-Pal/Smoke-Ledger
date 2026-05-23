@@ -52,6 +52,8 @@ const config = {
     ];
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
+      dayjs: path.resolve(__dirname, 'node_modules/dayjs'),
+      zod: path.resolve(__dirname, 'node_modules/zod'),
       // Shim RN-only modules with web equivalents so the shared `src/`
       // domain/repository code runs unmodified inside Next.js.
       [path.resolve(__dirname, '../src/lib/supabase')]: path.resolve(
