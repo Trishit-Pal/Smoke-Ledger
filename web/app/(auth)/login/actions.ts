@@ -13,6 +13,7 @@ import {
   isSupabaseAuthCookie,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
+import type { LoginActionState } from './loginActionState';
 
 const ONE_YEAR_SEC = 60 * 60 * 24 * 365;
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -24,13 +25,6 @@ const schema = z.object({
   captchaToken: z.string().min(1).optional(),
   next: z.string().optional().nullable(),
 });
-
-export type LoginActionState = {
-  code: string | null;
-  message: string | null;
-};
-
-export const initialLoginActionState: LoginActionState = { code: null, message: null };
 
 function isNextRedirectError(err: unknown): boolean {
   // next/navigation's redirect() throws an Error whose digest starts with

@@ -15,11 +15,8 @@ import { toAuthErrorMessage } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
-import {
-  initialLoginActionState,
-  signInWithPasswordAction,
-  type LoginActionState,
-} from './actions';
+import { signInWithPasswordAction } from './actions';
+import { initialLoginActionState, type LoginActionState } from './loginActionState';
 
 const emailSchema = z.string().email('Enter a valid email');
 const phoneSchema = z
