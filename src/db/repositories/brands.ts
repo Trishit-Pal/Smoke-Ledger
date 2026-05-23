@@ -9,6 +9,7 @@ import {
   IdSchema,
   parseOrThrow,
   type BrandInput,
+  type BrandVariantInput,
 } from '@/lib/validation';
 
 type BrandRow = {
@@ -169,7 +170,7 @@ export async function upsertVariant(
   priceInr: number | null,
 ): Promise<BrandVariant> {
   parseOrThrow(IdSchema, brandId, 'brand_id');
-  const validated = parseOrThrow(
+  const validated: BrandVariantInput = parseOrThrow(
     BrandVariantSchema,
     { name, defaultPackSize, avgPriceInr: priceInr },
     'brand_variant',
