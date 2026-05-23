@@ -35,6 +35,9 @@ const config = {
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '..'),
   },
+  eslint: {
+    dirs: ['app', 'components', 'hooks', 'lib'],
+  },
   async headers() {
     return [
       { source: '/(.*)', headers: baseSecurityHeaders },

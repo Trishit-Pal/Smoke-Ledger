@@ -264,7 +264,7 @@ export type ImportEnvelope = z.infer<typeof ImportEnvelopeSchema>;
  */
 export function parseOrThrow<T>(schema: z.ZodType<T>, input: unknown, label: string): T {
   const r = schema.safeParse(input);
-  if (r.success) return r.data;
+  if (r.success) return r.data as T;
   const issues = r.error.issues
     .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
     .slice(0, 5)
