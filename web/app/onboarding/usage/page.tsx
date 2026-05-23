@@ -2,28 +2,48 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@web/components/ui/Card';
-import { Chip } from '@web/components/ui/Chip';
-import { Input } from '@web/components/ui/Input';
-import { Button } from '@web/components/ui/Button';
-import { Text } from '@web/components/ui/Text';
+import { DigitRoll } from '@web/components/onboarding/DigitRoll';
+import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { setSetting } from '@/db/repositories/settings';
 import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
 import { toSafeErrorMessage } from '@/lib/errors';
 
-const PURCHASE_PREF = [
+const PRICE_PER_STICK = 18;
+const MAX_TICKS = 40;
+
+interface WindowOption {
+  id: 7 | 30;
+  label: string;
+  sub: string;
+}
+
+const WINDOW_OPTIONS: WindowOption[] = [
+  { id: 7, label: '7 days', sub: 'Tight cycle' },
+  { id: 30, label: '30 days', sub: 'Smoother trend' },
+];
+
+interface PurchaseOption {
+  id: 'single' | 'pack' | 'mixed';
+  label: string;
+}
+
+const PURCHASE_OPTIONS: PurchaseOption[] = [
   { id: 'single', label: 'Mostly singles' },
   { id: 'pack', label: 'Mostly packs' },
   { id: 'mixed', label: 'Mix of both' },
-] as const;
+];
 
 export default function OnboardingUsagePage() {
   const router = useRouter();
   const [perDay, setPerDay] = React.useState('10');
-  const [pref, setPref] = React.useState<string | null>(null);
+  const [pref, setPref] = React.useState<PurchaseOption['id'] | null>(null);
   const [windowDays, setWindowDays] = React.useState<7 | 30>(30);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const n = Math.max(0, Math.min(MAX_TICKS, Number(perDay) || 0));
+  const dailySpend = n * PRICE_PER_STICK;
+  const yearlySpend = dailySpend * 365;
 
   const onContinue = async () => {
     const parsed = Number(perDay);
@@ -53,79 +73,277 @@ export default function OnboardingUsagePage() {
   };
 
   return (
-    <div className="flex flex-col gap-lg">
-      <header className="flex flex-col gap-sm">
-        <Text variant="caption" muted>
-          STEP 1 OF 3
-        </Text>
-        <Text variant="display">Your daily baseline</Text>
-        <Text variant="small" muted>
-          One number is enough. We use it for trends and savings—not judgment.
-        </Text>
+    <div
+      className="editorial-stage"
+      style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720 }}
+    >
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span className="editorial-caption">Step 02 · The baseline</span>
+        <h2
+          className="editorial-headline"
+          style={{ fontSize: 'clamp(32px, 4vw, 44px)', margin: 0 }}
+        >
+          About how many a day?
+        </h2>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--text-muted)',
+            margin: 0,
+            lineHeight: 1.55,
+            maxWidth: 480,
+          }}
+        >
+          One number is plenty. We&rsquo;ll use it for trends and savings — never to judge you.
+        </p>
       </header>
 
-      <Card>
-        <div className="flex flex-col gap-md">
-          <Text variant="bodyStrong">About how many cigarettes per day?</Text>
-          <Input
-            label="Sticks per day"
-            type="number"
-            min={0}
-            max={60}
-            step={1}
-            inputMode="numeric"
-            value={perDay}
-            onChange={(e) => setPerDay(e.target.value)}
-          />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: 24,
+          alignItems: 'end',
+          padding: '24px 0',
+          borderTop: '1px solid var(--rule-strong)',
+          borderBottom: '1px solid var(--rule)',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="editorial-caption">Sticks per day</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span
+              className="editorial-numeral nums-tabular"
+              style={{ fontSize: 'clamp(72px, 11vw, 128px)', color: 'var(--text)' }}
+            >
+              <DigitRoll value={n} />
+            </span>
+            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>per day</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="editorial-caption">That&rsquo;s about</span>
+          <div
+            className="nums-tabular"
+            style={{
+              fontSize: 22,
+              color: 'var(--text)',
+              fontFamily: 'var(--font-display)',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+              ₹<DigitRoll value={dailySpend.toLocaleString('en-IN')} />
+            </span>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/ day</span>
+          </div>
+          <div
+            className="nums-tabular"
+            style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 4, flexWrap: 'wrap' }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+              ≈ ₹<DigitRoll value={yearlySpend.toLocaleString('en-IN')} /> a year
+            </span>
+            <span style={{ color: 'var(--text-faint)' }}>· at ₹{PRICE_PER_STICK}/stick</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => setPerDay(String(Math.max(0, n - 1)))}
+            className="focus-ring"
+            aria-label="Decrease"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 999,
+              border: '1px solid var(--rule)',
+              background: 'var(--bg-elevated)',
+              cursor: 'pointer',
+              fontSize: 18,
+              color: 'var(--text-muted)',
+              transition: 'border-color 160ms ease, color 160ms ease',
+            }}
+          >
+            −
+          </button>
           <input
             type="range"
             min={0}
-            max={40}
-            value={Math.min(40, Number(perDay) || 0)}
+            max={MAX_TICKS}
+            value={n}
             onChange={(e) => setPerDay(e.target.value)}
-            className="w-full accent-[var(--accent)]"
-            aria-label="Sticks per day slider"
+            className="brand-range focus-ring"
+            style={{ flex: 1 }}
+            aria-label="Sticks per day"
           />
-          <div className="flex flex-col gap-sm">
-            <Text variant="caption" muted>
-              Compare progress over
-            </Text>
-            <div className="flex gap-sm">
-              <Chip label="7 days" selected={windowDays === 7} onPress={() => setWindowDays(7)} />
-              <Chip label="30 days" selected={windowDays === 30} onPress={() => setWindowDays(30)} />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setPerDay(String(Math.min(MAX_TICKS, n + 1)))}
+            className="focus-ring"
+            aria-label="Increase"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 999,
+              border: '1px solid var(--rule)',
+              background: 'var(--bg-elevated)',
+              cursor: 'pointer',
+              fontSize: 18,
+              color: 'var(--text-muted)',
+              transition: 'border-color 160ms ease, color 160ms ease',
+            }}
+          >
+            +
+          </button>
         </div>
-      </Card>
 
-      <Card>
-        <div className="flex flex-col gap-md">
-          <Text variant="bodyStrong">How do you usually buy?</Text>
-          <div className="flex flex-wrap gap-sm">
-            {PURCHASE_PREF.map((item) => (
-              <Chip
-                key={item.id}
-                label={item.label}
-                selected={pref === item.id}
-                onPress={() => setPref(item.id)}
+        <div
+          aria-hidden
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${MAX_TICKS}, 1fr)`,
+            gap: 3,
+            alignItems: 'end',
+            height: 32,
+            perspective: 400,
+          }}
+        >
+          {Array.from({ length: MAX_TICKS }, (_, i) => i < n).map((on, i) => {
+            const isMilestone = i % 5 === 4;
+            return (
+              <div
+                key={i}
+                style={{
+                  height: on ? (isMilestone ? 24 : 14) : 4,
+                  background: on
+                    ? 'linear-gradient(to top, var(--accent), color-mix(in oklab, var(--accent) 70%, white))'
+                    : 'var(--rule)',
+                  opacity: on ? Math.max(0.55, 1 - i * 0.012) : 0.7,
+                  borderRadius: 1,
+                  transform: on ? `translateZ(${i * 0.6}px)` : 'translateZ(0)',
+                  transformStyle: 'preserve-3d',
+                  transition:
+                    'height 360ms cubic-bezier(0.34, 1.56, 0.64, 1), background 140ms ease, opacity 200ms ease, transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  transitionDelay: `${i * 8}ms`,
+                  boxShadow: on ? '0 1px 0 rgba(47,163,155,0.15)' : 'none',
+                }}
               />
-            ))}
-          </div>
+            );
+          })}
         </div>
-      </Card>
+
+        <div
+          className="nums-tabular"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 11,
+            color: 'var(--text-faint)',
+          }}
+        >
+          <span>0</span>
+          <span>10</span>
+          <span>20</span>
+          <span>30</span>
+          <span>40+</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <span className="editorial-caption">Compare progress over</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {WINDOW_OPTIONS.map((opt) => {
+            const selected = windowDays === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setWindowDays(opt.id)}
+                className="focus-ring"
+                style={{
+                  flex: '1 1 200px',
+                  textAlign: 'left',
+                  padding: '14px 16px',
+                  background: selected ? 'var(--accent-soft)' : 'var(--bg-elevated)',
+                  border: selected ? '1px solid var(--accent)' : '1px solid var(--rule)',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  transition: 'background 140ms ease, border-color 140ms ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: selected ? 'var(--accent)' : 'var(--text)',
+                  }}
+                >
+                  {opt.label}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{opt.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <span className="editorial-caption">How do you usually buy?</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {PURCHASE_OPTIONS.map((opt) => {
+            const selected = pref === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setPref(opt.id)}
+                className="focus-ring"
+                style={{
+                  height: 34,
+                  padding: '0 14px',
+                  fontSize: 13,
+                  borderRadius: 999,
+                  border: selected ? '1px solid var(--accent)' : '1px solid var(--rule)',
+                  background: selected ? 'var(--accent-soft)' : 'var(--bg-elevated)',
+                  color: selected ? 'var(--accent)' : 'var(--text-muted)',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 140ms ease',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {error ? (
-        <Text variant="small" color="var(--danger, #C85A54)">
+        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}>
           {error}
-        </Text>
+        </p>
       ) : null}
 
-      <Button
-        title={submitting ? 'Saving…' : 'Continue'}
-        fullWidth
-        disabled={!pref || submitting}
-        loading={submitting}
-        onPress={onContinue}
+      <OnboardingStepFooter
+        onBack={() => router.push('/onboarding/privacy')}
+        primary={{
+          label: submitting ? 'Saving…' : 'Continue →',
+          onPress: onContinue,
+          disabled: !pref || submitting,
+          loading: submitting,
+        }}
       />
     </div>
   );

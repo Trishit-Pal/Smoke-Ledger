@@ -168,7 +168,12 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  if (!hasRequiredConsents && pathname !== '/onboarding/privacy' && !isRecoveryRoute(pathname)) {
+  if (
+    !hasRequiredConsents &&
+    pathname !== '/onboarding' &&
+    pathname !== '/onboarding/privacy' &&
+    !isRecoveryRoute(pathname)
+  ) {
     return finalize(NextResponse.redirect(new URL('/onboarding/privacy', request.url)));
   }
 
@@ -186,12 +191,14 @@ export async function middleware(request: NextRequest) {
   // completed — i.e. the next page they should see.
   if (!onboarded && isOnboardingRoute(pathname)) {
     const ORDER: Record<string, number> = {
+      '/onboarding': 0,
       '/onboarding/privacy': 0,
       '/onboarding/usage': 1,
       '/onboarding/setup': 1,
       '/onboarding/baseline': 1,
       '/onboarding/goal': 2,
       '/onboarding/brands': 3,
+      '/onboarding/done': 4,
     };
     const stepIndex: Record<string, number> = {
       privacy: 0,
@@ -217,7 +224,14 @@ export async function middleware(request: NextRequest) {
   }
 
   if (onboarded && isOnboardingRoute(pathname)) {
-    return finalize(NextResponse.redirect(new URL('/dashboard', request.url)));
+    // Done summary is the one onboarding route a freshly-onboarded user is
+    // allowed to see, and only while their step is still 'done' (i.e. they
+    // haven't visited the dashboard yet).
+    const isDonePath = pathname === '/onboarding/done';
+    const stepIsDone = profile?.onboarding_step === 'done';
+    if (!(isDonePath && stepIsDone)) {
+      return finalize(NextResponse.redirect(new URL('/dashboard', request.url)));
+    }
   }
 
   return response;

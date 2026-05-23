@@ -7,14 +7,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getSupabase } from '@web/lib/supabase/client';
-import { Card } from '@web/components/ui/Card';
-import { Input } from '@web/components/ui/Input';
-import { Button } from '@web/components/ui/Button';
-import { Text } from '@web/components/ui/Text';
+import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
+import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
+import { EditorialModeSwitch } from '@web/components/editorial/EditorialModeSwitch';
+import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_LINKS } from '@web/lib/legal';
-import {
-  toAuthErrorMessage,
-} from '@/lib/auth-errors';
+import { toAuthErrorMessage } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
@@ -31,11 +29,67 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 type AuthMode = 'password' | 'email_otp' | 'phone_otp';
 
+const MODE_OPTIONS: { value: AuthMode; label: string }[] = [
+  { value: 'password', label: 'Password' },
+  { value: 'email_otp', label: 'Email link' },
+  { value: 'phone_otp', label: 'Phone OTP' },
+];
+
+const INPUT_STYLE: React.CSSProperties = {
+  width: '100%',
+  height: 40,
+  padding: '0 0 4px 0',
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '1px solid var(--rule)',
+  outline: 'none',
+  color: 'var(--text)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  transition: 'border-color 160ms ease',
+};
+
+const PRIMARY_CTA_STYLE: React.CSSProperties = {
+  height: 52,
+  padding: '0 24px',
+  border: 'none',
+  borderRadius: 10,
+  background: 'var(--accent)',
+  color: '#ffffff',
+  fontFamily: 'var(--font-sans)',
+  fontWeight: 600,
+  fontSize: 14,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 10,
+  width: '100%',
+  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
+  transition: 'transform 120ms ease, box-shadow 200ms ease, opacity 140ms ease',
+};
+
+const SECONDARY_CTA_STYLE: React.CSSProperties = {
+  height: 44,
+  padding: '0 18px',
+  border: '1px solid var(--rule)',
+  borderRadius: 10,
+  background: 'transparent',
+  color: 'var(--text)',
+  fontFamily: 'var(--font-sans)',
+  fontWeight: 500,
+  fontSize: 14,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  width: '100%',
+};
+
 export default function LoginPage() {
-  // useSearchParams forces a client boundary at the leaf; wrap in Suspense to
-  // satisfy Next 14's bailout warning and keep the static shell streaming.
   return (
-    <React.Suspense fallback={<Card><div className="h-[20rem]" /></Card>}>
+    <React.Suspense fallback={<div style={{ minHeight: 320 }} />}>
       <LoginPageInner />
     </React.Suspense>
   );
@@ -60,8 +114,11 @@ function LoginPageInner() {
   const [otpLoading, setOtpLoading] = React.useState(false);
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
   const [rememberMe, setRememberMe] = React.useState(false);
+  const [resendLoading, setResendLoading] = React.useState(false);
+  const [resendInfo, setResendInfo] = React.useState<string | null>(null);
   const captchaRequired = isCaptchaConfigured();
   const captchaReady = !captchaRequired || !!captchaToken;
+  const isDev = process.env.NODE_ENV !== 'production';
 
   React.useEffect(() => {
     if (callbackError === 'invalid_or_expired_link') {
@@ -76,14 +133,25 @@ function LoginPageInner() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     mode: 'onSubmit',
   });
 
+  const showEmailNotConfirmedActions =
+    callbackError === 'email_not_confirmed' ||
+    submitError === toAuthErrorMessage({ code: 'email_not_confirmed' });
+
+  const callbackRedirectTo = React.useMemo(() => {
+    if (typeof window === 'undefined') return undefined;
+    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+  }, [nextPath]);
+
   const onSubmit = async (values: FormValues) => {
     setSubmitError(null);
+    setResendInfo(null);
     if (captchaRequired && !captchaToken) {
       setSubmitError('Please complete the security check.');
       return;
@@ -105,28 +173,48 @@ function LoginPageInner() {
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
         const code = body.code ?? '';
-        if (code === 'email_not_confirmed') {
-          setSubmitError(body.message ?? toAuthErrorMessage({ code: 'email_not_confirmed' }));
-        } else if (code === 'invalid_credentials') {
-          setSubmitError(body.message ?? toAuthErrorMessage({ code: 'invalid_credentials' }));
-        } else {
-          setSubmitError(body.message ?? toAuthErrorMessage({ code }));
-        }
+        setSubmitError(body.message ?? toAuthErrorMessage({ code }));
         setCaptchaToken(null);
         return;
       }
 
       window.location.assign(nextPath);
-    } catch {
+    } catch (err) {
+      if (isDev) console.warn('[login] fetch failed', err);
       setSubmitError('Unable to sign in. Please try again.');
       setCaptchaToken(null);
     }
   };
 
-  const callbackRedirectTo = React.useMemo(() => {
-    if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-  }, [nextPath]);
+  const onInvalid = (fieldErrors: typeof errors) => {
+    if (isDev) console.warn('[login] validation failed', fieldErrors);
+    setSubmitError('Please fix the highlighted fields above and try again.');
+  };
+
+  const onResendConfirmation = async () => {
+    const email = getValues('email')?.trim();
+    if (!email) {
+      setSubmitError('Enter your email above, then tap resend.');
+      return;
+    }
+    setResendLoading(true);
+    setResendInfo(null);
+    try {
+      const { error } = await getSupabase().auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: callbackRedirectTo },
+      });
+      if (error) {
+        setSubmitError(toAuthErrorMessage(error));
+        return;
+      }
+      setSubmitError(null);
+      setResendInfo('If your account is pending confirmation, we sent another email.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const sendEmailOtp = async () => {
     setOtpError(null);
@@ -152,9 +240,6 @@ function LoginPageInner() {
         },
       });
       if (error) {
-        // Neutral copy regardless of whether the account exists, to defeat
-        // account enumeration. Supabase's "enumeration protection" setting
-        // should also be enabled in the dashboard for defense in depth.
         setOtpInfo('If this email is registered, we sent a sign-in link.');
         setCaptchaToken(null);
         return;
@@ -228,227 +313,337 @@ function LoginPageInner() {
   };
 
   return (
-    <Card>
-      <div className="flex flex-col gap-lg">
-        <div className="grid grid-cols-3 gap-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('password');
-              setOtpError(null);
-              setOtpInfo(null);
-            }}
-            className={`rounded-md border px-sm py-xs text-small ${
-              mode === 'password'
-                ? 'bg-accent text-white border-accent'
-                : 'border-border text-text-muted hover:text-text'
-            }`}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('email_otp');
-              setOtpSent(false);
-              setOtpError(null);
-              setOtpInfo(null);
-            }}
-            className={`rounded-md border px-sm py-xs text-small ${
-              mode === 'email_otp'
-                ? 'bg-accent text-white border-accent'
-                : 'border-border text-text-muted hover:text-text'
-            }`}
-          >
-            Email link
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('phone_otp');
-              setOtpSent(false);
-              setOtpError(null);
-              setOtpInfo(null);
-            }}
-            className={`rounded-md border px-sm py-xs text-small ${
-              mode === 'phone_otp'
-                ? 'bg-accent text-white border-accent'
-                : 'border-border text-text-muted hover:text-text'
-            }`}
-          >
-            Phone OTP
-          </button>
-        </div>
+    <>
+      <EditorialMasthead
+        caption="Account · Sign in"
+        title={
+          <>
+            Welcome <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>back</span>.
+          </>
+        }
+        subtitle="Your ledger, where you left it."
+      />
 
-        {mode === 'password' ? (
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-lg" noValidate>
-            <div className="flex flex-col gap-md">
-              <Input
-                label="Email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                error={errors.email?.message ?? null}
-                {...register('email')}
-              />
-              <Input
-                label="Password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                error={errors.password?.message ?? null}
-                {...register('password')}
-              />
-            </div>
+      <EditorialModeSwitch
+        options={MODE_OPTIONS}
+        value={mode}
+        onChange={(next) => {
+          setMode(next);
+          setOtpError(null);
+          setOtpInfo(null);
+          setOtpSent(false);
+        }}
+        ariaLabel="Sign-in method"
+      />
 
-            {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
-
-            <label className="flex items-start gap-sm text-small text-text-muted cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>Keep me signed in on this device</span>
-            </label>
-
-            {submitError ? (
-              <Text
-                variant="small"
-                color="var(--danger, #C85A54)"
-                className="text-center"
-                role="alert"
-              >
-                {submitError}
-              </Text>
-            ) : null}
-
-            <Button
-              type="submit"
-              title={isSubmitting ? 'Signing in…' : 'Sign in'}
-              variant="primary"
-              fullWidth
-              loading={isSubmitting}
-              disabled={isSubmitting || !captchaReady}
+      {mode === 'password' ? (
+        <form
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          className="flex flex-col"
+          style={{ gap: 0 }}
+          noValidate
+        >
+          <EditorialFieldRow label="Email" error={errors.email?.message ?? null} strong>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              style={INPUT_STYLE}
+              className="focus-ring"
+              {...register('email')}
             />
-          </form>
-        ) : null}
+          </EditorialFieldRow>
+          <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              style={INPUT_STYLE}
+              className="focus-ring"
+              {...register('password')}
+            />
+          </EditorialFieldRow>
 
-        {mode === 'email_otp' ? (
-          <div className="flex flex-col gap-md">
-            <Text variant="caption" muted>
-              We email a one-click sign-in link (not a numeric code). Use an account that already
-              exists, or create one on the signup page.
-            </Text>
-            <Input
-              label="Email"
+          {captchaRequired ? (
+            <EditorialFieldRow label="Security check" optional>
+              <TurnstileWidget onToken={setCaptchaToken} />
+            </EditorialFieldRow>
+          ) : null}
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '14px 0',
+              borderTop: '1px solid var(--rule)',
+              cursor: 'pointer',
+              fontSize: 13,
+              color: 'var(--text-muted)',
+            }}
+          >
+            <input
+              type="checkbox"
+              className="ed-checkbox focus-ring"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span>Keep me signed in on this device</span>
+          </label>
+
+          {submitError ? <InlineError message={submitError} /> : null}
+          {resendInfo ? <InlineInfo message={resendInfo} /> : null}
+
+          {showEmailNotConfirmedActions ? (
+            <button
+              type="button"
+              onClick={onResendConfirmation}
+              disabled={resendLoading}
+              className="focus-ring"
+              style={{ ...SECONDARY_CTA_STYLE, marginTop: 16 }}
+            >
+              {resendLoading ? 'Sending…' : 'Resend confirmation email'}
+            </button>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={isSubmitting || !captchaReady}
+            className="focus-ring"
+            style={{
+              ...PRIMARY_CTA_STYLE,
+              marginTop: 16,
+              opacity: isSubmitting || !captchaReady ? 0.45 : 1,
+              cursor: isSubmitting || !captchaReady ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSubmitting ? 'Signing in…' : 'Sign in →'}
+          </button>
+        </form>
+      ) : null}
+
+      {mode === 'email_otp' ? (
+        <div className="flex flex-col" style={{ gap: 0 }}>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              lineHeight: 1.55,
+              margin: '0 0 8px 0',
+              fontFamily: 'var(--font-display)',
+              fontStyle: 'italic',
+            }}
+          >
+            We email a one-click sign-in link (not a numeric code). Use an account that already
+            exists, or create one on the signup page.
+          </p>
+          <EditorialFieldRow label="Email" strong>
+            <input
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
               value={otpEmail}
               onChange={(event) => setOtpEmail(event.target.value)}
+              style={INPUT_STYLE}
+              className="focus-ring"
             />
-            {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
-            <Button
-              title={otpLoading ? 'Sending…' : 'Send sign-in link'}
-              variant="secondary"
-              fullWidth
-              loading={otpLoading}
-              onPress={sendEmailOtp}
-              disabled={otpLoading || !captchaReady}
-            />
-          </div>
-        ) : null}
+          </EditorialFieldRow>
+          {captchaRequired ? (
+            <EditorialFieldRow label="Security check" optional>
+              <TurnstileWidget onToken={setCaptchaToken} />
+            </EditorialFieldRow>
+          ) : null}
+          <button
+            type="button"
+            onClick={sendEmailOtp}
+            disabled={otpLoading || !captchaReady}
+            className="focus-ring"
+            style={{
+              ...PRIMARY_CTA_STYLE,
+              marginTop: 16,
+              opacity: otpLoading || !captchaReady ? 0.45 : 1,
+              cursor: otpLoading || !captchaReady ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {otpLoading ? 'Sending…' : 'Send sign-in link →'}
+          </button>
+        </div>
+      ) : null}
 
-        {mode === 'phone_otp' ? (
-          <div className="flex flex-col gap-md">
-            <Input
-              label="Phone number"
+      {mode === 'phone_otp' ? (
+        <div className="flex flex-col" style={{ gap: 0 }}>
+          <EditorialFieldRow label="Phone number" strong>
+            <input
               type="tel"
               autoComplete="tel"
               placeholder="+919876543210"
               value={otpPhone}
               onChange={(event) => setOtpPhone(event.target.value)}
+              style={INPUT_STYLE}
+              className="focus-ring"
             />
-            {!otpSent ? (
-              <>
-                {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
-                <Button
-                  title={otpLoading ? 'Sending…' : 'Send OTP code'}
-                  variant="secondary"
-                  fullWidth
-                  loading={otpLoading}
-                  onPress={sendPhoneOtp}
-                  disabled={otpLoading || !captchaReady}
-                />
-              </>
-            ) : (
-              <>
-                <Input
-                  label="OTP code"
+          </EditorialFieldRow>
+          {!otpSent ? (
+            <>
+              {captchaRequired ? (
+                <EditorialFieldRow label="Security check" optional>
+                  <TurnstileWidget onToken={setCaptchaToken} />
+                </EditorialFieldRow>
+              ) : null}
+              <button
+                type="button"
+                onClick={sendPhoneOtp}
+                disabled={otpLoading || !captchaReady}
+                className="focus-ring"
+                style={{
+                  ...PRIMARY_CTA_STYLE,
+                  marginTop: 16,
+                  opacity: otpLoading || !captchaReady ? 0.45 : 1,
+                  cursor: otpLoading || !captchaReady ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {otpLoading ? 'Sending…' : 'Send OTP code →'}
+              </button>
+            </>
+          ) : (
+            <>
+              <EditorialFieldRow label="OTP code">
+                <input
                   type="text"
                   autoComplete="one-time-code"
                   placeholder="Enter code"
                   value={otpCode}
                   onChange={(event) => setOtpCode(event.target.value)}
+                  style={INPUT_STYLE}
+                  className="focus-ring"
                 />
-                <Button
-                  title={otpLoading ? 'Verifying…' : 'Verify OTP and sign in'}
-                  variant="primary"
-                  fullWidth
-                  loading={otpLoading}
-                  onPress={verifyPhoneOtp}
-                />
-              </>
-            )}
-          </div>
-        ) : null}
-
-        {mode !== 'password' ? (
-          <label className="flex items-start gap-sm text-small text-text-muted cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>Keep me signed in on this device</span>
-          </label>
-        ) : null}
-
-        {otpInfo ? (
-          <Text variant="small" muted className="text-center">
-            {otpInfo}
-          </Text>
-        ) : null}
-        {otpError ? (
-          <Text variant="small" color="var(--danger, #C85A54)" className="text-center">
-            {otpError}
-          </Text>
-        ) : null}
-
-        <div className="flex items-center justify-between text-small">
-          <Link href="/signup" className="text-accent hover:opacity-80 font-medium">
-            Create account
-          </Link>
-          <Link href="/reset" className="text-text-muted hover:text-text">
-            Forgot password?
-          </Link>
+              </EditorialFieldRow>
+              <button
+                type="button"
+                onClick={verifyPhoneOtp}
+                disabled={otpLoading}
+                className="focus-ring"
+                style={{
+                  ...PRIMARY_CTA_STYLE,
+                  marginTop: 16,
+                  opacity: otpLoading ? 0.45 : 1,
+                  cursor: otpLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {otpLoading ? 'Verifying…' : 'Verify OTP →'}
+              </button>
+            </>
+          )}
         </div>
+      ) : null}
 
-        <Text variant="caption" muted className="text-center">
-          By signing in you agree to our{' '}
-          <Link href={LEGAL_LINKS.terms} className="text-accent hover:opacity-80">
-            Terms
-          </Link>{' '}
-          and{' '}
-          <Link href={LEGAL_LINKS.privacy} className="text-accent hover:opacity-80">
-            Privacy Policy
-          </Link>
-          .
-        </Text>
+      {mode !== 'password' ? (
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            paddingTop: 14,
+            borderTop: '1px solid var(--rule)',
+            cursor: 'pointer',
+            fontSize: 13,
+            color: 'var(--text-muted)',
+          }}
+        >
+          <input
+            type="checkbox"
+            className="ed-checkbox focus-ring"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          <span>Keep me signed in on this device</span>
+        </label>
+      ) : null}
+
+      {otpInfo ? <InlineInfo message={otpInfo} /> : null}
+      {otpError ? <InlineError message={otpError} /> : null}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 18,
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          paddingTop: 8,
+        }}
+      >
+        <Link
+          href="/signup"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: 'var(--accent)',
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+          }}
+        >
+          Create an account →
+        </Link>
+        <Link
+          href="/reset"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: 'var(--text-muted)',
+            textDecoration: 'none',
+          }}
+        >
+          Forgot password?
+        </Link>
       </div>
-    </Card>
+
+      <EditorialClosingSignet align="left">
+        By signing in you accept our{' '}
+        <Link href={LEGAL_LINKS.terms} style={{ color: 'var(--accent)' }}>
+          Terms
+        </Link>{' '}
+        and{' '}
+        <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent)' }}>
+          Privacy Policy
+        </Link>
+        . Quiet entry, quiet exit.
+      </EditorialClosingSignet>
+    </>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      style={{
+        fontSize: 13,
+        color: 'var(--warn-earth)',
+        margin: '12px 0 0 0',
+        lineHeight: 1.5,
+      }}
+    >
+      {message}
+    </p>
+  );
+}
+
+function InlineInfo({ message }: { message: string }) {
+  return (
+    <p
+      role="status"
+      style={{
+        fontSize: 13,
+        color: 'var(--accent)',
+        fontFamily: 'var(--font-display)',
+        fontStyle: 'italic',
+        margin: '12px 0 0 0',
+        lineHeight: 1.5,
+      }}
+    >
+      {message}
+    </p>
   );
 }

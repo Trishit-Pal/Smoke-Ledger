@@ -23,23 +23,23 @@
     "@react-native-async-storage/async-storage": "1.23.1",
     "@supabase/supabase-js": "^2.49.1",
     "dayjs": "^1.11.11",
-    "expo": "~51.0.0",
-    "expo-constants": "~16.0.0",
+    "expo": "^56.0.3",
+    "expo-constants": "^56.0.14",
     "expo-crypto": "~13.0.2",
-    "expo-haptics": "~13.0.0",
-    "expo-linking": "~6.3.0",
-    "expo-localization": "~15.0.0",
-    "expo-notifications": "~0.28.0",
-    "expo-router": "~3.5.0",
     "expo-file-system": "~17.0.1",
-    "expo-sharing": "~12.0.1",
+    "expo-haptics": "~13.0.0",
+    "expo-linking": "^56.0.11",
+    "expo-localization": "~15.0.0",
+    "expo-notifications": "^56.0.12",
+    "expo-router": "^56.2.5",
     "expo-secure-store": "~13.0.0",
-    "expo-splash-screen": "~0.27.0",
+    "expo-sharing": "~12.0.1",
+    "expo-splash-screen": "^56.0.9",
     "expo-status-bar": "~1.12.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-hook-form": "^7.51.0",
-    "react-native": "0.74.0",
+    "react-native": "^0.85.3",
     "react-native-gesture-handler": "~2.16.0",
     "react-native-reanimated": "~3.10.0",
     "react-native-safe-area-context": "4.10.0",
@@ -75,16 +75,25 @@
       "^next/server$": "<rootDir>/src/tests/__mocks__/next-server.ts",
       "^next/navigation$": "<rootDir>/src/tests/__mocks__/next-navigation.ts"
     },
-    "moduleDirectories": ["node_modules", "web/node_modules"],
+    "moduleDirectories": [
+      "node_modules",
+      "web/node_modules"
+    ],
     "globals": {
       "ts-jest": {
         "tsconfig": {
           "strict": true,
           "baseUrl": ".",
           "paths": {
-            "@/*": ["./src/*"],
-            "@app/*": ["./app/*"],
-            "@web/*": ["./web/*"]
+            "@/*": [
+              "./src/*"
+            ],
+            "@app/*": [
+              "./app/*"
+            ],
+            "@web/*": [
+              "./web/*"
+            ]
           },
           "skipLibCheck": true
         }

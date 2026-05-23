@@ -1,32 +1,50 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { GoToHomepageLink } from '@web/components/layout/GoToHomepageLink';
+import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
 import { LEGAL_LINKS } from '@web/lib/legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-lg relative">
-      <GoToHomepageLink />
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-xl">
-          <h1 className="text-h1 font-bold text-text">Smoke Ledger</h1>
-          <p className="text-small text-text-muted mt-xs">
-            Cessation support with privacy-first tracking.
-          </p>
-        </div>
-        {children}
-        <div className="mt-lg text-center text-caption text-text-muted flex items-center justify-center gap-md">
-          <Link href={LEGAL_LINKS.privacy} className="hover:text-text">
-            Privacy
-          </Link>
-          <Link href={LEGAL_LINKS.terms} className="hover:text-text">
-            Terms
-          </Link>
-          <Link href={LEGAL_LINKS.support} className="hover:text-text">
-            Support
-          </Link>
-        </div>
-      </div>
-    </div>
+    <EditorialPageShell maxWidth={520}>
+      {children}
+      <footer
+        style={{
+          marginTop: 32,
+          paddingTop: 16,
+          borderTop: '1px solid var(--rule)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        {[
+          { label: 'Privacy', href: LEGAL_LINKS.privacy },
+          { label: 'Terms', href: LEGAL_LINKS.terms },
+          { label: 'Support', href: LEGAL_LINKS.support },
+        ].map((link, i, arr) => (
+          <React.Fragment key={link.label}>
+            <Link
+              href={link.href}
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontStyle: 'italic',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                textDecoration: 'none',
+              }}
+            >
+              {link.label}
+            </Link>
+            {i < arr.length - 1 ? (
+              <span aria-hidden style={{ color: 'var(--text-faint)', fontSize: 11 }}>
+                ·
+              </span>
+            ) : null}
+          </React.Fragment>
+        ))}
+      </footer>
+    </EditorialPageShell>
   );
 }

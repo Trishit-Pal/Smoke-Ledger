@@ -90,13 +90,15 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     const code = getAuthErrorCode(error);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       {
         code: code || 'authentication_error',
         message: toAuthErrorMessage(error),
       },
       { status: 401 },
     );
+    response.cookies.getAll().forEach((cookie) => errorResponse.cookies.set(cookie));
+    return errorResponse;
   }
 
   return response;

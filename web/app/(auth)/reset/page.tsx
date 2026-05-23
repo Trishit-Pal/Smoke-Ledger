@@ -6,10 +6,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getSupabase } from '@web/lib/supabase/client';
-import { Card } from '@web/components/ui/Card';
-import { Input } from '@web/components/ui/Input';
-import { Button } from '@web/components/ui/Button';
-import { Text } from '@web/components/ui/Text';
+import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
+import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
+import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_LINKS } from '@web/lib/legal';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 
@@ -17,6 +16,38 @@ const schema = z.object({
   email: z.string().email('Enter a valid email').max(254),
 });
 type FormValues = z.infer<typeof schema>;
+
+const INPUT_STYLE: React.CSSProperties = {
+  width: '100%',
+  height: 40,
+  padding: '0 0 4px 0',
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '1px solid var(--rule)',
+  outline: 'none',
+  color: 'var(--text)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+};
+
+const PRIMARY_CTA_STYLE: React.CSSProperties = {
+  height: 52,
+  padding: '0 24px',
+  border: 'none',
+  borderRadius: 10,
+  background: 'var(--accent)',
+  color: '#ffffff',
+  fontFamily: 'var(--font-sans)',
+  fontWeight: 600,
+  fontSize: 14,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 10,
+  width: '100%',
+  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
+};
 
 export default function ResetPage() {
   const [success, setSuccess] = React.useState(false);
@@ -41,8 +72,6 @@ export default function ResetPage() {
       typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`
         : undefined;
-    // Neutral copy regardless of whether the email is registered, to avoid
-    // account enumeration. Errors are swallowed intentionally.
     await getSupabase().auth.resetPasswordForEmail(values.email.trim(), {
       redirectTo,
       ...(captchaToken ? { captchaToken } : {}),
@@ -53,65 +82,122 @@ export default function ResetPage() {
 
   if (success) {
     return (
-      <Card>
-        <div className="flex flex-col gap-md text-center">
-          <Text variant="h2">Check your email</Text>
-          <Text variant="small" muted>
-            If an account exists for that email, we just sent a password reset link.
-          </Text>
-          <Link href="/login" className="text-accent text-small font-medium hover:opacity-80 mt-md">
-            Back to sign in
-          </Link>
-        </div>
-      </Card>
+      <>
+        <EditorialMasthead
+          caption="Account · Reset"
+          title={
+            <>
+              Check your <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>inbox</span>.
+            </>
+          }
+          subtitle="If an account exists for that email, we just sent a password reset link."
+        />
+        <Link
+          href="/login"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: 'var(--accent)',
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+          }}
+        >
+          Back to sign in →
+        </Link>
+        <EditorialClosingSignet align="left">Quietly, again.</EditorialClosingSignet>
+      </>
     );
   }
 
   return (
-    <Card>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-lg" noValidate>
-        <Text variant="small" muted className="text-center">
-          Enter your email and we will send you a reset link.
-        </Text>
+    <>
+      <EditorialMasthead
+        caption="Account · Reset"
+        title={
+          <>
+            A <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>new</span> line.
+          </>
+        }
+        subtitle="Enter your email and we will send you a reset link."
+      />
 
-        <Input
-          label="Email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          error={errors.email?.message ?? null}
-          {...register('email')}
-        />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex flex-col"
+        style={{ gap: 0 }}
+        noValidate
+      >
+        <EditorialFieldRow label="Email" error={errors.email?.message ?? null} strong>
+          <input
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            style={INPUT_STYLE}
+            className="focus-ring"
+            {...register('email')}
+          />
+        </EditorialFieldRow>
 
-        {captchaRequired ? <TurnstileWidget onToken={setCaptchaToken} /> : null}
-
-        {submitError ? (
-          <Text variant="small" color="var(--danger, #C85A54)" className="text-center" role="alert">
-            {submitError}
-          </Text>
+        {captchaRequired ? (
+          <EditorialFieldRow label="Security check" optional>
+            <TurnstileWidget onToken={setCaptchaToken} />
+          </EditorialFieldRow>
         ) : null}
 
-        <Button
-          type="submit"
-          title={isSubmitting ? 'Sending…' : 'Send reset link'}
-          variant="primary"
-          fullWidth
-          loading={isSubmitting}
-          disabled={isSubmitting || !captchaReady}
-        />
+        {submitError ? (
+          <p
+            role="alert"
+            style={{ fontSize: 13, color: 'var(--warn-earth)', margin: '12px 0 0 0' }}
+          >
+            {submitError}
+          </p>
+        ) : null}
 
-        <div className="text-center text-small">
-          <Link href="/login" className="text-text-muted hover:text-text">
-            Back to sign in
-          </Link>
-        </div>
-        <Text variant="caption" muted className="text-center">
-          Need account help?{' '}
-          <Link href={LEGAL_LINKS.support} className="text-accent hover:opacity-80">
-            Contact support
-          </Link>
-        </Text>
+        <button
+          type="submit"
+          disabled={isSubmitting || !captchaReady}
+          className="focus-ring"
+          style={{
+            ...PRIMARY_CTA_STYLE,
+            marginTop: 16,
+            opacity: isSubmitting || !captchaReady ? 0.45 : 1,
+            cursor: isSubmitting || !captchaReady ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isSubmitting ? 'Sending…' : 'Send reset link →'}
+        </button>
       </form>
-    </Card>
+
+      <div style={{ display: 'flex', gap: 18, alignItems: 'baseline', paddingTop: 8 }}>
+        <Link
+          href="/login"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: 'var(--text-muted)',
+            textDecoration: 'none',
+          }}
+        >
+          Back to sign in
+        </Link>
+        <Link
+          href={LEGAL_LINKS.support}
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: 13,
+            color: 'var(--accent)',
+            textDecoration: 'underline',
+            textUnderlineOffset: 4,
+          }}
+        >
+          Need account help? Contact support →
+        </Link>
+      </div>
+
+      <EditorialClosingSignet align="left">Quietly, again.</EditorialClosingSignet>
+    </>
   );
 }

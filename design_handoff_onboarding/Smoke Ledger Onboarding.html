@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smoke Ledger — Onboarding</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..700,30..100,0..1&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Pull the codebase's design tokens into Tailwind so utility classes match
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: 'var(--bg)',
+            'bg-elevated': 'var(--bg-elevated)',
+            card: 'var(--card)',
+            border: 'var(--border)',
+            text: 'var(--text)',
+            'text-muted': 'var(--text-muted)',
+            'text-faint': 'var(--text-faint)',
+            accent: 'var(--accent)',
+            'accent-soft': 'var(--accent-soft)',
+            rule: 'var(--rule)',
+            'rule-strong': 'var(--rule-strong)',
+            warn: 'var(--warn-earth)',
+            'warn-soft': 'var(--warn-earth-soft)',
+            ink: 'var(--ink-surface)',
+            'ink-text': 'var(--ink-surface-text)',
+            'ink-muted': 'var(--ink-surface-muted)',
+            danger: '#C85A54',
+            success: '#4CAF84',
+          },
+          spacing: {
+            xs: 'var(--space-xs)',
+            sm: 'var(--space-sm)',
+            md: 'var(--space-md)',
+            lg: 'var(--space-lg)',
+            xl: 'var(--space-xl)',
+            xxl: 'var(--space-xxl)',
+            xxxl: 'var(--space-xxxl)',
+          },
+          fontFamily: {
+            sans: ['var(--font-sans)'],
+            display: ['var(--font-display)'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* ── Editorial tokens lifted from web/app/globals.css ── */
+    :root {
+      --bg: #F6F7F9;
+      --bg-elevated: #FFFFFF;
+      --card: #FFFFFF;
+      --border: #E1E5EB;
+      --text: #0B0F14;
+      --text-muted: #5A6673;
+      --text-faint: #A9B3BF;
+      --accent: #2FA39B;
+      --accent-soft: #E4F3F1;
+      --accent-glow: rgba(47, 163, 155, 0.25);
+      --shadow-card: 0 8px 32px rgba(11, 15, 20, 0.06);
+      --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-display: 'Fraunces', Georgia, serif;
+      --rule: #D6DBE2;
+      --rule-strong: #B9C1CC;
+      --warn-earth: #B86A4A;
+      --warn-earth-soft: #F2E4DD;
+      --ink-surface: #14191F;
+      --ink-surface-text: #E6EAEF;
+      --ink-surface-muted: #8C95A1;
+      --ink-surface-rule: #2A333F;
+      --paper-noise:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+
+      /* Density-driven spacing scale (Tweaks: cozy / compact) */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 24px;
+      --space-xxl: 32px;
+      --space-xxxl: 48px;
+    }
+
+    .density-compact {
+      --space-xs: 3px;
+      --space-sm: 6px;
+      --space-md: 9px;
+      --space-lg: 12px;
+      --space-xl: 18px;
+      --space-xxl: 24px;
+      --space-xxxl: 32px;
+    }
+
+    .dark {
+      --bg: #0B0F14;
+      --bg-elevated: #11161D;
+      --card: #1A2029;
+      --border: #232B35;
+      --text: #E6EAEF;
+      --text-muted: #A9B3BF;
+      --text-faint: #5A6673;
+      --accent: #2FA39B;
+      --accent-soft: #163230;
+      --accent-glow: rgba(47, 163, 155, 0.18);
+      --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.35);
+      --rule: #2A333F;
+      --rule-strong: #3A4452;
+      --warn-earth: #D08267;
+      --warn-earth-soft: #2B1C16;
+      --ink-surface: #E6EAEF;
+      --ink-surface-text: #0B0F14;
+      --ink-surface-muted: #5A6673;
+      --ink-surface-rule: #C7CED8;
+      --paper-noise:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: #0c0e10;
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Editorial typography utilities ── */
+    .editorial-numeral {
+      font-family: var(--font-display);
+      font-weight: 380;
+      font-variation-settings: 'opsz' 144, 'SOFT' 50, 'WONK' 0;
+      font-variant-numeric: lining-nums;
+      letter-spacing: -0.04em;
+      line-height: 0.9;
+    }
+    .editorial-headline {
+      font-family: var(--font-display);
+      font-weight: 360;
+      font-variation-settings: 'opsz' 144, 'SOFT' 60;
+      letter-spacing: -0.015em;
+      line-height: 1.04;
+    }
+    .editorial-caption {
+      font-family: var(--font-sans);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .editorial-caption-tight {
+      font-family: var(--font-sans);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .nums-tabular {
+      font-variant-numeric: tabular-nums lining-nums;
+      font-feature-settings: 'tnum' 1, 'lnum' 1;
+    }
+    .rule-hair { border-top: 1px solid var(--rule); }
+    .rule-hair-bot { border-bottom: 1px solid var(--rule); }
+    .rule-hair-strong { border-top: 1px solid var(--rule-strong); }
+
+    .paper-noise {
+      background-image: var(--paper-noise);
+      background-size: 160px 160px;
+      mix-blend-mode: multiply;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    .dark .paper-noise {
+      mix-blend-mode: screen;
+      opacity: 0.32;
+    }
+
+    .ink-panel {
+      background-color: var(--ink-surface);
+      color: var(--ink-surface-text);
+    }
+    .ink-panel .ink-muted { color: var(--ink-surface-muted); }
+    .ink-panel .ink-rule { border-color: var(--ink-surface-rule); }
+
+    /* ── Reveal animations ── */
+    @keyframes editorial-rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .stage > * {
+      opacity: 0;
+      animation: editorial-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: calc(var(--ed-index, 0) * 70ms + 60ms);
+      will-change: opacity, transform;
+    }
+    @keyframes rule-draw {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+    .rule-draw {
+      transform-origin: left center;
+      animation: rule-draw 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: calc(var(--ed-index, 0) * 70ms + 120ms);
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .fade-in { animation: fade-in 400ms ease-out both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage > *, .rule-draw, .fade-in {
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+      }
+    }
+
+    /* Premium motion ─── pillar rise (welcome) ─── chip pop ─── drift */
+    @keyframes pillarRise {
+      from {
+        opacity: 0;
+        transform: perspective(900px) rotateY(-22deg) translateZ(-40px) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: perspective(900px) rotateY(0) translateZ(0) translateY(0);
+      }
+    }
+    @keyframes chipPopIn {
+      0%   { opacity: 0; transform: scale(0.6) translateY(8px); }
+      60%  { opacity: 1; transform: scale(1.08) translateY(0); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes driftSlow {
+      0%, 100% { transform: translateY(0) translateX(0) rotate(-0.5deg); }
+      50%      { transform: translateY(-8px) translateX(4px) rotate(0.5deg); }
+    }
+    @keyframes sealStamp {
+      0%   { opacity: 0; transform: scale(2.2) rotate(45deg); }
+      55%  { opacity: 1; transform: scale(0.92) rotate(-12deg); }
+      100% { opacity: 0.88; transform: scale(1) rotate(-8deg); }
+    }
+
+    /* Hover lift utility for buttons inside steps */
+    .lift-on-hover { transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms; }
+    .lift-on-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px -8px rgba(11, 15, 20, 0.18);
+    }
+
+    /* Focus ring matching codebase */
+    .focus-ring:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    }
+
+    /* Range slider — accent color */
+    input[type="range"].brand-range {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 2px;
+      background: var(--rule);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"].brand-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: grab;
+      box-shadow: 0 0 0 6px rgba(47, 163, 155, 0.12);
+      transition: box-shadow 120ms;
+    }
+    input[type="range"].brand-range::-webkit-slider-thumb:active {
+      cursor: grabbing;
+      box-shadow: 0 0 0 8px rgba(47, 163, 155, 0.18);
+    }
+    input[type="range"].brand-range::-moz-range-thumb {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: grab;
+      box-shadow: 0 0 0 6px rgba(47, 163, 155, 0.12);
+    }
+
+    /* Custom checkbox */
+    .ed-checkbox {
+      appearance: none;
+      width: 18px; height: 18px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 3px;
+      background: var(--bg-elevated);
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: all 140ms;
+    }
+    .ed-checkbox:hover { border-color: var(--accent); }
+    .ed-checkbox:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .ed-checkbox:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px; top: 1px;
+      width: 5px; height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    /* Outer page (host of the browser window) */
+    .page-host {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(47, 163, 155, 0.08), transparent 70%),
+        #0c0e10;
+    }
+
+    /* Hide scrollbar but keep functional */
+    .scroll-clean { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+    .scroll-clean::-webkit-scrollbar { width: 8px; }
+    .scroll-clean::-webkit-scrollbar-track { background: transparent; }
+    .scroll-clean::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="browser-window.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="fx.jsx"></script>
+  <script type="text/babel" src="onboarding-steps.jsx"></script>
+  <script type="text/babel" src="onboarding-app.jsx"></script>
+</body>
+</html>

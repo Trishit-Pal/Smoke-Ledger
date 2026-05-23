@@ -12,6 +12,7 @@ function readAuthErrorCode(error: unknown): string {
   if (msg.includes('invalid login credentials')) return 'invalid_credentials';
   if (msg.includes('email not confirmed')) return 'email_not_confirmed';
   if (msg.includes('rate limit') || msg.includes('too many')) return 'too_many_requests';
+  if (msg.includes('captcha')) return 'captcha_required';
   return '';
 }
 
@@ -27,12 +28,8 @@ export function toAuthErrorMessage(error: unknown): string {
   if (code === 'too_many_requests') {
     return 'Too many attempts. Please wait and try again.';
   }
-
-  if (error && typeof error === 'object') {
-    const msg = ((error as { message?: string }).message ?? '').toLowerCase();
-    if (msg.includes('captcha')) {
-      return 'Security check failed. Please try again.';
-    }
+  if (code === 'captcha_required') {
+    return 'Security check failed or is not configured on this device. Please try again or contact support.';
   }
 
   return toSafeErrorMessage(error, 'authentication_error');

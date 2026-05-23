@@ -1,61 +1,216 @@
-import Link from 'next/link';
-import { Text } from '@web/components/ui/Text';
+'use client';
 
-const PRIMARY_CTA =
-  'h-11 px-5 rounded-md bg-accent text-white font-semibold inline-flex items-center justify-center hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
-const SECONDARY_CTA =
-  'h-11 px-5 rounded-md border border-border bg-bg-elevated text-text font-semibold inline-flex items-center justify-center hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+import * as React from 'react';
+import Link from 'next/link';
+import { TiltCard } from '@web/components/onboarding/TiltCard';
+
+const PRIMARY_CTA_STYLE: React.CSSProperties = {
+  height: 56,
+  padding: '0 28px',
+  border: 'none',
+  borderRadius: 10,
+  background: 'var(--accent)',
+  color: '#ffffff',
+  fontFamily: 'var(--font-sans)',
+  fontWeight: 600,
+  fontSize: 15,
+  letterSpacing: '0.01em',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 10,
+  cursor: 'pointer',
+  textDecoration: 'none',
+  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
+  transition: 'transform 120ms ease-out, box-shadow 240ms ease',
+};
+
+const PILLARS: { num: string; title: string; copy: string }[] = [
+  { num: 'I.', title: 'Free', copy: 'No ads, no upsell, no subscription tier.' },
+  { num: 'II.', title: 'Private', copy: 'Encrypted at rest. Yours to export or delete.' },
+  { num: 'III.', title: 'Honest', copy: 'No streaks. No badges. No shame patterns.' },
+];
 
 export function LandingHero() {
   return (
     <section
       aria-labelledby="landing-hero-heading"
-      className="relative overflow-hidden pt-xxl pb-xl px-lg md:px-xl"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        padding: 'clamp(56px, 8vw, 96px) clamp(20px, 5vw, 64px) clamp(40px, 5vw, 64px)',
+        background: 'var(--bg)',
+      }}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 50% -10%, var(--accent-glow), transparent 70%)',
-        }}
         aria-hidden
-      />
-      <div className="relative max-w-4xl mx-auto flex flex-col gap-lg text-center md:text-left">
-        <div className="flex flex-wrap justify-center md:justify-start gap-sm">
-          <span className="text-caption font-semibold uppercase tracking-wide text-accent px-sm py-xs rounded-pill bg-accent-soft">
-            100% free
-          </span>
-          <span className="text-caption text-text-muted px-sm py-xs rounded-pill border border-border">
-            No ads
-          </span>
-          <span className="text-caption text-text-muted px-sm py-xs rounded-pill border border-border">
-            18+ only
-          </span>
+        style={{
+          position: 'absolute',
+          top: -60,
+          right: -90,
+          fontFamily: 'var(--font-display)',
+          fontStyle: 'italic',
+          fontWeight: 300,
+          fontSize: 'clamp(220px, 28vw, 420px)',
+          color: 'var(--rule)',
+          opacity: 0.5,
+          lineHeight: 0.85,
+          pointerEvents: 'none',
+          letterSpacing: '-0.06em',
+          userSelect: 'none',
+          transform: 'translateZ(0)',
+          animation: 'driftSlow 18s ease-in-out infinite',
+          zIndex: 0,
+        }}
+      >
+        №.01
+      </div>
+
+      <div
+        className="editorial-stage"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 880,
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 28,
+        }}
+      >
+        <span className="editorial-caption">
+          Smoke Ledger · An honest tracker · Established 2026
+        </span>
+
+        <h1
+          id="landing-hero-heading"
+          className="editorial-headline"
+          style={{
+            fontSize: 'clamp(48px, 8vw, 84px)',
+            margin: 0,
+            color: 'var(--text)',
+          }}
+        >
+          Know every stick.
+          <br />
+          Spend less.
+          <br />
+          <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Quit on your terms.</span>
+        </h1>
+
+        <div
+          className="rule-draw"
+          style={{ borderTop: '1px solid var(--rule-strong)', width: 80 }}
+        />
+
+        <p
+          style={{
+            fontSize: 17,
+            lineHeight: 1.6,
+            color: 'var(--text-muted)',
+            margin: 0,
+            maxWidth: 560,
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+          }}
+        >
+          A private, observational record of your smoking — not a streak game, not a guilt
+          machine. Free, forever.
+        </p>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 16,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <Link href="/signup" style={PRIMARY_CTA_STYLE}>
+            Begin the ledger
+            <span aria-hidden style={{ fontSize: 18 }}>
+              →
+            </span>
+          </Link>
+          <Link
+            href="/login"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontStyle: 'italic',
+              fontSize: 14,
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+            }}
+          >
+            Already have an account? <span style={{ color: 'var(--accent)' }}>Sign in →</span>
+          </Link>
         </div>
 
-        <Text variant="display" id="landing-hero-heading" className="font-serif max-w-3xl">
-          Know every stick. Spend less. Quit on your terms.
-        </Text>
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--text-faint)',
+            fontFamily:
+              'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+            letterSpacing: '0.12em',
+          }}
+        >
+          Support software, not medical care. Adults 18+.
+        </span>
 
-        <Text variant="body" muted className="max-w-2xl mx-auto md:mx-0">
-          Free tracker for Indian smokers — one-tap logs, daily dashboard, and trends in INR.
-        </Text>
-
-        <div className="flex flex-wrap gap-md justify-center md:justify-start">
-          <Link href="/signup" className={PRIMARY_CTA}>
-            Create free account
-          </Link>
-          <Link href="/login" className={SECONDARY_CTA}>
-            Sign in
-          </Link>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 18,
+            marginTop: 16,
+            paddingTop: 24,
+            borderTop: '1px solid var(--rule)',
+            perspective: 1000,
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          {PILLARS.map(({ num, title, copy }, i) => (
+            <TiltCard
+              key={num}
+              max={8}
+              lift={10}
+              glare
+              style={{
+                padding: '18px 16px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--rule)',
+                borderRadius: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                opacity: 0,
+                animationDelay: `${i * 80 + 600}ms`,
+                animationName: 'pillarRise',
+                animationDuration: '700ms',
+                animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                animationFillMode: 'both',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 32,
+                  color: 'var(--accent)',
+                  lineHeight: 1,
+                  fontStyle: 'italic',
+                  fontWeight: 500,
+                }}
+              >
+                {num}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {copy}
+              </span>
+            </TiltCard>
+          ))}
         </div>
-
-        <Text variant="caption" muted className="max-w-xl mx-auto md:mx-0">
-          Support software, not medical care. Always consult a clinician for health decisions.
-        </Text>
       </div>
     </section>
   );
 }
-
-export { PRIMARY_CTA, SECONDARY_CTA };

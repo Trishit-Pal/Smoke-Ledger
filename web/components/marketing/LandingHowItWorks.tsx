@@ -1,46 +1,118 @@
-import { Text } from '@web/components/ui/Text';
+import * as React from 'react';
 
-const STEPS = [
+interface Step {
+  num: string;
+  title: string;
+  hint: string;
+  example: string;
+}
+
+const STEPS: Step[] = [
   {
-    step: '1',
-    title: 'Create your free account',
-    body: 'Sign up, confirm email, and accept privacy consents.',
+    num: 'I.',
+    title: 'Begin',
+    hint: 'Sign up free, confirm your email, accept the privacy consents.',
+    example: 'e.g. you@example.com',
   },
   {
-    step: '2',
-    title: 'Set baseline and brands',
-    body: 'Share your usual intake and pick your brands.',
+    num: 'II.',
+    title: 'Log',
+    hint: 'One tap, brand inferred. Edit later if needed.',
+    example: 'e.g. Gold Flake · 3:14 pm',
   },
   {
-    step: '3',
-    title: 'Log daily, watch progress',
-    body: 'One-tap logging fills your dashboard and trends.',
+    num: 'III.',
+    title: 'Read',
+    hint: 'The dashboard fills as days do. The week, month, year — in one read.',
+    example: 'e.g. 7-day avg: 8.4 / day',
   },
-] as const;
+];
 
 export function LandingHowItWorks() {
   return (
-    <section aria-labelledby="landing-how-heading" className="py-xl px-lg md:px-xl bg-bg-elevated/30">
-      <div className="max-w-5xl mx-auto flex flex-col gap-lg">
-        <div className="text-center">
-          <Text variant="caption" muted>
-            HOW IT WORKS
-          </Text>
-          <h2 id="landing-how-heading" className="text-h2 font-semibold font-serif text-text mt-sm">
-            Three steps to clarity
+    <section
+      aria-labelledby="landing-how-heading"
+      style={{
+        padding: 'clamp(56px, 8vw, 96px) clamp(20px, 5vw, 64px)',
+        background: 'var(--bg)',
+        borderTop: '1px solid var(--rule)',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 960,
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 32,
+        }}
+      >
+        <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span className="editorial-caption">How it reads</span>
+          <h2
+            id="landing-how-heading"
+            className="editorial-headline"
+            style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
+          >
+            Three <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>small</span> steps.
           </h2>
-        </div>
-        <ol className="grid gap-md md:grid-cols-3">
-          {STEPS.map((s) => (
+        </header>
+
+        <ol
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 16,
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+          }}
+        >
+          {STEPS.map((step) => (
             <li
-              key={s.step}
-              className="rounded-xl border border-border bg-card p-lg flex flex-col gap-sm shadow-[var(--shadow-card)]"
+              key={step.num}
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--rule)',
+                borderRadius: 14,
+                padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                minHeight: 180,
+              }}
             >
-              <span className="text-h2 font-serif text-accent">{s.step}</span>
-              <Text variant="h3">{s.title}</Text>
-              <Text variant="small" muted>
-                {s.body}
-              </Text>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 28,
+                  color: 'var(--accent)',
+                  fontStyle: 'italic',
+                  lineHeight: 1,
+                  fontWeight: 500,
+                }}
+              >
+                {step.num}
+              </span>
+              <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>
+                {step.title}
+              </span>
+              <span
+                style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55, flex: 1 }}
+              >
+                {step.hint}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontStyle: 'italic',
+                  fontSize: 12,
+                  color: 'var(--text-faint)',
+                  marginTop: 'auto',
+                }}
+              >
+                {step.example}
+              </span>
             </li>
           ))}
         </ol>

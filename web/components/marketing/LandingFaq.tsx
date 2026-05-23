@@ -1,6 +1,11 @@
-import { Text } from '@web/components/ui/Text';
+import * as React from 'react';
 
-const FAQ_ITEMS = [
+interface FaqItem {
+  q: string;
+  a: string;
+}
+
+const FAQ_ITEMS: FaqItem[] = [
   {
     q: 'Is Smoke Ledger really free?',
     a: 'Yes. Core tracking, trends, and export are free. We do not run ads or sell your data.',
@@ -13,36 +18,86 @@ const FAQ_ITEMS = [
     q: 'Is this medical advice?',
     a: 'No. Smoke Ledger is behavioral support software for adults 18+. Consult a licensed clinician for medical decisions.',
   },
-] as const;
+];
 
 export function LandingFaq() {
   return (
-    <section aria-labelledby="landing-faq-heading" className="py-xl px-lg md:px-xl border-t border-border/60">
-      <div className="max-w-3xl mx-auto flex flex-col gap-lg">
-        <div className="text-center">
-          <Text variant="caption" muted>
-            FAQ
-          </Text>
-          <h2 id="landing-faq-heading" className="text-h2 font-semibold font-serif text-text mt-sm">
-            Common questions
+    <section
+      aria-labelledby="landing-faq-heading"
+      style={{
+        padding: 'clamp(56px, 8vw, 96px) clamp(20px, 5vw, 64px)',
+        background: 'var(--bg)',
+        borderTop: '1px solid var(--rule)',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 720,
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 32,
+        }}
+      >
+        <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span className="editorial-caption">Frequently asked</span>
+          <h2
+            id="landing-faq-heading"
+            className="editorial-headline"
+            style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
+          >
+            Quiet <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>answers</span>.
           </h2>
-        </div>
-        <div className="flex flex-col gap-sm">
-          {FAQ_ITEMS.map((item) => (
-            <details
+        </header>
+
+        <div
+          style={{
+            borderTop: '1px solid var(--rule-strong)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {FAQ_ITEMS.map((item, i) => (
+            <article
               key={item.q}
-              className="group rounded-lg border border-border bg-card p-md open:shadow-[var(--shadow-card)]"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '36px 1fr',
+                gap: 16,
+                padding: '20px 0',
+                borderBottom: '1px solid var(--rule)',
+                alignItems: 'baseline',
+              }}
             >
-              <summary className="cursor-pointer list-none font-semibold text-text flex justify-between items-center gap-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent rounded-sm">
-                {item.q}
-                <span className="text-text-muted group-open:rotate-45 transition-transform" aria-hidden>
-                  +
-                </span>
-              </summary>
-              <Text variant="small" muted className="mt-sm">
-                {item.a}
-              </Text>
-            </details>
+              <span
+                className="editorial-caption-tight nums-tabular"
+                style={{ color: 'var(--text-faint)' }}
+              >
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                  }}
+                >
+                  {item.q}
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {item.a}
+                </p>
+              </div>
+            </article>
           ))}
         </div>
       </div>

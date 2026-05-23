@@ -1,9 +1,9 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { PublicPageShell } from '@web/components/layout/PublicPageShell';
-import { Card } from '@web/components/ui/Card';
-import { Text } from '@web/components/ui/Text';
-import { LEGAL_LINKS } from '@web/lib/legal';
+import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
+import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
+import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
+import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 
 export interface LegalSection {
   title: string;
@@ -17,48 +17,100 @@ interface LegalDocumentProps {
   sections: readonly LegalSection[];
 }
 
-export function LegalDocument({ title, subtitle, effectiveDate, sections }: LegalDocumentProps) {
+export function LegalDocument({
+  title,
+  subtitle,
+  effectiveDate,
+  sections,
+}: LegalDocumentProps) {
   return (
-    <PublicPageShell>
-      <main className="max-w-3xl mx-auto p-lg md:p-xl pb-16 flex flex-col gap-lg">
-        <header className="flex flex-col gap-sm">
-          <Text variant="caption" muted>
-            LEGAL
-          </Text>
-          <Text variant="display">{title}</Text>
-          <Text variant="small" muted>
-            {subtitle}
-          </Text>
-          <Text variant="small" faint>
-            Effective date: {effectiveDate}
-          </Text>
-        </header>
+    <EditorialPageShell maxWidth={760}>
+      <EditorialMasthead
+        caption={`Legal · ${LEGAL_COPY.productName}`}
+        title={title}
+        subtitle={subtitle}
+        effectiveDate={`Effective ${effectiveDate}`}
+        ruleWidth={80}
+      />
 
-        {sections.map((section) => (
-          <Card key={section.title}>
-            <div className="flex flex-col gap-sm">
-              <Text variant="h3">{section.title}</Text>
-              {section.body.map((paragraph) => (
-                <Text key={`${section.title}-${paragraph.slice(0, 24)}`} variant="small" muted>
+      {sections.map((section, i) => (
+        <section
+          key={section.title}
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          <header
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 16,
+              borderTop: '1px solid var(--rule-strong)',
+              paddingTop: 18,
+            }}
+          >
+            <span
+              className="editorial-caption-tight nums-tabular"
+              style={{ color: 'var(--text-faint)', minWidth: 28 }}
+            >
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <h2
+              className="editorial-headline"
+              style={{
+                fontSize: 'clamp(22px, 2.5vw, 28px)',
+                margin: 0,
+                flex: 1,
+                color: 'var(--text)',
+              }}
+            >
+              {section.title}
+            </h2>
+          </header>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              paddingLeft: 44,
+            }}
+          >
+            {section.body.map((paragraph, j) => (
+              <React.Fragment key={`${section.title}-${j}`}>
+                {j > 0 ? (
+                  <div
+                    aria-hidden
+                    style={{
+                      borderTop: '1px solid var(--rule)',
+                      width: 32,
+                    }}
+                  />
+                ) : null}
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
                   {paragraph}
-                </Text>
-              ))}
-            </div>
-          </Card>
-        ))}
-
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-sm">
-            <Text variant="small" muted>
-              Need help with account data requests?
-            </Text>
-            <Link href={LEGAL_LINKS.support} className="text-small font-semibold text-accent hover:opacity-80">
-              Contact support
-            </Link>
+                </p>
+              </React.Fragment>
+            ))}
           </div>
-        </Card>
-      </main>
-    </PublicPageShell>
+        </section>
+      ))}
+
+      <EditorialClosingSignet align="left">
+        Need help with account data requests?{' '}
+        <Link
+          href={LEGAL_LINKS.support}
+          style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+        >
+          Contact support →
+        </Link>
+      </EditorialClosingSignet>
+    </EditorialPageShell>
   );
 }
 
