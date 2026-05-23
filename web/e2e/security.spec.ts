@@ -19,6 +19,26 @@ test('security headers include CSP and frame denial', async ({ page }) => {
   expect(res?.headers()['x-frame-options']).toBe('DENY');
 });
 
+test('CSP nonce in response header matches nonce stamped on script tags', async ({ page }) => {
+  const res = await page.goto('/login');
+  const csp = res?.headers()['content-security-policy'] ?? '';
+  const nonceMatch = csp.match(/'nonce-([^']+)'/);
+  expect(nonceMatch, 'script-src must include a nonce-… token').not.toBeNull();
+  const nonce = nonceMatch![1];
+
+  // Every Next.js-generated <script> tag in the rendered HTML must carry the
+  // same nonce. Otherwise 'strict-dynamic' blocks every chunk and no JS runs
+  // — the exact failure mode that broke auth and the theme toggle.
+  const html = await res!.text();
+  const scriptTags = html.match(/<script\b[^>]*>/gi) ?? [];
+  expect(scriptTags.length, 'login page must render at least one <script>').toBeGreaterThan(0);
+  const stamped = scriptTags.filter((tag) => tag.includes(`nonce="${nonce}"`));
+  expect(
+    stamped.length,
+    `expected every <script> tag to carry nonce="${nonce}"; found ${stamped.length}/${scriptTags.length}`,
+  ).toBe(scriptTags.length);
+});
+
 test('signup page shows age acknowledgment', async ({ page }) => {
   await page.goto('/signup');
   await expect(page.getByText(/18 or older/i)).toBeVisible();

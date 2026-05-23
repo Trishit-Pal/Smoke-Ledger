@@ -59,9 +59,15 @@ function setAuthCookie(
 }
 
 function buildSecurityHeaders(nonce: string, requestHeaders: Headers) {
+  const csp = buildCsp(nonce);
+  // Next.js 14 reads the CSP from the forwarded *request* headers to extract
+  // the nonce and stamp it onto every <script> it emits. Setting it only on
+  // the response leaves framework scripts un-nonced and blocked by
+  // 'strict-dynamic'. Both headers must carry the same value.
   requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
   return {
-    'Content-Security-Policy': buildCsp(nonce),
+    'Content-Security-Policy': csp,
   };
 }
 

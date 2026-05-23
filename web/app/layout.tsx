@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { DM_Sans, Fraunces } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@web/components/providers/AuthProvider';
@@ -23,10 +24,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = headers().get('x-nonce') ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${fraunces.variable}`}>
       <body>
         <ThemeProvider
+          nonce={nonce}
           attribute="class"
           defaultTheme="dark"
           enableSystem={false}
