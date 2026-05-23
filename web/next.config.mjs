@@ -40,6 +40,13 @@ const config = {
     ];
   },
   webpack(webpackConfig) {
+    // Shared `../src` imports resolve modules from their file path upward, so on
+    // Vercel (install only in web/) packages like dayjs/zod in web/node_modules
+    // are missed unless we prefer web/node_modules explicitly.
+    webpackConfig.resolve.modules = [
+      path.resolve(__dirname, 'node_modules'),
+      ...(webpackConfig.resolve.modules ?? ['node_modules']),
+    ];
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
       // Shim RN-only modules with web equivalents so the shared `src/`

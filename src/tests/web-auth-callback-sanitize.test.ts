@@ -11,7 +11,7 @@
  * pathname is allowed, matching the contract of the shared
  * `sanitizeNextPath` in web/lib/auth/redirect.ts.
  */
-import { _sanitizeCallbackNextPath } from '../../web/app/auth/callback/route';
+import { _sanitizeCallbackNextPath } from '../../web/lib/auth/callbackNextPath';
 
 describe('_sanitizeCallbackNextPath (callback-side allowlist)', () => {
   // -------------------------------------------------------------------------
