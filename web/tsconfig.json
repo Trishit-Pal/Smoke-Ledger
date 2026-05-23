@@ -16,11 +16,18 @@
     "plugins": [{ "name": "next" }],
     "baseUrl": ".",
     "paths": {
+      "@/lib/supabase": ["./lib/supabase/client"],
+      "@/lib/secureStore": ["./lib/storage"],
+      "@/lib/haptics": ["./lib/haptics"],
+      "@/hooks/useTheme": ["./hooks/useTheme"],
+      "@/hooks/useReduceMotion": ["./hooks/useReduceMotion"],
       "@/*": ["../src/*"],
       "@web/*": ["./*"],
       "zod": ["./node_modules/zod"],
       "dayjs": ["./node_modules/dayjs"],
-      "dayjs/*": ["./node_modules/dayjs/*"]
+      "dayjs/*": ["./node_modules/dayjs/*"],
+      "zustand": ["./node_modules/zustand"],
+      "@supabase/supabase-js": ["./node_modules/@supabase/supabase-js"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
