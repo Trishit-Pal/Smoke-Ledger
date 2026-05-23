@@ -19,7 +19,8 @@
       "@/*": ["../src/*"],
       "@web/*": ["./*"],
       "zod": ["./node_modules/zod"],
-      "dayjs": ["./node_modules/dayjs"]
+      "dayjs": ["./node_modules/dayjs"],
+      "dayjs/*": ["./node_modules/dayjs/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
