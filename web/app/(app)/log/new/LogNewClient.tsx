@@ -317,42 +317,38 @@ export function LogNewClient({ brands }: LogNewClientProps) {
             label="Brand"
             sublabel={
               sortedBrands.length === 0
-                ? 'No brands yet — add one from settings, or save without a brand.'
-                : 'Pick a brand from your catalog, or leave as none.'
+                ? 'Add a brand to your catalog before you can log an entry.'
+                : 'Pick the brand for this entry — required.'
             }
           >
-            {sortedBrands.length === 0 ? null : (
+            {sortedBrands.length === 0 ? (
+              <a
+                href="/settings"
+                className="inline-flex items-center min-h-[36px] text-small text-accent underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+              >
+                Add a brand in Settings →
+              </a>
+            ) : (
               <EditorialPillRow
                 ariaLabel="Brand"
-                items={[
-                  {
-                    key: '__none__',
-                    label: 'None',
-                    selected: brandId === null,
-                    onPress: () => {
-                      setBrandId(null);
-                      setVariantName(null);
-                    },
+                items={sortedBrands.map((b) => ({
+                  key: b.id,
+                  label: b.isFavorite ? (
+                    <>
+                      <span aria-hidden className="mr-xs">
+                        ★
+                      </span>
+                      {b.name}
+                    </>
+                  ) : (
+                    b.name
+                  ),
+                  selected: brandId === b.id,
+                  onPress: () => {
+                    setBrandId(b.id);
+                    setVariantName(null);
                   },
-                  ...sortedBrands.map((b) => ({
-                    key: b.id,
-                    label: b.isFavorite ? (
-                      <>
-                        <span aria-hidden className="mr-xs">
-                          ★
-                        </span>
-                        {b.name}
-                      </>
-                    ) : (
-                      b.name
-                    ),
-                    selected: brandId === b.id,
-                    onPress: () => {
-                      setBrandId(b.id);
-                      setVariantName(null);
-                    },
-                  })),
-                ]}
+                }))}
               />
             )}
           </FieldRow>
@@ -557,12 +553,17 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               {error}
             </p>
           ) : null}
+          {brandId === null && sortedBrands.length > 0 ? (
+            <p className="text-caption text-text-faint italic mb-xs">
+              Choose a brand above to save this entry.
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={handleSave}
-            disabled={submitting}
+            disabled={submitting || brandId === null}
             aria-busy={submitting}
-            className="inline-flex items-center justify-center min-h-[48px] min-w-[14rem] px-xl rounded-md bg-text text-bg font-medium text-body hover:opacity-90 transition-opacity disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            className="inline-flex items-center justify-center min-h-[48px] min-w-[14rem] px-xl rounded-md bg-text text-bg font-medium text-body hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             {submitting ? 'Saving…' : 'Save log'}
           </button>

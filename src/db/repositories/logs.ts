@@ -202,6 +202,12 @@ export async function listLogsPage(opts?: ListLogsPageOpts): Promise<LogPage> {
 
 export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
   const supabase = getSupabase();
+  // Brand is mandatory for every log (price/amount stays optional). The UI
+  // disables logging until a brand is chosen; this is the defense-in-depth
+  // guard so no entry point can persist a brand-less log.
+  if (!draft.brandId) {
+    throw new AppError('validation_error', 'A cigarette brand is required to log.');
+  }
   const id = makeId('log');
   const localDate = draft.localDate ?? toLocalDate(draft.tsUtc);
   const localHour = draft.localHour ?? toLocalHour(draft.tsUtc);
