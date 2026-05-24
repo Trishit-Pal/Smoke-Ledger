@@ -16,7 +16,10 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+
+// Derive the tab-bar prop type from expo-router's own Tabs so it always matches
+// expo-router's vendored react-navigation types (avoids cross-package type drift).
+type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 const TABS = [
   { name: 'index',    glyph: '◇', label: 'Home',     a11y: 'Home tab' },
@@ -29,7 +32,7 @@ const TABS = [
 const INDICATOR_W = 36;
 const N = TABS.length;
 
-function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+function CustomTabBar({ state, navigation }: TabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();

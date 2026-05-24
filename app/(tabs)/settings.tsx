@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Switch, Alert, Linking } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';

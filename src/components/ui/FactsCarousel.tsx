@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolation,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
@@ -118,7 +119,7 @@ function FactCard({
 }: {
   fact: SmokingFact;
   index: number;
-  scrollX: Animated.SharedValue<number>;
+  scrollX: SharedValue<number>;
   cardW: number;
   reduce: boolean;
 }) {

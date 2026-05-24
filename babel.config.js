@@ -12,7 +12,9 @@ module.exports = function (api) {
           },
         },
       ],
-      'react-native-reanimated/plugin',
+      // Reanimated 4 uses the worklets plugin (replaces react-native-reanimated/plugin).
+      // Must remain the LAST plugin in the list.
+      'react-native-worklets/plugin',
     ],
   };
 };
