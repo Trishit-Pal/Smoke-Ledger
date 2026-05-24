@@ -26,6 +26,7 @@ module.exports = {
       'expo-router',
       'expo-secure-store',
       'expo-notifications',
+      'expo-font',
       [
         'expo-splash-screen',
         {

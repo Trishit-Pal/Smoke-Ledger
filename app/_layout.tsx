@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Fraunces_400Regular, Fraunces_600SemiBold } from '@expo-google-fonts/fraunces';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
@@ -21,6 +29,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Editorial fonts (Fraunces display + DM Sans body). Render is gated until
+  // these resolve so the first paint already uses the brand type.
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces_400Regular,
+    Fraunces_600SemiBold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
   const boot = useSession((s) => s.boot);
   const resetSession = useSession((s) => s.reset);
   const setSession = useAuth((s) => s.setSession);
@@ -126,7 +145,7 @@ export default function RootLayout() {
     );
   }
 
-  if (!ready) {
+  if (!ready || !fontsReady) {
     return (
       <View
         style={{
