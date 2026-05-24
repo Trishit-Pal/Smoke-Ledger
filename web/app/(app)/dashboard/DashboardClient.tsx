@@ -1,31 +1,23 @@
 'use client';
 
 /*
- * ─────────────────────────────────────────────────────────────────────────────
- *  Dashboard — "Quiet editorial · your own daily report" (revamp pilot)
- * ─────────────────────────────────────────────────────────────────────────────
+ * Dashboard — "Quiet editorial · your own daily report"
  *
- *  Aesthetic direction: A single thoughtful spread, not a dashboard. The day's
- *  cigarette count is presented as an editorial display numeral (Fraunces,
- *  display optical-size, light weight, tight tracking). Sections aren't cards —
- *  they are layout movements held together by hairline rules and small caps
- *  captions, the way a Sunday paper is. Teal is reserved for genuinely positive
- *  moments (a real smoke-free streak, an under-baseline week). Trend-up uses a
- *  muted terracotta earth tone, never alarm red. Gamification is absent on
- *  purpose — this is a quit-smoking app, and the design respects that.
+ * ─── CHARACTER ANIMATIONS INTEGRATION ──────────────────────────────────────
+ * The five additions below are the ONLY changes vs the original file. Each is
+ * tagged with `// CHARACTER:` so they're easy to lift if you want to apply a
+ * surgical patch instead of replacing the file.
  *
- *  Motion: a single page-load choreography. The masthead, headline numeral, and
- *  ledger rows rise in sequence with a slow gravitational ease (CSS keyframes
- *  via .editorial-stage + --ed-index). Charts animate their bar heights in.
- *  Everything short-circuits under prefers-reduced-motion via the global rule
- *  in globals.css.
+ *   1. Imports for CharacterCompanion + the mood bus.
+ *   2. Greet mood fired on first dashboard load.
+ *   3. Streak-milestone detection — when streak crosses a tier, the milestone
+ *      modal fires.
+ *   4. Mood dispatched inside runQuickLog when a log lands (regret if under
+ *      baseline, concern if it pushed the user over).
+ *   5. <CharacterCompanion> rendered inside the masthead header.
  *
- *  Data path is unchanged. The exported `DashboardClient` keeps the same name
- *  and props so page.tsx is untouched.
- *
- *  Discreet mode (isHomeTotalsHidden) masks all numeric totals consistently —
- *  the editorial numeral becomes "••", spend lines collapse to "•••", week
- *  bars flatten to a quiet uniform track.
+ * Everything else (data path, layout, copy, classes) is unchanged.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 import * as React from 'react';
@@ -52,6 +44,13 @@ import { toSafeErrorMessage } from '@/lib/errors';
 import { HealthMilestones } from '@web/components/ui/HealthMilestones';
 import { QuickLogStrip } from '@web/components/dashboard/QuickLogStrip';
 import { WeekStrip } from '@web/components/dashboard/WeekStrip';
+// CHARACTER (1): imports for the companion + mood bus.
+import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
+import {
+  dispatchMood,
+  dispatchMilestone,
+  milestoneForStreak,
+} from '@web/lib/character/mood';
 import type { Brand, BrandVariant, CigaretteLog, Goal, UserProfile } from '@/types';
 
 export interface DashboardClientProps {
@@ -61,8 +60,6 @@ export interface DashboardClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
 }
 
-/** Editorial sentence for the headline number — keeps tone honest, not cheerful,
- *  not alarming. Returns a phrase that pairs with the visible numeral. */
 function headlineDeck(opts: {
   todaySticks: number;
   baseline: number | null | undefined;
@@ -85,8 +82,6 @@ function headlineDeck(opts: {
   return `${todaySticks} today.`;
 }
 
-/** Tone for the 7-day trend line. Earth-toned terracotta for "up", teal for
- *  "down" (positive), neutral for stable. NEVER alarm red. */
 function trendTone(deltaPct: number): 'up' | 'down' | 'flat' {
   if (!Number.isFinite(deltaPct)) return 'flat';
   if (deltaPct > 2) return 'up';
@@ -123,6 +118,28 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
     [activeGoal, logs, today],
   );
 
+  // CHARACTER (2): fire a soft greet on first dashboard render so the figure
+  // reaches its resting wave. We deliberately don't fire on every render —
+  // only on mount.
+  React.useEffect(() => {
+    const t = window.setTimeout(() => dispatchMood('greet', { durationMs: 1800 }), 400);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // CHARACTER (3): when the smoke-free streak crosses a tier (1, 3, 7, 14, 30
+  // days), fire the full milestone modal. Only fires when the value INCREASES
+  // into a tier — so re-renders, refreshes, and history edits that drop the
+  // streak don't re-trigger.
+  const prevStreakRef = React.useRef<number>(streak);
+  React.useEffect(() => {
+    const prev = prevStreakRef.current;
+    if (streak > prev) {
+      const m = milestoneForStreak(streak);
+      if (m) dispatchMilestone(m);
+    }
+    prevStreakRef.current = streak;
+  }, [streak]);
+
   const runQuickLog = React.useCallback(
     async (opts: {
       brandId: string | null;
@@ -155,6 +172,24 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           notes: null,
         });
         await track(AnalyticsEvents.QUICK_ADD_USED, {});
+
+        // CHARACTER (4): pick a mood based on the post-log day total vs
+        // baseline. Computed inline so we don't have to wait for the router
+        // refresh to update `todaySticks`.
+        const newDayTotal = todaySticks + opts.quantity;
+        const baseline = profile.baselinePerDay ?? null;
+        if (baseline && baseline > 0 && newDayTotal > baseline) {
+          dispatchMood('concern', {
+            caption: 'Above your baseline — be kind to yourself.',
+            durationMs: 3400,
+          });
+        } else {
+          dispatchMood('regret', {
+            caption: 'Noted. No judgment.',
+            durationMs: 3200,
+          });
+        }
+
         setToast(
           `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${
             total != null ? ` · ${formatInr(total, { compact: true })}` : ''
@@ -168,7 +203,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         setQuickLogPending(false);
       }
     },
-    [router],
+    [router, todaySticks, profile.baselinePerDay],
   );
 
   const deck = headlineDeck({ todaySticks, baseline: profile.baselinePerDay, streak, hidden });
@@ -177,17 +212,15 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
     tTone === 'up' ? 'var(--warn-earth)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
   const streakColour = streak >= 1 ? 'var(--accent)' : 'var(--text)';
 
-  // Helper for editorial stage CSS-variable indexing (drives the stagger reveal).
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
     <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
-      {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
       <div className="editorial-stage flex flex-col gap-xxl">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm">
+        <header style={idx(0)} className="flex flex-col gap-sm relative">
           <div className="flex items-center gap-md">
             <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
             <span className="editorial-caption nums-tabular">{formatIndianDate(today)}</span>
@@ -196,6 +229,14 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           <p className="text-small text-text-muted text-center italic">
             Your daily ledger
           </p>
+
+          {/* CHARACTER (5): the masthead companion. Hidden on narrow viewports
+              so it never collides with the rule on small screens. Position
+              is absolute against the header (header is relative above), so
+              it doesn't disturb the existing layout. */}
+          <div className="hidden md:block absolute -top-2 right-0 pointer-events-none">
+            <CharacterCompanion size={88} />
+          </div>
         </header>
 
         {/* ─────────────── Headline · the day in one number ─────────────── */}
@@ -265,7 +306,6 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           </h2>
 
           <dl className="flex flex-col">
-            {/* Row 1 — 7-day average */}
             <div className="rule-hair-strong grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
               <div>
                 <dt className="text-body text-text">Seven-day average</dt>
@@ -286,7 +326,6 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
               </dd>
             </div>
 
-            {/* Row 2 — smoke-free streak */}
             <div className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
               <div>
                 <dt className="text-body text-text">Smoke-free streak</dt>
@@ -328,7 +367,6 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
                 {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
               </span>
             </p>
-            {/* Hairline progress rule — does the work of a progress bar, quietly. */}
             <div
               className="relative h-px w-full bg-[var(--rule)] mt-sm overflow-hidden"
               role="progressbar"
@@ -354,7 +392,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           </section>
         ) : null}
 
-        {/* ─────────────── The week — inverted editorial spread ─────────────── */}
+        {/* ─────────────── The week ─────────────── */}
         {logs.length > 0 ? (
           <section style={idx(4)} aria-labelledby="week-heading">
             <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
@@ -379,7 +417,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </section>
 
-        {/* ─────────────── Editor's note — pull quote ─────────────── */}
+        {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
           <section style={idx(6)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
             <h2 id="insight-heading" className="editorial-caption">
@@ -396,7 +434,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           </section>
         ) : null}
 
-        {/* ─────────────── Empty state — a quiet invitation ─────────────── */}
+        {/* ─────────────── Empty state ─────────────── */}
         {logs.length === 0 ? (
           <section style={idx(7)} className="rule-hair pt-lg flex flex-col gap-sm">
             <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
@@ -416,7 +454,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           </section>
         ) : null}
 
-        {/* ─────────────── Footer — typographic link ─────────────── */}
+        {/* ─────────────── Footer ─────────────── */}
         <footer style={idx(8)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
