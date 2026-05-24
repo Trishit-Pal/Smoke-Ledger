@@ -4,7 +4,8 @@
 -- absent in prod, so the Trends page hit PGRST202 ("function ... not found in
 -- schema cache"). Copied verbatim from 20260520000000:975-1028. Idempotent.
 
-CREATE OR REPLACE VIEW public.v_daily_summary_user AS
+CREATE OR REPLACE VIEW public.v_daily_summary_user
+  WITH (security_invoker = true) AS
 SELECT
   user_id,
   local_date,
