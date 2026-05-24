@@ -24,7 +24,7 @@ export function Card({ padded = true, glow = false, style, children, ...rest }: 
           borderRadius: radius.lg,
           padding: padded ? spacing.lg : 0,
           // Subtle elevation — light gets a faint ink shadow, dark is flat
-          shadowColor: isDark ? palette.ink : palette.ink,
+          shadowColor: palette.ink,
           shadowOffset: { width: 0, height: isDark ? 0 : 1 },
           shadowOpacity: isDark ? 0 : 0.04,
           shadowRadius: isDark ? 0 : 4,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, TextStyle } from 'react-native';
 import { Text } from './Text';
 import { Card } from './Card';
 import { useTheme } from '@/hooks/useTheme';
@@ -63,7 +63,7 @@ export function StatTile({
             value={animatedValue}
             format={formatAnimated ?? ((n) => Math.round(n).toString())}
             style={[
-              typography.display as object,
+              typography.display as TextStyle,
               { color, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
             ]}
           />

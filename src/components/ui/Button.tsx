@@ -3,7 +3,7 @@ import { Pressable, ViewStyle, StyleProp, ActivityIndicator, View } from 'react-
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Text } from './Text';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/constants/theme';
+import { palette, radius, spacing } from '@/constants/theme';
 import { tap } from '@/lib/haptics';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 
@@ -47,7 +47,7 @@ export function Button({
     : 'transparent';
 
   const fg =
-    variant === 'primary' || variant === 'danger' ? '#FFFFFF'
+    variant === 'primary' || variant === 'danger' ? palette.white
     : variant === 'secondary' ? theme.text
     : theme.text;
 
@@ -62,7 +62,7 @@ export function Button({
   return (
     <Pressable
       onPressIn={() => { if (!disabled && !loading && !reduce) scale.value = withSpring(0.96, SPRING); }}
-      onPressOut={() => { if (!reduce) scale.value = withSpring(1, SPRING); }}
+      onPressOut={() => { if (!disabled && !loading && !reduce) scale.value = withSpring(1, SPRING); }}
       onPress={() => { if (!disabled && !loading) { tap(); onPress?.(); } }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
