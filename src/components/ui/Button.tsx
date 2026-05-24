@@ -26,7 +26,7 @@ export interface ButtonProps {
 }
 
 // Module-level constants — avoids re-allocating on every render
-const HEIGHTS: Record<ButtonSize, number> = { sm: 36, md: 44, lg: 52 };
+const HEIGHTS: Record<ButtonSize, number> = { sm: 40, md: 48, lg: 56 };
 const PADDINGS: Record<ButtonSize, number> = { sm: spacing.md, md: spacing.xl, lg: spacing.xl };
 const SPRING = { damping: 18, stiffness: 300 };
 

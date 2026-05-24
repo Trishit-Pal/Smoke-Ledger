@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ViewProps, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/constants/theme';
+import { palette, radius, spacing } from '@/constants/theme';
 
 export interface CardProps extends ViewProps {
   padded?: boolean;
@@ -24,7 +24,7 @@ export function Card({ padded = true, glow = false, style, children, ...rest }: 
           borderRadius: radius.lg,
           padding: padded ? spacing.lg : 0,
           // Subtle elevation — light gets a faint ink shadow, dark is flat
-          shadowColor: isDark ? '#000000' : '#0B0F14',
+          shadowColor: isDark ? palette.ink : palette.ink,
           shadowOffset: { width: 0, height: isDark ? 0 : 1 },
           shadowOpacity: isDark ? 0 : 0.04,
           shadowRadius: isDark ? 0 : 4,

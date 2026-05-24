@@ -12,7 +12,7 @@
  * Default opacity: ~0.06 light, ~0.04 dark (mirrors web's 8 % / 5 % values).
  */
 
-import React from 'react';
+import React, { useId } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import Svg, { Defs, Filter, FeTurbulence, FeColorMatrix, Rect } from 'react-native-svg';
 import { useTheme } from '@/hooks/useTheme';
@@ -24,11 +24,16 @@ export interface PaperNoiseProps {
   height?: number | string;
   /** Override opacity (0–1). Defaults to theme-appropriate value (0.06 light / 0.04 dark). */
   opacity?: number;
+  /** Optional stable SVG filter id. When omitted a unique id is generated via useId(). */
+  id?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function PaperNoise({ width = '100%', height = '100%', opacity, style }: PaperNoiseProps) {
+export function PaperNoise({ width = '100%', height = '100%', opacity, id, style }: PaperNoiseProps) {
   const theme = useTheme();
+  // Strip colons (React's useId format ":r0:") so the id is a valid SVG id
+  const generatedId = useId().replace(/:/g, '');
+  const filterId = id ?? `paper-noise-filter-${generatedId}`;
   // Editorial: 6 % light (ink on paper), 4 % dark (light grain on dark surface)
   const resolvedOpacity = opacity ?? (theme.mode === 'dark' ? 0.04 : 0.06);
 
@@ -59,7 +64,7 @@ export function PaperNoise({ width = '100%', height = '100%', opacity, style }: 
       ]}
     >
       <Defs>
-        <Filter id="paper-noise-filter" x="0%" y="0%" width="100%" height="100%">
+        <Filter id={filterId} x="0%" y="0%" width="100%" height="100%">
           <FeTurbulence
             type="fractalNoise"
             baseFrequency={0.85}
@@ -78,7 +83,7 @@ export function PaperNoise({ width = '100%', height = '100%', opacity, style }: 
         y={0}
         width="100%"
         height="100%"
-        filter="url(#paper-noise-filter)"
+        filter={`url(#${filterId})`}
       />
     </Svg>
   );

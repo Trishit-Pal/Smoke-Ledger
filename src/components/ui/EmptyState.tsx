@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Text } from './Text';
-import { Button } from './Button';
+import { Button, ButtonVariant } from './Button';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing } from '@/constants/theme';
 
@@ -11,9 +11,10 @@ export interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  actionVariant?: ButtonVariant;
 }
 
-export function EmptyState({ title, description, actionLabel, onAction }: EmptyStateProps) {
+export function EmptyState({ title, description, actionLabel, onAction, actionVariant = 'primary' }: EmptyStateProps) {
   const theme = useTheme();
   return (
     <View style={{ alignItems: 'center', paddingVertical: spacing.xxl + 8, gap: spacing.md }}>
@@ -35,7 +36,7 @@ export function EmptyState({ title, description, actionLabel, onAction }: EmptyS
       ) : null}
       {actionLabel && onAction ? (
         <View style={{ marginTop: spacing.sm }}>
-          <Button title={actionLabel} onPress={onAction} variant="secondary" />
+          <Button title={actionLabel} onPress={onAction} variant={actionVariant} />
         </View>
       ) : null}
     </View>
