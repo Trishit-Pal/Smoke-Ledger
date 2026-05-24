@@ -33,6 +33,21 @@
   --ink-surface-text: #E6EAEF;
   --ink-surface-muted: #8C95A1;
   --ink-surface-rule: #2A333F;
+  /* Data-viz palette — higher-contrast, theme-aware (charts). Ticks are darker
+     than --text-muted so axis labels stay legible; gridlines visible but soft. */
+  --chart-grid: #D2D8E0;
+  --chart-axis: #5A6673;
+  --chart-tick: #404A57;
+  --chart-cursor: #A9B3BF;
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-text: #0B0F14;
+  --chart-tooltip-border: #B9C1CC;
+  --chart-series-1: #2FA39B;
+  --chart-series-2: #B86A4A;
+  --chart-series-3: #4C7CD9;
+  --chart-series-4: #8A6FC2;
+  --chart-series-5: #D99A2B;
+  --chart-series-6: #4CAF84;
   /* Paper noise: subtle SVG-based atmosphere applied behind the masthead. Sized
      small (8% opacity) so it reads as "ink on paper" not "stock-photo paper". */
   --paper-noise:
@@ -64,6 +79,21 @@
   --ink-surface-text: #0B0F14;
   --ink-surface-muted: #5A6673;
   --ink-surface-rule: #C7CED8;
+  /* Data-viz palette — dark variants. Brighter series + ticks for legibility on
+     the dark surface; gridlines a touch more visible than --border. */
+  --chart-grid: #2F3947;
+  --chart-axis: #5A6673;
+  --chart-tick: #B6C0CC;
+  --chart-cursor: #5A6673;
+  --chart-tooltip-bg: #1A2029;
+  --chart-tooltip-text: #E6EAEF;
+  --chart-tooltip-border: #3A4452;
+  --chart-series-1: #38C6BB;
+  --chart-series-2: #E0926F;
+  --chart-series-3: #7AA0E0;
+  --chart-series-4: #B49AE0;
+  --chart-series-5: #E6B354;
+  --chart-series-6: #6FD3A6;
   --paper-noise:
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }

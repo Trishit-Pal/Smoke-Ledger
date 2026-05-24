@@ -8,6 +8,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+import { CHART, CHART_SERIES, chartAxisTick, ChartTooltip } from '@web/components/charts/chartTheme';
 
 export interface LineChartProps {
   data: { label: string; value: number }[];
@@ -16,59 +17,43 @@ export interface LineChartProps {
   strokeColor?: string;
 }
 
-const BORDER = 'var(--border)';
-const TEXT_MUTED = 'var(--text-muted)';
-
-export function LineChart({
-  data,
-  height = 160,
-  formatY,
-  strokeColor,
-}: LineChartProps) {
-  const stroke = strokeColor ?? 'var(--accent)';
+export function LineChart({ data, height = 160, formatY, strokeColor }: LineChartProps) {
+  const stroke = strokeColor ?? CHART_SERIES[0];
   const reduced = useReduceMotion();
 
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer width="100%" height="100%">
         <RLineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={BORDER} strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: TEXT_MUTED }}
+            tick={chartAxisTick}
             tickLine={false}
-            axisLine={{ stroke: BORDER }}
+            axisLine={{ stroke: CHART.axis }}
           />
           {formatY ? (
             <YAxis
               tickFormatter={formatY}
-              tick={{ fontSize: 11, fill: TEXT_MUTED }}
+              tick={chartAxisTick}
               tickLine={false}
-              axisLine={{ stroke: BORDER }}
+              axisLine={{ stroke: CHART.axis }}
               width={40}
             />
           ) : (
             <YAxis hide />
           )}
           <Tooltip
-            cursor={{ stroke: BORDER, strokeDasharray: '3 3' }}
-            contentStyle={{
-              background: 'var(--card)',
-              border: `1px solid ${BORDER}`,
-              borderRadius: 8,
-              fontSize: 12,
-              color: 'var(--text)',
-            }}
-            labelStyle={{ color: 'var(--text-muted)' }}
-            formatter={(v: number) => (formatY ? formatY(v) : v)}
+            cursor={{ stroke: CHART.cursor, strokeDasharray: '4 4' }}
+            content={<ChartTooltip formatValue={formatY} />}
           />
           <Line
             type="monotone"
             dataKey="value"
             stroke={stroke}
-            strokeWidth={2}
+            strokeWidth={2.25}
             dot={{ r: 2.5, fill: stroke, stroke }}
-            activeDot={{ r: 4 }}
+            activeDot={{ r: 4.5 }}
             isAnimationActive={!reduced}
           />
         </RLineChart>

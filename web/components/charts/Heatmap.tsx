@@ -76,7 +76,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
               x={0}
               y={row * cellH + cellH / 2 + 3}
               fontSize={10}
-              fill="var(--text-muted)"
+              fill="var(--chart-tick)"
             >
               {label}
             </text>
@@ -94,8 +94,8 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
                   width={Math.max(0, cellW - gap)}
                   height={Math.max(0, cellH - gap)}
                   rx={2}
-                  fill={count > 0 ? `rgba(47,163,155,${opacity})` : 'var(--border)'}
-                  fillOpacity={count > 0 ? 1 : 0.25}
+                  fill={count > 0 ? 'var(--chart-series-1)' : 'var(--chart-grid)'}
+                  fillOpacity={count > 0 ? opacity : 0.5}
                 >
                   <title>{`${count} log${count === 1 ? '' : 's'} — ${DAY_LABELS[r]} ${c}:00`}</title>
                 </rect>
@@ -109,7 +109,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
               x={labelWidth + hour * cellW}
               y={height - 4}
               fontSize={10}
-              fill="var(--text-muted)"
+              fill="var(--chart-tick)"
             >
               {label}
             </text>

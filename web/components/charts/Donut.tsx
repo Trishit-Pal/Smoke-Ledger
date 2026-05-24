@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { useReduceMotion } from '@web/hooks/useReduceMotion';
+import { CHART_SERIES, chartTooltipStyle } from '@web/components/charts/chartTheme';
 
 export interface DonutSlice {
   label: string;
@@ -16,8 +17,6 @@ export interface DonutProps {
   centerLabel?: string;
   centerValue?: string;
 }
-
-const PALETTE = ['#2FA39B', '#4C7CD9', '#D99A2B', '#C85A54', '#8A6FC2', '#4CAF84'];
 
 export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutProps) {
   const reduced = useReduceMotion();
@@ -41,19 +40,11 @@ export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutPro
             {safeSlices.map((slice, idx) => (
               <Cell
                 key={`${slice.label}-${idx}`}
-                fill={slice.color ?? PALETTE[idx % PALETTE.length]}
+                fill={slice.color ?? CHART_SERIES[idx % CHART_SERIES.length]}
               />
             ))}
           </Pie>
-          <Tooltip
-            contentStyle={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              fontSize: 12,
-              color: 'var(--text)',
-            }}
-          />
+          <Tooltip contentStyle={chartTooltipStyle} />
         </PieChart>
       </ResponsiveContainer>
       {(centerLabel || centerValue) && (

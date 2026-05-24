@@ -12,6 +12,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+import { CHART, CHART_SERIES, chartAxisTick, ChartTooltip } from '@web/components/charts/chartTheme';
 
 export interface BarChartProps {
   data: { label: string; value: number }[];
@@ -20,10 +21,6 @@ export interface BarChartProps {
   showLabels?: boolean;
   emphasizeLast?: boolean;
 }
-
-const ACCENT = 'var(--accent)';
-const BORDER = 'var(--border)';
-const TEXT_MUTED = 'var(--text-muted)';
 
 export function BarChart({
   data,
@@ -34,18 +31,19 @@ export function BarChart({
 }: BarChartProps) {
   const lastIndex = data.length - 1;
   const reduced = useReduceMotion();
+  const fill = CHART_SERIES[0];
 
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer width="100%" height="100%">
         <RBarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={BORDER} strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
           {showLabels ? (
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: TEXT_MUTED }}
+              tick={chartAxisTick}
               tickLine={false}
-              axisLine={{ stroke: BORDER }}
+              axisLine={{ stroke: CHART.axis }}
             />
           ) : (
             <XAxis dataKey="label" hide />
@@ -53,32 +51,24 @@ export function BarChart({
           {formatY ? (
             <YAxis
               tickFormatter={formatY}
-              tick={{ fontSize: 11, fill: TEXT_MUTED }}
+              tick={chartAxisTick}
               tickLine={false}
-              axisLine={{ stroke: BORDER }}
+              axisLine={{ stroke: CHART.axis }}
               width={40}
             />
           ) : (
             <YAxis hide />
           )}
           <Tooltip
-            cursor={{ fill: 'transparent' }}
-            contentStyle={{
-              background: 'var(--card)',
-              border: `1px solid ${BORDER}`,
-              borderRadius: 8,
-              fontSize: 12,
-              color: 'var(--text)',
-            }}
-            labelStyle={{ color: 'var(--text-muted)' }}
-            formatter={(v: number) => (formatY ? formatY(v) : v)}
+            cursor={{ fill: 'var(--chart-cursor)', fillOpacity: 0.12 }}
+            content={<ChartTooltip formatValue={formatY} />}
           />
-          <Bar dataKey="value" fill={ACCENT} radius={[4, 4, 0, 0]} isAnimationActive={!reduced}>
+          <Bar dataKey="value" fill={fill} radius={[4, 4, 0, 0]} isAnimationActive={!reduced}>
             {data.map((_, i) => (
               <Cell
                 key={i}
-                fill={ACCENT}
-                fillOpacity={emphasizeLast && i === lastIndex ? 1 : 0.55}
+                fill={fill}
+                fillOpacity={emphasizeLast && i === lastIndex ? 1 : 0.62}
               />
             ))}
           </Bar>
