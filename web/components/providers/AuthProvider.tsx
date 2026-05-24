@@ -4,6 +4,7 @@ import { getSupabase } from '@web/lib/supabase/client';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
+import { invalidateAnalyticsConsentCache } from '@/services/analytics';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setInitialized } = useAuth();
@@ -32,7 +33,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session) {
         void maybeSyncDefaultBrandCatalog().catch(() => {});
       } else {
+        // Clean account-switch isolation: drop in-memory session data and the
+        // (user-keyed) analytics-consent cache so nothing carries to the next user.
         reset();
+        invalidateAnalyticsConsentCache();
       }
     });
     return () => subscription.unsubscribe();

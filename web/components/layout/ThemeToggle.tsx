@@ -4,6 +4,8 @@ import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { setSetting } from '@/db/repositories/settings';
+import { USER_THEME_SETTING_KEY } from '@web/lib/userTheme';
 
 export type ThemeTogglePlacement = 'fixed' | 'inline' | 'floating-onboarding';
 
@@ -53,7 +55,13 @@ export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
         aria-checked={isDark}
         aria-label={label}
         title={label}
-        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        onClick={() => {
+          const next = isDark ? 'light' : 'dark';
+          setTheme(next);
+          // Persist per-user so the choice follows the account. No-ops on public
+          // pages where there's no signed-in user (requireUserId rejects → caught).
+          void setSetting(USER_THEME_SETTING_KEY, next).catch(() => {});
+        }}
         className="focus-ring"
         style={{
           position: 'relative',

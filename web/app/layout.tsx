@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { DM_Sans, Fraunces } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@web/components/providers/AuthProvider';
+import { UserThemeSync } from '@web/components/providers/UserThemeSync';
 import { ThemeToggle } from '@web/components/layout/ThemeToggle';
 import './globals.css';
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <AuthProvider>
+            <UserThemeSync />
             <ThemeToggle />
             {children}
           </AuthProvider>
