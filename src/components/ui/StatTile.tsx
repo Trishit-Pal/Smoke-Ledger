@@ -29,7 +29,11 @@ export function StatTile({
 }: StatTileProps) {
   const theme = useTheme();
   const color =
-    tone === 'warn' ? theme.warn : tone === 'danger' ? theme.danger : tone === 'success' ? theme.success : theme.text;
+    tone === 'warn'    ? theme.warn
+    : tone === 'danger'  ? theme.danger
+    : tone === 'success' ? theme.success
+    : theme.text;
+
   return (
     <Card style={{ flex: 1, minWidth: 140 }}>
       <View
@@ -37,18 +41,31 @@ export function StatTile({
         accessible
         accessibilityLabel={`${label}: ${hidden ? 'hidden' : value}${sublabel ? `. ${sublabel}` : ''}`}
       >
-        <Text variant="caption" muted>
-          {label.toUpperCase()}
+        {/* Editorial caption label — uppercase, wide tracking */}
+        <Text
+          variant="caption"
+          muted
+          style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+        >
+          {label}
         </Text>
+        {/* Editorial numeral — Fraunces display family, tabular figures */}
         {hidden || animatedValue == null ? (
-          <Text variant="display" color={color}>
+          <Text
+            variant="display"
+            color={color}
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
             {hidden ? '••••' : value}
           </Text>
         ) : (
           <AnimatedNumber
             value={animatedValue}
             format={formatAnimated ?? ((n) => Math.round(n).toString())}
-            style={[typography.display as any, { color }]}
+            style={[
+              typography.display as object,
+              { color, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
+            ]}
           />
         )}
         {sublabel ? (

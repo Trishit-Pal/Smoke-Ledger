@@ -37,8 +37,9 @@ export function ProgressBar({ value, tone = 'default', height = 6 }: ProgressBar
   }));
 
   return (
+    // Editorial: theme.rule track (hairline feel) with theme.accent fill
     <View
-      style={{ height, backgroundColor: theme.border, borderRadius: radius.pill, overflow: 'hidden' }}
+      style={{ height, backgroundColor: theme.rule, borderRadius: radius.pill, overflow: 'hidden' }}
       accessible
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}

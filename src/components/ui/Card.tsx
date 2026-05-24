@@ -17,16 +17,18 @@ export function Card({ padded = true, glow = false, style, children, ...rest }: 
       {...rest}
       style={[
         {
+          // Editorial: paper surface with hairline border instead of heavy chrome
           backgroundColor: theme.card,
-          borderColor: glow ? theme.accent + '40' : theme.border,
+          borderColor: glow ? theme.accentGlow : theme.rule,
           borderWidth: 1,
-          borderRadius: radius.xl,
+          borderRadius: radius.lg,
           padding: padded ? spacing.lg : 0,
-          shadowColor: isDark ? theme.accent : '#000000',
-          shadowOffset: { width: 0, height: isDark ? 0 : 2 },
-          shadowOpacity: isDark ? (glow ? 0.18 : 0.08) : 0.06,
-          shadowRadius: isDark ? (glow ? 24 : 14) : 8,
-          elevation: isDark ? 4 : 2,
+          // Subtle elevation — light gets a faint ink shadow, dark is flat
+          shadowColor: isDark ? '#000000' : '#0B0F14',
+          shadowOffset: { width: 0, height: isDark ? 0 : 1 },
+          shadowOpacity: isDark ? 0 : 0.04,
+          shadowRadius: isDark ? 0 : 4,
+          elevation: isDark ? 0 : 1,
         },
         style,
       ]}

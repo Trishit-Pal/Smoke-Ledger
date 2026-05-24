@@ -46,9 +46,10 @@ export function Chip({ label, selected, onPress, disabled, style, accessibilityL
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.xs + 2,
             borderRadius: radius.pill,
-            backgroundColor: selected ? theme.accentSoft : theme.bgElevated,
+            // Editorial: selected = accentSoft fill + accent border; unselected = transparent + hairline rule
+            backgroundColor: selected ? theme.accentSoft : 'transparent',
             borderWidth: 1,
-            borderColor: selected ? theme.accent : theme.border,
+            borderColor: selected ? theme.accent : theme.ruleStrong,
             opacity: disabled ? 0.45 : 1,
           },
           animStyle,
@@ -58,9 +59,9 @@ export function Chip({ label, selected, onPress, disabled, style, accessibilityL
         <Text
           variant="caption"
           color={selected ? theme.accent : theme.textMuted}
-          style={{ letterSpacing: 0.5 }}
+          style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}
         >
-          {label.toUpperCase()}
+          {label}
         </Text>
       </Animated.View>
     </Pressable>

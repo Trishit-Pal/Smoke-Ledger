@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TextInput, View, StyleProp, ViewStyle, TextInputProps } from 'react-native';
 import { Text } from './Text';
 import { useTheme } from '@/hooks/useTheme';
-import { radius, spacing } from '@/constants/theme';
+import { radius, spacing, typography, fonts } from '@/constants/theme';
 
 export interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -17,14 +17,19 @@ export function Input({ label, hint, error, leftSlot, rightSlot, containerStyle,
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
 
-  const borderColor = error ? theme.danger : focused ? theme.accent : theme.border;
-  const glowOpacity = focused ? (theme.mode === 'dark' ? 0.25 : 0.15) : 0;
+  // Editorial: hairline border — danger on error, accent on focus, rule at rest
+  const borderColor = error ? theme.danger : focused ? theme.accent : theme.rule;
 
   return (
     <View style={[{ gap: spacing.xs }, containerStyle]}>
       {label ? (
-        <Text variant="caption" muted>
-          {label.toUpperCase()}
+        // Editorial caption label — uppercase, wide tracking, muted
+        <Text
+          variant="caption"
+          muted
+          style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+        >
+          {label}
         </Text>
       ) : null}
       <View
@@ -33,15 +38,10 @@ export function Input({ label, hint, error, leftSlot, rightSlot, containerStyle,
           alignItems: 'center',
           borderWidth: 1,
           borderColor,
-          borderRadius: radius.lg,
+          borderRadius: radius.md,
           backgroundColor: theme.bgElevated,
           paddingHorizontal: spacing.md,
-          minHeight: 50,
-          shadowColor: error ? theme.danger : theme.accent,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: glowOpacity,
-          shadowRadius: 10,
-          elevation: focused ? 2 : 0,
+          minHeight: 48,
         }}
       >
         {leftSlot ? <View style={{ marginRight: spacing.sm }}>{leftSlot}</View> : null}
@@ -50,7 +50,13 @@ export function Input({ label, hint, error, leftSlot, rightSlot, containerStyle,
           {...rest}
           onFocus={(e) => { setFocused(true); onFocus?.(e); }}
           onBlur={(e) => { setFocused(false); onBlur?.(e); }}
-          style={{ flex: 1, color: theme.text, fontSize: 15, paddingVertical: spacing.sm }}
+          style={{
+            flex: 1,
+            color: theme.text,
+            fontFamily: fonts.body,
+            fontSize: typography.body.fontSize,
+            paddingVertical: spacing.sm,
+          }}
         />
         {rightSlot ? <View style={{ marginLeft: spacing.sm }}>{rightSlot}</View> : null}
       </View>

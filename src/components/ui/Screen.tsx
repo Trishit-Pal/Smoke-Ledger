@@ -12,6 +12,8 @@ export interface ScreenProps {
   refreshing?: boolean;
   onRefresh?: () => void;
   noPadding?: boolean;
+  /** Optional masthead area rendered above the scroll content (e.g. with PaperNoise overlay) */
+  masthead?: React.ReactNode;
 }
 
 export function Screen({
@@ -22,6 +24,7 @@ export function Screen({
   refreshing,
   onRefresh,
   noPadding,
+  masthead,
 }: ScreenProps) {
   const theme = useTheme();
   const pad = noPadding ? 0 : spacing.lg;
@@ -39,6 +42,8 @@ export function Screen({
         barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme.bg}
       />
+      {/* Optional masthead slot — hosts PaperNoise or page headers */}
+      {masthead ?? null}
       {scroll ? (
         <ScrollView
           contentContainerStyle={{ paddingBottom: spacing.xxxl }}
