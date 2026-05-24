@@ -1,20 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, Pressable, TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
-import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
+import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
-import { StatTile } from '@/components/ui/StatTile';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { AnimatedBarChart } from '@/components/charts/AnimatedBarChart';
-import { FactsCarousel } from '@/components/ui/FactsCarousel';
+import { Divider } from '@/components/ui/Divider';
 import { HealthMilestones } from '@/components/ui/HealthMilestones';
+import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
-import { Tilt } from '@/components/anim/Tilt';
-import { Pulse } from '@/components/anim/Pulse';
-import { spacing } from '@/constants/theme';
+import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
+import { spacing, typography, fonts, radius } from '@/constants/theme';
 import { useSession } from '@/store/session';
 import { useTheme } from '@/hooks/useTheme';
 import {
@@ -31,12 +28,328 @@ import { potentialSavings } from '@/domain/savings';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { formatInr, formatDelta } from '@/lib/format';
-import { isHomeTotalsHidden } from '@/lib/discreet';
+import { isHomeTotalsHidden, maskBrandName, maskInr } from '@/lib/discreet';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { success } from '@/lib/haptics';
+import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function headlineDeck(opts: {
+  todaySticks: number;
+  baseline: number | null | undefined;
+  streak: number;
+  hidden: boolean;
+}): string {
+  if (opts.hidden) return 'Today — totals hidden.';
+  const { todaySticks, baseline, streak } = opts;
+  if (todaySticks === 0) {
+    if (streak >= 7) return `Smoke-free for ${streak} days. Quiet day.`;
+    if (streak >= 1) return `${streak === 1 ? 'A day' : `${streak} days`} smoke-free so far.`;
+    return 'Nothing logged yet today.';
+  }
+  if (todaySticks === 1) return 'One cigarette today.';
+  if (baseline && baseline > 0) {
+    if (todaySticks < baseline) return `${todaySticks} today — below your usual.`;
+    if (todaySticks === baseline) return `${todaySticks} today — at your usual.`;
+    return `${todaySticks} today — above your usual.`;
+  }
+  return `${todaySticks} today.`;
+}
+
+function trendTone(deltaPct: number): 'up' | 'down' | 'flat' {
+  if (!Number.isFinite(deltaPct)) return 'flat';
+  if (deltaPct > 2) return 'up';
+  if (deltaPct < -2) return 'down';
+  return 'flat';
+}
+
+// ─── WeekInkPanel — inverted bar chart section ──────────────────────────────
+
+interface WeekBar { label: string; value: number; }
+
+interface WeekInkPanelProps {
+  data: WeekBar[];
+  hidden: boolean;
+}
+
+function WeekInkPanel({ data, hidden }: WeekInkPanelProps) {
+  const theme = useTheme();
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const last = data.length - 1;
+
+  return (
+    <View
+      style={{
+        backgroundColor: theme.inkSurface,
+        borderRadius: radius.xl,
+        padding: spacing.xl,
+        gap: spacing.lg,
+      }}
+    >
+      {/* Section header */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Text
+          variant="caption"
+          style={{
+            textTransform: 'uppercase',
+            letterSpacing: 1.6,
+            color: theme.inkSurfaceMuted,
+          }}
+        >
+          The week
+        </Text>
+        <Text
+          variant="caption"
+          style={{ color: theme.inkSurfaceMuted }}
+        >
+          Mon — Sun
+        </Text>
+      </View>
+
+      {/* Bar columns */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          height: 96,
+          gap: spacing.sm,
+        }}
+        accessible
+        accessibilityLabel={
+          hidden
+            ? 'Last seven days — counts hidden'
+            : `Last seven days: ${data.map((d) => `${d.label} ${d.value}`).join(', ')}`
+        }
+      >
+        {data.map((d, i) => {
+          const isToday = i === last;
+          const pct = hidden ? 0.3 : Math.max(0.06, d.value / max);
+          return (
+            <View key={`${d.label}-${i}`} style={{ flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
+              {/* Track */}
+              <View
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  width: 8,
+                  height: '100%',
+                  backgroundColor: theme.inkSurfaceRule,
+                  borderRadius: radius.pill,
+                  opacity: 0.35,
+                }}
+              />
+              {/* Fill */}
+              <View
+                aria-hidden
+                style={{
+                  width: 8,
+                  height: `${pct * 100}%`,
+                  backgroundColor: isToday ? theme.accent : 'rgba(230, 234, 239, 0.45)',
+                  borderRadius: radius.pill,
+                }}
+              />
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Day labels + values */}
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        {data.map((d, i) => {
+          const isToday = i === last;
+          return (
+            <View key={`lbl-${i}`} style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+              <Text
+                variant="caption"
+                style={{
+                  textTransform: 'uppercase',
+                  color: theme.inkSurfaceMuted,
+                  opacity: isToday ? 1 : 0.7,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {d.label}
+              </Text>
+              <Text
+                variant="caption"
+                style={{
+                  color: isToday ? theme.accent : theme.inkSurfaceMuted,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {hidden ? '••' : d.value}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ─── QuickLogRow — inline quick-log strip adapted from web QuickLogStrip ────
+
+interface QuickLogRowProps {
+  profile: UserProfile | null;
+  brands: (Brand & { variants: BrandVariant[] })[];
+  lastEntry: CigaretteLog | null;
+  pending: boolean;
+  error: string | null;
+  toast: string | null;
+  onLogLast: (qty: number) => void;
+  onLogBrand: (brand: Brand & { variants: BrandVariant[] }) => void;
+  onAdvanced: () => void;
+}
+
+function QuickLogRow({
+  profile,
+  brands,
+  lastEntry,
+  pending,
+  error,
+  toast,
+  onLogLast,
+  onLogBrand,
+  onAdvanced,
+}: QuickLogRowProps) {
+  const theme = useTheme();
+  const discreet = profile?.discreetMode ?? false;
+
+  const favorites = useMemo(
+    () =>
+      [...brands]
+        .filter((b) => b.isFavorite)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 4),
+    [brands],
+  );
+
+  const noBrands = brands.length === 0;
+  const canRepeatLast = Boolean(lastEntry?.brandId);
+
+  const lastBrandLabel = lastEntry
+    ? `${maskBrandName(lastEntry.brandNameSnap ?? 'Unknown', discreet)}${lastEntry.variantSnap ? ` · ${lastEntry.variantSnap}` : ''}`
+    : null;
+
+  const lastPrice =
+    lastEntry?.unitPriceInr != null
+      ? maskInr(lastEntry.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      : null;
+
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {/* Deck line — last entry */}
+      <Text variant="small">
+        {lastBrandLabel ? (
+          <>
+            <Text variant="small" faint>Last: </Text>
+            <Text variant="small">{lastBrandLabel}</Text>
+            {lastPrice ? <Text variant="small" faint> · {lastPrice}</Text> : null}
+          </>
+        ) : (
+          <Text variant="small" style={{ fontStyle: 'italic' }} muted>
+            No cigarettes logged yet.
+          </Text>
+        )}
+      </Text>
+
+      {noBrands ? (
+        <Button
+          title="Add a brand to start logging →"
+          variant="primary"
+          onPress={onAdvanced}
+        />
+      ) : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
+          {/* Primary action: log last brand */}
+          <Button
+            title={pending ? 'Logging…' : 'Log one'}
+            variant="primary"
+            size="md"
+            disabled={pending || !canRepeatLast}
+            loading={pending}
+            onPress={() => onLogLast(1)}
+            accessibilityLabel={canRepeatLast ? 'Log one cigarette (repeat last)' : 'Log a full entry first to enable quick log'}
+          />
+          {/* +2 */}
+          <Button
+            title="+2"
+            variant="secondary"
+            size="md"
+            disabled={pending || !canRepeatLast}
+            onPress={() => onLogLast(2)}
+          />
+
+          {/* Favorite brand chips */}
+          {favorites.length > 0 ? (
+            <>
+              <Text variant="caption" faint>·</Text>
+              {favorites.map((brand) => {
+                const isLast = lastEntry?.brandId === brand.id;
+                return (
+                  <Pressable
+                    key={brand.id}
+                    onPress={() => onLogBrand(brand)}
+                    disabled={pending}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isLast }}
+                    accessibilityLabel={`Log one ${maskBrandName(brand.name, discreet)}`}
+                    style={({ pressed }) => ({ opacity: pressed || pending ? 0.55 : 1 })}
+                  >
+                    <Text
+                      variant="small"
+                      color={isLast ? theme.accent : theme.textMuted}
+                      style={{ textDecorationLine: 'underline', textDecorationColor: theme.ruleStrong }}
+                    >
+                      {maskBrandName(brand.name, discreet)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </>
+          ) : null}
+        </View>
+      )}
+
+      {/* Nudge when no last brand and no favorites */}
+      {!noBrands && !canRepeatLast && favorites.length === 0 ? (
+        <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
+          Pick a brand on the full entry to log your first stick.
+        </Text>
+      ) : null}
+
+      {/* Toast / error feedback */}
+      {toast ? (
+        <Text variant="small" color={theme.accent}>{toast}</Text>
+      ) : null}
+      {error ? (
+        <Text variant="small" color={theme.warnEarth}>{error}</Text>
+      ) : null}
+
+      {/* Add-details link */}
+      <Pressable
+        onPress={onAdvanced}
+        accessibilityRole="link"
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, alignSelf: 'flex-start' })}
+      >
+        <Text
+          variant="small"
+          muted
+          style={{ textDecorationLine: 'underline', textDecorationColor: theme.ruleStrong }}
+        >
+          Add details →
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Home ────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const router = useRouter();
@@ -44,21 +357,30 @@ export default function Home() {
   const logs = useSession((s) => s.logs);
   const profile = useSession((s) => s.profile);
   const goals = useSession((s) => s.goals);
+  const brands = useSession((s) => s.brands);
   const refreshLogs = useSession((s) => s.refreshLogs);
+
   const [refreshing, setRefreshing] = useState(false);
+  const [quickLogPending, setQuickLogPending] = useState(false);
   const [quickLogError, setQuickLogError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const today = todayIst();
   const last7Start = daysAgoIst(6);
 
+  // ── computed ──
   const todaySticks = useMemo(() => sticksOn(logs, today), [logs, today]);
   const todaySpend = useMemo(() => spendOn(logs, today), [logs, today]);
+  const avgPerDay = useMemo(() => rollingAvgSticks(logs, today, 7), [logs, today]);
+  const trend = useMemo(() => trendVsBaseline(logs, today, 7, 30), [logs, today]);
   const weekBars = useMemo(() => {
     const stats = dailyStats(logs, last7Start, today);
-    return stats.map((s) => ({ label: dayOfWeekShort(s.date).slice(0, 2), value: s.sticks }));
+    return stats.map((s) => ({
+      label: dayOfWeekShort(s.date).slice(0, 1).toUpperCase(),
+      value: s.sticks,
+    }));
   }, [logs, last7Start, today]);
 
-  const trend = useMemo(() => trendVsBaseline(logs, today, 7, 30), [logs, today]);
   const forecast = useMemo(() => forecastMonthlySpend(logs, today), [logs, today]);
   const insights = useMemo(() => generateInsights(logs, today), [logs, today]);
   const last = useMemo(() => lastLog(logs), [logs]);
@@ -74,21 +396,50 @@ export default function Home() {
     });
   }, [logs, profile]);
 
-  const quickLog = async () => {
+  const activeGoal = goals[0] ?? null;
+  const goalProgress = useMemo(
+    () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
+    [activeGoal, logs, today],
+  );
+
+  const hidden = isHomeTotalsHidden(profile);
+
+  // ── trend colour ──
+  const tTone = trendTone(trend.deltaPct);
+  const trendColor =
+    tTone === 'up' ? theme.warnEarth : tTone === 'down' ? theme.accent : theme.textMuted;
+  const streakColor = streak >= 1 ? theme.accent : theme.text;
+
+  // ── deck text ──
+  const deck = headlineDeck({
+    todaySticks,
+    baseline: profile?.baselinePerDay,
+    streak,
+    hidden,
+  });
+
+  // ── quick log ──
+  const runQuickLog = async (opts: {
+    brandId: string | null;
+    brandName: string | null;
+    variantName: string | null;
+    quantity: number;
+  }) => {
     try {
       setQuickLogError(null);
+      setQuickLogPending(true);
       const lastL = logs[0];
-      const now = new Date().toISOString();
       const unit = lastL?.unitPriceInr ?? null;
+      const total = unit != null ? unit * opts.quantity : null;
       await createLog({
-        tsUtc: now,
-        brandId: lastL?.brandId ?? null,
-        brandNameSnap: lastL?.brandNameSnap ?? null,
-        variantSnap: lastL?.variantSnap ?? null,
-        quantity: 1,
+        tsUtc: new Date().toISOString(),
+        brandId: opts.brandId,
+        brandNameSnap: opts.brandName,
+        variantSnap: opts.variantName,
+        quantity: opts.quantity,
         purchaseMode: 'single',
         packSize: lastL?.packSize ?? null,
-        totalPriceInr: unit,
+        totalPriceInr: total,
         unitPriceInr: unit,
         priceSource: unit != null ? 'inferred' : 'unknown',
         triggerTag: null,
@@ -100,10 +451,36 @@ export default function Home() {
       });
       await track(AnalyticsEvents.QUICK_ADD_USED, {});
       success();
+      const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${formatInr(total, { compact: true })}` : ''}`;
+      setToast(label);
+      setTimeout(() => setToast(null), 2500);
       await refreshLogs();
     } catch (e) {
       setQuickLogError(e instanceof Error ? e.message : 'Could not save log. Pull to refresh and retry.');
+    } finally {
+      setQuickLogPending(false);
     }
+  };
+
+  const handleLogLast = (qty: number) => {
+    const lastL = logs[0];
+    if (!lastL?.brandId) return;
+    void runQuickLog({
+      brandId: lastL.brandId,
+      brandName: lastL.brandNameSnap ?? null,
+      variantName: lastL.variantSnap ?? null,
+      quantity: qty,
+    });
+  };
+
+  const handleLogBrand = (brand: Brand & { variants: BrandVariant[] }) => {
+    const variant = brand.variants[0];
+    void runQuickLog({
+      brandId: brand.id,
+      brandName: brand.name,
+      variantName: variant?.name ?? null,
+      quantity: 1,
+    });
   };
 
   const onRefresh = async () => {
@@ -115,190 +492,396 @@ export default function Home() {
     }
   };
 
-  const hidden = isHomeTotalsHidden(profile);
-  const avgPerDay = rollingAvgSticks(logs, today, 7);
-
   let i = 0;
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
+
+      {/* ── Masthead ── */}
       <FadeSlideIn index={i++}>
-        <View style={{ gap: spacing.xs }}>
-          <Text variant="caption" muted>
-            {formatIndianDate(today).toUpperCase()}
+        <View style={{ position: 'relative', gap: spacing.xs, overflow: 'hidden' }}>
+          <PaperNoise />
+          {/* Rule + date centred */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+            <Text
+              variant="caption"
+              style={{ textTransform: 'uppercase', letterSpacing: 1.4, color: theme.textMuted }}
+            >
+              {formatIndianDate(today)}
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+          </View>
+          <Text
+            variant="small"
+            muted
+            style={{ textAlign: 'center', fontStyle: 'italic', fontFamily: fonts.displaySoft }}
+          >
+            Your daily ledger
           </Text>
-          <Text variant="display">Today</Text>
         </View>
       </FadeSlideIn>
 
+      {/* ── Hero numeral — today sticks + spend ── */}
       <FadeSlideIn index={i++}>
-        <Tilt>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <StatTile
-              label="Sticks"
-              value={String(todaySticks)}
-              animatedValue={todaySticks}
-              sublabel={`7-day avg ${avgPerDay.toFixed(1)}/day`}
-              hidden={hidden}
-            />
-            <StatTile
-              label="Spend"
-              value={formatInr(todaySpend, { compact: true })}
-              animatedValue={todaySpend}
-              formatAnimated={(n) => formatInr(n, { compact: true })}
-              sublabel={`Trend ${formatDelta(trend.deltaPct)}`}
-              tone={trend.deltaPct > 0 ? 'warn' : 'success'}
-              hidden={hidden}
-            />
+        <View style={{ gap: spacing.lg }}>
+          {/* Big numeral row */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.lg }}>
+            {/* Today sticks */}
+            <View style={{ gap: 4 }}>
+              <Text
+                variant="caption"
+                style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+              >
+                Today
+              </Text>
+              {hidden ? (
+                <Text
+                  style={[
+                    typography.display as TextStyle,
+                    { fontSize: 56, lineHeight: 60, letterSpacing: -1, fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
+                  ]}
+                >
+                  ••
+                </Text>
+              ) : (
+                <AnimatedNumber
+                  value={todaySticks}
+                  style={[
+                    typography.display as TextStyle,
+                    { fontSize: 56, lineHeight: 60, letterSpacing: -1, fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
+                  ]}
+                  accessibilityLabel={`Today's count: ${todaySticks} ${todaySticks === 1 ? 'cigarette' : 'cigarettes'}`}
+                />
+              )}
+            </View>
+            {/* Spend — right-aligned, smaller numeral */}
+            <View style={{ gap: 4, alignItems: 'flex-end', paddingBottom: 6 }}>
+              <Text
+                variant="caption"
+                style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+              >
+                Spend
+              </Text>
+              {hidden ? (
+                <Text
+                  style={[
+                    typography.h1 as TextStyle,
+                    { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
+                  ]}
+                >
+                  •••
+                </Text>
+              ) : (
+                <AnimatedNumber
+                  value={todaySpend}
+                  format={(n) => formatInr(n, { compact: true })}
+                  style={[
+                    typography.h1 as TextStyle,
+                    { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
+                  ]}
+                  accessibilityLabel={`Spent today: ${formatInr(todaySpend)}`}
+                />
+              )}
+            </View>
           </View>
-        </Tilt>
-      </FadeSlideIn>
 
-      <FadeSlideIn index={i++}>
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <View style={{ flex: 1 }}>
-            <Pulse active={streak >= 1}>
-              <Button title="Quick add +1" variant="primary" fullWidth onPress={quickLog} />
-            </Pulse>
-          </View>
-          <Button
-            title="Details"
-            variant="secondary"
-            onPress={() => router.push('/log/new')}
-            style={{ flex: 1 }}
+          {/* Deck copy */}
+          <Text variant="body" muted>{deck}</Text>
+
+          {/* Rule + Quick log strip */}
+          <Divider strong />
+          <QuickLogRow
+            profile={profile}
+            brands={brands}
+            lastEntry={last}
+            pending={quickLogPending}
+            error={quickLogError}
+            toast={toast}
+            onLogLast={handleLogLast}
+            onLogBrand={handleLogBrand}
+            onAdvanced={() => router.push('/log/new')}
           />
         </View>
-        {quickLogError ? (
-          <Text variant="small" color={theme.danger} style={{ marginTop: spacing.xs }}>
-            {quickLogError}
-          </Text>
-        ) : null}
       </FadeSlideIn>
 
-      {goals.length === 0 ? null : (
+      {/* ── Ledger — typographic rows ── */}
+      <FadeSlideIn index={i++}>
+        <View style={{ gap: 0 }}>
+          <Text
+            variant="caption"
+            style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted, marginBottom: spacing.md }}
+          >
+            The ledger
+          </Text>
+
+          {/* Row: 7-day average */}
+          <View style={{ paddingVertical: spacing.md, gap: 2 }}>
+            <Divider strong />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: spacing.md }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="body">Seven-day average</Text>
+                <Text variant="small" muted>
+                  Trend{' '}
+                  <Text variant="small" color={trendColor}>
+                    {formatDelta(trend.deltaPct)}
+                  </Text>
+                  {' '}vs your 30-day baseline
+                </Text>
+              </View>
+              {hidden ? (
+                <Text
+                  style={[typography.h1 as TextStyle, { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] }]}
+                >
+                  ••
+                </Text>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                  <AnimatedNumber
+                    value={avgPerDay}
+                    format={(n) => n.toFixed(1)}
+                    style={[typography.h1 as TextStyle, { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] }]}
+                    accessibilityLabel={`Seven-day average: ${avgPerDay.toFixed(1)} per day`}
+                  />
+                  <Text variant="small" faint>/d</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Row: Smoke-free streak */}
+          <View style={{ paddingVertical: spacing.md, gap: 2 }}>
+            <Divider />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: spacing.md }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="body">Smoke-free streak</Text>
+                <Text variant="small" muted>
+                  {last ? `Last logged ${formatIndianDate(last.localDate)}` : 'No logs yet'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                <Text
+                  style={[typography.h1 as TextStyle, { fontFamily: fonts.display, color: streakColor, fontVariant: ['tabular-nums'] }]}
+                  accessibilityLabel={`Smoke-free streak: ${streak} ${streak === 1 ? 'day' : 'days'}`}
+                >
+                  {streak}
+                </Text>
+                <Text variant="small" faint>d</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </FadeSlideIn>
+
+      {/* ── Goal verse ── */}
+      {goalProgress ? (
         <FadeSlideIn index={i++}>
-          <Card>
-            <View style={{ gap: spacing.sm }}>
-              <Text variant="bodyStrong">Active goal</Text>
-              {goals.slice(0, 1).map((g) => {
-                const p = evaluateGoal(g, logs, today);
-                const tone = p.atRisk ? 'warn' : !p.isOnTrack ? 'danger' : 'default';
-                return (
-                  <View key={g.id} style={{ gap: spacing.xs }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text variant="small">{p.label}</Text>
-                      <Text variant="small" muted>
-                        {p.unit === 'inr'
-                          ? `${formatInr(p.valueCurrent)} / ${formatInr(p.valueTarget)}`
-                          : `${p.valueCurrent} / ${p.valueTarget}`}
-                      </Text>
-                    </View>
-                    <ProgressBar value={p.percent} tone={tone} />
-                    <Text variant="caption" muted>
-                      {p.explanation}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </Card>
-        </FadeSlideIn>
-      )}
-
-      <FadeSlideIn index={i++}>
-        <Card>
-          <View style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="bodyStrong">Last 7 days</Text>
-              <Text variant="caption" muted>
-                STICKS / DAY
+          <View style={{ gap: spacing.sm }}>
+            <Text
+              variant="caption"
+              style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+            >
+              Your goal
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: spacing.xs }}>
+              <Text
+                variant="h2"
+                style={{ fontFamily: fonts.display }}
+              >
+                {goalProgress.label}
+              </Text>
+              <Text variant="h2" faint> · </Text>
+              <Text
+                variant="h2"
+                color={
+                  goalProgress.atRisk
+                    ? theme.warnEarth
+                    : goalProgress.isOnTrack
+                    ? theme.accent
+                    : theme.textMuted
+                }
+                style={{ fontVariant: ['tabular-nums'] }}
+              >
+                {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
               </Text>
             </View>
-            {weekBars.some((b) => b.value > 0) ? (
-              <AnimatedBarChart data={weekBars} height={140} />
-            ) : (
-              <Text variant="small" muted>
-                Log a few entries to see your pattern.
-              </Text>
-            )}
+            <ProgressBar
+              value={goalProgress.percent}
+              tone={goalProgress.atRisk ? 'warn' : goalProgress.isOnTrack ? 'success' : 'default'}
+              height={2}
+            />
+            {goalProgress.explanation ? (
+              <Text variant="small" muted>{goalProgress.explanation}</Text>
+            ) : null}
           </View>
-        </Card>
-      </FadeSlideIn>
+        </FadeSlideIn>
+      ) : null}
 
+      {/* ── The week — inverted ink panel ── */}
+      {logs.length > 0 ? (
+        <FadeSlideIn index={i++}>
+          <WeekInkPanel data={weekBars} hidden={hidden} />
+        </FadeSlideIn>
+      ) : null}
+
+      {/* ── Body recovery / health milestones ── */}
       <FadeSlideIn index={i++}>
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <StatTile
-            label="Smoke-free streak"
-            value={`${streak}d`}
-            sublabel="Consecutive smoke-free days"
-          />
-          <StatTile
-            label="Month forecast"
-            value={formatInr(forecast.forecast, { compact: true })}
-            animatedValue={forecast.forecast}
-            formatAnimated={(n) => formatInr(n, { compact: true })}
-            sublabel={`${forecast.daysElapsed}/${forecast.daysInMonth} days elapsed`}
-            hidden={hidden}
-          />
+        <View style={{ gap: spacing.md }}>
+          <Text
+            variant="caption"
+            style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+          >
+            Body recovery
+          </Text>
+          <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </View>
       </FadeSlideIn>
 
-      <FadeSlideIn index={i++}>
-        <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
-      </FadeSlideIn>
+      {/* ── Editor's note — single insight ── */}
+      {insights.length > 0 ? (
+        <FadeSlideIn index={i++}>
+          <View style={{ gap: spacing.md }}>
+            <Text
+              variant="caption"
+              style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+            >
+              From your week
+            </Text>
+            {/* Blockquote: left border + Fraunces headline */}
+            <View
+              style={{
+                borderLeftWidth: 2,
+                borderLeftColor: theme.ruleStrong,
+                paddingLeft: spacing.lg,
+                gap: spacing.xs,
+              }}
+            >
+              <Text
+                style={[
+                  typography.h2 as TextStyle,
+                  { fontFamily: fonts.displaySoft, color: theme.text, lineHeight: 28 },
+                ]}
+              >
+                {insights[0].title}
+              </Text>
+              {insights[0].explanation ? (
+                <Text variant="body" muted>{insights[0].explanation}</Text>
+              ) : null}
+            </View>
+          </View>
+        </FadeSlideIn>
+      ) : null}
 
+      {/* ── Savings + Monthly forecast ── */}
       {savings && savings.totalInr > 0 ? (
         <FadeSlideIn index={i++}>
           <Card>
-            <View style={{ gap: spacing.xs }}>
-              <Text variant="caption" muted>
-                POTENTIAL SAVINGS
-              </Text>
-              <Text variant="h1" color={theme.success}>
-                {formatInr(savings.totalInr, { compact: true })}
-              </Text>
-              <Text variant="small" muted>
-                Based on {savings.sticksAvoided} sticks below baseline × average unit price{' '}
-                {formatInr(savings.avgUnitPriceUsed)}.
-              </Text>
+            <View style={{ gap: spacing.md }}>
+              {/* Savings */}
+              <View style={{ gap: spacing.xs }}>
+                <Text
+                  variant="caption"
+                  style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+                >
+                  Potential savings
+                </Text>
+                <AnimatedNumber
+                  value={savings.totalInr}
+                  format={(n) => formatInr(n, { compact: true })}
+                  style={[
+                    typography.h1 as TextStyle,
+                    { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
+                  ]}
+                />
+                <Text variant="small" muted>
+                  {savings.sticksAvoided} sticks below baseline × avg unit price {formatInr(savings.avgUnitPriceUsed)}
+                </Text>
+              </View>
+
+              <Divider />
+
+              {/* Monthly forecast */}
+              <View style={{ gap: spacing.xs }}>
+                <Text
+                  variant="caption"
+                  style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+                >
+                  Month forecast
+                </Text>
+                {hidden ? (
+                  <Text style={[typography.h1 as TextStyle, { fontFamily: fonts.display, color: theme.text }]}>
+                    •••
+                  </Text>
+                ) : (
+                  <AnimatedNumber
+                    value={forecast.forecast}
+                    format={(n) => formatInr(n, { compact: true })}
+                    style={[
+                      typography.h1 as TextStyle,
+                      { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
+                    ]}
+                  />
+                )}
+                <Text variant="small" muted>
+                  {forecast.daysElapsed}/{forecast.daysInMonth} days elapsed
+                </Text>
+              </View>
             </View>
           </Card>
         </FadeSlideIn>
       ) : null}
 
-      <FadeSlideIn index={i++}>
-        <FactsCarousel count={5} />
-      </FadeSlideIn>
-
-      {insights.length > 0 ? (
+      {/* ── Empty state ── */}
+      {logs.length === 0 ? (
         <FadeSlideIn index={i++}>
-          <View style={{ gap: spacing.sm }}>
-            <Text variant="h3">Patterns we noticed</Text>
-            {insights.slice(0, 3).map((ins) => (
-              <Card key={ins.id}>
-                <View style={{ gap: spacing.xs }}>
-                  <Text variant="bodyStrong">{ins.title}</Text>
-                  <Text variant="small" muted>
-                    {ins.explanation}
-                  </Text>
-                  <Text variant="caption" muted>
-                    EVIDENCE — {ins.evidence}
-                  </Text>
-                </View>
-              </Card>
-            ))}
+          <View style={{ gap: spacing.sm, paddingTop: spacing.lg }}>
+            <Divider />
+            <Text
+              style={[
+                typography.h2 as TextStyle,
+                { fontFamily: fonts.displaySoft, color: theme.text, lineHeight: 28, paddingTop: spacing.lg },
+              ]}
+            >
+              No entries yet.
+            </Text>
+            <Text variant="body" muted style={{ maxWidth: 320 }}>
+              Logging one cigarette is enough to start seeing your spend, your cadence, and the days you skipped.
+            </Text>
+            <Button
+              title="Log your first"
+              variant="primary"
+              style={{ alignSelf: 'flex-start', marginTop: spacing.sm }}
+              onPress={() => router.push('/log/new')}
+            />
           </View>
         </FadeSlideIn>
-      ) : logs.length === 0 ? (
-        <FadeSlideIn index={i++}>
-          <EmptyState
-            title="Nothing logged yet"
-            description="Use Quick add or Details to record your first cigarette."
-            actionLabel="Log now"
-            onAction={() => router.push('/log/new')}
-          />
-        </FadeSlideIn>
       ) : null}
+
+      {/* ── Footer ── */}
+      <FadeSlideIn index={i++}>
+        <View style={{ paddingTop: spacing.md, gap: 0 }}>
+          <Divider />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md }}>
+            <Pressable
+              onPress={() => router.push('/log')}
+              accessibilityRole="link"
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <Text
+                variant="small"
+                muted
+                style={{ textDecorationLine: 'underline', textDecorationColor: theme.ruleStrong }}
+              >
+                View full history →
+              </Text>
+            </Pressable>
+            <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
+              Quiet, on purpose.
+            </Text>
+          </View>
+        </View>
+      </FadeSlideIn>
+
     </Screen>
   );
 }
