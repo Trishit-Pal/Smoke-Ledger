@@ -35,13 +35,13 @@ export function BarChart({ data, height = 160, formatY, showLabels = true, empha
     <View onLayout={onLayout} style={{ width: '100%', height }}>
       {w > 0 ? (
         <Svg width={w} height={height}>
-          {/* gridline */}
+          {/* gridlines — baseline uses ruleStrong, mid uses rule (dashed hairline) */}
           <Line
             x1={padL}
             x2={w - padR}
             y1={padT + chartH}
             y2={padT + chartH}
-            stroke={theme.border}
+            stroke={theme.ruleStrong}
             strokeWidth={1}
           />
           <Line
@@ -49,11 +49,11 @@ export function BarChart({ data, height = 160, formatY, showLabels = true, empha
             x2={w - padR}
             y1={padT + chartH / 2}
             y2={padT + chartH / 2}
-            stroke={theme.border}
+            stroke={theme.rule}
             strokeDasharray="2,3"
             strokeWidth={1}
           />
-          <SvgText x={4} y={padT + 10} fill={theme.textMuted} fontSize={10}>
+          <SvgText x={4} y={padT + 10} fill={theme.text} fontSize={10}>
             {formatY ? formatY(max) : String(max)}
           </SvgText>
           {data.map((d, i) => {
@@ -62,7 +62,7 @@ export function BarChart({ data, height = 160, formatY, showLabels = true, empha
             const y = padT + chartH - h;
             const isLast = i === data.length - 1;
             const fill = theme.accent;
-            const opacity = emphasizeLast && isLast ? 1 : 0.55;
+            const opacity = emphasizeLast && isLast ? 1 : 0.62;
             return (
               <React.Fragment key={`${d.label}-${i}`}>
                 <Rect x={x} y={y} width={barW} height={Math.max(1, h)} rx={3} fill={fill} opacity={opacity} />
@@ -70,7 +70,7 @@ export function BarChart({ data, height = 160, formatY, showLabels = true, empha
                   <SvgText
                     x={x + barW / 2}
                     y={height - 6}
-                    fill={theme.textMuted}
+                    fill={theme.text}
                     fontSize={10}
                     textAnchor="middle"
                   >

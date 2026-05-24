@@ -63,6 +63,8 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
           {grid.map((row, dow) =>
             row.map((v, h) => {
               const intensity = v / max;
+              // Empty cells use the rule token (hairline color) at a fixed low opacity;
+              // active cells ramp from theme.accent at 0.18 up to 1.0 — mirrors web heatmap.
               return (
                 <Rect
                   key={`${dow}-${h}`}
@@ -71,8 +73,8 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
                   width={Math.max(1, cellW - 1)}
                   height={Math.max(1, cellH - 1)}
                   rx={2}
-                  fill={theme.accent}
-                  opacity={v === 0 ? 0.06 : 0.18 + 0.8 * intensity}
+                  fill={v === 0 ? theme.rule : theme.accent}
+                  opacity={v === 0 ? 0.5 : 0.18 + 0.8 * intensity}
                 />
               );
             }),
@@ -82,7 +84,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
               key={i}
               x={4}
               y={padT + i * cellH + cellH / 2 + 3}
-              fill={theme.textMuted}
+              fill={theme.text}
               fontSize={9}
             >
               {l}
@@ -93,7 +95,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
               key={h}
               x={padL + h * cellW}
               y={height - 4}
-              fill={theme.textMuted}
+              fill={theme.text}
               fontSize={9}
             >
               {`${h}h`}

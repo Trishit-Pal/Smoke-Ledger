@@ -43,17 +43,18 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
     <View onLayout={onLayout} style={{ width: '100%', height }}>
       {w > 0 ? (
         <Svg width={w} height={height}>
-          <Line x1={padL} x2={w - padR} y1={padT + chartH} y2={padT + chartH} stroke={theme.border} strokeWidth={1} />
+          {/* gridlines — baseline uses ruleStrong, mid uses rule (dashed hairline) */}
+          <Line x1={padL} x2={w - padR} y1={padT + chartH} y2={padT + chartH} stroke={theme.ruleStrong} strokeWidth={1} />
           <Line
             x1={padL}
             x2={w - padR}
             y1={padT + chartH / 2}
             y2={padT + chartH / 2}
-            stroke={theme.border}
+            stroke={theme.rule}
             strokeDasharray="2,3"
             strokeWidth={1}
           />
-          <SvgText x={4} y={padT + 10} fill={theme.textMuted} fontSize={10}>
+          <SvgText x={4} y={padT + 10} fill={theme.text} fontSize={10}>
             {formatY ? formatY(max) : String(max)}
           </SvgText>
           <Path d={path} fill="none" stroke={strokeColor ?? theme.accent} strokeWidth={2} />

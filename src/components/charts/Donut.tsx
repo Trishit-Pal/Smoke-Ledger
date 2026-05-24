@@ -34,7 +34,7 @@ export function Donut({ slices, size = 140, thickness = 16, centerLabel, centerV
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke={theme.border}
+              stroke={theme.rule}
               strokeWidth={thickness}
               fill="transparent"
             />
