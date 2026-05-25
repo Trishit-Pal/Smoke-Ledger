@@ -1,18 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, Switch, Alert, Linking } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Switch, Alert, Linking, Pressable, TextInput, AccessibilityInfo } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Divider';
-import { Input } from '@/components/ui/Input';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Chip } from '@/components/ui/Chip';
-import { spacing } from '@/constants/theme';
+import { spacing, typography, fonts, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useSession } from '@/store/session';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSetting, setSetting } from '@/db/repositories/settings';
@@ -33,21 +32,279 @@ import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
 import type { Brand } from '@/types';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type BusyAction =
+  | null
+  | 'save-baseline'
+  | 'signout'
+  | 'export-json'
+  | 'erase-all'
+  | 'delete-account'
+  | 'toggle-discreet'
+  | 'toggle-hide'
+  | 'toggle-analytics'
+  | 'add-brand';
+
+// ─── Small-caps section caption + deck ────────────────────────────────────────
+
+interface SectionHeadProps {
+  caption: string;
+  deck: string;
+  accessibilityLabel?: string;
+}
+
+function SectionHead({ caption, deck, accessibilityLabel }: SectionHeadProps) {
+  const theme = useTheme();
+  return (
+    <View style={{ gap: spacing.xs }} accessible accessibilityLabel={accessibilityLabel ?? caption}>
+      <Text
+        variant="caption"
+        color={theme.textMuted}
+        style={{ textTransform: 'uppercase', letterSpacing: 1.8 }}
+      >
+        {caption}
+      </Text>
+      <Text variant="small" muted style={{ maxWidth: 320 }}>
+        {deck}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Hairline preference row ──────────────────────────────────────────────────
+
+interface PrefRowProps {
+  label: string;
+  sublabel?: string;
+  control: React.ReactNode;
+  strongRule?: boolean;
+  /** When true, renders the top border as a strong rule (used on first rows) */
+}
+
+function PrefRow({ label, sublabel, control, strongRule = false }: PrefRowProps) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: strongRule ? theme.ruleStrong : theme.rule,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        paddingVertical: spacing.md,
+        gap: spacing.md,
+      }}
+    >
+      <View style={{ flex: 1, gap: spacing.xs }}>
+        <Text variant="body">{label}</Text>
+        {sublabel ? (
+          <Text variant="small" muted style={{ maxWidth: 280 }}>
+            {sublabel}
+          </Text>
+        ) : null}
+      </View>
+      <View style={{ flexShrink: 0, alignItems: 'flex-end', justifyContent: 'center', paddingTop: 2 }}>
+        {control}
+      </View>
+    </View>
+  );
+}
+
+// ─── Editorial switch (native Switch with editorial track/thumb colours) ──────
+
+interface EditorialSwitchProps {
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  disabled?: boolean;
+  accessibilityLabel: string;
+}
+
+function EditorialSwitch({ value, onValueChange, disabled, accessibilityLabel }: EditorialSwitchProps) {
+  const theme = useTheme();
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
+      trackColor={{ false: theme.rule, true: theme.accent }}
+      thumbColor={value ? theme.bg : theme.textFaint}
+      ios_backgroundColor={theme.rule}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+    />
+  );
+}
+
+// ─── Text-link control ────────────────────────────────────────────────────────
+
+interface TextLinkProps {
+  onPress: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  destructive?: boolean;
+  accessibilityLabel?: string;
+  children: string;
+}
+
+function TextLink({ onPress, disabled, busy, destructive, accessibilityLabel, children }: TextLinkProps) {
+  const theme = useTheme();
+  const color = destructive ? theme.warnEarth : theme.text;
+  const isDisabled = disabled || busy;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? children}
+      accessibilityState={{ disabled: !!isDisabled, busy: !!busy }}
+      style={{ opacity: isDisabled ? 0.5 : 1, minHeight: 32, justifyContent: 'center' }}
+    >
+      <Text
+        variant="small"
+        color={color}
+        style={{ textDecorationLine: 'underline', textDecorationColor: color }}
+      >
+        {busy ? `${children.replace(/…$/, '')}…` : children}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ─── Stagger-entry animated section wrapper ───────────────────────────────────
+
+interface StageProps {
+  index: number;
+  reduce: boolean;
+  children: React.ReactNode;
+}
+
+function Stage({ index, reduce, children }: StageProps) {
+  if (reduce) {
+    return <View>{children}</View>;
+  }
+  return (
+    <Animated.View entering={FadeIn.delay(index * 80).duration(260)}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ─── Inline baseline editor ───────────────────────────────────────────────────
+
+interface BaselineSectionProps {
+  initialBaseline: string;
+  busy: BusyAction;
+  reduce: boolean;
+  onSave: (value: string, onDone: () => void) => void;
+}
+
+function BaselineSection({ initialBaseline, busy, reduce, onSave }: BaselineSectionProps) {
+  const theme = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initialBaseline);
+  const inputRef = useRef<TextInput>(null);
+
+  const isBusy = busy === 'save-baseline';
+  const isAnyBusy = busy !== null;
+
+  const handleEdit = () => {
+    setDraft(initialBaseline);
+    setEditing(true);
+  };
+
+  const handleCancel = () => {
+    setDraft(initialBaseline);
+    setEditing(false);
+  };
+
+  const handleSave = () => {
+    onSave(draft, () => setEditing(false));
+  };
+
+  const displayValue = initialBaseline === '' ? '—' : initialBaseline;
+
+  return (
+    <PrefRow
+      strongRule
+      label="Baseline per day"
+      sublabel="Your typical day before quitting."
+      control={
+        editing ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <TextInput
+              ref={inputRef}
+              value={draft}
+              onChangeText={setDraft}
+              keyboardType="number-pad"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
+              accessibilityLabel="Baseline sticks per day"
+              placeholder="e.g. 10"
+              placeholderTextColor={theme.textFaint}
+              style={{
+                width: 64,
+                color: theme.text,
+                fontFamily: fonts.body,
+                fontSize: typography.small.fontSize,
+                textAlign: 'right',
+                borderBottomWidth: 1,
+                borderBottomColor: theme.ruleStrong,
+                paddingVertical: spacing.xs,
+              }}
+            />
+            <TextLink onPress={handleSave} busy={isBusy} disabled={isAnyBusy} accessibilityLabel="Save baseline">
+              Save
+            </TextLink>
+            <TextLink onPress={handleCancel} disabled={isAnyBusy}>
+              Cancel
+            </TextLink>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text
+              variant="small"
+              color={initialBaseline === '' ? theme.textFaint : theme.text}
+              style={{ fontFamily: fonts.bodyMedium, minWidth: 24, textAlign: 'right' }}
+            >
+              {displayValue}
+              {initialBaseline !== '' ? (
+                <Text variant="caption" faint>
+                  {' /d'}
+                </Text>
+              ) : null}
+            </Text>
+            <TextLink onPress={handleEdit} disabled={isAnyBusy} accessibilityLabel="Edit baseline">
+              Edit
+            </TextLink>
+          </View>
+        )
+      }
+    />
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function Settings() {
   const theme = useTheme();
   const router = useRouter();
+  const reduce = useReduceMotion();
+
   const profile = useSession((s) => s.profile);
   const booted = useSession((s) => s.booted);
   const refreshProfile = useSession((s) => s.refreshProfile);
   const refreshBrands = useSession((s) => s.refreshBrands);
   const boot = useSession((s) => s.boot);
-  const [baseline, setBaseline] = useState<string>(
-    profile?.baselinePerDay != null ? String(profile.baselinePerDay) : '',
-  );
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+
   const [analyticsOptIn, setAnalyticsOptIn] = useState(false);
+  const [busy, setBusy] = useState<BusyAction>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
+
+  // Brand form
+  const [showAddBrand, setShowAddBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
   const [newVariantName, setNewVariantName] = useState('Regular');
   const [newPackSize, setNewPackSize] = useState('20');
@@ -55,37 +312,57 @@ export default function Settings() {
   const [newCategory, setNewCategory] = useState<Brand['category']>('regular');
 
   useEffect(() => {
-    (async () => {
+    let mounted = true;
+    void (async () => {
       const value = await getSetting<boolean>('consent.analyticsOptIn');
-      setAnalyticsOptIn(value === true);
+      if (mounted) setAnalyticsOptIn(value === true);
     })();
+    return () => { mounted = false; };
   }, []);
 
-  const toggle = async (key: keyof NonNullable<typeof profile>, value: boolean) => {
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+
+  const saveBaseline = async (draft: string, onDone: () => void) => {
+    setBusy('save-baseline');
+    setError(null);
     try {
-      await updateProfile({ [key]: value } as any);
+      const parsed = draft.trim() === '' ? null : Number(draft);
+      if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
+        throw new Error('Baseline must be a valid number.');
+      }
+      await updateProfile({ baselinePerDay: parsed });
       await refreshProfile();
+      onDone();
     } catch (e) {
-      Alert.alert('Update failed', toSafeErrorMessage(e, 'dependency_failure'));
+      setError(toSafeErrorMessage(e, 'validation_error'));
+    } finally {
+      setBusy(null);
     }
   };
 
-  const saveBaseline = async () => {
-    setSaveError(null);
-    setSaving(true);
+  const toggleProfile = async (
+    key: 'discreetMode' | 'hideTotalsOnHome',
+    value: boolean,
+    actionKey: BusyAction,
+  ) => {
+    setBusy(actionKey);
+    setError(null);
     try {
-      const n = baseline === '' ? null : Number(baseline);
-      await updateProfile({ baselinePerDay: Number.isFinite(n as number) ? (n as number) : null });
+      await updateProfile({ [key]: value } as Record<string, boolean>);
       await refreshProfile();
+      if (key === 'discreetMode' && value) {
+        void track(AnalyticsEvents.DISCREET_MODE_ENABLED, { enabled: true });
+      }
     } catch (e) {
-      setSaveError(toSafeErrorMessage(e, 'validation_error'));
+      setError(toSafeErrorMessage(e, 'dependency_failure'));
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
   };
 
   const toggleAnalytics = async (value: boolean) => {
-    setBusy(true);
+    setBusy('toggle-analytics');
+    setError(null);
     try {
       await setSetting('consent.analyticsOptIn', value);
       const {
@@ -98,14 +375,16 @@ export default function Settings() {
       }
       setAnalyticsOptIn(value);
     } catch (e) {
-      Alert.alert('Update failed', toSafeErrorMessage(e, 'dependency_failure'));
+      setError(toSafeErrorMessage(e, 'dependency_failure'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   const exportData = async () => {
-    setBusy(true);
+    setBusy('export-json');
+    setError(null);
+    setExportWarning(null);
     try {
       const payload = await exportAccountData();
       const json = JSON.stringify(payload, null, 2);
@@ -123,17 +402,16 @@ export default function Settings() {
           'Sharing is unavailable on this device. The export file was saved to app cache.',
         );
       }
-      await track(AnalyticsEvents.EXPORT_REQUESTED, { format: 'json' });
+      void track(AnalyticsEvents.EXPORT_REQUESTED, { format: 'json' });
       if (payload.truncated) {
-        Alert.alert(
-          'Export may be incomplete',
-          'This file includes your most recent entries only. Older entries beyond the export limit were not included. Contact support if you need a full historical export.',
+        setExportWarning(
+          'This export includes your most recent entries only. Older entries beyond the export limit were not included. Contact support if you need a full historical export.',
         );
       }
     } catch (e) {
-      Alert.alert('Export failed', toSafeErrorMessage(e, 'dependency_failure'));
+      setError(toSafeErrorMessage(e, 'dependency_failure'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -143,50 +421,53 @@ export default function Settings() {
     const packSize = Number(newPackSize);
     const avgPrice = newAvgPrice.trim() === '' ? null : Number(newAvgPrice);
     if (!brandName) {
-      Alert.alert('Validation', 'Brand name is required.');
+      setError('Brand name is required.');
       return;
     }
     if (!Number.isFinite(packSize) || packSize < 1) {
-      Alert.alert('Validation', 'Pack size must be a positive number.');
+      setError('Pack size must be a valid positive number.');
       return;
     }
     if (avgPrice != null && (!Number.isFinite(avgPrice) || avgPrice < 0)) {
-      Alert.alert('Validation', 'Average price must be valid.');
+      setError('Average price must be valid.');
       return;
     }
-    setBusy(true);
+    setBusy('add-brand');
+    setError(null);
     try {
       const brand = await createBrand(brandName, newCategory);
       await upsertVariant(brand.id, variantName, packSize, avgPrice);
       await refreshBrands();
-      await track(AnalyticsEvents.BRAND_CREATED, { category: newCategory, is_seed: false });
+      void track(AnalyticsEvents.BRAND_CREATED, { category: newCategory, is_seed: false });
       setNewBrandName('');
       setNewVariantName('Regular');
       setNewPackSize('20');
       setNewAvgPrice('');
       setNewCategory('regular');
+      setShowAddBrand(false);
     } catch (e) {
-      Alert.alert('Brand not added', toSafeErrorMessage(e, 'validation_error'));
+      setError(toSafeErrorMessage(e, 'validation_error'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   const signOut = () => {
-    Alert.alert('Sign out?', 'You will need to sign in again to view your data.', [
+    Alert.alert('Sign out?', 'Your data stays. You can sign back in anywhere.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
-          setBusy(true);
+          setBusy('signout');
+          setError(null);
           try {
             await getSupabase().auth.signOut();
             router.replace('/login');
           } catch (e) {
-            Alert.alert('Sign out failed', toSafeErrorMessage(e, 'dependency_failure'));
+            setError(toSafeErrorMessage(e, 'dependency_failure'));
           } finally {
-            setBusy(false);
+            setBusy(null);
           }
         },
       },
@@ -195,23 +476,24 @@ export default function Settings() {
 
   const deleteAccount = () => {
     Alert.alert(
-      'Delete account?',
-      'Permanently deletes your Supabase auth account and all cloud data. This cannot be undone.',
+      'Delete your account permanently?',
+      'This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete account',
           style: 'destructive',
           onPress: async () => {
-            setBusy(true);
+            setBusy('delete-account');
+            setError(null);
             try {
               await deleteUserAccount();
               await wipeSecureStore();
               router.replace('/login');
             } catch (e) {
-              Alert.alert('Error', toSafeErrorMessage(e, 'dependency_failure'));
+              setError(toSafeErrorMessage(e, 'dependency_failure'));
             } finally {
-              setBusy(false);
+              setBusy(null);
             }
           },
         },
@@ -221,15 +503,16 @@ export default function Settings() {
 
   const eraseAll = () => {
     Alert.alert(
-      'Erase all data?',
-      'Removes every log, brand, goal and setting from your cloud account for this app. Your login will stay active. Default brands will be restored.',
+      'Erase all app data?',
+      'This keeps your login and re-seeds default brands. All your logs, goals, and custom data will be erased and cannot be recovered.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Erase',
+          text: 'Erase data',
           style: 'destructive',
           onPress: async () => {
-            setBusy(true);
+            setBusy('erase-all');
+            setError(null);
             try {
               await cancelAll();
               await eraseAllUserData();
@@ -237,15 +520,17 @@ export default function Settings() {
               await boot();
               router.replace('/onboarding/welcome');
             } catch (e) {
-              Alert.alert('Error', toSafeErrorMessage(e, 'dependency_failure'));
+              setError(toSafeErrorMessage(e, 'dependency_failure'));
             } finally {
-              setBusy(false);
+              setBusy(null);
             }
           },
         },
       ],
     );
   };
+
+  // ─── Loading / error guards ──────────────────────────────────────────────────
 
   if (!booted) {
     return (
@@ -263,216 +548,482 @@ export default function Settings() {
         <Text variant="small" muted>
           Could not load your profile. Pull to refresh or sign in again.
         </Text>
-        <Button title="Retry" onPress={() => void refreshProfile()} />
+        <Pressable
+          onPress={() => void refreshProfile()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading profile"
+          style={{ marginTop: spacing.md }}
+        >
+          <Text variant="small" color={theme.accent} style={{ textDecorationLine: 'underline' }}>
+            Retry
+          </Text>
+        </Pressable>
       </Screen>
     );
   }
 
+  const currentBaseline =
+    profile.baselinePerDay != null ? String(profile.baselinePerDay) : '';
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <Screen>
-      <View style={{ gap: spacing.xs }}>
-        <Text variant="caption" muted>
-          SETTINGS
-        </Text>
-        <Text variant="display">Preferences</Text>
-      </View>
 
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ gap: 2 }}>
-            <Text variant="bodyStrong">Appearance</Text>
-            <Text variant="caption" muted>Light · Auto · Dark</Text>
+      {/* ── Masthead ── */}
+      <Stage index={0} reduce={reduce}>
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+            <Text
+              variant="caption"
+              color={theme.textMuted}
+              style={{ textTransform: 'uppercase', letterSpacing: 1.8 }}
+            >
+              Settings
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
           </View>
-          <ThemeToggle />
+          <Text
+            variant="small"
+            muted
+            style={{ textAlign: 'center', fontStyle: 'italic' }}
+          >
+            Preferences, policies, the way out.
+          </Text>
         </View>
-      </Card>
+      </Stage>
 
-      <Card>
+      {/* ── Appearance ── */}
+      <Stage index={1} reduce={reduce}>
         <View style={{ gap: spacing.md }}>
-          <Text variant="bodyStrong">Baseline</Text>
-          <Input
-            label="Sticks per day"
-            keyboardType="number-pad"
-            value={baseline}
-            onChangeText={setBaseline}
-            placeholder="e.g., 10"
+          <SectionHead
+            caption="Appearance"
+            deck="Choose how the app looks. Auto follows your system setting."
           />
-          <Button title="Save baseline" onPress={saveBaseline} loading={saving} />
-          {saveError ? (
-            <Text variant="small" color={theme.danger}>{saveError}</Text>
+          <PrefRow
+            strongRule
+            label="Theme"
+            sublabel="Light · Auto · Dark"
+            control={<ThemeToggle />}
+          />
+        </View>
+      </Stage>
+
+      {/* ── Daily baseline ── */}
+      <Stage index={2} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="Daily baseline"
+            deck="The number of cigarettes that counts as your usual day. Everything on the dashboard is read against this."
+          />
+          <BaselineSection
+            initialBaseline={currentBaseline}
+            busy={busy}
+            reduce={reduce}
+            onSave={saveBaseline}
+          />
+        </View>
+      </Stage>
+
+      {/* ── Privacy ── */}
+      <Stage index={3} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="Privacy"
+            deck="What this device shows you, and what — if anything — leaves it."
+          />
+          <View>
+            <PrefRow
+              strongRule
+              label="Discreet mode"
+              sublabel="Mask totals and brand names on the home screen."
+              control={
+                <EditorialSwitch
+                  value={profile.discreetMode}
+                  onValueChange={(v) => void toggleProfile('discreetMode', v, 'toggle-discreet')}
+                  disabled={busy !== null}
+                  accessibilityLabel="Discreet mode"
+                />
+              }
+            />
+            <PrefRow
+              label="Hide totals on home"
+              sublabel="Collapse the headline number and spend on the dashboard."
+              control={
+                <EditorialSwitch
+                  value={profile.hideTotalsOnHome}
+                  onValueChange={(v) => void toggleProfile('hideTotalsOnHome', v, 'toggle-hide')}
+                  disabled={busy !== null}
+                  accessibilityLabel="Hide totals on home"
+                />
+              }
+            />
+            <PrefRow
+              label="Anonymous analytics"
+              sublabel="Opt-in, first-party event counts only. No log content, no brand names, no prices."
+              control={
+                <EditorialSwitch
+                  value={analyticsOptIn}
+                  onValueChange={(v) => void toggleAnalytics(v)}
+                  disabled={busy !== null}
+                  accessibilityLabel="Anonymous analytics"
+                />
+              }
+            />
+          </View>
+        </View>
+      </Stage>
+
+      {/* ── Brand catalog ── */}
+      <Stage index={4} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="Brand catalog"
+            deck="Add brands and variants when your preferred option is not already listed."
+          />
+          <PrefRow
+            strongRule
+            label="Add a custom brand"
+            sublabel="Local to your account; never shared with other users."
+            control={
+              <TextLink
+                onPress={() => setShowAddBrand((open) => !open)}
+                disabled={busy !== null}
+                accessibilityLabel={showAddBrand ? 'Hide brand form' : 'Add brand'}
+              >
+                {showAddBrand ? 'Hide form' : 'Add brand'}
+              </TextLink>
+            }
+          />
+
+          {showAddBrand ? (
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: theme.rule,
+                paddingTop: spacing.md,
+                gap: spacing.md,
+              }}
+            >
+              {/* Brand name */}
+              <View style={{ gap: spacing.xs }}>
+                <Text
+                  variant="caption"
+                  color={theme.textMuted}
+                  style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                >
+                  Brand name
+                </Text>
+                <TextInput
+                  value={newBrandName}
+                  onChangeText={setNewBrandName}
+                  placeholder="e.g. Camel"
+                  placeholderTextColor={theme.textFaint}
+                  autoCapitalize="words"
+                  accessibilityLabel="Brand name"
+                  style={{
+                    color: theme.text,
+                    fontFamily: fonts.body,
+                    fontSize: typography.body.fontSize,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.ruleStrong,
+                    paddingVertical: spacing.xs,
+                  }}
+                />
+              </View>
+
+              {/* Variant + Pack size + Avg price */}
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Text
+                    variant="caption"
+                    color={theme.textMuted}
+                    style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                  >
+                    Variant
+                  </Text>
+                  <TextInput
+                    value={newVariantName}
+                    onChangeText={setNewVariantName}
+                    placeholder="e.g. Blue"
+                    placeholderTextColor={theme.textFaint}
+                    accessibilityLabel="Variant name"
+                    style={{
+                      color: theme.text,
+                      fontFamily: fonts.body,
+                      fontSize: typography.body.fontSize,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.ruleStrong,
+                      paddingVertical: spacing.xs,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Text
+                    variant="caption"
+                    color={theme.textMuted}
+                    style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                  >
+                    Pack size
+                  </Text>
+                  <TextInput
+                    value={newPackSize}
+                    onChangeText={setNewPackSize}
+                    keyboardType="number-pad"
+                    placeholder="20"
+                    placeholderTextColor={theme.textFaint}
+                    accessibilityLabel="Pack size"
+                    style={{
+                      color: theme.text,
+                      fontFamily: fonts.body,
+                      fontSize: typography.body.fontSize,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.ruleStrong,
+                      paddingVertical: spacing.xs,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Text
+                    variant="caption"
+                    color={theme.textMuted}
+                    style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                  >
+                    Avg price (₹)
+                  </Text>
+                  <TextInput
+                    value={newAvgPrice}
+                    onChangeText={setNewAvgPrice}
+                    keyboardType="decimal-pad"
+                    placeholder="optional"
+                    placeholderTextColor={theme.textFaint}
+                    accessibilityLabel="Average price in rupees"
+                    style={{
+                      color: theme.text,
+                      fontFamily: fonts.body,
+                      fontSize: typography.body.fontSize,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.ruleStrong,
+                      paddingVertical: spacing.xs,
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Category chips */}
+              <View style={{ gap: spacing.xs }}>
+                <Text
+                  variant="caption"
+                  color={theme.textMuted}
+                  style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                >
+                  Category
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {(['budget', 'regular', 'premium', 'imported', 'other'] as Brand['category'][]).map(
+                    (cat) => (
+                      <Chip
+                        key={cat}
+                        label={cat}
+                        selected={newCategory === cat}
+                        onPress={() => setNewCategory(cat)}
+                      />
+                    ),
+                  )}
+                </View>
+              </View>
+
+              {/* Form actions */}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, paddingTop: spacing.xs }}>
+                <TextLink onPress={() => setShowAddBrand(false)} disabled={busy !== null}>
+                  Cancel
+                </TextLink>
+                <TextLink
+                  onPress={() => void addCustomBrand()}
+                  busy={busy === 'add-brand'}
+                  disabled={busy !== null}
+                  accessibilityLabel="Save new brand"
+                >
+                  Save brand
+                </TextLink>
+              </View>
+            </View>
           ) : null}
         </View>
-      </Card>
+      </Stage>
 
-      <Card>
+      {/* ── Your data ── */}
+      <Stage index={5} reduce={reduce}>
         <View style={{ gap: spacing.md }}>
-          <Text variant="bodyStrong">Privacy</Text>
-          <Row
-            label="Discreet mode"
-            hint="Hides numeric totals and brand names on Home"
-            value={profile.discreetMode}
-            onChange={(v) => {
-              toggle('discreetMode', v);
-              if (v) track(AnalyticsEvents.DISCREET_MODE_ENABLED, { enabled: true });
-            }}
+          <SectionHead
+            caption="Your data"
+            deck="Export everything you have recorded, or erase the log without closing the account."
           />
-          <Divider />
-          <Row
-            label="Hide totals on Home"
-            hint="Masks sticks and spend on the dashboard"
-            value={profile.hideTotalsOnHome}
-            onChange={(v) => toggle('hideTotalsOnHome', v)}
-          />
-          <Divider />
-          <Row
-            label="Product analytics"
-            hint="Optional first-party analytics events to improve app quality"
-            value={analyticsOptIn}
-            onChange={toggleAnalytics}
-          />
-        </View>
-      </Card>
-
-      <Card>
-        <View style={{ gap: spacing.md }}>
-          <Text variant="bodyStrong">Account</Text>
-          <Text variant="small" muted>
-            Data is stored in Smoke Ledger cloud (Supabase Postgres). Sign in is required to use the app.
-          </Text>
-          <Button title="Export account data" variant="secondary" onPress={exportData} loading={busy} />
-          <Button title="Sign out" variant="secondary" onPress={signOut} loading={busy} />
-          <Button title="Delete account" variant="danger" onPress={deleteAccount} loading={busy} />
-        </View>
-      </Card>
-
-      <Card>
-        <View style={{ gap: spacing.md }}>
-          <Text variant="bodyStrong">Brand catalog</Text>
-          <Text variant="small" muted>
-            Add custom brands and variants if your preferred option is missing.
-          </Text>
-          <Input
-            label="Brand name"
-            value={newBrandName}
-            onChangeText={setNewBrandName}
-            placeholder="e.g., Camel"
-          />
-          <Input
-            label="Variant"
-            value={newVariantName}
-            onChangeText={setNewVariantName}
-            placeholder="e.g., Blue"
-          />
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Input
-              label="Pack size"
-              keyboardType="number-pad"
-              value={newPackSize}
-              onChangeText={setNewPackSize}
-              containerStyle={{ flex: 1 }}
+          <View>
+            <PrefRow
+              strongRule
+              label="Export your data"
+              sublabel="JSON file with your profile, logs, and brand catalogue."
+              control={
+                <TextLink
+                  onPress={() => void exportData()}
+                  busy={busy === 'export-json'}
+                  disabled={busy !== null}
+                  accessibilityLabel="Export data (JSON)"
+                >
+                  Export data (JSON)
+                </TextLink>
+              }
             />
-            <Input
-              label="Avg price (₹)"
-              keyboardType="decimal-pad"
-              value={newAvgPrice}
-              onChangeText={setNewAvgPrice}
-              placeholder="optional"
-              containerStyle={{ flex: 1 }}
+            {exportWarning ? (
+              <View style={{ paddingVertical: spacing.sm }}>
+                <Text variant="small" color={theme.warnEarth} style={{ fontStyle: 'italic' }}>
+                  {exportWarning}
+                </Text>
+              </View>
+            ) : null}
+            <PrefRow
+              label="Erase all log data"
+              sublabel="Removes every cigarette log, goal, and custom brand. Your account and login stay."
+              control={
+                <TextLink
+                  onPress={eraseAll}
+                  busy={busy === 'erase-all'}
+                  disabled={busy !== null}
+                  destructive
+                  accessibilityLabel="Erase all app data"
+                >
+                  Erase all app data
+                </TextLink>
+              }
             />
           </View>
-          <Text variant="caption" muted>
-            CATEGORY
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            {(['budget', 'regular', 'premium', 'imported', 'other'] as Brand['category'][]).map(
-              (category) => (
-                <Chip
-                  key={category}
-                  label={category}
-                  selected={newCategory === category}
-                  onPress={() => setNewCategory(category)}
-                />
-              ),
-            )}
-          </View>
-          <Button title="Add brand" variant="secondary" onPress={addCustomBrand} loading={busy} />
         </View>
-      </Card>
+      </Stage>
 
-      <Card>
-        <View style={{ gap: spacing.sm }}>
-          <Text variant="bodyStrong">About Smoke Ledger</Text>
-          <Text variant="small" muted>
-            Cessation support for smoking behavior and spend in INR. Data syncs securely to the cloud.
-            No advertising SDKs. Optional usage events stay in first-party tables. This is not medical
-            advice and not a substitute for professional care.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Button
-              title="Privacy"
-              size="sm"
-              variant="secondary"
-              onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+      {/* ── Account ── */}
+      <Stage index={6} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="Account"
+            deck="Sign out of this device, or close the account entirely."
+          />
+          <View>
+            <PrefRow
+              strongRule
+              label="Sign out of this device"
+              sublabel="Your data stays. You can sign back in anywhere."
+              control={
+                <TextLink
+                  onPress={signOut}
+                  busy={busy === 'signout'}
+                  disabled={busy !== null}
+                  accessibilityLabel="Sign out"
+                >
+                  Sign out
+                </TextLink>
+              }
             />
-            <Button
-              title="Terms"
-              size="sm"
-              variant="secondary"
-              onPress={() => Linking.openURL(LEGAL_URLS.terms)}
-            />
-            <Button
-              title="Support"
-              size="sm"
-              variant="secondary"
-              onPress={() => Linking.openURL(LEGAL_URLS.support)}
+            <PrefRow
+              label="Delete account permanently"
+              sublabel="All your logs, preferences, and audit history are erased. This is permanent."
+              control={
+                <TextLink
+                  onPress={deleteAccount}
+                  busy={busy === 'delete-account'}
+                  disabled={busy !== null}
+                  destructive
+                  accessibilityLabel="Delete account — permanent"
+                >
+                  Delete account
+                </TextLink>
+              }
             />
           </View>
-          <Text variant="caption" muted>
+        </View>
+      </Stage>
+
+      {/* ── About ── */}
+      <Stage index={7} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="About"
+            deck="Cessation support for smoking behaviour and spend in INR. No advertising SDKs. This is not medical advice."
+          />
+          <View>
+            <PrefRow
+              strongRule
+              label="Privacy policy"
+              sublabel={undefined}
+              control={
+                <TextLink
+                  onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
+                  accessibilityLabel="Open privacy policy"
+                >
+                  Open
+                </TextLink>
+              }
+            />
+            <PrefRow
+              label="Terms of service"
+              sublabel={undefined}
+              control={
+                <TextLink
+                  onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
+                  accessibilityLabel="Open terms of service"
+                >
+                  Open
+                </TextLink>
+              }
+            />
+            <PrefRow
+              label="Support"
+              sublabel={undefined}
+              control={
+                <TextLink
+                  onPress={() => void Linking.openURL(LEGAL_URLS.support)}
+                  accessibilityLabel="Open support"
+                >
+                  Open
+                </TextLink>
+              }
+            />
+          </View>
+          <Text variant="caption" faint style={{ paddingTop: spacing.xs }}>
             v0.2.0
           </Text>
         </View>
-      </Card>
+      </Stage>
 
-      <Card>
-        <View style={{ gap: spacing.sm }}>
-          <Text variant="bodyStrong" color={theme.danger}>
-            Danger zone
+      {/* ── Status / error stripe ── */}
+      {error ? (
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ paddingTop: spacing.sm }}
+        >
+          <Text variant="small" color={theme.warnEarth}>
+            {error}
           </Text>
-          <Text variant="small" muted>
-            Erases app data in the cloud for this account. Your login remains; default brands are
-            re-seeded.
-          </Text>
-          <Button title="Erase all data" variant="danger" onPress={eraseAll} loading={busy} />
         </View>
-      </Card>
-    </Screen>
-  );
-}
+      ) : null}
 
-interface RowProps {
-  label: string;
-  hint?: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}
-
-function Row({ label, hint, value, onChange }: RowProps) {
-  const theme = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="body">{label}</Text>
-        {hint ? (
-          <Text variant="caption" muted>
-            {hint}
-          </Text>
-        ) : null}
+      {/* ── End-mark ── */}
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: theme.rule,
+          paddingTop: spacing.md,
+          alignItems: 'center',
+        }}
+      >
+        <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
+          Set quietly. Reviewed quietly.
+        </Text>
       </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: theme.border, true: theme.accent }}
-      />
-    </View>
+
+    </Screen>
   );
 }
