@@ -39,7 +39,7 @@ import { Heatmap } from '@/components/charts/Heatmap';
 import { MoodTriggerMatrixView } from '@/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@/components/anim/Reveal';
 import { useTheme } from '@/hooks/useTheme';
-import { spacing } from '@/constants/theme';
+import { spacing, radius } from '@/constants/theme';
 import { useSession } from '@/store/session';
 import {
   brandSpendMix,
@@ -386,7 +386,7 @@ export default function Trends() {
             paddingVertical: spacing.sm,
             paddingHorizontal: spacing.md,
             backgroundColor: theme.warnEarthSoft,
-            borderRadius: 8,
+            borderRadius: radius.md,
           }}
         >
           <Text variant="small" style={{ color: theme.warnEarth }}>
@@ -572,7 +572,7 @@ export default function Trends() {
           <View
             style={{
               backgroundColor: theme.inkSurface,
-              borderRadius: 14,
+              borderRadius: radius.lg,
               padding: spacing.xl,
               gap: spacing.lg,
             }}
@@ -626,7 +626,7 @@ export default function Trends() {
                             style={{
                               width: 8,
                               height: 8,
-                              borderRadius: 4,
+                              borderRadius: radius.pill,
                               backgroundColor: theme.chart[idx % theme.chart.length] ?? theme.accent,
                               flexShrink: 0,
                             }}
