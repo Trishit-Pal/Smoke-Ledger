@@ -43,7 +43,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Divider } from '@/components/ui/Divider';
 
-import { fonts, radius, spacing, typography } from '@/constants/theme';
+import { fonts, radius, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 
@@ -341,12 +341,12 @@ export default function NewLog() {
         label: v.name,
         selected: variantName === v.name,
         onPress: () => {
-          setVariantName((cur) => {
-            if (cur === v.name) return null;
-            // Update pack size to variant default when selecting
+          const isDeselect = variantName === v.name;
+          setVariantName(isDeselect ? null : v.name);
+          // Update pack size to the variant default when selecting (not on deselect)
+          if (!isDeselect) {
             setPackSize(v.defaultPackSize ? String(v.defaultPackSize) : '');
-            return v.name;
-          });
+          }
         },
       })),
     [selectedBrand, variantName],
