@@ -18,6 +18,10 @@ export const ONBOARDING_ROUTE_ORDER: Record<string, number> = {
 
   '/onboarding/brands': 3,
 
+  '/onboarding/done': 4,
+
+  '/onboarding/notifications': 4,
+
 };
 
 
@@ -57,6 +61,10 @@ export const MOBILE_ONBOARDING_ROUTES = [
   '/onboarding/goal',
 
   '/onboarding/brands',
+
+  '/onboarding/done',
+
+  '/onboarding/notifications',
 
 ] as const;
 

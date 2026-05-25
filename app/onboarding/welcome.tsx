@@ -4,59 +4,106 @@ import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
+import { Divider } from '@/components/ui/Divider';
+import { Card } from '@/components/ui/Card';
+import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
+import { Tilt } from '@/components/anim/Tilt';
 import { Pulse } from '@/components/anim/Pulse';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 
+interface Pillar {
+  roman: string;
+  title: string;
+  copy: string;
+}
+
+const PILLARS: Pillar[] = [
+  { roman: 'I.', title: 'Free', copy: 'No ads, no upsell, no subscription tier.' },
+  { roman: 'II.', title: 'Private', copy: 'Encrypted at rest. Yours to export or delete.' },
+  { roman: 'III.', title: 'Honest', copy: 'No streaks. No badges. No shame patterns.' },
+];
+
 export default function Welcome() {
   const router = useRouter();
   const theme = useTheme();
+
   return (
     <Screen>
-      <View style={{ flex: 1, gap: spacing.lg, paddingTop: spacing.xxl }}>
-        <FadeSlideIn index={0} delay={0}>
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              backgroundColor: theme.accentSoft,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text variant="h1" color={theme.accent}>
-              SL
+      {/* Step caption */}
+      <FadeSlideIn index={0} delay={40}>
+        <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>
+          AN HONEST TRACKER · ESTABLISHED 2026
+        </Text>
+      </FadeSlideIn>
+
+      {/* Editorial headline */}
+      <FadeSlideIn index={1}>
+        <View style={{ gap: spacing.xs }}>
+          <Text variant="display" style={{ lineHeight: 34 }}>
+            Know every stick.{'\n'}
+            Spend less.{'\n'}
+            <Text variant="display" color={theme.accent} style={{ fontStyle: 'italic', lineHeight: 34 }}>
+              Quit on your terms.
             </Text>
-          </View>
-        </FadeSlideIn>
-
-        <FadeSlideIn index={1}>
-          <Text variant="display">Smoke Ledger</Text>
-        </FadeSlideIn>
-
-        <FadeSlideIn index={2}>
-          <Text variant="body" muted>
-            A calm place to reduce or quit smoking with clear daily tracking. Log what you smoke, what
-            it costs in INR, and the small steps that keep progress sustainable. Sign in keeps your data
-            synced securely in Smoke Ledger cloud—no ads, no third-party analytics SDKs.
           </Text>
-        </FadeSlideIn>
+        </View>
+      </FadeSlideIn>
 
-        <View style={{ flex: 1 }} />
+      {/* Hairline rule */}
+      <FadeSlideIn index={2}>
+        <View style={{ width: 60 }}>
+          <Divider strong />
+        </View>
+      </FadeSlideIn>
 
-        <FadeSlideIn index={3}>
-          <Pulse active>
-            <Button
-              title="Get started"
-              fullWidth
-              size="lg"
-              onPress={() => router.push('/onboarding/privacy')}
-            />
-          </Pulse>
-        </FadeSlideIn>
-      </View>
+      {/* Body copy */}
+      <FadeSlideIn index={3}>
+        <Text variant="body" muted>
+          Smoke Ledger is a private, observational record of your smoking — not a streak
+          game, not a guilt machine. We'll set this up in four small steps. About ninety
+          seconds.
+        </Text>
+      </FadeSlideIn>
+
+      {/* CTA */}
+      <FadeSlideIn index={4}>
+        <Pulse active>
+          <Button
+            title="Begin the ledger →"
+            fullWidth
+            size="lg"
+            onPress={() => router.push('/onboarding/privacy')}
+          />
+        </Pulse>
+      </FadeSlideIn>
+
+      {/* Pillar cards */}
+      <FadeSlideIn index={5}>
+        <View style={{ gap: spacing.sm }}>
+          {PILLARS.map((p) => (
+            <Tilt key={p.roman} maxDeg={5}>
+              <Card style={{ position: 'relative', overflow: 'hidden' }}>
+                <PaperNoise />
+                <View style={{ gap: spacing.xs }}>
+                  <Text
+                    variant="h1"
+                    color={theme.accent}
+                    style={{ fontStyle: 'italic', fontSize: 28, lineHeight: 30 }}
+                  >
+                    {p.roman}
+                  </Text>
+                  <Text variant="bodyStrong">{p.title}</Text>
+                  <Text variant="small" muted>
+                    {p.copy}
+                  </Text>
+                </View>
+              </Card>
+            </Tilt>
+          ))}
+        </View>
+      </FadeSlideIn>
     </Screen>
   );
 }

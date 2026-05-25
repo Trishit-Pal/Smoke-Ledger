@@ -28,7 +28,9 @@ export default function OnboardingLayout() {
   useEffect(() => {
     if (!checked || !profile) return;
 
-    if (profile.onboardedAt) {
+    // The /done screen is the last onboarding step and is shown AFTER markOnboarded
+    // sets onboardedAt. Allow it to render; the done screen itself navigates to tabs.
+    if (profile.onboardedAt && pathname !== '/onboarding/done') {
       router.replace('/(tabs)');
       return;
     }
