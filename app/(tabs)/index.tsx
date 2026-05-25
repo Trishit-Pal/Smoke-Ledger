@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Pressable, TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -28,7 +28,7 @@ import { potentialSavings } from '@/domain/savings';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { formatInr, formatDelta } from '@/lib/format';
-import { isHomeTotalsHidden, maskBrandName, maskInr } from '@/lib/discreet';
+import { isHomeTotalsHidden, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
@@ -129,7 +129,7 @@ function WeekInkPanel({ data, hidden }: WeekInkPanelProps) {
           const isToday = i === last;
           const pct = hidden ? 0.3 : Math.max(0.06, d.value / max);
           return (
-            <View key={`${d.label}-${i}`} style={{ flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <View key={i} style={{ flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
               {/* Track */}
               <View
                 aria-hidden
@@ -364,9 +364,18 @@ export default function Home() {
   const [quickLogPending, setQuickLogPending] = useState(false);
   const [quickLogError, setQuickLogError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const today = todayIst();
-  const last7Start = daysAgoIst(6);
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const today = useMemo(() => todayIst(), [refreshing]);
+  const last7Start = useMemo(() => daysAgoIst(6), [refreshing]);
 
   // ── computed ──
   const todaySticks = useMemo(() => sticksOn(logs, today), [logs, today]);
@@ -453,7 +462,10 @@ export default function Home() {
       success();
       const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${formatInr(total, { compact: true })}` : ''}`;
       setToast(label);
-      setTimeout(() => setToast(null), 2500);
+      if (toastTimerRef.current !== null) {
+        clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = setTimeout(() => setToast(null), 2500);
       await refreshLogs();
     } catch (e) {
       setQuickLogError(e instanceof Error ? e.message : 'Could not save log. Pull to refresh and retry.');
@@ -492,13 +504,11 @@ export default function Home() {
     }
   };
 
-  let i = 0;
-
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
 
       {/* ── Masthead ── */}
-      <FadeSlideIn index={i++}>
+      <FadeSlideIn index={0}>
         <View style={{ position: 'relative', gap: spacing.xs, overflow: 'hidden' }}>
           <PaperNoise />
           {/* Rule + date centred */}
@@ -523,7 +533,7 @@ export default function Home() {
       </FadeSlideIn>
 
       {/* ── Hero numeral — today sticks + spend ── */}
-      <FadeSlideIn index={i++}>
+      <FadeSlideIn index={1}>
         <View style={{ gap: spacing.lg }}>
           {/* Big numeral row */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.lg }}>
@@ -606,7 +616,7 @@ export default function Home() {
       </FadeSlideIn>
 
       {/* ── Ledger — typographic rows ── */}
-      <FadeSlideIn index={i++}>
+      <FadeSlideIn index={2}>
         <View style={{ gap: 0 }}>
           <Text
             variant="caption"
@@ -675,7 +685,7 @@ export default function Home() {
 
       {/* ── Goal verse ── */}
       {goalProgress ? (
-        <FadeSlideIn index={i++}>
+        <FadeSlideIn index={3}>
           <View style={{ gap: spacing.sm }}>
             <Text
               variant="caption"
@@ -719,13 +729,13 @@ export default function Home() {
 
       {/* ── The week — inverted ink panel ── */}
       {logs.length > 0 ? (
-        <FadeSlideIn index={i++}>
+        <FadeSlideIn index={4}>
           <WeekInkPanel data={weekBars} hidden={hidden} />
         </FadeSlideIn>
       ) : null}
 
       {/* ── Body recovery / health milestones ── */}
-      <FadeSlideIn index={i++}>
+      <FadeSlideIn index={5}>
         <View style={{ gap: spacing.md }}>
           <Text
             variant="caption"
@@ -739,7 +749,7 @@ export default function Home() {
 
       {/* ── Editor's note — single insight ── */}
       {insights.length > 0 ? (
-        <FadeSlideIn index={i++}>
+        <FadeSlideIn index={6}>
           <View style={{ gap: spacing.md }}>
             <Text
               variant="caption"
@@ -774,7 +784,7 @@ export default function Home() {
 
       {/* ── Savings + Monthly forecast ── */}
       {savings && savings.totalInr > 0 ? (
-        <FadeSlideIn index={i++}>
+        <FadeSlideIn index={7}>
           <Card>
             <View style={{ gap: spacing.md }}>
               {/* Savings */}
@@ -785,16 +795,27 @@ export default function Home() {
                 >
                   Potential savings
                 </Text>
-                <AnimatedNumber
-                  value={savings.totalInr}
-                  format={(n) => formatInr(n, { compact: true })}
-                  style={[
-                    typography.h1 as TextStyle,
-                    { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
-                  ]}
-                />
+                {hidden ? (
+                  <Text
+                    style={[
+                      typography.h1 as TextStyle,
+                      { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
+                    ]}
+                  >
+                    •••
+                  </Text>
+                ) : (
+                  <AnimatedNumber
+                    value={savings.totalInr}
+                    format={(n) => formatInr(n, { compact: true })}
+                    style={[
+                      typography.h1 as TextStyle,
+                      { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
+                    ]}
+                  />
+                )}
                 <Text variant="small" muted>
-                  {savings.sticksAvoided} sticks below baseline × avg unit price {formatInr(savings.avgUnitPriceUsed)}
+                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
                 </Text>
               </View>
 
@@ -833,7 +854,7 @@ export default function Home() {
 
       {/* ── Empty state ── */}
       {logs.length === 0 ? (
-        <FadeSlideIn index={i++}>
+        <FadeSlideIn index={8}>
           <View style={{ gap: spacing.sm, paddingTop: spacing.lg }}>
             <Divider />
             <Text
@@ -858,7 +879,7 @@ export default function Home() {
       ) : null}
 
       {/* ── Footer ── */}
-      <FadeSlideIn index={i++}>
+      <FadeSlideIn index={9}>
         <View style={{ paddingTop: spacing.md, gap: 0 }}>
           <Divider />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md }}>
