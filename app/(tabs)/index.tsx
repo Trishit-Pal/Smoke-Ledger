@@ -149,7 +149,7 @@ function WeekInkPanel({ data, hidden }: WeekInkPanelProps) {
                 style={{
                   width: 8,
                   height: `${pct * 100}%`,
-                  backgroundColor: isToday ? theme.accent : 'rgba(230, 234, 239, 0.45)',
+                  backgroundColor: isToday ? theme.accent : theme.inkSurfaceMuted,
                   borderRadius: radius.pill,
                 }}
               />
