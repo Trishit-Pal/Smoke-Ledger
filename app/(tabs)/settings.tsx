@@ -1,15 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Switch, Alert, Linking, Pressable, TextInput, AccessibilityInfo } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from 'react-native-reanimated';
+import { View, Switch, Alert, Linking, Pressable, TextInput } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Divider } from '@/components/ui/Divider';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Chip } from '@/components/ui/Chip';
-import { spacing, typography, fonts, radius } from '@/constants/theme';
+import { spacing, typography, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useSession } from '@/store/session';
