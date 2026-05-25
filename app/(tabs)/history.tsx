@@ -34,9 +34,18 @@ import { contextLabel } from '@/constants/contexts';
 import { moodLabel } from '@/constants/moods';
 import { listLogsPage } from '@/db/repositories/logs';
 import type { LogCursor } from '@/db/repositories/logs';
-import type { CigaretteLog } from '@/types';
+import type { CigaretteLog, PurchaseMode } from '@/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+function purchaseModeLabel(mode: PurchaseMode): string {
+  switch (mode) {
+    case 'single': return 'single';
+    case 'pack': return 'pack';
+    case 'carton': return 'carton';
+    case 'custom': return 'custom';
+  }
+}
 
 type FilterKind = 'all' | 'priced' | 'tagged';
 
@@ -166,6 +175,8 @@ export default function History() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const mountedRef = useRef(true);
 
+  const probedRef = useRef(false);
+
   const [filter, setFilter] = useState<FilterKind>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -182,14 +193,16 @@ export default function History() {
 
   // On first render, probe whether there are older logs beyond the store window
   // by calling listLogsPage with a cursor derived from the oldest store log.
-  // We only do this once (cursor === undefined means "not probed yet").
+  // probedRef ensures this fires exactly once — no duplicate/concurrent probes
+  // even if storeLogs gets a new array reference before the async resolves.
   useEffect(() => {
-    if (cursor !== undefined) return;
-    // The store already holds the most-recent ~90 days. We set the initial
-    // cursor from the oldest log's ts+id so the "Load older" button correctly
-    // fetches entries before that point. To know whether hasMore is true, we
-    // issue a minimal probe (limit 1) beyond the store window.
-    const oldest = [...storeLogs].sort((a, b) => a.tsUtc.localeCompare(b.tsUtc))[0];
+    if (probedRef.current) return;
+    probedRef.current = true;
+
+    // Read the current store snapshot directly to avoid a stale-closure on
+    // the empty initial list (logs are hydrated before this screen mounts).
+    const snapshot = useSession.getState().logs;
+    const oldest = [...snapshot].sort((a, b) => a.tsUtc.localeCompare(b.tsUtc))[0];
     if (!oldest) {
       // No logs at all — no pagination needed.
       setCursor(null);
@@ -201,7 +214,6 @@ export default function History() {
       .then((page) => {
         if (cancelled || !mountedRef.current) return;
         // If hasMore, the returned nextCursor points to even older entries.
-        // The probe itself returned 1 log which we'll accumulate on first Load.
         // For simplicity: just store the probeCursor as the starting cursor so
         // the first "Load older" click fetches from that boundary.
         setCursor(page.nextCursor !== null ? probeCursor : null);
@@ -214,7 +226,8 @@ export default function History() {
     return () => {
       cancelled = true;
     };
-  }, [storeLogs, cursor]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLoadMore = useCallback(() => {
     if (!cursor || isLoadingMore) return;
@@ -451,7 +464,7 @@ export default function History() {
                                   {' · '}
                                   {discreet
                                     ? '•••'
-                                    : `${log.quantity} ${log.quantity === 1 ? 'stick' : 'sticks'}`}
+                                    : `${log.quantity} × ${purchaseModeLabel(log.purchaseMode)}`}
                                 </Text>
                                 {log.triggerTag || log.contextTag ? (
                                   <Text variant="caption" color={theme.accent}>
