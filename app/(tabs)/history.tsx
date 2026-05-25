@@ -1,26 +1,93 @@
-import React, { useMemo, useState } from 'react';
-import { View, Pressable, Alert } from 'react-native';
+/**
+ * History — editorial ledger, web-parity.
+ *
+ * Design: "the printed ledger" — hairline rules, no Card chrome, Fraunces
+ * tabular numerals for day totals, date-group headers with Today/Yesterday
+ * relative labels, load-older cursor pagination via listLogsPage.
+ *
+ * Data: initial window from useSession (≤90 days); deeper pages fetched on
+ * demand via listLogsPage and merged/deduped by log id.
+ */
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Divider } from '@/components/ui/Divider';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
-import { spacing } from '@/constants/theme';
+import { fonts, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/store/session';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 import { formatInr } from '@/lib/format';
-import { formatIndianDate, formatTime } from '@/lib/date';
+import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
 import { triggerLabel } from '@/constants/triggers';
 import { contextLabel } from '@/constants/contexts';
 import { moodLabel } from '@/constants/moods';
+import { listLogsPage } from '@/db/repositories/logs';
+import type { LogCursor } from '@/db/repositories/logs';
 import type { CigaretteLog } from '@/types';
 
-function CravingDots({ craving }: { craving: number | null }) {
-  if (craving == null) return null;
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+type FilterKind = 'all' | 'priced' | 'tagged';
+
+interface DayGroup {
+  date: string;
+  rows: CigaretteLog[];
+  totalSticks: number;
+  totalSpend: number;
+}
+
+function buildGroups(logs: CigaretteLog[]): DayGroup[] {
+  const map = new Map<string, DayGroup>();
+  for (const log of logs) {
+    const g = map.get(log.localDate) ?? {
+      date: log.localDate,
+      rows: [],
+      totalSticks: 0,
+      totalSpend: 0,
+    };
+    g.rows.push(log);
+    g.totalSticks += log.quantity;
+    g.totalSpend += log.totalPriceInr ?? 0;
+    map.set(log.localDate, g);
+  }
+  // Sort each group's rows newest-first, then sort groups newest-first.
+  for (const g of map.values()) {
+    g.rows.sort((a, b) => b.tsUtc.localeCompare(a.tsUtc));
+  }
+  return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function relativeDayLabel(ymd: string, today: string, yesterday: string): string | null {
+  if (ymd === today) return 'Today';
+  if (ymd === yesterday) return 'Yesterday';
+  return null;
+}
+
+// Dedupe two log arrays by id; preserves order of `primary`, appends new from `extra`.
+function mergeUniq(primary: CigaretteLog[], extra: CigaretteLog[]): CigaretteLog[] {
+  const seen = new Set(primary.map((l) => l.id));
+  const toAdd = extra.filter((l) => !seen.has(l.id));
+  return toAdd.length === 0 ? primary : [...primary, ...toAdd];
+}
+
+// ─── sub-components ─────────────────────────────────────────────────────────
+
+interface CravingDotsProps {
+  craving: number;
+}
+
+function CravingDots({ craving }: CravingDotsProps) {
   const dots = Math.max(1, Math.min(5, Math.round((craving / 10) * 5) || 1));
   return (
     <Text variant="caption" style={{ letterSpacing: 2 }}>
@@ -29,183 +96,470 @@ function CravingDots({ craving }: { craving: number | null }) {
   );
 }
 
+interface ExpandedDetailProps {
+  log: CigaretteLog;
+  borderColor: string;
+}
+
+function ExpandedDetail({ log, borderColor }: ExpandedDetailProps) {
+  const hasMood = log.moodBefore != null || log.moodAfter != null;
+  const hasNotes = log.notes != null && log.notes.trim().length > 0;
+  return (
+    <Reveal dependencyKey="open" duration={300}>
+      <View
+        style={{
+          paddingHorizontal: spacing.md,
+          paddingBottom: spacing.md,
+          paddingTop: spacing.sm,
+          gap: spacing.xs,
+          borderTopWidth: 1,
+          borderTopColor: borderColor,
+        }}
+      >
+        {hasMood ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <Text variant="caption" muted>Mood</Text>
+            <Text variant="caption">
+              {moodLabel(log.moodBefore)}
+              {log.moodBefore && log.moodAfter ? ' → ' : ''}
+              {log.moodAfter ? moodLabel(log.moodAfter) : ''}
+            </Text>
+          </View>
+        ) : null}
+        {log.craving != null ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+            <Text variant="caption" muted>Craving</Text>
+            <CravingDots craving={log.craving} />
+            <Text variant="caption" muted>{log.craving}/10</Text>
+          </View>
+        ) : null}
+        {log.contextTag ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <Text variant="caption" muted>Context</Text>
+            <Text variant="caption">{contextLabel(log.contextTag)}</Text>
+          </View>
+        ) : null}
+        {hasNotes ? (
+          <View style={{ gap: 2, paddingTop: spacing.xs }}>
+            <Text variant="caption" muted>Notes</Text>
+            <Text variant="small">{log.notes}</Text>
+          </View>
+        ) : null}
+      </View>
+    </Reveal>
+  );
+}
+
+// ─── main screen ────────────────────────────────────────────────────────────
+
 export default function History() {
   const theme = useTheme();
-  const logs = useSession((s) => s.logs);
+  const storeLogs = useSession((s) => s.logs);
   const profile = useSession((s) => s.profile);
   const removeLog = useSession((s) => s.removeLog);
   const discreet = isDiscreetMode(profile);
-  const [filter, setFilter] = useState<'all' | 'priced' | 'tagged'>('all');
+
+  // Accumulated logs = store window + any cursor-fetched pages.
+  const [extraLogs, setExtraLogs] = useState<CigaretteLog[]>([]);
+  const [cursor, setCursor] = useState<LogCursor | null | undefined>(undefined); // undefined = not yet known
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const mountedRef = useRef(true);
+
+  const [filter, setFilter] = useState<FilterKind>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const toggleExpand = (id: string) => {
+  const today = useMemo(() => todayIst(), []);
+  const yesterday = useMemo(() => daysAgoIst(1), []);
+
+  // Cleanup on unmount — guards against setState after unmount in async fetch.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // On first render, probe whether there are older logs beyond the store window
+  // by calling listLogsPage with a cursor derived from the oldest store log.
+  // We only do this once (cursor === undefined means "not probed yet").
+  useEffect(() => {
+    if (cursor !== undefined) return;
+    // The store already holds the most-recent ~90 days. We set the initial
+    // cursor from the oldest log's ts+id so the "Load older" button correctly
+    // fetches entries before that point. To know whether hasMore is true, we
+    // issue a minimal probe (limit 1) beyond the store window.
+    const oldest = [...storeLogs].sort((a, b) => a.tsUtc.localeCompare(b.tsUtc))[0];
+    if (!oldest) {
+      // No logs at all — no pagination needed.
+      setCursor(null);
+      return;
+    }
+    const probeCursor: LogCursor = { ts: oldest.tsUtc, id: oldest.id };
+    let cancelled = false;
+    listLogsPage({ cursor: probeCursor, limit: 1 })
+      .then((page) => {
+        if (cancelled || !mountedRef.current) return;
+        // If hasMore, the returned nextCursor points to even older entries.
+        // The probe itself returned 1 log which we'll accumulate on first Load.
+        // For simplicity: just store the probeCursor as the starting cursor so
+        // the first "Load older" click fetches from that boundary.
+        setCursor(page.nextCursor !== null ? probeCursor : null);
+      })
+      .catch(() => {
+        if (cancelled || !mountedRef.current) return;
+        // If probe fails, don't show pagination — graceful degradation.
+        setCursor(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storeLogs, cursor]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!cursor || isLoadingMore) return;
+    const requestedCursor = cursor;
+    setLoadError(null);
+    setIsLoadingMore(true);
+    listLogsPage({ cursor: requestedCursor, limit: 50 })
+      .then((page) => {
+        if (!mountedRef.current) return;
+        setExtraLogs((prev) => mergeUniq(prev, page.logs));
+        setCursor(page.nextCursor);
+      })
+      .catch((err: unknown) => {
+        if (!mountedRef.current) return;
+        setLoadError(err instanceof Error ? err.message : 'Failed to load older entries.');
+      })
+      .finally(() => {
+        if (mountedRef.current) setIsLoadingMore(false);
+      });
+  }, [cursor, isLoadingMore]);
+
+  const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
+
+  const confirmDelete = useCallback(
+    (log: CigaretteLog) => {
+      Alert.alert('Delete log?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void removeLog(log.id) },
+      ]);
+    },
+    [removeLog],
+  );
+
+  // Merge store + extra, then apply filter.
+  const allLogs = useMemo(() => mergeUniq(storeLogs, extraLogs), [storeLogs, extraLogs]);
 
   const filtered = useMemo(() => {
-    if (filter === 'priced') return logs.filter((l) => l.totalPriceInr != null);
-    if (filter === 'tagged') return logs.filter((l) => l.triggerTag || l.contextTag);
-    return logs;
-  }, [logs, filter]);
+    if (filter === 'priced') return allLogs.filter((l) => l.totalPriceInr != null);
+    if (filter === 'tagged') return allLogs.filter((l) => l.triggerTag || l.contextTag);
+    return allLogs;
+  }, [allLogs, filter]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, CigaretteLog[]>();
-    for (const l of filtered) {
-      const arr = map.get(l.localDate) ?? [];
-      arr.push(l);
-      map.set(l.localDate, arr);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filtered]);
+  const groups = useMemo(() => buildGroups(filtered), [filtered]);
 
-  const confirmDelete = (log: CigaretteLog) => {
-    Alert.alert('Delete log?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => removeLog(log.id) },
-    ]);
-  };
+  // Whether to show the trailing affordance row.
+  const showTrailing = groups.length > 0;
+  // cursor undefined = probing, null = exhausted, LogCursor = more available.
+  const hasMore = cursor != null && cursor !== undefined;
 
   return (
     <Screen>
-      <View style={{ gap: spacing.xs }}>
-        <Text variant="caption" muted>
-          HISTORY
-        </Text>
-        <Text variant="display">What you logged</Text>
-      </View>
-
+      {/* ─── Masthead ─── */}
       <FadeSlideIn index={0}>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
-          <Chip label="With price" selected={filter === 'priced'} onPress={() => setFilter('priced')} />
-          <Chip label="Tagged" selected={filter === 'tagged'} onPress={() => setFilter('tagged')} />
+        <View
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: theme.ruleStrong,
+            paddingBottom: spacing.md,
+            gap: spacing.xs,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+            <Text
+              variant="caption"
+              muted
+              style={{ letterSpacing: 1.4, textTransform: 'uppercase' }}
+            >
+              History
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+          </View>
+          <Text
+            variant="small"
+            faint
+            style={{ textAlign: 'center', fontStyle: 'italic' }}
+          >
+            The printed ledger
+          </Text>
         </View>
       </FadeSlideIn>
 
-      {grouped.length === 0 ? (
-        <EmptyState
-          title="No logs match"
-          description={
-            filter === 'all'
-              ? 'Your logs will appear here once you start recording.'
-              : 'Try a different filter.'
-          }
-        />
-      ) : (
-        grouped.map(([date, items], groupIndex) => {
-          const daySticks = items.reduce((a, b) => a + b.quantity, 0);
-          const daySpend = items.reduce((a, b) => a + (b.totalPriceInr ?? 0), 0);
-          return (
-            <FadeSlideIn key={date} index={groupIndex} delay={0} step={80}>
-              <View style={{ gap: spacing.sm }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text variant="h3">{formatIndianDate(date)}</Text>
-                  <Text variant="small" muted>
-                    {discreet ? '••• sticks' : `${daySticks} sticks`} ·{' '}
-                    {maskInr(daySpend, discreet, (n) => formatInr(n))}
-                  </Text>
-                </View>
-                <Card padded={false}>
-                  {items.map((l, i) => {
-                    const isExpanded = expandedIds.has(l.id);
-                    const hasMood = l.moodBefore != null || l.moodAfter != null;
-                    const hasNotes = l.notes != null && l.notes.trim().length > 0;
-                    const hasExpandable = hasMood || l.craving != null || hasNotes || !!l.contextTag;
-                    return (
-                      <View key={l.id}>
-                        <Pressable
-                          onPress={hasExpandable ? () => toggleExpand(l.id) : undefined}
-                          onLongPress={() => confirmDelete(l)}
-                          accessibilityLabel={`${l.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(l.tsUtc)}${hasExpandable ? ', tap to expand' : ''}`}
-                        >
-                          <View style={{ padding: spacing.md, gap: 4 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                              <Text variant="bodyStrong">{maskBrandName(l.brandNameSnap ?? 'Unlogged brand', discreet)}</Text>
-                              <Text variant="small" muted>
-                                {formatTime(l.tsUtc)}
-                              </Text>
-                            </View>
-                            <Text variant="small" muted>
-                              {l.variantSnap ? `${l.variantSnap} · ` : ''}
-                              {discreet ? '•••' : `${l.quantity} × ${l.purchaseMode}`} ·{' '}
-                              {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
-                            </Text>
-                            {l.triggerTag || l.contextTag ? (
-                              <Text variant="caption" color={theme.accent}>
-                                {[triggerLabel(l.triggerTag), contextLabel(l.contextTag)]
-                                  .filter((s) => s && s !== '—')
-                                  .join(' · ')}
-                              </Text>
-                            ) : null}
-                            {hasExpandable ? (
-                              <Text variant="caption" color={theme.textFaint}>
-                                {isExpanded ? '▲ less' : '▼ mood · notes'}
-                              </Text>
-                            ) : null}
-                          </View>
-                        </Pressable>
+      {/* ─── Filter chips ─── */}
+      <FadeSlideIn index={1}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <Chip
+            label="With price"
+            selected={filter === 'priced'}
+            onPress={() => setFilter('priced')}
+          />
+          <Chip
+            label="Tagged"
+            selected={filter === 'tagged'}
+            onPress={() => setFilter('tagged')}
+          />
+        </View>
+      </FadeSlideIn>
 
-                        {isExpanded ? (
-                          <Reveal dependencyKey="open" duration={300}>
+      {/* ─── Content ─── */}
+      {groups.length === 0 ? (
+        <FadeSlideIn index={2}>
+          <EmptyState
+            title="No logs match"
+            description={
+              filter === 'all'
+                ? 'Your logs will appear here once you start recording.'
+                : 'Try a different filter.'
+            }
+          />
+        </FadeSlideIn>
+      ) : (
+        <>
+          {groups.map((group, gi) => {
+            const relLabel = relativeDayLabel(group.date, today, yesterday);
+            return (
+              <FadeSlideIn key={group.date} index={gi + 2} step={60}>
+                <View>
+                  {/* ─── Day header ─── */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-end',
+                      paddingBottom: spacing.sm,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.ruleStrong,
+                    }}
+                  >
+                    {/* Left: relative label + date + spend */}
+                    <View style={{ gap: 2 }}>
+                      {relLabel ? (
+                        <Text
+                          variant="small"
+                          style={{
+                            fontFamily: fonts.serif,
+                            fontStyle: 'italic',
+                            color: theme.text,
+                            lineHeight: 18,
+                          }}
+                        >
+                          {relLabel}
+                        </Text>
+                      ) : null}
+                      <Text
+                        variant="caption"
+                        style={{ letterSpacing: 0.5, textTransform: 'uppercase' }}
+                        muted
+                      >
+                        {formatIndianDate(group.date)}
+                      </Text>
+                      <Text variant="caption" faint>
+                        {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
+                        {' '}spent
+                      </Text>
+                    </View>
+
+                    {/* Right: stick count editorial numeral */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text
+                        variant="h1"
+                        style={{
+                          fontFamily: fonts.display,
+                          color: theme.text,
+                          fontVariant: ['tabular-nums'],
+                          lineHeight: 28,
+                        }}
+                        accessibilityLabel={
+                          discreet
+                            ? 'Day total hidden'
+                            : `${group.totalSticks} ${group.totalSticks === 1 ? 'cigarette' : 'cigarettes'} on this day`
+                        }
+                      >
+                        {discreet ? '••' : group.totalSticks}
+                      </Text>
+                      <Text variant="caption" faint>
+                        {group.totalSticks === 1 ? 'stick' : 'sticks'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* ─── Log rows — hairline ledger ─── */}
+                  <View>
+                    {group.rows.map((log, rowIdx) => {
+                      const isExpanded = expandedIds.has(log.id);
+                      const hasMood = log.moodBefore != null || log.moodAfter != null;
+                      const hasNotes = log.notes != null && log.notes.trim().length > 0;
+                      const hasExpandable =
+                        hasMood || log.craving != null || hasNotes || !!log.contextTag;
+
+                      return (
+                        <View key={log.id}>
+                          <Pressable
+                            onPress={hasExpandable ? () => toggleExpand(log.id) : undefined}
+                            onLongPress={() => confirmDelete(log)}
+                            accessibilityLabel={`${log.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(log.tsUtc)}${hasExpandable ? ', tap to expand' : ''}`}
+                          >
+                            {/* Main ledger row — brand left, price right */}
                             <View
                               style={{
-                                paddingHorizontal: spacing.md,
-                                paddingBottom: spacing.md,
-                                gap: spacing.xs,
-                                borderTopWidth: 1,
-                                borderTopColor: theme.border,
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'baseline',
+                                paddingVertical: spacing.md,
+                                gap: spacing.md,
                               }}
                             >
-                              {hasMood ? (
-                                <View style={{ flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs }}>
-                                  <Text variant="caption" muted>Mood</Text>
-                                  <Text variant="caption">
-                                    {moodLabel(l.moodBefore)}
-                                    {l.moodBefore && l.moodAfter ? ' → ' : ''}
-                                    {l.moodAfter ? moodLabel(l.moodAfter) : ''}
+                              {/* Left: brand, variant + time, tags */}
+                              <View style={{ flex: 1, gap: 2 }}>
+                                <Text variant="bodyStrong" numberOfLines={1}>
+                                  {maskBrandName(log.brandNameSnap ?? 'Unlogged brand', discreet)}
+                                  {log.variantSnap && !discreet ? (
+                                    <Text variant="body" muted>
+                                      {' · '}
+                                      {log.variantSnap}
+                                    </Text>
+                                  ) : null}
+                                </Text>
+                                <Text variant="small" muted>
+                                  <Text
+                                    variant="small"
+                                    muted
+                                    style={{ fontVariant: ['tabular-nums'] }}
+                                  >
+                                    {formatTime(log.tsUtc)}
                                   </Text>
-                                </View>
-                              ) : null}
-                              {l.craving != null ? (
-                                <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                                  <Text variant="caption" muted>Craving</Text>
-                                  <CravingDots craving={l.craving} />
-                                  <Text variant="caption" muted>{l.craving}/10</Text>
-                                </View>
-                              ) : null}
-                              {l.contextTag ? (
-                                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                                  <Text variant="caption" muted>Context</Text>
-                                  <Text variant="caption">{contextLabel(l.contextTag)}</Text>
-                                </View>
-                              ) : null}
-                              {hasNotes ? (
-                                <View style={{ gap: 2, paddingTop: spacing.xs }}>
-                                  <Text variant="caption" muted>Notes</Text>
-                                  <Text variant="small">{l.notes}</Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          </Reveal>
-                        ) : null}
+                                  {' · '}
+                                  {discreet
+                                    ? '•••'
+                                    : `${log.quantity} ${log.quantity === 1 ? 'stick' : 'sticks'}`}
+                                </Text>
+                                {log.triggerTag || log.contextTag ? (
+                                  <Text variant="caption" color={theme.accent}>
+                                    {[triggerLabel(log.triggerTag), contextLabel(log.contextTag)]
+                                      .filter((s) => s && s !== '—')
+                                      .join(' · ')}
+                                  </Text>
+                                ) : null}
+                                {hasExpandable ? (
+                                  <Text variant="caption" faint>
+                                    {isExpanded ? '▲ less' : '▼ mood · notes'}
+                                  </Text>
+                                ) : null}
+                              </View>
 
-                        {i < items.length - 1 ? <Divider inset={spacing.md} /> : null}
-                      </View>
-                    );
-                  })}
-                </Card>
+                              {/* Right: price in tabular Fraunces */}
+                              <Text
+                                variant="body"
+                                style={{ fontVariant: ['tabular-nums'] }}
+                              >
+                                {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
+                              </Text>
+                            </View>
+                          </Pressable>
+
+                          {isExpanded ? (
+                            <ExpandedDetail log={log} borderColor={theme.rule} />
+                          ) : null}
+
+                          {rowIdx < group.rows.length - 1 ? (
+                            <Divider />
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Hairline gap between groups */}
+                  <View style={{ height: spacing.lg }} />
+                </View>
+              </FadeSlideIn>
+            );
+          })}
+
+          {/* ─── Trailing affordance — load older or end mark ─── */}
+          {showTrailing ? (
+            <FadeSlideIn index={groups.length + 2} step={60}>
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: theme.rule,
+                  paddingTop: spacing.md,
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                }}
+              >
+                {loadError ? (
+                  <Text
+                    variant="small"
+                    style={{ textAlign: 'center', color: theme.warnEarth }}
+                    accessibilityRole="alert"
+                  >
+                    {loadError}
+                  </Text>
+                ) : null}
+
+                {cursor === undefined ? (
+                  // Still probing — show nothing (no flash).
+                  null
+                ) : hasMore ? (
+                  <Pressable
+                    onPress={handleLoadMore}
+                    disabled={isLoadingMore}
+                    accessibilityRole="button"
+                    accessibilityLabel="Load older entries"
+                    accessibilityState={{ busy: isLoadingMore, disabled: isLoadingMore }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      {isLoadingMore ? (
+                        <ActivityIndicator size="small" color={theme.textMuted} />
+                      ) : null}
+                      <Text
+                        variant="small"
+                        muted
+                        style={{
+                          opacity: isLoadingMore ? 0.6 : 1,
+                          textDecorationLine: isLoadingMore ? 'none' : 'underline',
+                          textDecorationColor: theme.ruleStrong,
+                          textDecorationStyle: 'solid',
+                        }}
+                      >
+                        {isLoadingMore ? 'Loading older entries…' : 'Load older entries →'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : (
+                  <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
+                    End of the ledger.
+                  </Text>
+                )}
               </View>
             </FadeSlideIn>
-          );
-        })
+          ) : null}
+        </>
       )}
 
-      <Text variant="caption" muted style={{ textAlign: 'center' }}>
+      {/* ─── Hint caption ─── */}
+      <Text variant="caption" faint style={{ textAlign: 'center' }}>
         Tap a row to reveal mood & notes · long-press to delete
       </Text>
     </Screen>
