@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -32,10 +32,14 @@ export default function Done() {
   const router = useRouter();
   const theme = useTheme();
   const profile = useSession((s) => s.profile);
+  const brands = useSession((s) => s.brands);
   const [busy, setBusy] = useState(false);
   const [purchasePref, setPurchasePref] = useState<string | null>(null);
-  const [favCount, setFavCount] = useState(0);
   const [printed, setPrinted] = useState(false);
+  // Favorites count comes from the session brands (mobile brands screen writes
+  // isFavorite directly via the brands repo; no settings_kv key is written for
+  // the favorite name list on mobile).
+  const favCount = useMemo(() => brands.filter((b) => b.isFavorite).length, [brands]);
 
   const baseline = Math.max(0, Math.round(Number(profile?.baselinePerDay) || 0));
   const yearlySpend = baseline * PRICE_PER_STICK * 365;
@@ -51,12 +55,8 @@ export default function Done() {
 
   useEffect(() => {
     void (async () => {
-      const [pref, brands] = await Promise.all([
-        getSetting<string>('onboarding.purchasePref'),
-        getSetting<string[]>('onboarding.favoriteBrandNames'),
-      ]);
+      const pref = await getSetting<string>('onboarding.purchasePref');
       if (pref) setPurchasePref(pref);
-      if (brands) setFavCount(brands.length);
     })();
     const t = setTimeout(() => setPrinted(true), 200);
     return () => clearTimeout(t);
