@@ -23,6 +23,8 @@ import { spacing } from '@/constants/theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { MilestoneCelebration } from '@/components/character/MilestoneCelebration';
+import { LogoutFarewell } from '@/components/character/LogoutFarewell';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -179,6 +181,11 @@ export default function RootLayout() {
           <Stack.Screen name="log/new" options={{ presentation: 'modal' }} />
         </Stack>
         </ErrorBoundary>
+        {/* Character listeners — mounted once at the root so dispatchMilestone()
+            and dispatchFarewell() reach them from any screen. They render
+            nothing until their event fires. */}
+        <MilestoneCelebration />
+        <LogoutFarewell />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

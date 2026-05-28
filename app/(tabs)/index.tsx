@@ -34,6 +34,8 @@ import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { success } from '@/lib/haptics';
+import { CharacterCompanion } from '@/components/character/CharacterCompanion';
+import { dispatchMilestone, dispatchMood, milestoneForStreak } from '@/lib/character/mood';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -413,6 +415,29 @@ export default function Home() {
 
   const hidden = isHomeTotalsHidden(profile);
 
+  // ── Character: greet once on mount, fire milestone modal on streak ↑ to a tier ──
+  useEffect(() => {
+    // Soft greet after the dashboard's first paint settles.
+    const t = setTimeout(() => dispatchMood('greet', { caption: 'Quiet day.' }), 600);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Track the previous streak value so we only fire a milestone when the streak
+  // crosses UP to a tier (1/3/7/14/30) — not on first load or when it resets.
+  const prevStreakRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevStreakRef.current;
+    if (prev === null) {
+      prevStreakRef.current = streak;
+      return;
+    }
+    if (streak > prev) {
+      const milestone = milestoneForStreak(streak);
+      if (milestone) dispatchMilestone(milestone);
+    }
+    prevStreakRef.current = streak;
+  }, [streak]);
+
   // ── trend colour ──
   const tTone = trendTone(trend.deltaPct);
   const trendColor =
@@ -460,6 +485,15 @@ export default function Home() {
       });
       await track(AnalyticsEvents.QUICK_ADD_USED, {});
       success();
+      // Character reaction — terracotta concern if the post-log day total is
+      // above the user's baseline, ink regret otherwise. Caption stays neutral
+      // and judgment-free per the editorial voice.
+      const postLogTotal = todaySticks + opts.quantity;
+      const baselinePerDay = profile?.baselinePerDay ?? null;
+      const isAbove = baselinePerDay != null && postLogTotal > baselinePerDay;
+      dispatchMood(isAbove ? 'concern' : 'regret', {
+        caption: isAbove ? 'Above your usual today.' : 'Noted. No judgment.',
+      });
       const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${formatInr(total, { compact: true })}` : ''}`;
       setToast(label);
       if (toastTimerRef.current !== null) {
@@ -521,6 +555,10 @@ export default function Home() {
               {formatIndianDate(today)}
             </Text>
             <View style={{ flex: 1, height: 1, backgroundColor: theme.ruleStrong }} />
+          </View>
+          {/* Resident character companion — reacts to greet/regret/concern/applaud */}
+          <View style={{ alignItems: 'center', marginTop: spacing.xs }}>
+            <CharacterCompanion size={72} />
           </View>
           <Text
             variant="small"

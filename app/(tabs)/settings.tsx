@@ -29,6 +29,7 @@ import {
 import { AnalyticsEvents } from '@/constants/events';
 import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { dispatchFarewell } from '@/lib/character/mood';
 import type { Brand } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -461,6 +462,10 @@ export default function Settings() {
           setBusy('signout');
           setError(null);
           try {
+            // Fire the farewell overlay first; bridge the visual gap so the
+            // user sees the wave-off rather than a blank flash before /login.
+            dispatchFarewell();
+            await new Promise((r) => setTimeout(r, 1600));
             await getSupabase().auth.signOut();
             router.replace('/login');
           } catch (e) {
