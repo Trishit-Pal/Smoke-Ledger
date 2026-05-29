@@ -14,3 +14,20 @@ major_version = 17
 
 [auth]
 enabled = true
+
+# Phone OTP delivery via MSG91 (Phase D). The blocks below are intentionally
+# commented out because (a) older Supabase CLI versions reject the
+# `auth.hook.send_sms` key, and (b) the production hook lives in the hosted
+# project's Dashboard. Uncomment ONLY after the DLT template and hook secret
+# are live. See docs/auth/msg91-setup.md.
+#
+# [auth.sms]
+# enable_signup = false
+# enable_confirmations = true
+# template = "Smoke Ledger code: {{ .Code }} - never share."
+# max_frequency = "1m0s"
+#
+# [auth.hook.send_sms]
+# enabled = true
+# uri = "https://<project-ref>.supabase.co/functions/v1/send-sms-otp"
+# secrets = "env(SUPABASE_SMS_HOOK_SECRET)"

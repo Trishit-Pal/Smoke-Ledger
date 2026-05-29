@@ -14,11 +14,11 @@ export function EditorialClosingSignet({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 10,
         alignItems: align === 'center' ? 'center' : 'flex-start',
         textAlign: align === 'center' ? 'center' : 'left',
-        marginTop: 16,
-        paddingTop: 16,
+        marginTop: 8,
+        paddingTop: 12,
         borderTop: '1px solid var(--rule)',
       }}
     >

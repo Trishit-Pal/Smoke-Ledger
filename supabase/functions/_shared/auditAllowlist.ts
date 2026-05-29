@@ -14,6 +14,9 @@ export const AUDIT_EVENT_TYPES = new Set<string>([
   'app_lock_disabled',
   'reminder_enabled',
   'reminder_disabled',
+  'phone_otp_sent',
+  'phone_otp_verified',
+  'phone_otp_rate_limited',
 ]);
 
 export const AUDIT_EVENT_CATEGORIES = new Set<string>([

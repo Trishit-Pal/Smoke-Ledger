@@ -12,12 +12,19 @@ import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosi
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
+import { PasswordField } from '@web/components/auth/PasswordField';
+import {
+  INPUT_STYLE,
+  PRIMARY_CTA_STYLE,
+  SECONDARY_CTA_STYLE,
+} from '@web/lib/auth/inputStyle';
+import { emailZodStrict, useDebouncedEmailValidity } from '@web/lib/auth/email';
 // CHARACTER (1): mood dispatcher.
 import { dispatchMood } from '@web/lib/character/mood';
 
 const schema = z
   .object({
-    email: z.string().email('Enter a valid email').max(254),
+    email: emailZodStrict,
     password: z
       .string()
       .min(8, 'Password must be at least 8 characters')
@@ -38,56 +45,6 @@ type FormValues = z.infer<typeof schema>;
 function emailRedirectTo(): string | undefined {
   return typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
 }
-
-const INPUT_STYLE: React.CSSProperties = {
-  width: '100%',
-  height: 40,
-  padding: '0 0 4px 0',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid var(--rule)',
-  outline: 'none',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-};
-
-const PRIMARY_CTA_STYLE: React.CSSProperties = {
-  height: 52,
-  padding: '0 24px',
-  border: 'none',
-  borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
-  fontFamily: 'var(--font-sans)',
-  fontWeight: 600,
-  fontSize: 14,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 10,
-  width: '100%',
-  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
-};
-
-const SECONDARY_CTA_STYLE: React.CSSProperties = {
-  height: 44,
-  padding: '0 18px',
-  border: '1px solid var(--rule)',
-  borderRadius: 10,
-  background: 'transparent',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-sans)',
-  fontWeight: 500,
-  fontSize: 14,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  width: '100%',
-};
 
 function SignupEmailSuccess({ email }: { email: string }) {
   const [resendLoading, setResendLoading] = React.useState(false);
@@ -181,7 +138,7 @@ function SignupEmailSuccess({ email }: { email: string }) {
         </p>
       ) : null}
 
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', paddingTop: 8 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 4 }}>
         <Link
           href={`mailto:${LEGAL_COPY.supportEmail}`}
           style={{
@@ -234,6 +191,13 @@ export default function SignupPage() {
   const passwordValue = watch('password');
   const confirmValue = watch('confirmPassword');
   const acknowledgedValue = watch('acknowledged');
+  const emailValidity = useDebouncedEmailValidity(emailValue);
+  // Only surface live errors that are high-signal (disposable domain). Format
+  // typos wait for submit so we don't nag while the user is still typing.
+  const liveEmailError =
+    emailValidity.state === 'invalid' && emailValidity.message.startsWith('Disposable')
+      ? emailValidity.message
+      : null;
 
   // CHARACTER (2): greet on mount — figure waves as the form appears.
   React.useEffect(() => {
@@ -368,7 +332,7 @@ export default function SignupPage() {
         style={{ gap: 0 }}
         noValidate
       >
-        <EditorialFieldRow label="Email" error={errors.email?.message ?? null} strong>
+        <EditorialFieldRow label="Email" error={errors.email?.message ?? liveEmailError} strong>
           <input
             type="email"
             autoComplete="email"
@@ -379,12 +343,9 @@ export default function SignupPage() {
           />
         </EditorialFieldRow>
         <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
-          <input
-            type="password"
+          <PasswordField
             autoComplete="new-password"
             placeholder="At least 8 characters"
-            style={INPUT_STYLE}
-            className="focus-ring"
             {...register('password')}
           />
         </EditorialFieldRow>
@@ -392,12 +353,9 @@ export default function SignupPage() {
           label="Confirm password"
           error={errors.confirmPassword?.message ?? null}
         >
-          <input
-            type="password"
+          <PasswordField
             autoComplete="new-password"
             placeholder="Repeat password"
-            style={INPUT_STYLE}
-            className="focus-ring"
             {...register('confirmPassword')}
           />
         </EditorialFieldRow>
@@ -523,7 +481,7 @@ export default function SignupPage() {
         ) : null}
       </form>
 
-      <div style={{ display: 'flex', gap: 18, alignItems: 'baseline', paddingTop: 8 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', paddingTop: 4 }}>
         <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           Already have an account?
         </span>

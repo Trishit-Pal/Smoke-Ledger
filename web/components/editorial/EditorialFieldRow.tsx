@@ -22,9 +22,9 @@ export function EditorialFieldRow({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
-        paddingTop: 14,
-        paddingBottom: 14,
+        gap: 6,
+        paddingTop: 10,
+        paddingBottom: 10,
         borderTop: `1px solid var(--${strong ? 'rule-strong' : 'rule'})`,
       }}
     >

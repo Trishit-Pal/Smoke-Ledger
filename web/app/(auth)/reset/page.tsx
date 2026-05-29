@@ -11,9 +11,10 @@ import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_LINKS } from '@web/lib/legal';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
+import { emailZodStrict } from '@web/lib/auth/email';
 
 const schema = z.object({
-  email: z.string().email('Enter a valid email').max(254),
+  email: emailZodStrict,
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -169,7 +170,7 @@ export default function ResetPage() {
         </button>
       </form>
 
-      <div style={{ display: 'flex', gap: 18, alignItems: 'baseline', paddingTop: 8 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', paddingTop: 4 }}>
         <Link
           href="/login"
           style={{

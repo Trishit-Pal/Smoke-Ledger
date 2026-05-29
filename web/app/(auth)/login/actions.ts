@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
+import { emailZodStrict } from '@web/lib/auth/email';
 import {
   REMEMBER_ME_COOKIE,
   applyAuthCookiePolicy,
@@ -19,7 +20,7 @@ const ONE_YEAR_SEC = 60 * 60 * 24 * 365;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const schema = z.object({
-  email: z.string().email().max(320),
+  email: emailZodStrict,
   password: z.string().min(1).max(128),
   rememberMe: z.boolean().optional(),
   captchaToken: z.string().min(1).optional(),

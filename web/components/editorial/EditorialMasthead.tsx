@@ -67,7 +67,7 @@ export function EditorialMasthead({
       <h1
         className="editorial-headline"
         style={{
-          fontSize: 'clamp(32px, 4vw, 48px)',
+          fontSize: 'clamp(26px, 3.4vw, 40px)',
           margin: 0,
           color: 'var(--text)',
         }}
@@ -79,7 +79,7 @@ export function EditorialMasthead({
           style={{
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
-            fontSize: 16,
+            fontSize: 14,
             color: 'var(--text-muted)',
             lineHeight: 1.5,
             margin: 0,

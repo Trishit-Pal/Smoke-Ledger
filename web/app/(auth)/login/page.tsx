@@ -17,72 +17,56 @@ import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { signInWithPasswordAction } from './actions';
 import { initialLoginActionState, type LoginActionState } from './loginActionState';
+import {
+  sendPhoneOtpAction,
+  verifyPhoneOtpAction,
+  initialPhoneOtpActionState,
+  type PhoneOtpActionState,
+} from './_actions/phoneOtp';
+import { PasswordField } from '@web/components/auth/PasswordField';
+import {
+  INPUT_STYLE,
+  PRIMARY_CTA_STYLE,
+  SECONDARY_CTA_STYLE,
+} from '@web/lib/auth/inputStyle';
+import { emailZodStrict } from '@web/lib/auth/email';
+import {
+  DEFAULT_COUNTRY,
+  SUPPORTED_COUNTRIES,
+  getCountryByCode,
+  isPhoneOtpEnabled,
+} from '@web/lib/auth/phone';
 // CHARACTER (1): mood dispatcher — no new deps, uses the window event bus.
 import { dispatchMood } from '@web/lib/character/mood';
 
-const emailSchema = z.string().email('Enter a valid email');
-const phoneSchema = z
-  .string()
-  .regex(/^\+[1-9]\d{7,14}$/, 'Use E.164 format, e.g. +919876543210');
+const emailSchema = emailZodStrict;
 
 type AuthMode = 'password' | 'email_otp' | 'phone_otp';
 
-const MODE_OPTIONS: { value: AuthMode; label: string }[] = [
+const ALL_MODE_OPTIONS: { value: AuthMode; label: string }[] = [
   { value: 'password', label: 'Password' },
   { value: 'email_otp', label: 'Email link' },
   { value: 'phone_otp', label: 'Phone OTP' },
 ];
 
-const INPUT_STYLE: React.CSSProperties = {
-  width: '100%',
+const MODE_OPTIONS: { value: AuthMode; label: string }[] = isPhoneOtpEnabled()
+  ? ALL_MODE_OPTIONS
+  : ALL_MODE_OPTIONS.filter((m) => m.value !== 'phone_otp');
+
+const COUNTRY_SELECT_STYLE: React.CSSProperties = {
   height: 40,
-  padding: '0 0 4px 0',
+  padding: '0 8px 4px 0',
   background: 'transparent',
   border: 'none',
   borderBottom: '1px solid var(--rule)',
   outline: 'none',
   color: 'var(--text)',
   fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  transition: 'border-color 160ms ease',
-};
-
-const PRIMARY_CTA_STYLE: React.CSSProperties = {
-  height: 52,
-  padding: '0 24px',
-  border: 'none',
-  borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
-  fontFamily: 'var(--font-sans)',
-  fontWeight: 600,
   fontSize: 14,
   cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 10,
-  width: '100%',
-  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
-  transition: 'transform 120ms ease, box-shadow 200ms ease, opacity 140ms ease',
-};
-
-const SECONDARY_CTA_STYLE: React.CSSProperties = {
-  height: 44,
-  padding: '0 18px',
-  border: '1px solid var(--rule)',
-  borderRadius: 10,
-  background: 'transparent',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-sans)',
-  fontWeight: 500,
-  fontSize: 14,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  width: '100%',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  flexShrink: 0,
 };
 
 function PasswordSubmitButton({ disabled }: { disabled: boolean }) {
@@ -101,6 +85,83 @@ function PasswordSubmitButton({ disabled }: { disabled: boolean }) {
       }}
     >
       {pending ? 'Signing in…' : 'Sign in →'}
+    </button>
+  );
+}
+
+function PhoneSendButton({ disabled, label }: { disabled: boolean; label: string }) {
+  const { pending } = useFormStatus();
+  const isInactive = pending || disabled;
+  return (
+    <button
+      type="submit"
+      disabled={isInactive}
+      className="focus-ring"
+      style={{
+        ...PRIMARY_CTA_STYLE,
+        marginTop: 16,
+        opacity: isInactive ? 0.45 : 1,
+        cursor: isInactive ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {pending ? 'Sending…' : label}
+    </button>
+  );
+}
+
+function PhoneVerifyButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  const isInactive = pending || disabled;
+  return (
+    <button
+      type="submit"
+      disabled={isInactive}
+      className="focus-ring"
+      style={{
+        ...PRIMARY_CTA_STYLE,
+        marginTop: 16,
+        opacity: isInactive ? 0.45 : 1,
+        cursor: isInactive ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {pending ? 'Verifying…' : 'Verify OTP →'}
+    </button>
+  );
+}
+
+function PhoneResendButton({
+  cooldownSec,
+}: {
+  cooldownSec: number;
+}) {
+  const { pending } = useFormStatus();
+  const isInactive = pending || cooldownSec > 0;
+  const label =
+    pending
+      ? 'Resending…'
+      : cooldownSec > 0
+        ? `Resend code in ${cooldownSec}s`
+        : 'Resend code';
+  return (
+    <button
+      type="submit"
+      disabled={isInactive}
+      className="focus-ring"
+      style={{
+        background: 'transparent',
+        border: 'none',
+        fontFamily: 'var(--font-display)',
+        fontStyle: 'italic',
+        fontSize: 13,
+        color: 'var(--accent)',
+        textDecoration: 'underline',
+        textUnderlineOffset: 4,
+        padding: 0,
+        cursor: isInactive ? 'not-allowed' : 'pointer',
+        opacity: isInactive ? 0.5 : 1,
+      }}
+    >
+      {label}
     </button>
   );
 }
@@ -126,7 +187,6 @@ function LoginPageInner() {
   const [otpError, setOtpError] = React.useState<string | null>(null);
   const [otpInfo, setOtpInfo] = React.useState<string | null>(null);
   const [otpEmail, setOtpEmail] = React.useState('');
-  const [otpPhone, setOtpPhone] = React.useState('');
   const [otpCode, setOtpCode] = React.useState('');
   const [otpSent, setOtpSent] = React.useState(false);
   const [otpLoading, setOtpLoading] = React.useState(false);
@@ -134,12 +194,27 @@ function LoginPageInner() {
   const [rememberMe, setRememberMe] = React.useState(false);
   const [resendLoading, setResendLoading] = React.useState(false);
   const [resendInfo, setResendInfo] = React.useState<string | null>(null);
+  const [countryCode, setCountryCode] = React.useState<string>(DEFAULT_COUNTRY.code);
+  const [localPhone, setLocalPhone] = React.useState('');
+  const [cooldownSec, setCooldownSec] = React.useState(0);
   const captchaRequired = isCaptchaConfigured();
   const captchaReady = !captchaRequired || !!captchaToken;
+  const selectedCountry = React.useMemo(
+    () => getCountryByCode(countryCode) ?? DEFAULT_COUNTRY,
+    [countryCode],
+  );
 
   const [passwordActionState, passwordFormAction] = useFormState<LoginActionState, FormData>(
     signInWithPasswordAction,
     initialLoginActionState,
+  );
+  const [sendPhoneOtpState, sendPhoneOtpFormAction] = useFormState<PhoneOtpActionState, FormData>(
+    sendPhoneOtpAction,
+    initialPhoneOtpActionState,
+  );
+  const [verifyPhoneOtpState, verifyPhoneOtpFormAction] = useFormState<PhoneOtpActionState, FormData>(
+    verifyPhoneOtpAction,
+    initialPhoneOtpActionState,
   );
   const passwordEmailRef = React.useRef<HTMLInputElement>(null);
 
@@ -192,6 +267,37 @@ function LoginPageInner() {
       });
     }
   }, [otpInfo]);
+
+  // Phone OTP send → flip into verify step + start resend cooldown.
+  React.useEffect(() => {
+    if (!sendPhoneOtpState.message) return;
+    if (sendPhoneOtpState.code === 'sent') {
+      setOtpInfo(sendPhoneOtpState.message);
+      setOtpError(null);
+      setOtpSent(true);
+      setCooldownSec(30);
+    } else {
+      setOtpError(sendPhoneOtpState.message);
+      setOtpInfo(null);
+    }
+  }, [sendPhoneOtpState]);
+
+  // Phone OTP verify → surface invalid/rate-limit messages. On success the
+  // server action redirects, so the only messages reaching here are failures.
+  React.useEffect(() => {
+    if (verifyPhoneOtpState.code === 'idle' || !verifyPhoneOtpState.message) return;
+    setOtpError(verifyPhoneOtpState.message);
+  }, [verifyPhoneOtpState]);
+
+  // Cooldown countdown for the resend button.
+  React.useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const handle = window.setTimeout(
+      () => setCooldownSec((s) => Math.max(0, s - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(handle);
+  }, [cooldownSec]);
 
   const callbackRedirectTo = React.useMemo(() => {
     if (typeof window === 'undefined') return undefined;
@@ -257,68 +363,6 @@ function LoginPageInner() {
     }
   };
 
-  const sendPhoneOtp = async () => {
-    setOtpError(null);
-    setOtpInfo(null);
-    const parsed = phoneSchema.safeParse(otpPhone.trim());
-    if (!parsed.success) {
-      setOtpError(parsed.error.issues[0]?.message ?? 'Enter a valid phone number.');
-      return;
-    }
-    if (captchaRequired && !captchaToken) {
-      setOtpError('Please complete the security check.');
-      return;
-    }
-    setOtpLoading(true);
-    try {
-      setRememberMePreference(rememberMe);
-      const { error } = await getSupabase().auth.signInWithOtp({
-        phone: parsed.data,
-        options: {
-          shouldCreateUser: false,
-          ...(captchaToken ? { captchaToken } : {}),
-        },
-      });
-      if (error) {
-        setOtpInfo('If this number is registered, an OTP was sent.');
-        setCaptchaToken(null);
-        return;
-      }
-      setOtpSent(true);
-      setOtpInfo('If this number is registered, an OTP was sent. Enter the code to continue.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const verifyPhoneOtp = async () => {
-    setOtpError(null);
-    const parsed = phoneSchema.safeParse(otpPhone.trim());
-    if (!parsed.success) {
-      setOtpError(parsed.error.issues[0]?.message ?? 'Enter a valid phone number.');
-      return;
-    }
-    if (!otpCode.trim()) {
-      setOtpError('Enter the OTP code.');
-      return;
-    }
-    setOtpLoading(true);
-    try {
-      const { error } = await getSupabase().auth.verifyOtp({
-        phone: parsed.data,
-        token: otpCode.trim(),
-        type: 'sms',
-      });
-      if (error) {
-        setOtpError(toAuthErrorMessage(error));
-        return;
-      }
-      router.replace(nextPath);
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
   return (
     <>
       <EditorialMasthead
@@ -339,6 +383,8 @@ function LoginPageInner() {
           setOtpError(null);
           setOtpInfo(null);
           setOtpSent(false);
+          setOtpCode('');
+          setCooldownSec(0);
         }}
         ariaLabel="Sign-in method"
       />
@@ -370,16 +416,13 @@ function LoginPageInner() {
             />
           </EditorialFieldRow>
           <EditorialFieldRow label="Password">
-            <input
-              type="password"
+            <PasswordField
               name="password"
               required
               minLength={8}
               maxLength={128}
               autoComplete="current-password"
               placeholder="••••••••"
-              style={INPUT_STYLE}
-              className="focus-ring"
             />
           </EditorialFieldRow>
 
@@ -479,66 +522,114 @@ function LoginPageInner() {
 
       {mode === 'phone_otp' ? (
         <div className="flex flex-col" style={{ gap: 0 }}>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              lineHeight: 1.55,
+              margin: '0 0 8px 0',
+              fontFamily: 'var(--font-display)',
+              fontStyle: 'italic',
+            }}
+          >
+            We send a 6-digit code by SMS to a registered phone number.
+          </p>
+
           <EditorialFieldRow label="Phone number" strong>
-            <input
-              type="tel"
-              autoComplete="tel"
-              placeholder="+919876543210"
-              value={otpPhone}
-              onChange={(event) => setOtpPhone(event.target.value)}
-              style={INPUT_STYLE}
-              className="focus-ring"
-            />
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+              <select
+                aria-label="Country code"
+                value={countryCode}
+                onChange={(event) => {
+                  setCountryCode(event.target.value);
+                  setLocalPhone('');
+                }}
+                style={COUNTRY_SELECT_STYLE}
+                className="focus-ring"
+              >
+                {SUPPORTED_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={selectedCountry.localLength}
+                pattern={selectedCountry.regex.source}
+                autoComplete="tel-national"
+                placeholder={selectedCountry.placeholder}
+                value={localPhone}
+                onChange={(event) =>
+                  setLocalPhone(
+                    event.target.value.replace(/\D+/g, '').slice(0, selectedCountry.localLength),
+                  )
+                }
+                style={{ ...INPUT_STYLE, flex: 1 }}
+                className="focus-ring"
+                disabled={otpSent}
+              />
+            </div>
           </EditorialFieldRow>
+
           {!otpSent ? (
-            <>
+            <form action={sendPhoneOtpFormAction} style={{ display: 'contents' }}>
+              <input type="hidden" name="countryCode" value={countryCode} />
+              <input type="hidden" name="localNumber" value={localPhone} />
+              {captchaToken ? (
+                <input type="hidden" name="captchaToken" value={captchaToken} />
+              ) : null}
               {captchaRequired ? (
                 <EditorialFieldRow label="Security check" optional>
                   <TurnstileWidget onToken={setCaptchaToken} />
                 </EditorialFieldRow>
               ) : null}
-              <button
-                type="button"
-                onClick={sendPhoneOtp}
-                disabled={otpLoading || !captchaReady}
-                className="focus-ring"
-                style={{
-                  ...PRIMARY_CTA_STYLE,
-                  marginTop: 16,
-                  opacity: otpLoading || !captchaReady ? 0.45 : 1,
-                  cursor: otpLoading || !captchaReady ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {otpLoading ? 'Sending…' : 'Send OTP code →'}
-              </button>
-            </>
+              <PhoneSendButton
+                disabled={
+                  !captchaReady ||
+                  !selectedCountry.regex.test(localPhone)
+                }
+                label="Send OTP code →"
+              />
+            </form>
           ) : (
             <>
-              <EditorialFieldRow label="OTP code">
-                <input
-                  type="text"
-                  autoComplete="one-time-code"
-                  placeholder="Enter code"
-                  value={otpCode}
-                  onChange={(event) => setOtpCode(event.target.value)}
-                  style={INPUT_STYLE}
-                  className="focus-ring"
-                />
-              </EditorialFieldRow>
-              <button
-                type="button"
-                onClick={verifyPhoneOtp}
-                disabled={otpLoading}
-                className="focus-ring"
-                style={{
-                  ...PRIMARY_CTA_STYLE,
-                  marginTop: 16,
-                  opacity: otpLoading ? 0.45 : 1,
-                  cursor: otpLoading ? 'not-allowed' : 'pointer',
-                }}
+              <form action={verifyPhoneOtpFormAction} style={{ display: 'contents' }}>
+                <input type="hidden" name="countryCode" value={countryCode} />
+                <input type="hidden" name="localNumber" value={localPhone} />
+                <input type="hidden" name="next" value={nextPath} />
+                <EditorialFieldRow label="OTP code">
+                  <input
+                    name="code"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    pattern="\d{6}"
+                    autoComplete="one-time-code"
+                    placeholder="Enter 6-digit code"
+                    value={otpCode}
+                    onChange={(event) =>
+                      setOtpCode(event.target.value.replace(/\D+/g, '').slice(0, 6))
+                    }
+                    style={INPUT_STYLE}
+                    className="focus-ring"
+                    required
+                  />
+                </EditorialFieldRow>
+                <PhoneVerifyButton disabled={otpCode.length < 6} />
+              </form>
+              <form
+                action={sendPhoneOtpFormAction}
+                style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-start' }}
               >
-                {otpLoading ? 'Verifying…' : 'Verify OTP →'}
-              </button>
+                <input type="hidden" name="countryCode" value={countryCode} />
+                <input type="hidden" name="localNumber" value={localPhone} />
+                {captchaToken ? (
+                  <input type="hidden" name="captchaToken" value={captchaToken} />
+                ) : null}
+                <PhoneResendButton cooldownSec={cooldownSec} />
+              </form>
             </>
           )}
         </div>
@@ -573,10 +664,10 @@ function LoginPageInner() {
       <div
         style={{
           display: 'flex',
-          gap: 18,
+          gap: 12,
           alignItems: 'baseline',
           flexWrap: 'wrap',
-          paddingTop: 8,
+          paddingTop: 4,
         }}
       >
         <Link

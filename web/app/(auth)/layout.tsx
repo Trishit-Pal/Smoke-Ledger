@@ -9,13 +9,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {children}
       <footer
         style={{
-          marginTop: 32,
-          paddingTop: 16,
+          marginTop: 20,
+          paddingTop: 12,
           borderTop: '1px solid var(--rule)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: 16,
+          gap: 12,
           flexWrap: 'wrap',
         }}
       >

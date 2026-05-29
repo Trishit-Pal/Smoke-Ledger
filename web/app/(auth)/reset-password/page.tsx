@@ -10,6 +10,8 @@ import { getSupabase } from '@web/lib/supabase/client';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
+import { PasswordField } from '@web/components/auth/PasswordField';
+import { PRIMARY_CTA_STYLE } from '@web/lib/auth/inputStyle';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 const schema = z
@@ -23,38 +25,6 @@ const schema = z
   });
 
 type FormValues = z.infer<typeof schema>;
-
-const INPUT_STYLE: React.CSSProperties = {
-  width: '100%',
-  height: 40,
-  padding: '0 0 4px 0',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid var(--rule)',
-  outline: 'none',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-};
-
-const PRIMARY_CTA_STYLE: React.CSSProperties = {
-  height: 52,
-  padding: '0 24px',
-  border: 'none',
-  borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
-  fontFamily: 'var(--font-sans)',
-  fontWeight: 600,
-  fontSize: 14,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 10,
-  width: '100%',
-  boxShadow: '0 12px 32px -8px rgba(47, 163, 155, 0.45), 0 2px 4px rgba(11, 15, 20, 0.08)',
-};
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -131,12 +101,9 @@ export default function ResetPasswordPage() {
         noValidate
       >
         <EditorialFieldRow label="New password" error={errors.password?.message ?? null} strong>
-          <input
-            type="password"
+          <PasswordField
             autoComplete="new-password"
             placeholder="At least 8 characters"
-            style={INPUT_STYLE}
-            className="focus-ring"
             {...register('password')}
           />
         </EditorialFieldRow>
@@ -144,12 +111,9 @@ export default function ResetPasswordPage() {
           label="Confirm new password"
           error={errors.confirmPassword?.message ?? null}
         >
-          <input
-            type="password"
+          <PasswordField
             autoComplete="new-password"
             placeholder="Repeat password"
-            style={INPUT_STYLE}
-            className="focus-ring"
             {...register('confirmPassword')}
           />
         </EditorialFieldRow>
