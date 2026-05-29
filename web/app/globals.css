@@ -422,14 +422,16 @@
   transform-box: fill-box;
   transform-origin: center;
 }
+/* CHARACTER: --character-ink fallback enables per-instance inverted-surface override. */
 .character-fig .stroke {
-  stroke: var(--text);
+  stroke: var(--character-ink, var(--text, #0B0F14));
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* CHARACTER: --character-ink fallback enables per-instance inverted-surface override. */
 .character-fig .fill {
-  fill: var(--text);
+  fill: var(--character-ink, var(--text, #0B0F14));
   stroke: none;
 }
 .character-fig .accent {

@@ -17,6 +17,8 @@ import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { signInWithPasswordAction } from './actions';
 import { initialLoginActionState, type LoginActionState } from './loginActionState';
+// CHARACTER (1): mood dispatcher — no new deps, uses the window event bus.
+import { dispatchMood } from '@web/lib/character/mood';
 
 const emailSchema = z.string().email('Enter a valid email');
 const phoneSchema = z
@@ -157,10 +159,39 @@ function LoginPageInner() {
     }
   }, [callbackError]);
 
+  // CHARACTER (2): greet on first render — the figure waves as the form loads.
+  React.useEffect(() => {
+    const t = window.setTimeout(
+      () => dispatchMood('greet', { durationMs: 2000 }),
+      500,
+    );
+    return () => window.clearTimeout(t);
+  }, []);
+
   const passwordError = passwordActionState.message ?? submitError;
   const showEmailNotConfirmedActions =
     callbackError === 'email_not_confirmed' ||
     passwordActionState.code === 'email_not_confirmed';
+
+  // CHARACTER (3): regret on any sign-in error — figure droops, cigarette wisp.
+  React.useEffect(() => {
+    if (passwordError) {
+      dispatchMood('regret', {
+        caption: 'Noted. No judgment.',
+        durationMs: 3200,
+      });
+    }
+  }, [passwordError]);
+
+  // CHARACTER (4): thumb on OTP sent — a quiet acknowledgement.
+  React.useEffect(() => {
+    if (otpInfo) {
+      dispatchMood('thumb', {
+        caption: 'Link on its way.',
+        durationMs: 3000,
+      });
+    }
+  }, [otpInfo]);
 
   const callbackRedirectTo = React.useMemo(() => {
     if (typeof window === 'undefined') return undefined;

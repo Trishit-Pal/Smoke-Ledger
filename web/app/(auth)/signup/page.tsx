@@ -12,6 +12,8 @@ import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosi
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
+// CHARACTER (1): mood dispatcher.
+import { dispatchMood } from '@web/lib/character/mood';
 
 const schema = z
   .object({
@@ -229,6 +231,46 @@ export default function SignupPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   const emailValue = watch('email');
+  const passwordValue = watch('password');
+  const confirmValue = watch('confirmPassword');
+  const acknowledgedValue = watch('acknowledged');
+
+  // CHARACTER (2): greet on mount — figure waves as the form appears.
+  React.useEffect(() => {
+    const t = window.setTimeout(
+      () => dispatchMood('greet', { durationMs: 2000 }),
+      500,
+    );
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // CHARACTER (3): thumb when all fields look correctly filled. Encouragement
+  // before the user clicks submit — "ready when you are."
+  const formLooksComplete =
+    emailValue?.includes('@') &&
+    (passwordValue?.length ?? 0) >= 8 &&
+    confirmValue === passwordValue &&
+    acknowledgedValue === true;
+
+  React.useEffect(() => {
+    if (formLooksComplete) {
+      dispatchMood('thumb', {
+        caption: 'Ready when you are.',
+        durationMs: 5000,
+      });
+    }
+  }, [formLooksComplete]);
+
+  // CHARACTER (4): applaud on successful account creation.
+  React.useEffect(() => {
+    if (successEmail) {
+      dispatchMood('applaud', {
+        caption: 'Welcome aboard.',
+        celebrate: true,
+        durationMs: 3200,
+      });
+    }
+  }, [successEmail]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitError(null);
