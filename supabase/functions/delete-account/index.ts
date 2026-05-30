@@ -1,5 +1,11 @@
 // Deletes the authenticated user via Admin API.
 //
+// Two-step deletion: this function ALWAYS calls `public.erase_account_data()`
+// as the user before `auth.admin.deleteUser` runs. The SQL function explicitly
+// purges every user-owned table and anonymizes audit rows; CASCADE then catches
+// anything left over. The combination gives an auditable purge even if a
+// future table is added without `ON DELETE CASCADE`.
+//
 // Hardening notes
 // ----------------
 // 1. JWT verification: the function uses `getUser(<bearer>)` on the anon client
@@ -13,53 +19,32 @@
 //    if KV is unavailable — a KV outage returns 429 rather than silently
 //    disabling abuse protection (defense-in-depth). Logs the event for ops.
 // 4. Origin allowlist: refuses unknown origins. Refuses `*` in production.
-// 5. Audit trail: writes an `account_deleted` event with the user's hashed id
-//    BEFORE calling `admin.deleteUser`. After delete the row remains with a
-//    NULL `user_id` (it cascades on the original row), but we additionally
-//    persist a copy in `error_events` with category `compliance.delete` so the
-//    record survives the cascade.
+//    Shared with audit-record via ../_shared/cors.ts.
+// 5. Audit trail: writes an `account_delete_requested` event with the user's
+//    hashed id BEFORE the erase. The erase function itself writes a second
+//    `account_data_erased` row with the same hash. A tamper-evident copy lives
+//    in `error_events` (category compliance.delete) so the record survives the
+//    auth-row cascade.
+// 6. Erase fail-safe: if `erase_account_data()` fails the function aborts WITHOUT
+//    calling admin.deleteUser. The user's data and auth row stay intact and the
+//    user can retry. We never delete the auth row over an unverified purge.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sha256Hex } from '../_shared/hash.ts';
 import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { corsHeaders, originAllowed } from '../_shared/cors.ts';
 
 const log = createLogger('delete-account');
 
 // ---------------- env ----------------
-
-const ENV = (Deno.env.get('ENVIRONMENT') ?? Deno.env.get('ENV') ?? 'production').toLowerCase();
-const IS_PROD = ENV === 'production';
-
-const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
-const allowAnyOrigin = allowedOrigins.includes('*');
 
 const REAUTH_WINDOW_MIN = Number.parseInt(Deno.env.get('REAUTH_WINDOW_MIN') ?? '15', 10);
 const RATE_LIMIT_MAX = Number.parseInt(Deno.env.get('RATE_LIMIT_MAX') ?? '5', 10);
 const RATE_LIMIT_WINDOW_SEC = Number.parseInt(Deno.env.get('RATE_LIMIT_WINDOW_SEC') ?? '600', 10);
 
 // ---------------- helpers ----------------
-
-function originAllowed(origin: string | null): boolean {
-  if (!origin) return true; // Non-browser clients (mobile, curl).
-  if (allowAnyOrigin && !IS_PROD) return true; // '*' allowed only outside prod.
-  return allowedOrigins.includes(origin);
-}
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = originAllowed(origin) && origin;
-  return {
-    'Access-Control-Allow-Origin': allowed ? origin : 'null',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Max-Age': '600',
-    Vary: 'Origin',
-  };
-}
 
 function json(body: Record<string, unknown>, status = 200, origin: string | null = null): Response {
   return new Response(JSON.stringify(body), {
@@ -190,6 +175,26 @@ serve(async (req) => {
       });
     }
 
+    // Step 1 of the 2-step deletion: explicit data purge.
+    // erase_account_data() reads auth.uid() internally, so it must run with
+    // the user's bearer token — supabaseUser is the same anon client we used
+    // for getUser() above, with Authorization wired in. Service role would
+    // bypass auth.uid() and the function would fail.
+    const { error: eraseErr } = await supabaseUser.rpc('erase_account_data');
+    if (eraseErr) {
+      log.error('erase_failed_pre_delete', {
+        request_id: requestId,
+        error: String(eraseErr.message).slice(0, 200),
+      });
+      return json(
+        { error: 'erase_failed', request_id: requestId },
+        500,
+        origin,
+      );
+    }
+
+    // Step 2: remove the auth row. CASCADE catches any user-keyed rows the
+    // erase missed (defense in depth against future schema drift).
     const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (delErr) {
       return json(

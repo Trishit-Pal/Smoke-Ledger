@@ -38,6 +38,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { revalidateAppViews } from '../_actions/revalidate';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSupabase } from '@web/lib/supabase/client';
@@ -259,6 +260,7 @@ export function SettingsClient({
       await updateProfile({ baselinePerDay: parsed });
       setEditingBaseline(false);
       flashToast(parsed != null ? `Baseline updated to ${parsed}/day.` : 'Baseline cleared.');
+      await revalidateAppViews();
       router.refresh();
     } catch (e) {
       setError(toSafeErrorMessage(e, 'validation_error'));
@@ -272,6 +274,7 @@ export function SettingsClient({
     setError(null);
     try {
       await updateProfile({ discreetMode: value });
+      await revalidateAppViews();
       router.refresh();
       if (value) {
         await track(AnalyticsEvents.DISCREET_MODE_ENABLED, { enabled: true });
@@ -288,6 +291,7 @@ export function SettingsClient({
     setError(null);
     try {
       await updateProfile({ hideTotalsOnHome: value });
+      await revalidateAppViews();
       router.refresh();
     } catch (e) {
       setError(toSafeErrorMessage(e));
@@ -371,6 +375,7 @@ export function SettingsClient({
     try {
       const brand = await createBrand(brandName, newCategory);
       await upsertVariant(brand.id, variantName, packSize, avgPrice);
+      await revalidateAppViews();
       router.refresh();
       await track(AnalyticsEvents.BRAND_CREATED, { category: newCategory, is_seed: false });
       setNewBrandName('');

@@ -10,40 +10,15 @@ import {
 import { sha256Hex } from '../_shared/hash.ts';
 import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { corsHeaders, originAllowed } from '../_shared/cors.ts';
 
 const log = createLogger('audit-record');
-
-const ENV = (Deno.env.get('ENVIRONMENT') ?? Deno.env.get('ENV') ?? 'production').toLowerCase();
-const IS_PROD = ENV === 'production';
-
-const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
-const allowAnyOrigin = allowedOrigins.includes('*');
 
 const RATE_LIMIT_MAX = Number.parseInt(Deno.env.get('AUDIT_RATE_LIMIT_MAX') ?? '10', 10);
 const RATE_LIMIT_WINDOW_SEC = Number.parseInt(
   Deno.env.get('AUDIT_RATE_LIMIT_WINDOW_SEC') ?? '60',
   10,
 );
-
-function originAllowed(origin: string | null): boolean {
-  if (!origin) return true;
-  if (allowAnyOrigin && !IS_PROD) return true;
-  return allowedOrigins.includes(origin);
-}
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = originAllowed(origin) && origin;
-  return {
-    'Access-Control-Allow-Origin': allowed ? origin : 'null',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Max-Age': '600',
-    Vary: 'Origin',
-  };
-}
 
 function json(body: Record<string, unknown>, status = 200, origin: string | null = null): Response {
   return new Response(JSON.stringify(body), {

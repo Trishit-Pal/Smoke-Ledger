@@ -6,6 +6,11 @@ import { BottomNav } from '@web/components/layout/BottomNav';
 // area. Both render nothing until an event fires; zero cost when idle.
 import { MilestoneCelebration } from '@web/components/character/MilestoneCelebration';
 import { LogoutFarewell } from '@web/components/character/LogoutFarewell';
+// REALTIME: mounted once at the (app) layout — keeps one WebSocket per
+// session and calls router.refresh() (debounced) when any of the current
+// user's cigarette_logs / goals / user_profiles rows change. Cross-tab and
+// cross-device updates flow through here.
+import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           to document.body and fire only on their respective custom events. */}
       <MilestoneCelebration />
       <LogoutFarewell />
+      <RealtimeRefresher />
     </div>
   );
 }

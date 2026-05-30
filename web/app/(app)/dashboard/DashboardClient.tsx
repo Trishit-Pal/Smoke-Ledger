@@ -22,6 +22,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { revalidateAppViews } from '../_actions/revalidate';
 import {
   dailyStats,
   sticksOn,
@@ -196,6 +197,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           }`,
         );
         window.setTimeout(() => setToast(null), 2500);
+        await revalidateAppViews();
         router.refresh();
       } catch (e) {
         setQuickLogError(toSafeErrorMessage(e, 'dependency_failure'));

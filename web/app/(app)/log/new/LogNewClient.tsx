@@ -26,6 +26,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
+import { revalidateAppViews } from '../../_actions/revalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { deriveUnitPrice } from '@/domain/calc';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
@@ -275,6 +276,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         price_source: result.source,
       });
 
+      await revalidateAppViews();
       router.refresh();
       router.back();
     } catch (e) {
