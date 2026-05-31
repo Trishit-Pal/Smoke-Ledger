@@ -1,3 +1,5 @@
+import { readSupabaseUrl } from '@web/lib/supabase/env';
+
 /**
  * Per-request Content-Security-Policy.
  *
@@ -10,7 +12,7 @@
  *   clickjacking, base-tag hijack, and form-action redirects.
  */
 export function buildCsp(nonce: string): string {
-  const rawSupabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
+  const rawSupabaseUrl = readSupabaseUrl() ?? '';
   let supabaseHttp = 'https://*.supabase.co';
   let supabaseWs = 'wss://*.supabase.co';
   if (rawSupabaseUrl) {

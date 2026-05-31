@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@web/lib/supabase/server';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 const auditBodySchema = z.object({
   eventType: z.string().min(1).max(80),
@@ -45,8 +46,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    const supabaseUrl = readSupabaseUrl();
+    const supabaseAnonKey = readSupabaseAnonKey();
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ error: 'server_misconfigured' }, { status: 500 });
     }

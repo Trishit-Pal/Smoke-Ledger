@@ -8,13 +8,14 @@ import {
   REMEMBER_ME_COOKIE,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 type CookieOptions = AuthCookieOptions;
 
 export function createClient() {
   const cookieStore = cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const supabaseUrl = readSupabaseUrl();
+  const supabaseAnonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase env is not configured');
   }
@@ -49,5 +50,5 @@ export function createClient() {
 }
 
 export function isSupabaseServerConfigured(): boolean {
-  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return !!(readSupabaseUrl() && readSupabaseAnonKey());
 }
