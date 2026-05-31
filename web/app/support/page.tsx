@@ -5,6 +5,11 @@ import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 
+// Pure static support/contact content — no per-request data. Serve from the CDN
+// and revalidate daily instead of rendering per request. See SCALING_PLAN.md §2b.
+export const dynamic = 'force-static';
+export const revalidate = 86400;
+
 interface SupportSectionProps {
   index: string;
   title: string;

@@ -1,6 +1,8 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { createClient } from '@web/lib/supabase/server';
+import { brandsCacheTag } from '@web/lib/server/data';
 
 // Flushes the Next.js Router Cache for every authenticated app view.
 // Pair with `router.refresh()` after a mutation: refresh() re-renders the
@@ -17,4 +19,16 @@ export async function revalidateAppViews(): Promise<void> {
   revalidatePath('/trends');
   revalidatePath('/settings');
   revalidatePath('/log/new');
+}
+
+// Busts the per-user brand+variant Data Cache (getServerBrandsWithVariants)
+// after a brand mutation — create, variant upsert, favorite toggle, delete.
+// Resolves the user id from the session so only that user's tag is invalidated.
+// Call alongside revalidateAppViews() + router.refresh() on brand changes.
+export async function revalidateBrands(): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) revalidateTag(brandsCacheTag(user.id));
 }

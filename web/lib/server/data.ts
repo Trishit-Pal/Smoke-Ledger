@@ -1,6 +1,9 @@
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@web/lib/supabase/server';
+import { createAdminClient } from '@web/lib/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoIst } from '@/lib/date';
 import type {
   Brand,
@@ -276,46 +279,72 @@ export const getServerGoals = cache(async (): Promise<Goal[]> => {
   return (data as GoalRow[]).map(mapGoal);
 });
 
+/** Per-user cache tag for the brand+variant Data Cache. Bust via `revalidateBrands()`. */
+export function brandsCacheTag(userId: string): string {
+  return `brands:${userId}`;
+}
+
+/** Brand data changes rarely; cache it cross-request and let mutations bust the tag. */
+const BRANDS_CACHE_TTL_SECONDS = 600;
+
+async function loadBrandsWithVariants(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<(Brand & { variants: BrandVariant[] })[]> {
+  const { data: brands, error: bErr } = await supabase
+    .from('brands')
+    .select('*')
+    .eq('user_id', userId)
+    .order('is_favorite', { ascending: false })
+    .order('name', { ascending: true });
+  if (bErr) throw new Error(bErr.message);
+  const { data: vars, error: vErr } = await supabase
+    .from('brand_variants')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name', { ascending: true });
+  if (vErr) throw new Error(vErr.message);
+  const byBrand = new Map<string, BrandVariant[]>();
+  for (const v of (vars ?? []) as VarRow[]) {
+    const list = byBrand.get(v.brand_id) ?? [];
+    list.push({
+      id: v.id,
+      brandId: v.brand_id,
+      name: v.name,
+      defaultPackSize: v.default_pack_size,
+      avgPriceInr: v.avg_price_inr != null ? Number(v.avg_price_inr) : null,
+      lastPriceInr: v.last_price_inr != null ? Number(v.last_price_inr) : null,
+      lastPricedAt: v.last_priced_at,
+    });
+    byBrand.set(v.brand_id, list);
+  }
+  return ((brands ?? []) as BrandRow[]).map((b) => ({
+    id: b.id,
+    name: b.name,
+    category: b.category,
+    isSeed: b.is_seed,
+    isFavorite: b.is_favorite,
+    createdAt: b.created_at,
+    updatedAt: b.updated_at,
+    variants: byBrand.get(b.id) ?? [],
+  }));
+}
+
 export const getServerBrandsWithVariants = cache(
   async (): Promise<(Brand & { variants: BrandVariant[] })[]> => {
-    const supabase = createClient();
     const userId = await requireServerUserId();
-    const { data: brands, error: bErr } = await supabase
-      .from('brands')
-      .select('*')
-      .eq('user_id', userId)
-      .order('is_favorite', { ascending: false })
-      .order('name', { ascending: true });
-    if (bErr) throw new Error(bErr.message);
-    const { data: vars, error: vErr } = await supabase
-      .from('brand_variants')
-      .select('*')
-      .eq('user_id', userId);
-    if (vErr) throw new Error(vErr.message);
-    const byBrand = new Map<string, BrandVariant[]>();
-    for (const v of (vars ?? []) as VarRow[]) {
-      const list = byBrand.get(v.brand_id) ?? [];
-      list.push({
-        id: v.id,
-        brandId: v.brand_id,
-        name: v.name,
-        defaultPackSize: v.default_pack_size,
-        avgPriceInr: v.avg_price_inr != null ? Number(v.avg_price_inr) : null,
-        lastPriceInr: v.last_price_inr != null ? Number(v.last_price_inr) : null,
-        lastPricedAt: v.last_priced_at,
-      });
-      byBrand.set(v.brand_id, list);
-    }
-    return ((brands ?? []) as BrandRow[]).map((b) => ({
-      id: b.id,
-      name: b.name,
-      category: b.category,
-      isSeed: b.is_seed,
-      isFavorite: b.is_favorite,
-      createdAt: b.created_at,
-      updatedAt: b.updated_at,
-      variants: byBrand.get(b.id) ?? [],
-    }));
+    const admin = createAdminClient();
+    // Without a service-role key we cannot read inside unstable_cache (it forbids
+    // cookies), so fall back to the request-scoped RLS client — correct, uncached.
+    if (!admin) return loadBrandsWithVariants(createClient(), userId);
+    // Cross-request Data Cache. Using the service-role client here is safe: every
+    // query is explicitly scoped to the authenticated user's id, which is also the
+    // cache key + tag, so no cross-user data can be cached or returned.
+    return unstable_cache(
+      () => loadBrandsWithVariants(admin, userId),
+      ['brands-with-variants', userId],
+      { tags: [brandsCacheTag(userId)], revalidate: BRANDS_CACHE_TTL_SECONDS },
+    )();
   },
 );
 

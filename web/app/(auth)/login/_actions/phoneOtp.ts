@@ -1,10 +1,10 @@
 'use server';
 
-import { headers, cookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createAdminClient } from '@web/lib/supabase/admin';
+import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
 import {
   getCountryByCode,
   isPhoneOtpEnabled,
@@ -47,39 +47,6 @@ const verifySchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.'),
   next: z.string().optional().nullable(),
 });
-
-interface RateLimitKey {
-  kind: string;
-  key: string;
-  max: number;
-  windowSec: number;
-}
-
-function getClientIp(): string {
-  const h = headers();
-  const xff = h.get('x-forwarded-for');
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  return h.get('x-real-ip') ?? 'unknown';
-}
-
-async function checkRateLimits(keys: RateLimitKey[]): Promise<boolean> {
-  const admin = createAdminClient();
-  if (!admin) return false;
-  for (const k of keys) {
-    const { data, error } = await admin.rpc('consume_rate_limit', {
-      p_kind: k.kind,
-      p_key: k.key,
-      p_max: k.max,
-      p_window_sec: k.windowSec,
-    });
-    if (error) return false;
-    if (data === false) return false;
-  }
-  return true;
-}
 
 function isNextRedirectError(err: unknown): boolean {
   return (

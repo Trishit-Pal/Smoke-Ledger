@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { emailZodStrict } from '@web/lib/auth/email';
+import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
 import {
   REMEMBER_ME_COOKIE,
   applyAuthCookiePolicy,
@@ -69,6 +70,23 @@ export async function signInWithPasswordAction(
 
     const { email, password, rememberMe = false, captchaToken } = parsed.data;
     nextPathToRedirect = sanitizeNextPath(parsed.data.next ?? null);
+
+    // DB-backed token bucket (same `consume_rate_limit` RPC as OTP). Fail-open
+    // so a missing service-role key can't lock everyone out of sign-in —
+    // Supabase's native auth limits remain as a backstop. See SCALING_PLAN.md §2a.
+    const rateOk = await checkRateLimits(
+      [
+        { kind: 'pw_login_ip', key: getClientIp(), max: 10, windowSec: 600 },
+        { kind: 'pw_login_email', key: email.trim().toLowerCase(), max: 5, windowSec: 900 },
+      ],
+      { failOpen: true },
+    );
+    if (!rateOk) {
+      return {
+        code: 'rate_limited',
+        message: 'Too many sign-in attempts. Please wait a few minutes and try again.',
+      };
+    }
 
     const cookieStore = cookies();
     try {

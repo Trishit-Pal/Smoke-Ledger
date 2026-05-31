@@ -86,4 +86,16 @@ describe('catalogSync', () => {
     expect(mockSync).toHaveBeenCalledTimes(2);
     expect(storage.getItem(CATALOG_SYNC_STORAGE_KEY)).toBe(CATALOG_SYNC_VERSION);
   });
+
+  it('maybeSyncDefaultBrandCatalog times out a hanging sync without marking storage', async () => {
+    const storage = makeStorage();
+    // A sync that never settles simulates a stalled network on boot; the
+    // timeout race must reject and leave the marker unwritten so the next
+    // launch retries.
+    mockSync.mockImplementationOnce(() => new Promise<void>(() => {}));
+    await expect(
+      maybeSyncDefaultBrandCatalog(storage, { timeoutMs: 10 }),
+    ).rejects.toThrow('catalog_sync_timeout');
+    expect(storage.getItem(CATALOG_SYNC_STORAGE_KEY)).toBeNull();
+  });
 });

@@ -64,6 +64,10 @@ const config = {
         './lib/supabase/client',
       ),
       [path.resolve(__dirname, '../src/lib/secureStore')]: path.resolve(__dirname, './lib/storage'),
+      [path.resolve(__dirname, '../src/lib/catalogStorageNative')]: path.resolve(
+        __dirname,
+        './lib/catalogStorageNative',
+      ),
       [path.resolve(__dirname, '../src/lib/haptics')]: path.resolve(__dirname, './lib/haptics'),
       [path.resolve(__dirname, '../src/hooks/useTheme')]: path.resolve(
         __dirname,

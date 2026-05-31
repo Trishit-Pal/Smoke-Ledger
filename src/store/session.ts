@@ -5,6 +5,7 @@ import type { Brand, BrandVariant, CigaretteLog, Goal, UserProfile } from '@/typ
 import * as logsRepo from '@/db/repositories/logs';
 import * as brandsRepo from '@/db/repositories/brands';
 import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
+import { makeNativeCatalogStorage } from '@/lib/catalogStorageNative';
 import * as goalsRepo from '@/db/repositories/goals';
 import * as profileRepo from '@/db/repositories/profile';
 import { daysAgoIst, todayIst } from '@/lib/date';
@@ -50,8 +51,12 @@ export const useSession = create<SessionState>((set, get) => ({
     }),
 
   boot: async () => {
-    // Keep existing users in sync with the evolving default catalog (once per tab/version).
-    await maybeSyncDefaultBrandCatalog().catch(() => undefined);
+    // Keep existing users in sync with the evolving default catalog (once per
+    // catalog version). On native we hydrate the marker from AsyncStorage so the
+    // gate survives cold boots — without it, `window` is undefined and the RPC
+    // would re-run on every launch. The RPC is timeout-guarded internally.
+    const catalogStorage = await makeNativeCatalogStorage();
+    await maybeSyncDefaultBrandCatalog(catalogStorage).catch(() => undefined);
     const [profile, logs, brands, goals] = await Promise.all([
       profileRepo.getProfile(),
       logsRepo.listLogs({ fromDate: daysAgoIst(LOG_LOOKBACK_DAYS), toDate: todayIst() }),

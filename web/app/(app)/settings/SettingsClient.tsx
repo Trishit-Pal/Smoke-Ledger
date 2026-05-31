@@ -38,7 +38,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { revalidateAppViews } from '../_actions/revalidate';
+import { revalidateAppViews, revalidateBrands } from '../_actions/revalidate';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSupabase } from '@web/lib/supabase/client';
@@ -375,6 +375,7 @@ export function SettingsClient({
     try {
       const brand = await createBrand(brandName, newCategory);
       await upsertVariant(brand.id, variantName, packSize, avgPrice);
+      await revalidateBrands();
       await revalidateAppViews();
       router.refresh();
       await track(AnalyticsEvents.BRAND_CREATED, { category: newCategory, is_seed: false });

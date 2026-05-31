@@ -2,6 +2,11 @@ import * as React from 'react';
 import { LegalDocument } from '@web/components/legal/LegalDocument';
 import { LEGAL_COPY, LEGAL_VERSIONS } from '@web/lib/legal';
 
+// Pure static legal content — no per-request data. Serve from the CDN and
+// revalidate daily instead of rendering per request. See SCALING_PLAN.md §2b.
+export const dynamic = 'force-static';
+export const revalidate = 86400;
+
 const sections = [
   {
     title: 'What this policy covers',
