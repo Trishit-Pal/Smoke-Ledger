@@ -8,6 +8,7 @@ import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { emailZodStrict } from '@web/lib/auth/email';
 import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 import {
   REMEMBER_ME_COOKIE,
   applyAuthCookiePolicy,
@@ -47,8 +48,8 @@ export async function signInWithPasswordAction(
   let nextPathToRedirect: string | null = null;
 
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    const supabaseUrl = readSupabaseUrl();
+    const supabaseAnonKey = readSupabaseAnonKey();
     if (!supabaseUrl || !supabaseAnonKey) {
       return { code: 'server_misconfigured', message: 'Sign-in is temporarily unavailable.' };
     }

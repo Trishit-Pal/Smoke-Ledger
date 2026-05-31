@@ -6,6 +6,7 @@ import {
   isSupabaseAuthCookie,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 let client: SupabaseClient | null = null;
 
@@ -41,16 +42,13 @@ function serializeBrowserCookie(name: string, value: string, options?: AuthCooki
 }
 
 export function isSupabaseConfigured(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return !!(readSupabaseUrl() && readSupabaseAnonKey());
 }
 
 export function getSupabase(): SupabaseClient {
   if (client) return client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url = readSupabaseUrl();
+  const key = readSupabaseAnonKey();
   if (!url || !key) {
     throw new Error(
       'Supabase env is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',

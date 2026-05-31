@@ -11,6 +11,7 @@ import {
   toE164,
 } from '@web/lib/auth/phone';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 import {
   applyAuthCookiePolicy,
   hardenCookieOptions,
@@ -103,8 +104,8 @@ export async function sendPhoneOtpAction(
     };
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const supabaseUrl = readSupabaseUrl();
+  const anonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !anonKey) {
     return { code: 'unavailable', message: 'Sign-in is temporarily unavailable.' };
   }
@@ -174,8 +175,8 @@ export async function verifyPhoneOtpAction(
       };
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    const supabaseUrl = readSupabaseUrl();
+    const anonKey = readSupabaseAnonKey();
     if (!supabaseUrl || !anonKey) {
       return { code: 'unavailable', message: 'Sign-in is temporarily unavailable.' };
     }

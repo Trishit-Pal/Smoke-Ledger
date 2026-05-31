@@ -10,6 +10,7 @@ import {
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
 import { sanitizeCallbackNextPath, CALLBACK_ONBOARDING_PATHS } from '@web/lib/auth/callbackNextPath';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 type CookieOptions = AuthCookieOptions;
 
@@ -41,8 +42,8 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get('type') as EmailOtpType | null;
   let nextPath = sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = readSupabaseUrl();
+  const supabaseAnonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.redirect(new URL('/login', requestUrl.origin));
   }

@@ -9,6 +9,7 @@ import {
   REMEMBER_ME_COOKIE,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
+import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 const AUTH_ROUTES = ['/login', '/signup', '/reset'];
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support'];
@@ -87,8 +88,8 @@ export async function middleware(request: NextRequest) {
     return res;
   };
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const supabaseUrl = readSupabaseUrl();
+  const supabaseAnonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {
     if (IS_PROD) {
       console.error('[middleware] Supabase env missing; refusing protected routes.');
