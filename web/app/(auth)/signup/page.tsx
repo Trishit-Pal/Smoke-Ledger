@@ -19,8 +19,13 @@ import {
   SECONDARY_CTA_STYLE,
 } from '@web/lib/auth/inputStyle';
 import { emailZodStrict, useDebouncedEmailValidity } from '@web/lib/auth/email';
+import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
+import { precheckSignupAction, precheckResendAction } from '../_actions/authPrechecks';
 // CHARACTER (1): mood dispatcher.
 import { dispatchMood } from '@web/lib/character/mood';
+
+const SERVICE_UNAVAILABLE_MESSAGE =
+  'Service is temporarily unavailable. Please try again in a moment.';
 
 const schema = z
   .object({
@@ -56,16 +61,26 @@ function SignupEmailSuccess({ email }: { email: string }) {
     setResendInfo(null);
     setResendError(null);
     try {
-      const { error } = await getSupabase().auth.resend({
-        type: 'signup',
-        email,
-        options: { emailRedirectTo: emailRedirectTo() },
-      });
+      const gate = await precheckResendAction(email);
+      if (!gate.ok) {
+        setResendError(gate.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      const { error } = await withTimeout(
+        getSupabase().auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: emailRedirectTo() },
+        }),
+        DEFAULT_AUTH_TIMEOUT_MS,
+      );
       if (error) {
         setResendError(toSafeErrorMessage(error, 'dependency_failure'));
         return;
       }
       setResendInfo('If your account is pending confirmation, we sent another email.');
+    } catch {
+      setResendError(SERVICE_UNAVAILABLE_MESSAGE);
     } finally {
       setResendLoading(false);
     }
@@ -244,14 +259,28 @@ export default function SignupPage() {
       return;
     }
     const trimmedEmail = values.email.trim();
-    const { data, error } = await getSupabase().auth.signUp({
-      email: trimmedEmail,
-      password: values.password,
-      options: {
-        emailRedirectTo: emailRedirectTo(),
-        ...(captchaToken ? { captchaToken } : {}),
-      },
-    });
+    const gate = await precheckSignupAction(trimmedEmail);
+    if (!gate.ok) {
+      setSubmitError(gate.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+      return;
+    }
+    const result = await withTimeout(
+      getSupabase().auth.signUp({
+        email: trimmedEmail,
+        password: values.password,
+        options: {
+          emailRedirectTo: emailRedirectTo(),
+          ...(captchaToken ? { captchaToken } : {}),
+        },
+      }),
+      DEFAULT_AUTH_TIMEOUT_MS,
+    ).catch(() => null);
+    if (!result) {
+      setSubmitError(SERVICE_UNAVAILABLE_MESSAGE);
+      setCaptchaToken(null);
+      return;
+    }
+    const { data, error } = result;
     if (error) {
       setSubmitError(toSafeErrorMessage(error, 'authentication_error'));
       setCaptchaToken(null);
@@ -291,20 +320,31 @@ export default function SignupPage() {
     }
     setOtpSignupLoading(true);
     try {
-      const { error } = await getSupabase().auth.signInWithOtp({
-        email: parsed.data,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: emailRedirectTo(),
-          ...(captchaToken ? { captchaToken } : {}),
-        },
-      });
+      const gate = await precheckSignupAction(parsed.data);
+      if (!gate.ok) {
+        setOtpSignupError(gate.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      const { error } = await withTimeout(
+        getSupabase().auth.signInWithOtp({
+          email: parsed.data,
+          options: {
+            shouldCreateUser: true,
+            emailRedirectTo: emailRedirectTo(),
+            ...(captchaToken ? { captchaToken } : {}),
+          },
+        }),
+        DEFAULT_AUTH_TIMEOUT_MS,
+      );
       if (error) {
         setOtpSignupError(toSafeErrorMessage(error, 'authentication_error'));
         setCaptchaToken(null);
         return;
       }
       setSuccessEmail(parsed.data);
+    } catch {
+      setOtpSignupError(SERVICE_UNAVAILABLE_MESSAGE);
+      setCaptchaToken(null);
     } finally {
       setOtpSignupLoading(false);
     }

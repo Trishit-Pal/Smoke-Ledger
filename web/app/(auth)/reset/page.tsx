@@ -12,6 +12,11 @@ import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosi
 import { LEGAL_LINKS } from '@web/lib/legal';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { emailZodStrict } from '@web/lib/auth/email';
+import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
+import { precheckResetAction } from '../_actions/authPrechecks';
+
+const SERVICE_UNAVAILABLE_MESSAGE =
+  'Service is temporarily unavailable. Please try again in a moment.';
 
 const schema = z.object({
   email: emailZodStrict,
@@ -69,14 +74,32 @@ export default function ResetPage() {
       setSubmitError('Please complete the security check.');
       return;
     }
+    const trimmedEmail = values.email.trim();
+    const gate = await precheckResetAction(trimmedEmail);
+    if (!gate.ok) {
+      setSubmitError(gate.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+      return;
+    }
     const redirectTo =
       typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`
         : undefined;
-    await getSupabase().auth.resetPasswordForEmail(values.email.trim(), {
-      redirectTo,
-      ...(captchaToken ? { captchaToken } : {}),
-    });
+    try {
+      // Timeout only guards against a hung request. We otherwise stay neutral
+      // (ignore the result) so the success screen never reveals whether the
+      // email exists — the anti-enumeration contract.
+      await withTimeout(
+        getSupabase().auth.resetPasswordForEmail(trimmedEmail, {
+          redirectTo,
+          ...(captchaToken ? { captchaToken } : {}),
+        }),
+        DEFAULT_AUTH_TIMEOUT_MS,
+      );
+    } catch {
+      setCaptchaToken(null);
+      setSubmitError(SERVICE_UNAVAILABLE_MESSAGE);
+      return;
+    }
     setCaptchaToken(null);
     setSuccess(true);
   };

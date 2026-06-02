@@ -8,6 +8,8 @@ import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { emailZodStrict } from '@web/lib/auth/email';
 import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
+import { isNextRedirectError, safeAuthCatchState } from '@web/lib/auth/authCatch';
+import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 import {
   REMEMBER_ME_COOKIE,
@@ -28,18 +30,6 @@ const schema = z.object({
   captchaToken: z.string().min(1).optional(),
   next: z.string().optional().nullable(),
 });
-
-function isNextRedirectError(err: unknown): boolean {
-  // next/navigation's redirect() throws an Error whose digest starts with
-  // 'NEXT_REDIRECT'. This is the framework's signal — never swallow it.
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'digest' in err &&
-    typeof (err as { digest?: unknown }).digest === 'string' &&
-    (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
-  );
-}
 
 export async function signInWithPasswordAction(
   _prev: LoginActionState,
@@ -124,11 +114,14 @@ export async function signInWithPasswordAction(
       },
     });
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-      options: captchaToken ? { captchaToken } : undefined,
-    });
+    const { error } = await withTimeout(
+      supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+        options: captchaToken ? { captchaToken } : undefined,
+      }),
+      DEFAULT_AUTH_TIMEOUT_MS,
+    );
 
     if (error) {
       return {
@@ -138,11 +131,11 @@ export async function signInWithPasswordAction(
     }
   } catch (err) {
     if (isNextRedirectError(err)) throw err;
-    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    // TEMPORARY: surface the actual error in the action state so production
-    // can be diagnosed without runtime-log access. Replace with a generic
-    // message once the underlying throw is identified and fixed.
-    return { code: 'diagnostic_error', message: `Sign-in failed: ${msg.slice(0, 300)}` };
+    // Log the real error server-side (Vercel logs); return a GENERIC message so
+    // raw internal error text never reaches the client. A withTimeout deadline
+    // also lands here as a dependency_failure rather than a hung spinner.
+    console.error('[login] unexpected sign-in error', err);
+    return safeAuthCatchState(err);
   }
 
   // redirect() throws NEXT_REDIRECT so the client receives a 303 with the
