@@ -16,6 +16,8 @@ import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/T
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { signInWithPasswordAction } from './actions';
+import { precheckResendAction } from '../_actions/authPrechecks';
+import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { initialLoginActionState, type LoginActionState } from './loginActionState';
 import {
   sendPhoneOtpAction,
@@ -40,6 +42,9 @@ import {
 import { dispatchMood } from '@web/lib/character/mood';
 
 const emailSchema = emailZodStrict;
+
+const SERVICE_UNAVAILABLE_MESSAGE =
+  'Service is temporarily unavailable. Please try again in a moment.';
 
 type AuthMode = 'password' | 'email_otp' | 'phone_otp';
 
@@ -313,17 +318,27 @@ function LoginPageInner() {
     setResendLoading(true);
     setResendInfo(null);
     try {
-      const { error } = await getSupabase().auth.resend({
-        type: 'signup',
-        email,
-        options: { emailRedirectTo: callbackRedirectTo },
-      });
+      const gate = await precheckResendAction(email);
+      if (!gate.ok) {
+        setSubmitError(gate.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      const { error } = await withTimeout(
+        getSupabase().auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: callbackRedirectTo },
+        }),
+        DEFAULT_AUTH_TIMEOUT_MS,
+      );
       if (error) {
         setSubmitError(toAuthErrorMessage(error));
         return;
       }
       setSubmitError(null);
       setResendInfo('If your account is pending confirmation, we sent another email.');
+    } catch {
+      setSubmitError(SERVICE_UNAVAILABLE_MESSAGE);
     } finally {
       setResendLoading(false);
     }
