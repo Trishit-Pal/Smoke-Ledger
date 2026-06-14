@@ -187,6 +187,7 @@ function LoginPageInner() {
     [searchParams],
   );
   const callbackError = searchParams.get('error');
+  const reason = searchParams.get('reason');
   const [mode, setMode] = React.useState<AuthMode>('password');
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [otpError, setOtpError] = React.useState<string | null>(null);
@@ -468,6 +469,9 @@ function LoginPageInner() {
             <span>Keep me signed in on this device</span>
           </label>
 
+          {reason === 'reauth' && !passwordError ? (
+            <InlineInfo message="Confirm it's you to finish deleting your account." />
+          ) : null}
           {passwordError ? <InlineError message={passwordError} /> : null}
           {resendInfo ? <InlineInfo message={resendInfo} /> : null}
 

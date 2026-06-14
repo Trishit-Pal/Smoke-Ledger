@@ -49,7 +49,7 @@ import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
-import { toSafeErrorMessage } from '@/lib/errors';
+import { toSafeErrorMessage, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant } from '@/db/repositories/brands';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
@@ -70,6 +70,7 @@ export interface SettingsClientProps {
   profile: UserProfile;
   brands: (Brand & { variants: BrandVariant[] })[];
   analyticsOptIn: boolean;
+  initialAction?: string;
 }
 
 /** Editorial-stage CSS-variable indexing helper — drives the stagger reveal. */
@@ -217,6 +218,7 @@ export function SettingsClient({
   profile,
   brands: _initialBrands,
   analyticsOptIn: initialAnalyticsOptIn,
+  initialAction,
 }: SettingsClientProps) {
   const router = useRouter();
 
@@ -247,6 +249,17 @@ export function SettingsClient({
     setToast(msg);
     window.setTimeout(() => setToast(null), 2500);
   }, []);
+
+  // ── Re-auth resume: open delete dialog if redirected back with ?action=delete ──
+  const initialActionHandled = React.useRef(false);
+  React.useEffect(() => {
+    if (initialActionHandled.current) return;
+    if (initialAction === 'delete' && confirmAction === null) {
+      initialActionHandled.current = true;
+      setConfirmAction('delete');
+      router.replace('/settings');
+    }
+  }, [initialAction, confirmAction, router]);
 
   // ── Handlers (semantics preserved; data path unchanged) ─────────────────
   const onSaveProfile = async () => {
@@ -424,15 +437,29 @@ export function SettingsClient({
   const onDeleteAccount = async () => {
     setBusy('delete-account');
     setError(null);
+    // Hoisted so finally can read it — suppresses dialog close on reauth redirect.
+    let isReauthRedirect = false;
     try {
-      await deleteUserAccount();
+      await deleteUserAccount({
+        onReauthRequired: () => {
+          router.push(
+            `/login?next=${encodeURIComponent('/settings?action=delete')}&reason=reauth`,
+          );
+        },
+      });
       await wipeSecureStore();
       router.replace('/login');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      // When onReauthRequired fires, it throws AppError('authentication_error').
+      // The redirect IS the UX — suppress the error stripe and keep the dialog
+      // open so there is no flash before navigation lands.
+      isReauthRedirect = isAppError(e) && e.code === 'authentication_error';
+      if (!isReauthRedirect) {
+        setError(toSafeErrorMessage(e, 'dependency_failure'));
+      }
     } finally {
       setBusy(null);
-      setConfirmAction(null);
+      if (!isReauthRedirect) setConfirmAction(null);
     }
   };
 

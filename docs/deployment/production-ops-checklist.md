@@ -31,7 +31,9 @@ SELECT name, avg_price_inr FROM smoke_seed.brand_catalog WHERE sort_order IN (1,
 - [ ] **Password reset** enabled
 - [ ] **URL configuration** — Site URL + redirect URLs include `/auth/callback` (see [auth-email-delivery.md](./auth-email-delivery.md))
 - [ ] **Custom SMTP** configured for reliable mail (Resend or similar) — built-in mailer is rate-limited
+- [ ] **Leaked password protection** — Dashboard → Authentication → Security → Password Strength → enable "Check against HaveIBeenPwned.org" (currently flagged as WARN by security advisors)
 - [ ] Optional: **Captcha** (Cloudflare Turnstile) — set site key in Vercel as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- [ ] Optional: **`REAUTH_WINDOW_MIN` on Edge Functions** — `delete-account` defaults to 15 min. If users report spurious "sign in again" prompts, raise this env var (e.g. `30`). Do not remove it — the gate blocks stolen-refresh-token account deletion.
 
 Full email troubleshooting: [docs/deployment/auth-email-delivery.md](./auth-email-delivery.md)
 

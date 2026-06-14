@@ -2,6 +2,7 @@ import { getSupabase } from '@/lib/supabase';
 import { useSession } from '@/store/session';
 import { invalidateAnalyticsConsentCache } from '@/services/analytics';
 import { AppError, classifyError } from '@/lib/errors';
+import { parseEdgeFunctionError, parseEdgeResponse } from '@/lib/edgeFunctionError';
 
 interface DeleteOptions {
   /**
@@ -33,7 +34,29 @@ export async function deleteUserAccount(options: DeleteOptions = {}): Promise<vo
   const { data, error } = await supabase.functions.invoke('delete-account', {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (error) throw new AppError(classifyError(error), error.message);
+
+  if (error) {
+    // supabase-js v2: non-2xx responses set data=null and error=FunctionsHttpError.
+    // The structured body lives in error.context (a native Response object).
+    const body = await parseEdgeResponse(error);
+    const { code, serverCode } = parseEdgeFunctionError(body);
+
+    if (serverCode === 'reauth_required') {
+      options.onReauthRequired?.();
+      throw new AppError('authentication_error', 'Please sign in again to confirm account deletion.');
+    }
+    if (serverCode === 'rate_limited') {
+      throw new AppError('rate_limited', 'Too many delete attempts. Please wait and try again.');
+    }
+    if (body !== null) {
+      throw new AppError(code, serverCode ?? error.message);
+    }
+    // No structured body (network error, HTML 524, etc.) — fall back to message heuristics.
+    throw new AppError(classifyError(error), error.message);
+  }
+
+  // Legacy fallback: supabase-js never puts error body in data for non-2xx,
+  // but this branch is kept for SDK compatibility.
   if (data && typeof data === 'object' && 'error' in data) {
     const code = String((data as { error: string }).error);
     if (code === 'reauth_required') {

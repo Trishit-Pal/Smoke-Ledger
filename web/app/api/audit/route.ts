@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@web/lib/supabase/server';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
+import { serverLog } from '@web/lib/log';
 
 const auditBodySchema = z.object({
   eventType: z.string().min(1).max(80),
@@ -73,9 +74,7 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 204 });
     }
 
-    if (edgeRes.status !== 204) {
-      console.error('[api/audit] edge failed', edgeRes.status, edgeBody);
-    }
+    serverLog('error', 'api.audit.edge_failed', { status: edgeRes.status, body: edgeBody });
 
     if (edgeRes.status === 429) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
