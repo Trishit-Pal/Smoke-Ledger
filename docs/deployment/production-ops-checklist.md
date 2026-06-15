@@ -2,6 +2,8 @@
 
 Run after linking Supabase (`supabase link`) and before treating production as ready.
 
+> **Automated gate:** the [`release-preflight` skill](../../.claude/skills/release-preflight/SKILL.md) runs the full pre-ship suite (typecheck, tests, build, lint, `verify:backend`, `verify:sovereignty`, `preflight:launch`, live advisors) and routes the diff through the repo's review agents. The latest point-in-time data-sovereignty audit is at [docs/security/sovereignty-audit-2026-06.md](../security/sovereignty-audit-2026-06.md). This checklist covers the **dashboard/config** blockers those scripts cannot change for you.
+
 ## 0. Dev environment note (C4 audit)
 
 - If your local Supabase DB was initialized before the C4 audit fix, `user_profiles.baseline_per_day` may still be `double precision`. Run `ALTER TABLE public.user_profiles ALTER COLUMN baseline_per_day TYPE numeric(5,2);` or reset the local DB with `supabase db reset`.
