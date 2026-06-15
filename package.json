@@ -9,6 +9,8 @@
     "functions:deploy:audit-record": "supabase functions deploy audit-record",
     "functions:deploy:all": "npm run functions:deploy:delete-account && npm run functions:deploy:audit-record",
     "verify:backend": "node scripts/verify-backend.mjs",
+    "verify:sovereignty": "node scripts/verify-sovereignty.mjs",
+    "preflight:all": "npm run verify:backend && npm run verify:sovereignty",
     "preflight:launch": "node scripts/preflight-launch.mjs",
     "start": "expo start",
     "android": "expo start --android",
