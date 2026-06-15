@@ -12,5 +12,10 @@ out/
 coverage/
 test-results/
 *.tsbuildinfo
-.claude/
+# Ignore local Claude Code config, but commit the shared, repo-scoped
+# agents/skills/index so every contributor and CI run shares the same gates.
+.claude/*
+!.claude/agents/
+!.claude/skills/
+!.claude/README.md
 supabase/.temp/
