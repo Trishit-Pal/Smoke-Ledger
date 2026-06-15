@@ -447,8 +447,16 @@ export function SettingsClient({
           );
         },
       });
-      await wipeSecureStore();
-      router.replace('/login');
+      // Best-effort local cleanup; the account is already gone server-side, so
+      // never block the homepage redirect on it.
+      try {
+        await wipeSecureStore();
+      } catch {
+        // Ignore — deletion already succeeded; the redirect must still happen.
+      }
+      // Account is gone — return the user to the public homepage with a
+      // confirmation flag (the landing page shows a dismissible notice).
+      router.replace('/?deleted=1');
     } catch (e) {
       // When onReauthRequired fires, it throws AppError('authentication_error').
       // The redirect IS the UX — suppress the error stripe and keep the dialog
