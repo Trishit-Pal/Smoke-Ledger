@@ -22,6 +22,7 @@ const IS_PROD = ENV === 'production';
 
 export const DEFAULT_PROD_ORIGINS: readonly string[] = [
   'https://smoke-ledger.vercel.app',
+  'https://smoke-ledger-beige.vercel.app', // canonical Vercel production alias
   'https://smokeledger.app',
 ];
 
