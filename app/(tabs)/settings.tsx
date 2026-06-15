@@ -492,8 +492,19 @@ export default function Settings() {
             setError(null);
             try {
               await deleteUserAccount();
-              await wipeSecureStore();
-              router.replace('/login');
+              // Best-effort local cleanup; never block the redirect on it.
+              try {
+                await wipeSecureStore();
+              } catch {
+                // Ignore — deletion already succeeded.
+              }
+              // Confirm completion, then return to the first-run login entry.
+              // The account is gone; the same email can sign up fresh.
+              Alert.alert(
+                'Account deleted',
+                'Your account and all its data have been removed. You can create a new account anytime.',
+                [{ text: 'OK', onPress: () => router.replace('/login') }],
+              );
             } catch (e) {
               setError(toSafeErrorMessage(e, 'dependency_failure'));
             } finally {

@@ -69,7 +69,10 @@ export async function deleteUserAccount(options: DeleteOptions = {}): Promise<vo
     throw new AppError('dependency_failure', code);
   }
 
-  await supabase.auth.signOut();
+  // The auth user is already deleted server-side, so a global revoke is a
+  // doomed round-trip. Local scope clears the client session instantly and
+  // lets the caller navigate to the homepage without waiting on the network.
+  await supabase.auth.signOut({ scope: 'local' });
   try {
     useSession.getState().reset();
   } catch {

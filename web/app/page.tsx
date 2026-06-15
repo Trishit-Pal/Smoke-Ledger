@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { PublicPageShell } from '@web/components/layout/PublicPageShell';
+import { AccountDeletedNotice } from '@web/components/marketing/AccountDeletedNotice';
 import { LandingHero } from '@web/components/marketing/LandingHero';
 import { LandingTrustStrip } from '@web/components/marketing/LandingTrustStrip';
 import { LandingProductBento } from '@web/components/marketing/LandingProductBento';
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <PublicPageShell>
+      <AccountDeletedNotice />
       <LandingHero />
       <LandingTrustStrip />
       <LandingProductBento />
