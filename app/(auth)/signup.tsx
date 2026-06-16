@@ -10,12 +10,10 @@ import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
 import { toSafeErrorMessage } from '@/lib/errors';
-import { isAdult } from '@/domain/age';
+import { computeAge, MIN_AGE } from '@/domain/age';
 import { GENDER_VALUES } from '@/lib/validation';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Gender } from '@/types';
-
-const DOB_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function SignupScreen() {
   const theme = useTheme();
@@ -37,11 +35,14 @@ export default function SignupScreen() {
       setErr('Please enter your name.');
       return;
     }
-    if (!DOB_RE.test(dob)) {
-      setErr('Enter your date of birth as YYYY-MM-DD.');
+    // computeAge returns null for malformed or impossible dates (e.g. Feb 30),
+    // so distinguish "invalid date" from "underage" with the right message.
+    const age = computeAge(dob);
+    if (age === null) {
+      setErr('Enter a valid date of birth as YYYY-MM-DD.');
       return;
     }
-    if (!isAdult(dob)) {
+    if (age < MIN_AGE) {
       setErr('You must be 18 or older to use Smoke Ledger.');
       return;
     }

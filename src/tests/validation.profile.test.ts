@@ -15,9 +15,10 @@ describe('ProfilePatchSchema — identity + optional fields', () => {
     expect(ok({ fullName: 'x'.repeat(81) })).toBe(false);
   });
 
-  it('rejects a malformed date of birth', () => {
+  it('rejects a malformed or impossible date of birth', () => {
     expect(ok({ dateOfBirth: '2000-1-1' })).toBe(false);
     expect(ok({ dateOfBirth: '01/01/2000' })).toBe(false);
+    expect(ok({ dateOfBirth: '2000-02-30' })).toBe(false); // calendar-invalid
   });
 
   it('rejects an unknown gender value', () => {

@@ -138,16 +138,19 @@ DECLARE
   v_gender    text := nullif(NEW.raw_user_meta_data ->> 'gender', '');
   v_dob       date := NULL;
 BEGIN
-  -- Parse DOB defensively; malformed input becomes NULL (completion gate asks later).
+  -- If a DOB is supplied it must parse AND be 18+. Fail CLOSED: a present-but-
+  -- unparseable value aborts the signup rather than silently dropping to NULL,
+  -- which would skip the age gate. (A NULL/absent DOB is the legacy/admin path.)
   IF v_dob_text IS NOT NULL THEN
     BEGIN
       v_dob := v_dob_text::date;
     EXCEPTION
-      WHEN others THEN v_dob := NULL;
+      WHEN others THEN
+        RAISE EXCEPTION 'invalid_date_of_birth' USING ERRCODE = '22007';
     END;
     -- HARD 18+ gate at account creation: a minor's auth.users insert is rolled back
     -- entirely, so no account (and no email/phone row) is ever stored.
-    IF v_dob IS NOT NULL AND v_dob > (current_date - interval '18 years') THEN
+    IF v_dob > (current_date - interval '18 years') THEN
       RAISE EXCEPTION 'underage_signup' USING ERRCODE = '23514';
     END IF;
   END IF;

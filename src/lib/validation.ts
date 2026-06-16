@@ -173,10 +173,9 @@ export const ProfileSchema = z
     // Identity — set once at signup (or via the completion form), then immutable
     // server-side. age is derived from dateOfBirth; never stored as a stale int.
     fullName: z.string().trim().min(1).max(80).optional(),
-    dateOfBirth: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must be YYYY-MM-DD')
-      .optional(),
+    // YmdSchema also rejects impossible calendar dates (e.g. 2000-02-30), so a
+    // bad value fails validation here instead of erroring at the DB cast.
+    dateOfBirth: YmdSchema.optional(),
     gender: z.enum(GENDER_VALUES).optional(),
     // Optional, editable in Settings (mobile is rate-limited to once / 30 days).
     mobileE164: z

@@ -16,8 +16,8 @@
  *  never alarm red.
  *
  *  Motion: .editorial-stage choreography. Index allocation:
- *    0 = masthead, 1 = Preferences, 2 = Privacy, 3 = Brand catalog,
- *    4 = Data, 5 = Account, 6 = end-mark.
+ *    0 = masthead, 1 = Preferences, 1.5 = Profile, 2 = Privacy,
+ *    3 = Brand catalog, 4 = Data, 5 = Account, 6 = end-mark.
  *  Toggles and inline edits do NOT have entrance animations — they're stateful
  *  controls, not narrative content. All animation short-circuits under
  *  prefers-reduced-motion via the global @media block in globals.css.
