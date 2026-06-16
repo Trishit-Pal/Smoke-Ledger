@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Switch, Alert, Linking, Pressable, TextInput } from 'react-native';
+import {
+  View,
+  Switch,
+  Alert,
+  Linking,
+  Pressable,
+  TextInput,
+  type KeyboardTypeOptions,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -28,8 +36,11 @@ import {
 } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { LEGAL_URLS } from '@/lib/legal';
-import { toSafeErrorMessage } from '@/lib/errors';
+import { toSafeErrorMessage, isAppError } from '@/lib/errors';
 import { dispatchFarewell } from '@/lib/character/mood';
+import { computeAge } from '@/domain/age';
+import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -37,7 +48,10 @@ import type { Brand } from '@/types';
 type BusyAction =
   | null
   | 'save-baseline'
+  | 'save-mobile'
+  | 'save-place'
   | 'signout'
+  | 'return-home'
   | 'export-json'
   | 'erase-all'
   | 'delete-account'
@@ -285,6 +299,151 @@ function BaselineSection({ initialBaseline, busy, reduce, onSave }: BaselineSect
   );
 }
 
+// ─── Inline editable text row (mobile number, place) ──────────────────────────
+
+interface InlineEditRowProps {
+  label: string;
+  sublabel?: string;
+  value: string | null;
+  placeholder?: string;
+  keyboardType?: KeyboardTypeOptions;
+  busyKey: BusyAction;
+  busy: BusyAction;
+  /** When false, the field is read-only (e.g. mobile is in its 30-day lock). */
+  editable?: boolean;
+  strongRule?: boolean;
+  onSave: (value: string, onDone: () => void) => void;
+}
+
+function InlineEditRow({
+  label,
+  sublabel,
+  value,
+  placeholder,
+  keyboardType = 'default',
+  busyKey,
+  busy,
+  editable = true,
+  strongRule,
+  onSave,
+}: InlineEditRowProps) {
+  const theme = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+
+  const isBusy = busy === busyKey;
+  const isAnyBusy = busy !== null;
+  const hasValue = !!value && value.trim() !== '';
+
+  const handleEdit = () => {
+    setDraft(value ?? '');
+    setEditing(true);
+  };
+  const handleCancel = () => {
+    setDraft(value ?? '');
+    setEditing(false);
+  };
+  const handleSave = () => onSave(draft, () => setEditing(false));
+
+  return (
+    <PrefRow
+      strongRule={strongRule}
+      label={label}
+      sublabel={sublabel}
+      control={
+        editing ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              keyboardType={keyboardType}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
+              accessibilityLabel={label}
+              placeholder={placeholder}
+              placeholderTextColor={theme.textFaint}
+              style={{
+                minWidth: 150,
+                color: theme.text,
+                fontFamily: fonts.body,
+                fontSize: typography.small.fontSize,
+                textAlign: 'right',
+                borderBottomWidth: 1,
+                borderBottomColor: theme.ruleStrong,
+                paddingVertical: spacing.xs,
+              }}
+            />
+            <TextLink
+              onPress={handleSave}
+              busy={isBusy}
+              disabled={isAnyBusy}
+              accessibilityLabel={`Save ${label}`}
+            >
+              Save
+            </TextLink>
+            <TextLink onPress={handleCancel} disabled={isAnyBusy}>
+              Cancel
+            </TextLink>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text
+              variant="small"
+              color={hasValue ? theme.text : theme.textFaint}
+              style={{ fontFamily: fonts.bodyMedium }}
+            >
+              {hasValue ? value : 'Not set'}
+            </Text>
+            {editable ? (
+              <TextLink
+                onPress={handleEdit}
+                disabled={isAnyBusy}
+                accessibilityLabel={`Edit ${label}`}
+              >
+                Edit
+              </TextLink>
+            ) : null}
+          </View>
+        )
+      }
+    />
+  );
+}
+
+// ─── Read-only display row (immutable identity) ───────────────────────────────
+
+function ReadonlyRow({
+  label,
+  sublabel,
+  value,
+  strongRule,
+}: {
+  label: string;
+  sublabel?: string;
+  value: string | null;
+  strongRule?: boolean;
+}) {
+  const theme = useTheme();
+  const hasValue = !!value && value.trim() !== '';
+  return (
+    <PrefRow
+      strongRule={strongRule}
+      label={label}
+      sublabel={sublabel}
+      control={
+        <Text
+          variant="small"
+          color={hasValue ? theme.text : theme.textFaint}
+          style={{ fontFamily: fonts.bodyMedium }}
+        >
+          {hasValue ? value : 'Not set'}
+        </Text>
+      }
+    />
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -331,6 +490,46 @@ export default function Settings() {
         throw new Error('Baseline must be a valid number.');
       }
       await updateProfile({ baselinePerDay: parsed });
+      await refreshProfile();
+      onDone();
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'validation_error'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveMobile = async (raw: string, onDone: () => void) => {
+    setBusy('save-mobile');
+    setError(null);
+    try {
+      const trimmed = raw.trim();
+      const value = trimmed === '' ? null : normalizeToE164(trimmed);
+      if (trimmed !== '' && value === null) {
+        throw new Error('Enter a valid mobile number.');
+      }
+      await updateProfile({ mobileE164: value });
+      await refreshProfile();
+      onDone();
+    } catch (e) {
+      // The DB trigger rejects a change inside the 30-day window — surface the
+      // specific disclaimer rather than the generic rate-limit copy.
+      if (isAppError(e) && e.code === 'rate_limited') {
+        setError('You can change your mobile number only once every 30 days.');
+      } else {
+        setError(toSafeErrorMessage(e, 'validation_error'));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const savePlace = async (raw: string, onDone: () => void) => {
+    setBusy('save-place');
+    setError(null);
+    try {
+      const trimmed = raw.trim();
+      await updateProfile({ place: trimmed === '' ? null : trimmed });
       await refreshProfile();
       onDone();
     } catch (e) {
@@ -478,6 +677,34 @@ export default function Settings() {
     ]);
   };
 
+  const returnHome = () => {
+    Alert.alert(
+      'Return to the home screen?',
+      'You will be signed out and taken back to the sign-in screen. Your data is saved — you can sign back in anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out & leave',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy('return-home');
+            setError(null);
+            try {
+              dispatchFarewell();
+              await new Promise((r) => setTimeout(r, 1600));
+              await getSupabase().auth.signOut();
+              router.replace('/login');
+            } catch (e) {
+              setError(toSafeErrorMessage(e, 'dependency_failure'));
+            } finally {
+              setBusy(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const deleteAccount = () => {
     Alert.alert(
       'Delete your account permanently?',
@@ -582,6 +809,16 @@ export default function Settings() {
   const currentBaseline =
     profile.baselinePerDay != null ? String(profile.baselinePerDay) : '';
 
+  const age = profile.dateOfBirth ? computeAge(profile.dateOfBirth) : null;
+  const ageText = age != null ? `${age} years` : null;
+  const genderText = profile.gender ? GENDER_LABELS[profile.gender] : null;
+  const mobileEditable = canChangeMobile(profile.mobileChangedAt, new Date());
+  const mobileNext = nextMobileChangeDate(profile.mobileChangedAt);
+  const mobileSublabel =
+    !mobileEditable && mobileNext
+      ? `Used for support only. Changeable once every 30 days — next change on ${mobileNext.toLocaleDateString()}.`
+      : 'Used for support only. Changeable once every 30 days.';
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -640,6 +877,41 @@ export default function Settings() {
             reduce={reduce}
             onSave={saveBaseline}
           />
+        </View>
+      </Stage>
+
+      {/* ── Profile ── */}
+      <Stage index={2.5} reduce={reduce}>
+        <View style={{ gap: spacing.md }}>
+          <SectionHead
+            caption="Profile"
+            deck="Your name, age, and gender are set once at signup and can't be changed. Mobile number and place are optional."
+          />
+          <View>
+            <ReadonlyRow strongRule label="Name" value={profile.fullName ?? null} />
+            <ReadonlyRow label="Age" value={ageText} />
+            <ReadonlyRow label="Gender" value={genderText} />
+            <InlineEditRow
+              label="Mobile number"
+              sublabel={mobileSublabel}
+              value={profile.mobileE164 ?? null}
+              placeholder="+91…"
+              keyboardType="phone-pad"
+              busyKey="save-mobile"
+              busy={busy}
+              editable={mobileEditable}
+              onSave={saveMobile}
+            />
+            <InlineEditRow
+              label="Place"
+              sublabel="City or region (optional)."
+              value={profile.place ?? null}
+              placeholder="e.g. Mumbai"
+              busyKey="save-place"
+              busy={busy}
+              onSave={savePlace}
+            />
+          </View>
         </View>
       </Stage>
 
@@ -924,11 +1196,25 @@ export default function Settings() {
         <View style={{ gap: spacing.md }}>
           <SectionHead
             caption="Account"
-            deck="Sign out of this device, or close the account entirely."
+            deck="Return to the home screen, sign out of this device, or close the account entirely."
           />
           <View>
             <PrefRow
               strongRule
+              label="Return to home screen"
+              sublabel="Signs you out and returns to the sign-in screen. Your data is saved."
+              control={
+                <TextLink
+                  onPress={returnHome}
+                  busy={busy === 'return-home'}
+                  disabled={busy !== null}
+                  accessibilityLabel="Return to home screen"
+                >
+                  Go home
+                </TextLink>
+              }
+            />
+            <PrefRow
               label="Sign out of this device"
               sublabel="Your data stays. You can sign back in anywhere."
               control={

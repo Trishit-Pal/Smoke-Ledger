@@ -22,6 +22,12 @@ type Row = {
   health_disclaimer_version?: string | null;
   data_processing_consent_at?: string | null;
   marketing_consent_at?: string | null;
+  full_name?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  mobile_e164?: string | null;
+  mobile_changed_at?: string | null;
+  place?: string | null;
 };
 
 function rowToProfile(r: Row): UserProfile {
@@ -41,6 +47,12 @@ function rowToProfile(r: Row): UserProfile {
     healthDisclaimerVersion: r.health_disclaimer_version ?? null,
     dataProcessingConsentAt: r.data_processing_consent_at ?? null,
     marketingConsentAt: r.marketing_consent_at ?? null,
+    fullName: r.full_name ?? null,
+    dateOfBirth: r.date_of_birth ?? null,
+    gender: (r.gender as UserProfile['gender']) ?? null,
+    mobileE164: r.mobile_e164 ?? null,
+    mobileChangedAt: r.mobile_changed_at ?? null,
+    place: r.place ?? null,
   };
 }
 
@@ -83,6 +95,14 @@ export async function updateProfile(patch: Partial<UserProfile>): Promise<UserPr
   if (defined.appLockEnabled !== undefined) row.app_lock_enabled = defined.appLockEnabled;
   if (defined.hideTotalsOnHome !== undefined) row.hide_totals_on_home = defined.hideTotalsOnHome;
   if (defined.onboardedAt !== undefined) row.onboarded_at = defined.onboardedAt;
+  // Identity fields: writable once (the DB trigger rejects a second change).
+  if (defined.fullName !== undefined) row.full_name = defined.fullName;
+  if (defined.dateOfBirth !== undefined) row.date_of_birth = defined.dateOfBirth;
+  if (defined.gender !== undefined) row.gender = defined.gender;
+  // mobile_e164 is rate-limited by the trigger; mobile_changed_at is server-owned
+  // and deliberately never written from the client.
+  if (defined.mobileE164 !== undefined) row.mobile_e164 = defined.mobileE164;
+  if (defined.place !== undefined) row.place = defined.place;
   if (Object.keys(row).length) {
     const { error } = await supabase.from('user_profiles').update(row).eq('id', userId);
     if (error) throw mapDbError(error);
