@@ -5,14 +5,24 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { isAdult } from '@/domain/age';
+import { GENDER_VALUES } from '@/lib/validation';
+import { GENDER_LABELS } from '@/lib/profileLabels';
+import type { Gender } from '@/types';
+
+const DOB_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function SignupScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const [fullName, setFullName] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState<Gender | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -23,6 +33,22 @@ export default function SignupScreen() {
   const onSubmit = async () => {
     setErr(null);
     setInfo(null);
+    if (!fullName.trim()) {
+      setErr('Please enter your name.');
+      return;
+    }
+    if (!DOB_RE.test(dob)) {
+      setErr('Enter your date of birth as YYYY-MM-DD.');
+      return;
+    }
+    if (!isAdult(dob)) {
+      setErr('You must be 18 or older to use Smoke Ledger.');
+      return;
+    }
+    if (!gender) {
+      setErr('Please select a gender option.');
+      return;
+    }
     if (password.length < 8) {
       setErr('Password must be at least 8 characters.');
       return;
@@ -41,6 +67,14 @@ export default function SignupScreen() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          // Persisted + 18+-enforced by the handle_new_user DB trigger.
+          data: {
+            full_name: fullName.trim(),
+            date_of_birth: dob,
+            gender,
+          },
+        },
       });
       if (error) {
         setErr(toSafeErrorMessage(error, 'authentication_error'));
@@ -80,6 +114,44 @@ export default function SignupScreen() {
           </View>
 
           <View style={{ gap: spacing.md }}>
+            <Input
+              label="Name"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              autoComplete="name"
+            />
+            <Input
+              label="Date of birth"
+              value={dob}
+              onChangeText={setDob}
+              placeholder="YYYY-MM-DD"
+              keyboardType="numbers-and-punctuation"
+              autoComplete="birthdate-full"
+              hint="You must be 18 or older. This can't be changed later."
+            />
+            <View style={{ gap: spacing.xs }}>
+              <Text
+                variant="caption"
+                muted
+                style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+              >
+                Gender
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                {GENDER_VALUES.map((g) => (
+                  <Chip
+                    key={g}
+                    label={GENDER_LABELS[g]}
+                    selected={gender === g}
+                    onPress={() => setGender(g)}
+                  />
+                ))}
+              </View>
+              <Text variant="small" muted>
+                This can&rsquo;t be changed later.
+              </Text>
+            </View>
             <Input
               label="Email"
               value={email}

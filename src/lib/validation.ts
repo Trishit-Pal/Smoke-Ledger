@@ -160,6 +160,8 @@ export const PinSchema = z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits')
 
 /* ---------- Profile ---------- */
 
+export const GENDER_VALUES = ['male', 'female', 'other', 'undisclosed'] as const;
+
 export const ProfileSchema = z
   .object({
     baselinePerDay: z.number().min(0).max(200).nullable().optional(),
@@ -168,6 +170,21 @@ export const ProfileSchema = z
     appLockEnabled: z.boolean().optional(),
     hideTotalsOnHome: z.boolean().optional(),
     onboardedAt: IsoUtcSchema.nullable().optional(),
+    // Identity — set once at signup (or via the completion form), then immutable
+    // server-side. age is derived from dateOfBirth; never stored as a stale int.
+    fullName: z.string().trim().min(1).max(80).optional(),
+    dateOfBirth: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must be YYYY-MM-DD')
+      .optional(),
+    gender: z.enum(GENDER_VALUES).optional(),
+    // Optional, editable in Settings (mobile is rate-limited to once / 30 days).
+    mobileE164: z
+      .string()
+      .regex(/^\+[1-9]\d{7,14}$/, 'Enter a valid mobile number')
+      .nullable()
+      .optional(),
+    place: z.string().trim().max(80).nullable().optional(),
   })
   .strict();
 

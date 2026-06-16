@@ -52,12 +52,18 @@ import { setSetting } from '@/db/repositories/settings';
 import { toSafeErrorMessage, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant } from '@/db/repositories/brands';
+import { computeAge } from '@/domain/age';
+import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
 
 type BusyAction =
   | null
   | 'save-profile'
+  | 'save-mobile'
+  | 'save-place'
   | 'signout'
+  | 'return-home'
   | 'export-json'
   | 'erase-all'
   | 'delete-account'
@@ -228,6 +234,12 @@ export function SettingsClient({
   const [baseline, setBaseline] = React.useState(initialBaseline);
   const [editingBaseline, setEditingBaseline] = React.useState(false);
 
+  // ── Profile (mobile + place) edit-in-place state ────────────────────────
+  const [editingMobile, setEditingMobile] = React.useState(false);
+  const [mobileDraft, setMobileDraft] = React.useState(profile.mobileE164 ?? '');
+  const [editingPlace, setEditingPlace] = React.useState(false);
+  const [placeDraft, setPlaceDraft] = React.useState(profile.place ?? '');
+
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(initialAnalyticsOptIn);
 
   // ── Brand catalog add-form state ────────────────────────────────────────
@@ -243,7 +255,9 @@ export function SettingsClient({
   const [exportWarning, setExportWarning] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<BusyAction>(null);
-  const [confirmAction, setConfirmAction] = React.useState<'erase' | 'delete' | null>(null);
+  const [confirmAction, setConfirmAction] = React.useState<'erase' | 'delete' | 'leave' | null>(
+    null,
+  );
 
   const flashToast = React.useCallback((msg: string) => {
     setToast(msg);
@@ -419,6 +433,63 @@ export function SettingsClient({
     }
   };
 
+  const onReturnHome = async () => {
+    setBusy('return-home');
+    setError(null);
+    try {
+      await getSupabase().auth.signOut();
+      router.replace('/');
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'authentication_error'));
+    } finally {
+      setBusy(null);
+      setConfirmAction(null);
+    }
+  };
+
+  const onSaveMobile = async () => {
+    setBusy('save-mobile');
+    setError(null);
+    try {
+      const trimmed = mobileDraft.trim();
+      const value = trimmed === '' ? null : normalizeToE164(trimmed);
+      if (trimmed !== '' && value === null) {
+        throw new Error('Enter a valid mobile number.');
+      }
+      await updateProfile({ mobileE164: value });
+      setEditingMobile(false);
+      flashToast(value ? 'Mobile number updated.' : 'Mobile number cleared.');
+      await revalidateAppViews();
+      router.refresh();
+    } catch (e) {
+      // The DB trigger rejects a change inside the 30-day window.
+      if (isAppError(e) && e.code === 'rate_limited') {
+        setError('You can change your mobile number only once every 30 days.');
+      } else {
+        setError(toSafeErrorMessage(e, 'validation_error'));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onSavePlace = async () => {
+    setBusy('save-place');
+    setError(null);
+    try {
+      const trimmed = placeDraft.trim();
+      await updateProfile({ place: trimmed === '' ? null : trimmed });
+      setEditingPlace(false);
+      flashToast(trimmed ? 'Place updated.' : 'Place cleared.');
+      await revalidateAppViews();
+      router.refresh();
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'validation_error'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onEraseAll = async () => {
     setBusy('erase-all');
     setError(null);
@@ -470,6 +541,18 @@ export function SettingsClient({
       if (!isReauthRedirect) setConfirmAction(null);
     }
   };
+
+  // ── Derived profile display values ──────────────────────────────────────
+  const age = profile.dateOfBirth ? computeAge(profile.dateOfBirth) : null;
+  const ageText = age != null ? `${age} years` : 'Not set';
+  const genderText = profile.gender ? GENDER_LABELS[profile.gender] : 'Not set';
+  const nameText = profile.fullName && profile.fullName.trim() !== '' ? profile.fullName : 'Not set';
+  const mobileEditable = canChangeMobile(profile.mobileChangedAt ?? null, new Date());
+  const mobileNext = nextMobileChangeDate(profile.mobileChangedAt ?? null);
+  const mobileSublabel =
+    !mobileEditable && mobileNext
+      ? `Used for support only. Changeable once every 30 days — next change on ${mobileNext.toLocaleDateString()}.`
+      : 'Used for support only. Changeable once every 30 days.';
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -582,6 +665,137 @@ export function SettingsClient({
                 )}
               </dd>
             </div>
+          </dl>
+        </section>
+
+        {/* ─────────────── Profile ─────────────── */}
+        <section
+          style={stageIndex(1.5)}
+          aria-labelledby="profile-heading"
+          className="flex flex-col gap-md"
+        >
+          <SectionHead
+            id="profile-heading"
+            caption="Profile"
+            deck="Your name, age, and gender are set once at signup and can't be changed. Mobile number and place are optional."
+          />
+          <dl className="flex flex-col">
+            <PrefRow
+              strongRule
+              label="Name"
+              control={<span className="text-body text-text">{nameText}</span>}
+            />
+            <PrefRow label="Age" control={<span className="text-body text-text">{ageText}</span>} />
+            <PrefRow
+              label="Gender"
+              control={<span className="text-body text-text">{genderText}</span>}
+            />
+            <PrefRow
+              label="Mobile number"
+              sublabel={mobileSublabel}
+              control={
+                editingMobile ? (
+                  <div className="flex items-center gap-md">
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={mobileDraft}
+                      onChange={(event) => setMobileDraft(event.target.value)}
+                      aria-label="Mobile number"
+                      placeholder="+91…"
+                      autoFocus
+                      className="w-40 bg-transparent border-0 border-b text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)]"
+                      style={{ borderBottomColor: 'var(--rule-strong)' }}
+                    />
+                    <TextLink
+                      onClick={() => void onSaveMobile()}
+                      disabled={busy != null}
+                      busy={busy === 'save-mobile'}
+                      ariaLabel="Save mobile number"
+                    >
+                      {busy === 'save-mobile' ? 'Saving…' : 'Save'}
+                    </TextLink>
+                    <TextLink
+                      onClick={() => {
+                        setMobileDraft(profile.mobileE164 ?? '');
+                        setEditingMobile(false);
+                      }}
+                      disabled={busy != null}
+                    >
+                      Cancel
+                    </TextLink>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-md">
+                    <span className="text-body text-text">{profile.mobileE164 ?? 'Not set'}</span>
+                    {mobileEditable ? (
+                      <TextLink
+                        onClick={() => {
+                          setMobileDraft(profile.mobileE164 ?? '');
+                          setEditingMobile(true);
+                        }}
+                        disabled={busy != null}
+                        ariaLabel="Edit mobile number"
+                      >
+                        Edit
+                      </TextLink>
+                    ) : null}
+                  </div>
+                )
+              }
+            />
+            <PrefRow
+              label="Place"
+              sublabel="City or region (optional)."
+              control={
+                editingPlace ? (
+                  <div className="flex items-center gap-md">
+                    <input
+                      type="text"
+                      value={placeDraft}
+                      onChange={(event) => setPlaceDraft(event.target.value)}
+                      aria-label="Place"
+                      placeholder="e.g. Mumbai"
+                      autoFocus
+                      maxLength={80}
+                      className="w-40 bg-transparent border-0 border-b text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)]"
+                      style={{ borderBottomColor: 'var(--rule-strong)' }}
+                    />
+                    <TextLink
+                      onClick={() => void onSavePlace()}
+                      disabled={busy != null}
+                      busy={busy === 'save-place'}
+                      ariaLabel="Save place"
+                    >
+                      {busy === 'save-place' ? 'Saving…' : 'Save'}
+                    </TextLink>
+                    <TextLink
+                      onClick={() => {
+                        setPlaceDraft(profile.place ?? '');
+                        setEditingPlace(false);
+                      }}
+                      disabled={busy != null}
+                    >
+                      Cancel
+                    </TextLink>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-md">
+                    <span className="text-body text-text">{profile.place ?? 'Not set'}</span>
+                    <TextLink
+                      onClick={() => {
+                        setPlaceDraft(profile.place ?? '');
+                        setEditingPlace(true);
+                      }}
+                      disabled={busy != null}
+                      ariaLabel="Edit place"
+                    >
+                      Edit
+                    </TextLink>
+                  </div>
+                )
+              }
+            />
           </dl>
         </section>
 
@@ -824,11 +1038,25 @@ export function SettingsClient({
           <SectionHead
             id="account-heading"
             caption="Account"
-            deck="Sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
+            deck="Return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
           />
           <dl className="flex flex-col">
             <PrefRow
               strongRule
+              label="Return to home page"
+              sublabel="Signs you out and returns to the public home page. Your data is saved — you can sign back in anytime."
+              control={
+                <TextLink
+                  onClick={() => setConfirmAction('leave')}
+                  disabled={busy != null}
+                  busy={busy === 'return-home'}
+                  ariaLabel="Return to home page"
+                >
+                  {busy === 'return-home' ? 'Leaving…' : 'Go home'}
+                </TextLink>
+              }
+            />
+            <PrefRow
               label="Sign out of this device"
               sublabel="Your data stays. You can sign back in anywhere."
               control={
@@ -921,6 +1149,15 @@ export function SettingsClient({
         destructive
         loading={busy === 'delete-account'}
         onConfirm={() => void onDeleteAccount()}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+      />
+      <ConfirmDialog
+        open={confirmAction === 'leave'}
+        title="Return to the home page?"
+        description="You'll be signed out and taken back to the public home page. Your data is saved — you can sign back in anytime."
+        confirmLabel="Sign out & leave"
+        loading={busy === 'return-home'}
+        onConfirm={() => void onReturnHome()}
         onOpenChange={(open) => !open && setConfirmAction(null)}
       />
     </div>

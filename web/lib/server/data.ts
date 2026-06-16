@@ -30,6 +30,12 @@ type ProfileRow = {
   health_disclaimer_version: string | null;
   data_processing_consent_at: string | null;
   marketing_consent_at: string | null;
+  full_name: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  mobile_e164: string | null;
+  mobile_changed_at: string | null;
+  place: string | null;
 };
 
 type GoalRow = {
@@ -81,6 +87,12 @@ function mapProfile(row: ProfileRow): UserProfile {
     healthDisclaimerVersion: row.health_disclaimer_version,
     dataProcessingConsentAt: row.data_processing_consent_at,
     marketingConsentAt: row.marketing_consent_at,
+    fullName: row.full_name,
+    dateOfBirth: row.date_of_birth,
+    gender: (row.gender as UserProfile['gender']) ?? null,
+    mobileE164: row.mobile_e164,
+    mobileChangedAt: row.mobile_changed_at,
+    place: row.place,
   };
 }
 

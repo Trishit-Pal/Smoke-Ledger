@@ -94,6 +94,8 @@ export interface Goal {
 
 export type OnboardingStep = 'privacy' | 'usage' | 'setup' | 'baseline' | 'brands' | 'goal' | 'done';
 
+export type Gender = 'male' | 'female' | 'other' | 'undisclosed';
+
 export interface UserProfile {
   baselinePerDay: number | null;
   baselineWindowDays: number; // 7|30|custom
@@ -109,6 +111,14 @@ export interface UserProfile {
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
   marketingConsentAt?: string | null;
+  // Identity — collected at signup, immutable once set (enforced in the DB).
+  fullName?: string | null;
+  dateOfBirth?: string | null; // 'YYYY-MM-DD'; age is derived, never stored
+  gender?: Gender | null;
+  // Optional, editable in Settings. mobileChangedAt is server-owned (rate-limit).
+  mobileE164?: string | null;
+  mobileChangedAt?: string | null;
+  place?: string | null;
 }
 
 export interface Insight {

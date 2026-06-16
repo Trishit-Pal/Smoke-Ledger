@@ -11,6 +11,9 @@ import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { isAdult } from '@/domain/age';
+import { GENDER_VALUES } from '@/lib/validation';
+import { GENDER_LABELS } from '@/lib/profileLabels';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { PasswordField } from '@web/components/auth/PasswordField';
 import {
@@ -29,7 +32,14 @@ const SERVICE_UNAVAILABLE_MESSAGE =
 
 const schema = z
   .object({
+    fullName: z.string().trim().min(1, 'Enter your name').max(80, 'Name is too long'),
     email: emailZodStrict,
+    dateOfBirth: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your date of birth'),
+    gender: z.enum(GENDER_VALUES, {
+      errorMap: () => ({ message: 'Select an option' }),
+    }),
     password: z
       .string()
       .min(8, 'Password must be at least 8 characters')
@@ -44,6 +54,10 @@ const schema = z
   .refine((d) => d.password === d.confirmPassword, {
     path: ['confirmPassword'],
     message: 'Passwords do not match',
+  })
+  .refine((d) => isAdult(d.dateOfBirth), {
+    path: ['dateOfBirth'],
+    message: 'You must be 18 or older to use Smoke Ledger.',
   });
 type FormValues = z.infer<typeof schema>;
 
@@ -202,7 +216,10 @@ export default function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
+  const fullNameValue = watch('fullName');
   const emailValue = watch('email');
+  const dobValue = watch('dateOfBirth');
+  const genderValue = watch('gender');
   const passwordValue = watch('password');
   const confirmValue = watch('confirmPassword');
   const acknowledgedValue = watch('acknowledged');
@@ -226,7 +243,10 @@ export default function SignupPage() {
   // CHARACTER (3): thumb when all fields look correctly filled. Encouragement
   // before the user clicks submit — "ready when you are."
   const formLooksComplete =
+    (fullNameValue?.trim().length ?? 0) > 0 &&
     emailValue?.includes('@') &&
+    isAdult(dobValue ?? '') &&
+    !!genderValue &&
     (passwordValue?.length ?? 0) >= 8 &&
     confirmValue === passwordValue &&
     acknowledgedValue === true;
@@ -270,6 +290,13 @@ export default function SignupPage() {
         password: values.password,
         options: {
           emailRedirectTo: emailRedirectTo(),
+          // Identity is enforced + persisted by the handle_new_user DB trigger,
+          // which also hard-blocks under-18 (aborts the auth insert).
+          data: {
+            full_name: values.fullName.trim(),
+            date_of_birth: values.dateOfBirth,
+            gender: values.gender,
+          },
           ...(captchaToken ? { captchaToken } : {}),
         },
       }),
@@ -314,6 +341,19 @@ export default function SignupPage() {
       setOtpSignupError(parsed.error.issues[0]?.message ?? 'Enter a valid email first');
       return;
     }
+    // The email-link path also creates an account, so it must carry the same
+    // identity + 18+ gate — otherwise it would be a bypass around the age check.
+    const fullName = fullNameValue?.trim() ?? '';
+    const gender = genderValue;
+    const dob = dobValue ?? '';
+    if (!fullName || !gender || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      setOtpSignupError('Please fill in your name, date of birth, and gender first.');
+      return;
+    }
+    if (!isAdult(dob)) {
+      setOtpSignupError('You must be 18 or older to use Smoke Ledger.');
+      return;
+    }
     if (captchaRequired && !captchaToken) {
       setOtpSignupError('Please complete the security check.');
       return;
@@ -331,6 +371,7 @@ export default function SignupPage() {
           options: {
             shouldCreateUser: true,
             emailRedirectTo: emailRedirectTo(),
+            data: { full_name: fullName, date_of_birth: dob, gender },
             ...(captchaToken ? { captchaToken } : {}),
           },
         }),
@@ -363,7 +404,7 @@ export default function SignupPage() {
             Open the <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>book</span>.
           </>
         }
-        subtitle="Two fields. Ninety seconds."
+        subtitle="A few details. Ninety seconds."
       />
 
       <form
@@ -372,7 +413,17 @@ export default function SignupPage() {
         style={{ gap: 0 }}
         noValidate
       >
-        <EditorialFieldRow label="Email" error={errors.email?.message ?? liveEmailError} strong>
+        <EditorialFieldRow label="Name" error={errors.fullName?.message ?? null} strong>
+          <input
+            type="text"
+            autoComplete="name"
+            placeholder="Your name"
+            style={INPUT_STYLE}
+            className="focus-ring"
+            {...register('fullName')}
+          />
+        </EditorialFieldRow>
+        <EditorialFieldRow label="Email" error={errors.email?.message ?? liveEmailError}>
           <input
             type="email"
             autoComplete="email"
@@ -381,6 +432,40 @@ export default function SignupPage() {
             className="focus-ring"
             {...register('email')}
           />
+        </EditorialFieldRow>
+        <EditorialFieldRow
+          label="Date of birth"
+          error={errors.dateOfBirth?.message ?? null}
+          hint="You must be 18 or older. This can't be changed later."
+        >
+          <input
+            type="date"
+            autoComplete="bday"
+            style={INPUT_STYLE}
+            className="focus-ring"
+            {...register('dateOfBirth')}
+          />
+        </EditorialFieldRow>
+        <EditorialFieldRow
+          label="Gender"
+          error={errors.gender?.message ?? null}
+          hint="This can't be changed later."
+        >
+          <select
+            defaultValue=""
+            style={INPUT_STYLE}
+            className="focus-ring"
+            {...register('gender')}
+          >
+            <option value="" disabled>
+              Select…
+            </option>
+            {GENDER_VALUES.map((g) => (
+              <option key={g} value={g}>
+                {GENDER_LABELS[g]}
+              </option>
+            ))}
+          </select>
         </EditorialFieldRow>
         <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
           <PasswordField
