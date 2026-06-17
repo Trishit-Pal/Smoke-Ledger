@@ -37,11 +37,12 @@ export default function SignupScreen() {
       setErr('Please enter your name.');
       return;
     }
-    // computeAge returns null for malformed or impossible dates (e.g. Feb 30),
-    // so distinguish "invalid date" from "underage" with the right message.
+    // The date picker only ever emits a valid YYYY-MM-DD or '' (nothing chosen),
+    // so a null age means no date was selected. (computeAge still also guards
+    // against malformed/impossible dates defensively.)
     const age = computeAge(dob);
     if (age === null) {
-      setErr('Enter a valid date of birth as YYYY-MM-DD.');
+      setErr('Please select your date of birth.');
       return;
     }
     if (age < MIN_AGE) {

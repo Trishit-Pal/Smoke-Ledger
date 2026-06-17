@@ -37,6 +37,16 @@ function localParts(ref: Date): DateParts {
 }
 
 /**
+ * True if today is the user's birthday (matching month and day).
+ */
+export function isBirthdayToday(dobIso: string, today: Date = new Date()): boolean {
+  const dob = parseYmd(dobIso);
+  if (!dob) return false;
+  const t = localParts(today);
+  return t.m === dob.m && t.d === dob.d;
+}
+
+/**
  * Integer age in completed years, or null if `dobIso` is not a valid date.
  */
 export function computeAge(dobIso: string, today: Date = new Date()): number | null {

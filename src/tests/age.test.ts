@@ -1,4 +1,4 @@
-import { computeAge, isAdult, MIN_AGE } from '@/domain/age';
+import { computeAge, isAdult, MIN_AGE, isBirthdayToday } from '@/domain/age';
 
 // Build the reference "today" from local parts so the result is independent of
 // the test runner's timezone (computeAge reads local Y/M/D).
@@ -44,5 +44,23 @@ describe('isAdult', () => {
   it('fails closed for invalid or future dates', () => {
     expect(isAdult('not-a-date', onJune16(2026))).toBe(false);
     expect(isAdult('2030-01-01', onJune16(2026))).toBe(false);
+  });
+});
+
+describe('isBirthdayToday', () => {
+  it('returns true when month and day match today', () => {
+    expect(isBirthdayToday('1990-06-16', onJune16(2026))).toBe(true);
+    expect(isBirthdayToday('2000-06-16', onJune16(2026))).toBe(true);
+  });
+
+  it('returns false when month or day does not match', () => {
+    expect(isBirthdayToday('1990-06-15', onJune16(2026))).toBe(false);
+    expect(isBirthdayToday('1990-05-16', onJune16(2026))).toBe(false);
+    expect(isBirthdayToday('1990-01-01', onJune16(2026))).toBe(false);
+  });
+
+  it('returns false for malformed dates', () => {
+    expect(isBirthdayToday('not-a-date', onJune16(2026))).toBe(false);
+    expect(isBirthdayToday('2021-02-30', onJune16(2026))).toBe(false);
   });
 });

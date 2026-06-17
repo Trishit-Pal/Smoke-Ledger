@@ -24,6 +24,7 @@ import {
   sticksOn,
   trendVsBaseline,
 } from '@/domain/calc';
+import { isBirthdayToday } from '@/domain/age';
 import { potentialSavings } from '@/domain/savings';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
@@ -421,6 +422,18 @@ export default function Home() {
     const t = setTimeout(() => dispatchMood('greet', { caption: 'Quiet day.' }), 600);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!profile?.date_of_birth) return;
+    if (isBirthdayToday(profile.date_of_birth)) {
+      dispatchMilestone({
+        type: 'birthday',
+        days: 0,
+        title: 'Happy Birthday!',
+        body: 'A special day for a special journey. Here is to another year of breathing easier.',
+      });
+    }
+  }, [profile]);
 
   // Track the previous streak value so we only fire a milestone when the streak
   // crosses UP to a tier (1/3/7/14/30) — not on first load or when it resets.

@@ -87,7 +87,7 @@ export function MilestoneCelebration() {
               Milestone
             </Text>
             <Text variant="caption" style={{ color: theme.textFaint }}>
-              Day {detail?.days ?? ''}
+              {detail?.type === 'streak' ? `Day ${detail?.days ?? ''}` : ''}
             </Text>
           </View>
           <View style={{ borderTopWidth: 1, borderTopColor: theme.ruleStrong, marginTop: spacing.xs }} />
