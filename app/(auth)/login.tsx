@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
@@ -11,11 +12,6 @@ import { getSupabase } from '@/lib/supabase';
 import { toAuthErrorMessage } from '@/lib/auth-errors';
 
 type Mode = 'password' | 'magic-link';
-
-// Deep-link redirect target for the magic-link email. The app's scheme is
-// registered in app.config.js (scheme: 'smokeledger') and app/auth/callback.tsx
-// handles the URL on both cold and warm starts via expo-linking.
-const MAGIC_LINK_REDIRECT = 'smokeledger://auth/callback';
 
 function isLikelyEmail(value: string): boolean {
   return /\S+@\S+\.\S+/.test(value.trim());
@@ -87,7 +83,9 @@ export default function LoginScreen() {
           // Only sign in existing accounts via magic link — never silently
           // create a new user from this flow. New users go through /signup.
           shouldCreateUser: false,
-          emailRedirectTo: MAGIC_LINK_REDIRECT,
+          // The `?next=` keeps a valid query string so the email template can
+          // append `&token_hash=…&type=magiclink` — the cross-device-safe path.
+          emailRedirectTo: Linking.createURL('/auth/callback', { queryParams: { next: '/' } }),
         },
       });
       if (error) {
@@ -95,7 +93,7 @@ export default function LoginScreen() {
         return;
       }
       // Neutral copy — don't reveal whether the email exists (per launch posture).
-      setInfo('If that email is registered, a sign-in link is on its way. Open it on this device.');
+      setInfo('If that email is registered, a sign-in link is on its way. Open it on any device to finish signing in.');
     } finally {
       setLoading(false);
     }
@@ -120,7 +118,7 @@ export default function LoginScreen() {
             <Text variant="small" muted>
               {mode === 'password'
                 ? 'Use the email and password you registered with.'
-                : 'We will email you a one-tap sign-in link. Open it on this device.'}
+                : 'We will email you a one-tap sign-in link. Open it on any device.'}
             </Text>
           </View>
 

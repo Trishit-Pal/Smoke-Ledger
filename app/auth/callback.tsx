@@ -6,6 +6,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Text } from '@/components/ui/Text';
 import { spacing } from '@/constants/theme';
 import { createSessionFromUrl } from '@/lib/authCallback';
+import { useAuth } from '@/store/auth';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 export default function AuthCallbackScreen() {
@@ -16,20 +17,31 @@ export default function AuthCallbackScreen() {
 
   useEffect(() => {
     let cancelled = false;
+    // The cold-start URL (getInitialURL) and the warm-start listener can both
+    // deliver the same link; process it at most once to avoid a double session
+    // exchange / double navigation.
+    let handled = false;
 
     const run = async (url: string | null) => {
       if (!url) {
-        if (!cancelled) setError('Missing authentication link.');
+        if (!cancelled && !handled) setError('Missing authentication link.');
         return;
       }
+      if (handled) return;
+      handled = true;
       const result = await createSessionFromUrl(url);
       if (cancelled) return;
       if (result === 'none') {
         setError('This link is invalid or expired.');
         return;
       }
+      setError(null);
       if (result === 'recovery') {
         setRecovery(true);
+      }
+      if (result === 'signed_up') {
+        // First-time confirmation — let the welcome screen celebrate it.
+        useAuth.getState().setJustCreated(true);
       }
       setDone(true);
     };

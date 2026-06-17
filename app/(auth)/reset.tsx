@@ -31,8 +31,12 @@ export default function ResetPasswordScreen() {
       const supabase = getSupabase();
       // Neutral copy regardless of result to avoid account enumeration.
       // Deep-link back into the mobile reset-password handler so the user can
-      // complete the recovery without bouncing through a browser.
-      const redirectTo = Linking.createURL('/auth/callback');
+      // complete the recovery without bouncing through a browser. The `?next=`
+      // keeps a valid query string so the email template can append
+      // `&token_hash=…&type=recovery` — the cross-device-safe verification path.
+      const redirectTo = Linking.createURL('/auth/callback', {
+        queryParams: { next: '/reset-password' },
+      });
       await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo });
       setMsg('If an account exists for that email, a reset link is on its way.');
     } catch (e) {

@@ -18,6 +18,7 @@ import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/T
 import { PasswordField } from '@web/components/auth/PasswordField';
 import {
   INPUT_STYLE,
+  DATE_INPUT_STYLE,
   PRIMARY_CTA_STYLE,
   SECONDARY_CTA_STYLE,
 } from '@web/lib/auth/inputStyle';
@@ -62,7 +63,12 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 function emailRedirectTo(): string | undefined {
-  return typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+  // Always carry a `?next=` so the email template can append `&token_hash=…&type=…`
+  // with a valid query string. New accounts are routed to onboarding by the
+  // callback regardless of this value (consent gates), so it is a safe default.
+  return typeof window !== 'undefined'
+    ? `${window.location.origin}/auth/callback?next=${encodeURIComponent('/onboarding/privacy')}`
+    : undefined;
 }
 
 function SignupEmailSuccess({ email }: { email: string }) {
@@ -441,7 +447,7 @@ export default function SignupPage() {
           <input
             type="date"
             autoComplete="bday"
-            style={INPUT_STYLE}
+            style={DATE_INPUT_STYLE}
             className="focus-ring"
             {...register('dateOfBirth')}
           />

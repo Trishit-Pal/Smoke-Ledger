@@ -11,6 +11,7 @@ import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { PasswordField } from '@web/components/auth/PasswordField';
+import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { PRIMARY_CTA_STYLE } from '@web/lib/auth/inputStyle';
 import { toSafeErrorMessage } from '@/lib/errors';
 
@@ -45,16 +46,21 @@ export default function ResetPasswordPage() {
       setSubmitError(toSafeErrorMessage(error, 'authentication_error'));
       return;
     }
-    await supabase.auth.signOut();
     setSuccess(true);
-    setTimeout(() => {
+    // Sign out right before redirecting (not now) so the success screen keeps a
+    // valid session while the celebratory burst (~1.4s) plays — signing out first
+    // can let middleware bounce the user to /login before the burst is seen. The
+    // manual "Continue to sign in →" link lets impatient users skip ahead.
+    setTimeout(async () => {
+      await supabase.auth.signOut();
       router.replace('/login');
-    }, 800);
+    }, 2600);
   };
 
   if (success) {
     return (
-      <>
+      <div style={{ position: 'relative' }}>
+        <ConfettiBurst active />
         <EditorialMasthead
           caption="Account · Updated"
           title={
@@ -78,7 +84,7 @@ export default function ResetPasswordPage() {
           Continue to sign in →
         </Link>
         <EditorialClosingSignet align="left">Quietly entered.</EditorialClosingSignet>
-      </>
+      </div>
     );
   }
 

@@ -4,6 +4,11 @@
 
 /* ── Light theme ── */
 :root {
+  /* Tie native UA controls (date popup, <select> option lists, scrollbars) to the
+     app's class-based theme. Without this the browser paints them using the OS
+     color-scheme — decoupled from `.dark` — which is why the DOB picker and gender
+     dropdown rendered with unreadable contrast in dark mode. */
+  color-scheme: light;
   --bg: #F6F7F9;
   --bg-elevated: #FFFFFF;
   --card: #FFFFFF;
@@ -56,6 +61,7 @@
 
 /* ── Dark theme ── */
 .dark {
+  color-scheme: dark;
   --bg: #0B0F14;
   --bg-elevated: #11161D;
   --card: #1A2029;

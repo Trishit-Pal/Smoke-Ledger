@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;background:#F6F7F9;font-family:'DM Sans',-apple-system,'Segoe UI',Roboto,sans-serif;color:#0B0F14;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border:1px solid #D6DBE2;border-radius:14px;padding:32px;">
+            <tr><td style="font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:#5A6673;">Smoke Ledger</td></tr>
+            <tr><td style="padding-top:8px;font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#0B0F14;">Reset your password</td></tr>
+            <tr><td style="padding-top:12px;font-size:15px;line-height:22px;color:#5A6673;">Tap the button below to choose a new password for your Smoke Ledger account. You can open this link on any device.</td></tr>
+            <tr><td style="padding-top:24px;">
+              <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery"
+                 style="display:inline-block;background:#2FA39B;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:10px;">
+                Reset password &rarr;
+              </a>
+            </td></tr>
+            <tr><td style="padding-top:20px;font-size:13px;line-height:18px;color:#A9B3BF;">If you didn&rsquo;t request a password reset, you can safely ignore this email. This link expires in 1 hour.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

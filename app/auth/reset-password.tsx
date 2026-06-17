@@ -5,17 +5,21 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ConfettiBurst } from '@/components/character/ConfettiBurst';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { getSupabase } from '@/lib/supabase';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 export default function ResetPasswordScreen() {
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const onSubmit = async () => {
     setErr(null);
@@ -32,14 +36,38 @@ export default function ResetPasswordScreen() {
       const supabase = getSupabase();
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      await supabase.auth.signOut();
-      router.replace('/login');
+      setSuccess(true);
+      // Let the celebratory burst play, then sign out so the user re-enters with
+      // the new password. Shorter hold when reduce-motion is enabled.
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        router.replace('/login');
+      }, reduceMotion ? 600 : 2200);
     } catch (e) {
       setErr(toSafeErrorMessage(e, 'authentication_error'));
     } finally {
       setLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <Screen scroll={false}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
+          <ConfettiBurst active={!reduceMotion} />
+          <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}>
+            Password updated
+          </Text>
+          <Text variant="display" style={{ textAlign: 'center' }}>
+            All set
+          </Text>
+          <Text variant="small" muted style={{ textAlign: 'center' }}>
+            Signing you out so you can sign in with your new password…
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Stamp } from '@web/components/onboarding/Stamp';
+import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { saveComplianceConsents, setOnboardingStep } from '@/db/repositories/profile';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
@@ -76,6 +77,19 @@ export default function OnboardingPrivacyPage() {
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [welcome, setWelcome] = React.useState(false);
+
+  // Fire the account-created celebration once when arriving from a fresh signup
+  // confirmation (?welcome=1, set by the auth callback). Read from the URL
+  // directly (no useSearchParams Suspense requirement) and strip the param so a
+  // refresh or back-navigation doesn't replay it.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('welcome') === '1') {
+      setWelcome(true);
+      router.replace('/onboarding/privacy');
+    }
+  }, [router]);
 
   const values: Record<RequiredKey | 'analytics', boolean> = {
     age: ageConfirmed,
@@ -143,8 +157,9 @@ export default function OnboardingPrivacyPage() {
   return (
     <div
       className="editorial-stage"
-      style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 620 }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 620 }}
     >
+      {welcome ? <ConfettiBurst active /> : null}
       <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span className="editorial-caption">Step 01 · Before we start</span>
         <h2
