@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { spacing } from '@/constants/theme';
@@ -69,6 +71,9 @@ export default function SignupScreen() {
         email: email.trim(),
         password,
         options: {
+          // Deep-link the confirmation back into the app. The `?next=` keeps a
+          // valid query string so the email template appends `&token_hash=…&type=signup`.
+          emailRedirectTo: Linking.createURL('/auth/callback', { queryParams: { next: '/' } }),
           // Persisted + 18+-enforced by the handle_new_user DB trigger.
           data: {
             full_name: fullName.trim(),
@@ -122,13 +127,10 @@ export default function SignupScreen() {
               autoCapitalize="words"
               autoComplete="name"
             />
-            <Input
+            <DatePickerField
               label="Date of birth"
               value={dob}
-              onChangeText={setDob}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-              autoComplete="birthdate-full"
+              onChange={setDob}
               hint="You must be 18 or older. This can't be changed later."
             />
             <View style={{ gap: spacing.xs }}>

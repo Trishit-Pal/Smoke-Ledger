@@ -10,8 +10,11 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Tilt } from '@/components/anim/Tilt';
 import { Pulse } from '@/components/anim/Pulse';
+import { ConfettiBurst } from '@/components/character/ConfettiBurst';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { useAuth } from '@/store/auth';
 
 interface Pillar {
   roman: string;
@@ -28,9 +31,20 @@ const PILLARS: Pillar[] = [
 export default function Welcome() {
   const router = useRouter();
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
+  const setJustCreated = useAuth((s) => s.setJustCreated);
+  // Read the one-shot flag once at mount (lazy initializer) so it stays true for
+  // this mount even after we clear the store flag below.
+  const [celebrate] = React.useState(() => useAuth.getState().justCreated);
+
+  React.useEffect(() => {
+    if (celebrate) setJustCreated(false); // clear so re-entry doesn't replay it
+  }, [celebrate, setJustCreated]);
 
   return (
     <Screen>
+      {celebrate ? <ConfettiBurst active={!reduceMotion} /> : null}
+
       {/* Step caption */}
       <FadeSlideIn index={0} delay={40}>
         <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>

@@ -134,7 +134,14 @@ export async function GET(request: NextRequest) {
   }
 
   if (!hasRequiredConsents) {
-    return redirectWithCookies(response, new URL('/onboarding/privacy', requestUrl.origin));
+    const target = new URL('/onboarding/privacy', requestUrl.origin);
+    // First-time signup confirmation → flag the first onboarding screen to fire
+    // the account-created celebration. Cross-device-safe (carried in the URL, not
+    // device-local storage).
+    if (type === 'signup') {
+      target.searchParams.set('welcome', '1');
+    }
+    return redirectWithCookies(response, target);
   }
 
   if (!onboarded) {

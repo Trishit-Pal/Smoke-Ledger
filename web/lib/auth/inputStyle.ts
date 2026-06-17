@@ -9,9 +9,21 @@ export const INPUT_STYLE: React.CSSProperties = {
   borderBottom: '1px solid var(--rule)',
   outline: 'none',
   color: 'var(--text)',
+  // Tints native control accents (date highlight, checkbox/radio) to the brand teal.
+  accentColor: 'var(--accent)',
   fontFamily: 'var(--font-sans)',
   fontSize: 16,
   transition: 'border-color 160ms ease',
+};
+
+// Native <input type="date"> and <select> render their popups with the UA color
+// scheme. `colorScheme: 'light dark'` makes the control follow the page's
+// color-scheme (set on :root/.dark in globals.css) so the calendar/option list is
+// legible in both themes. `cursor: pointer` reflects that the whole field is clickable.
+export const DATE_INPUT_STYLE: React.CSSProperties = {
+  ...INPUT_STYLE,
+  colorScheme: 'light dark',
+  cursor: 'pointer',
 };
 
 export const PRIMARY_CTA_STYLE: React.CSSProperties = {

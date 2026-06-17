@@ -15,6 +15,17 @@ major_version = 17
 [auth]
 enabled = true
 
+# REQUIRED for the cross-device email links below to be accepted. Set these under
+# THIS [auth] block (do not declare a second [auth] table) before
+# `supabase config push`, or set the equivalent values in
+# Dashboard → Authentication → URL Configuration. Keep both the production web
+# origin and the mobile deep-link scheme in the allowlist.
+# site_url = "https://<your-production-web-domain>"
+# additional_redirect_urls = [
+#   "https://<your-production-web-domain>/auth/callback",
+#   "smokeledger://auth/callback",
+# ]
+
 # Phone OTP delivery via MSG91 (Phase D). The blocks below are intentionally
 # commented out because (a) older Supabase CLI versions reject the
 # `auth.hook.send_sms` key, and (b) the production hook lives in the hosted
@@ -31,3 +42,24 @@ enabled = true
 # enabled = true
 # uri = "https://<project-ref>.supabase.co/functions/v1/send-sms-otp"
 # secrets = "env(SUPABASE_SMS_HOOK_SECRET)"
+
+# ── Email auth templates (cross-device-safe links) ────────────────────────────
+# Each template builds the link from the per-request redirect target
+# ({{ .RedirectTo }} — e.g. https://<site>/auth/callback?next=… on web, or
+# smokeledger://auth/callback?next=… on mobile) and appends the verification
+# `token_hash` + a fixed `type`. Because the callback verifies via
+# verifyOtp({ token_hash, type }) instead of exchanging the PKCE `code`, the link
+# works on ANY device — not just the one that requested it. Every auth call in the
+# app passes a redirect that already contains `?next=…`, so `&token_hash=…` always
+# appends a valid query string. `content_path` is resolved from the project root.
+[auth.email.template.confirmation]
+subject = "Confirm your Smoke Ledger account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your Smoke Ledger sign-in link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Smoke Ledger password"
+content_path = "./supabase/templates/recovery.html"
