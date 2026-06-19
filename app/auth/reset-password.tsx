@@ -12,6 +12,9 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { getSupabase } from '@/lib/supabase';
 import { toSafeErrorMessage } from '@/lib/errors';
 
+const RESET_SESS_HOLD_SHORT = 600;
+const RESET_SESS_HOLD_LONG = 2200;
+
 export default function ResetPasswordScreen() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
@@ -20,6 +23,11 @@ export default function ResetPasswordScreen() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
 
   const onSubmit = async () => {
     setErr(null);
@@ -39,10 +47,10 @@ export default function ResetPasswordScreen() {
       setSuccess(true);
       // Let the celebratory burst play, then sign out so the user re-enters with
       // the new password. Shorter hold when reduce-motion is enabled.
-      setTimeout(async () => {
+      timerRef.current = setTimeout(async () => {
         await supabase.auth.signOut();
         router.replace('/login');
-      }, reduceMotion ? 600 : 2200);
+      }, reduceMotion ? RESET_SESS_HOLD_SHORT : RESET_SESS_HOLD_LONG);
     } catch (e) {
       setErr(toSafeErrorMessage(e, 'authentication_error'));
     } finally {

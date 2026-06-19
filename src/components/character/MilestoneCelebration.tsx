@@ -36,7 +36,7 @@ export function MilestoneCelebration() {
       setDetail(d);
       setOpen(true);
       // Fire the masthead companion in parallel
-      dispatchMood('applaud', { caption: `${d.days}-day streak.`, durationMs: 3400 });
+      dispatchMood('applaud', { caption: d.type === 'streak' ? `${d.days}-day streak.` : 'Happy Birthday!', durationMs: 3400 });
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       dismissTimer.current = setTimeout(() => setOpen(false), AUTO_DISMISS_MS);
     });
