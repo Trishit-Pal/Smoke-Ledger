@@ -85,5 +85,5 @@ const MILESTONE_TIERS: ReadonlyArray<MilestoneEventDetail> = [
 
 export function milestoneForStreak(days: number): MilestoneEventDetail | null {
   const tier = MILESTONE_TIERS.find((m) => m.days === days);
-  return tier ? { ...tier } : null;
+  return tier ? { ...tier, type: 'streak' as const } : null;
 }

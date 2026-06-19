@@ -133,6 +133,10 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
   // into a tier — so re-renders, refreshes, and history edits that drop the
   // streak don't re-trigger.
   const prevStreakRef = React.useRef<number | null>(null);
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, []);
   React.useEffect(() => {
     if (prevStreakRef.current === null) { prevStreakRef.current = streak; return; }
     if (streak > prevStreakRef.current) {
@@ -212,7 +216,8 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
             total != null ? ` · ${formatInr(total, { compact: true })}` : ''
           }`,
         );
-        window.setTimeout(() => setToast(null), 2500);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 2500);
         await revalidateAppViews();
         router.refresh();
       } catch (e) {

@@ -88,6 +88,7 @@ const MILESTONE_TIERS: ReadonlyArray<{ days: number; title: string; body: string
   { days: 30, title: 'A month, quieter.',     body: 'Thirty days. This is no longer a streak — it is a habit.' },
 ];
 
-export function milestoneForStreak(days: number): { days: number; title: string; body: string } | null {
-  return MILESTONE_TIERS.find((m) => m.days === days) ?? null;
+export function milestoneForStreak(days: number): MilestoneEventDetail | null {
+  const tier = MILESTONE_TIERS.find((m) => m.days === days);
+  return tier ? { ...tier, type: 'streak' as const } : null;
 }
