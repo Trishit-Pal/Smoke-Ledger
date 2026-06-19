@@ -1,14 +1,14 @@
 {
   "sections": [
-    { "id": "glossary", "file": "00-glossary.md", "sources": [], "last_verified_commit": null, "status": "manual" },
-    { "id": "architecture", "file": "01-architecture.md", "sources": ["src/store/**", "src/lib/supabase.ts", "web/lib/server/**", "app/_layout.tsx", "metro.config.js"], "last_verified_commit": null, "status": "stale" },
-    { "id": "data-model", "file": "02-data-model.md", "sources": ["supabase/migrations/**", "src/types/index.ts"], "last_verified_commit": null, "status": "stale" },
-    { "id": "auth", "file": "03-auth.md", "sources": ["src/lib/authCallback.ts", "src/tests/authCallback.test.ts", "src/store/auth.ts", "app/auth/**", "app/(auth)/**", "web/app/auth/**", "web/app/(auth)/**"], "last_verified_commit": null, "status": "stale" },
-    { "id": "identity-profile", "file": "04-identity-profile.md", "sources": ["src/domain/age.ts", "src/lib/mobileNumber.ts", "src/lib/profileLabels.ts", "src/lib/validation.ts", "src/db/repositories/profile.ts", "app/(tabs)/settings.tsx", "web/app/(app)/settings/**"], "last_verified_commit": null, "status": "stale" },
-    { "id": "logging", "file": "05-logging.md", "sources": ["src/domain/calc.ts", "src/db/repositories/logs.ts", "src/db/repositories/brands.ts", "app/(tabs)/log.tsx"], "last_verified_commit": null, "status": "stale" },
-    { "id": "goals-insights", "file": "06-goals-insights.md", "sources": ["src/domain/goals.ts", "src/domain/insights.ts", "src/domain/correlations.ts", "src/domain/health.ts", "src/domain/savings.ts", "src/db/repositories/goals.ts"], "last_verified_commit": null, "status": "stale" },
-    { "id": "celebrations", "file": "07-celebrations.md", "sources": ["src/domain/age.ts", "src/lib/character/**", "web/lib/character/**", "src/components/character/**", "web/components/character/**", "app/(tabs)/index.tsx", "web/app/(app)/dashboard/**"], "last_verified_commit": null, "status": "stale" },
-    { "id": "security-privacy", "file": "08-security-privacy.md", "sources": ["supabase/migrations/**", "supabase/functions/**", "web/lib/server/auth.ts", "docs/security/**"], "last_verified_commit": null, "status": "stale" },
-    { "id": "infra-ops", "file": "09-infra-ops.md", "sources": ["package.json", "web/package.json", "metro.config.js", "app.json", "app.config.js", "eas.json", ".github/**", "docs/deployment/**", "docs/runbooks/**"], "last_verified_commit": null, "status": "stale" }
+    { "id": "glossary", "file": "00-glossary.md", "sources": [], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "architecture", "file": "01-architecture.md", "sources": ["src/store/**", "src/lib/supabase.ts", "web/lib/server/**", "app/_layout.tsx", "metro.config.js"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "data-model", "file": "02-data-model.md", "sources": ["supabase/migrations/**", "src/types/index.ts"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "auth", "file": "03-auth.md", "sources": ["src/lib/authCallback.ts", "src/tests/authCallback.test.ts", "src/store/auth.ts", "app/auth/**", "app/(auth)/**", "web/app/auth/**", "web/app/(auth)/**"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "identity-profile", "file": "04-identity-profile.md", "sources": ["src/domain/age.ts", "src/lib/mobileNumber.ts", "src/lib/profileLabels.ts", "src/lib/validation.ts", "src/db/repositories/profile.ts", "app/(tabs)/settings.tsx", "web/app/(app)/settings/**"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "logging", "file": "05-logging.md", "sources": ["src/domain/calc.ts", "src/db/repositories/logs.ts", "src/db/repositories/brands.ts", "app/(tabs)/log.tsx"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "goals-insights", "file": "06-goals-insights.md", "sources": ["src/domain/goals.ts", "src/domain/insights.ts", "src/domain/correlations.ts", "src/domain/health.ts", "src/domain/savings.ts", "src/db/repositories/goals.ts"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "celebrations", "file": "07-celebrations.md", "sources": ["src/domain/age.ts", "src/lib/character/**", "web/lib/character/**", "src/components/character/**", "web/components/character/**", "app/(tabs)/index.tsx", "web/app/(app)/dashboard/**"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "security-privacy", "file": "08-security-privacy.md", "sources": ["supabase/migrations/**", "supabase/functions/**", "web/lib/server/auth.ts", "docs/security/**"], "last_verified_commit": "fcabb85", "status": "current" },
+    { "id": "infra-ops", "file": "09-infra-ops.md", "sources": ["package.json", "web/package.json", "metro.config.js", "app.json", "app.config.js", "eas.json", ".github/**", "docs/deployment/**", "docs/runbooks/**"], "last_verified_commit": "fcabb85", "status": "current" }
   ]
 }
