@@ -259,9 +259,19 @@ export function SettingsClient({
     null,
   );
 
+  // Keep the toast dismissal timer in a ref so we can clear it on unmount and
+  // before re-arming — avoids a setState-after-unmount and matches DashboardClient.
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   const flashToast = React.useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
   // ── Re-auth resume: open delete dialog if redirected back with ?action=delete ──
