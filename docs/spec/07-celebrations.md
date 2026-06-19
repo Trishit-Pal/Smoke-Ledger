@@ -8,7 +8,7 @@ sources:
   - web/components/character/**
   - app/(tabs)/index.tsx
   - web/app/(app)/dashboard/**
-last_verified_commit: fcabb85
+last_verified_commit: 4b286c1
 status: current
 ---
 
@@ -42,7 +42,7 @@ Three named events are defined:
 - `character:milestone` — opens the celebration modal.
 - `character:farewell` — opens the logout overlay (not related to celebrations).
 
-`MilestoneEventDetail` (`mood.ts:35–44`) carries `type` (`'streak' | 'birthday'`), `days` (an integer; `0` for birthdays), `title`, and an optional `body`. `dispatchMilestone` (`mood.ts:55–57`) emits the event. `milestoneForStreak` (`mood.ts:86–89`) maps a streak integer to its tier detail, returning `null` for non-tier values so the caller can skip non-milestone days.
+`MilestoneEventDetail` (`mood.ts:35–44`) carries `type` (`'streak' | 'birthday'`), `days` (an integer; `0` for birthdays), `title`, and an optional `body`. `dispatchMilestone` (`mood.ts:55–57`) emits the event. `milestoneForStreak` (`mood.ts:86–89`) maps a streak integer to its tier detail, returning `null` for non-tier values so the caller can skip non-milestone days. It injects `type: 'streak'` onto the returned object (`return tier ? { ...tier, type: 'streak' as const } : null`) — the `MILESTONE_TIERS` entries themselves omit `type`, so the factory is the single place that stamps it. This matters because every downstream `d.type === 'streak'` check (the masthead caption and the modal `Day N` header) depends on it; before this was fixed, streak milestones arrived with `type === undefined` and fell through to the birthday branch.
 
 The five streak tiers live in `MILESTONE_TIERS` (`mood.ts:78–84`):
 
@@ -126,7 +126,9 @@ The `seed` prop acts purely as a memoisation key. Changing `seed` regenerates th
 
 ## Open gaps
 
-~~**Bug: birthday modal shows "0-day streak." caption in the masthead.**~~ **Fixed in commit `d69f9ad`.** The mobile `MilestoneCelebration.tsx:39` previously dispatched the masthead mood with a hardcoded streak caption for all milestone types. The fix added a conditional: `caption: d.type === 'streak' ? \`${d.days}-day streak.\` : 'Happy Birthday!'`. The web version already had the correct conditional. Both implementations now produce "Happy Birthday!" for birthday events and "N-day streak." for streak milestones.
+~~**Bug: birthday modal shows "0-day streak." caption in the masthead.**~~ **Fixed in commit `d69f9ad`.** The mobile `MilestoneCelebration.tsx:39` previously dispatched the masthead mood with a hardcoded streak caption for all milestone types. The fix added a conditional: `caption: d.type === 'streak' ? \`${d.days}-day streak.\` : 'Happy Birthday!'`. The web version already had the correct conditional.
+
+~~**Bug: streak milestone shows "Happy Birthday!" caption.**~~ **Fixed in commit `4b286c1`.** The mirror of the bug above: with the caption conditional in place, *streak* events were dispatched via `milestoneForStreak`, whose returned objects omitted `type`. So `d.type === 'streak'` was `false` and every streak tier wrongly produced "Happy Birthday!" in the masthead and hid the `Day N` modal header. The fix injects `type: 'streak'` in `milestoneForStreak` on both platforms. Both birthday and streak captions now render correctly end-to-end.
 
 **No reduce-motion gate on the modal's own confetti.** `CharacterCompanion` checks `useReduceMotion()` before firing `ConfettiBurst`. `MilestoneCelebration` does not — its `ConfettiBurst` at line 96 is always rendered when the modal is open. Users with reduce-motion enabled still see the in-modal burst.
 

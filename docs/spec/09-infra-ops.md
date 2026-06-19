@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: fcabb85
+last_verified_commit: 4b286c1
 status: current
 ---
 
@@ -146,6 +146,6 @@ The rules here that must not quietly break:
 
 **CI project schema must be kept current manually.** There is no automated step that applies new migrations to the CI Supabase project. If a maintainer forgets to run `npm run db:push` against the CI project after merging a migration, the `verify-backend.mjs` step in `rls-integration` will fail, blocking all PRs until someone notices and applies the migration.
 
-**`error_events` layer-3 constraint absent from live DB.** The `db-smoke` CI job asserts that `error_events_compliance_delete_null_user_check` exists (via `scripts/sql/smoke.sql:38-44`), but as of the 2026-06 sovereignty audit (`docs/security/sovereignty-audit-2026-06.md:§4`) this constraint was absent from the live production project. The migration that adds it exists in the repo; the gap is between the repo's migrations and what was applied to production at audit time. Re-running `npm run db:push` and then `npm run verify:backend` should close it, but it has not been confirmed post-audit.
+**`error_events` layer-3 constraint — resolved 2026-06-19.** The 2026-06 sovereignty audit (`docs/security/sovereignty-audit-2026-06.md:§4`) found `error_events_compliance_delete_null_user_check` absent from the live production project despite being declared in an earlier migration (a migrations-can-lie gap). It is now applied and confirmed present in the live DB via `pg_constraint`. The fix-forward migration `supabase/migrations/20260619000000_error_events_compliance_check.sql` adds it idempotently (`IF NOT EXISTS`), so a fresh CI project converges to the same state. The `db-smoke` CI job (`scripts/sql/smoke.sql:38-44`) continues to assert its existence.
 
 **`verify-delete-resignup.mjs` is not a CI gate.** This script proves the end-to-end deletion contract (inaccessibility, hard delete, fresh re-signup) but it is not run in the CI workflow. It requires the service-role key and creates/deletes real users, so it is intentionally a manual pre-release step. That means a regression in the deletion flow would not be caught until a human runs the script.
