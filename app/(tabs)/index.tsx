@@ -423,15 +423,18 @@ export default function Home() {
     return () => clearTimeout(t);
   }, []);
 
+  // Birthday celebration — fired once per session.
+  const birthdayFiredRef = useRef(false);
   useEffect(() => {
-    if (!profile?.date_of_birth) return;
-    if (isBirthdayToday(profile.date_of_birth)) {
+    if (birthdayFiredRef.current || !profile?.dateOfBirth) return;
+    if (isBirthdayToday(profile.dateOfBirth)) {
       dispatchMilestone({
         type: 'birthday',
         days: 0,
         title: 'Happy Birthday!',
         body: 'A special day for a special journey. Here is to another year of breathing easier.',
       });
+      birthdayFiredRef.current = true;
     }
   }, [profile]);
 

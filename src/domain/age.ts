@@ -38,12 +38,25 @@ function localParts(ref: Date): DateParts {
 
 /**
  * True if today is the user's birthday (matching month and day).
+ * For February 29 birthdays in non-leap years, it triggers on March 1
+ * to align with the project's conservative age-gate logic.
  */
 export function isBirthdayToday(dobIso: string, today: Date = new Date()): boolean {
   const dob = parseYmd(dobIso);
   if (!dob) return false;
   const t = localParts(today);
-  return t.m === dob.m && t.d === dob.d;
+
+  // Standard case: month and day match
+  if (t.m === dob.m && t.d === dob.d) return true;
+
+  // Leap year case: Born Feb 29, today is March 1 in a non-leap year
+  if (dob.m === 2 && dob.d === 29 && t.m === 3 && t.d === 1) {
+    // Verify today is not in a leap year (otherwise Feb 29 would have matched above)
+    const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    if (!isLeap(t.y)) return true;
+  }
+
+  return false;
 }
 
 /**

@@ -41,7 +41,10 @@ export function MilestoneCelebration() {
       setDetail(d);
       setOpen(true);
       // also fire the masthead companion
-      dispatchMood('applaud', { caption: `${d.days}-day streak.`, durationMs: 3400 });
+      dispatchMood('applaud', {
+        caption: d.type === 'streak' ? `${d.days}-day streak.` : 'Happy Birthday!',
+        durationMs: 3400
+      });
       if (dismissTimer.current) window.clearTimeout(dismissTimer.current);
       dismissTimer.current = window.setTimeout(() => setOpen(false), AUTO_DISMISS_MS);
     }
@@ -100,7 +103,7 @@ export function MilestoneCelebration() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span className="editorial-caption">Milestone</span>
           <span className="editorial-caption" style={{ color: 'var(--text-faint)' }}>
-            Day {detail.days}
+            {detail.type === 'streak' ? `Day ${detail.days}` : ''}
           </span>
         </div>
         <div

@@ -63,4 +63,14 @@ describe('isBirthdayToday', () => {
     expect(isBirthdayToday('not-a-date', onJune16(2026))).toBe(false);
     expect(isBirthdayToday('2021-02-30', onJune16(2026))).toBe(false);
   });
+
+  it('handles February 29 birthdays', () => {
+    const feb29Dob = '2000-02-29';
+    // Leap year: should match on Feb 29
+    expect(isBirthdayToday(feb29Dob, new Date(2024, 1, 29))).toBe(true);
+    // Non-leap year: should match on Mar 1
+    expect(isBirthdayToday(feb29Dob, new Date(2023, 2, 1))).toBe(true);
+    // Non-leap year: should NOT match on Feb 28
+    expect(isBirthdayToday(feb29Dob, new Date(2023, 1, 28))).toBe(false);
+  });
 });

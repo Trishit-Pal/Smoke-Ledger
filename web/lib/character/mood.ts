@@ -45,6 +45,8 @@ export interface MoodEventDetail {
 }
 
 export interface MilestoneEventDetail {
+  /** Type of milestone: 'streak' (default) or 'birthday'. */
+  type?: 'streak' | 'birthday';
   /** Days under baseline, e.g. 1, 3, 7, 14, 30. */
   days: number;
   /** Headline shown in the milestone modal. */
