@@ -217,7 +217,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           }`,
         );
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = window.setTimeout(() => setToast(null), 2500);
+        toastTimerRef.current = setTimeout(() => setToast(null), 2500);
         await revalidateAppViews();
         router.refresh();
       } catch (e) {
