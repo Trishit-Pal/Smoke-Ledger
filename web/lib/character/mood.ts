@@ -45,6 +45,8 @@ export interface MoodEventDetail {
 }
 
 export interface MilestoneEventDetail {
+  /** Type of milestone: 'streak' (default) or 'birthday'. */
+  type?: 'streak' | 'birthday';
   /** Days under baseline, e.g. 1, 3, 7, 14, 30. */
   days: number;
   /** Headline shown in the milestone modal. */
@@ -86,6 +88,7 @@ const MILESTONE_TIERS: ReadonlyArray<{ days: number; title: string; body: string
   { days: 30, title: 'A month, quieter.',     body: 'Thirty days. This is no longer a streak — it is a habit.' },
 ];
 
-export function milestoneForStreak(days: number): { days: number; title: string; body: string } | null {
-  return MILESTONE_TIERS.find((m) => m.days === days) ?? null;
+export function milestoneForStreak(days: number): MilestoneEventDetail | null {
+  const tier = MILESTONE_TIERS.find((m) => m.days === days);
+  return tier ? { ...tier, type: 'streak' as const } : null;
 }

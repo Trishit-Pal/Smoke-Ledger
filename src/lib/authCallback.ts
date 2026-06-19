@@ -15,8 +15,8 @@ function resultForType(type: string | null | undefined): SessionResult {
  * Parse a Supabase auth deep link and establish a session. Supports all three
  * link shapes so a link works regardless of which device opened it:
  *   - `token_hash` + `type` → verifyOtp (cross-device safe; preferred template)
- *   - implicit `#access_token`/`#refresh_token` → setSession
  *   - PKCE `code` → exchangeCodeForSession (same-device fallback)
+ *   - implicit `#access_token`/`#refresh_token` → setSession (legacy)
  * Returns the flow type so callers can route recovery links to the reset screen
  * and celebrate first-time signups.
  */
@@ -25,15 +25,28 @@ export async function createSessionFromUrl(url: string): Promise<SessionResult> 
 
   try {
     const parsed = new URL(url);
-    const code = parsed.searchParams.get('code');
     const type = parsed.searchParams.get('type');
 
+    // 1. token_hash + type → verifyOtp (cross-device safe; preferred template)
+    const tokenHash = parsed.searchParams.get('token_hash');
+    if (tokenHash && type) {
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type as 'recovery' | 'signup' | 'invite' | 'magiclink' | 'email_change' | 'email',
+      });
+      if (error) throw error;
+      return resultForType(type);
+    }
+
+    // 2. code → exchangeCodeForSession (PKCE; same-device only)
+    const code = parsed.searchParams.get('code');
     if (code) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) throw error;
       return resultForType(type);
     }
 
+    // 3. #access_token/#refresh_token → setSession (legacy implicit flow)
     const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
     const hashParams = new URLSearchParams(hash);
     const accessToken = hashParams.get('access_token');
@@ -47,17 +60,6 @@ export async function createSessionFromUrl(url: string): Promise<SessionResult> 
       });
       if (error) throw error;
       return resultForType(hashType);
-    }
-
-    const tokenHash = parsed.searchParams.get('token_hash');
-    const otpType = parsed.searchParams.get('type');
-    if (tokenHash && otpType) {
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: otpType as 'recovery' | 'signup' | 'invite' | 'magiclink' | 'email_change' | 'email',
-      });
-      if (error) throw error;
-      return resultForType(otpType);
     }
   } catch {
     return 'none';

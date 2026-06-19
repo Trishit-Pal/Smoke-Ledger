@@ -1,4 +1,4 @@
-# Smoke Ledger — Scaling Plan
+  # Smoke Ledger — Scaling Plan
 
 > **Status:** Audit complete; verified against the live `Smoke-Ledger` production DB
 > (`tvcwrsglceahkjnfuzkn`) on 2026-05-31, not just the repo migrations.

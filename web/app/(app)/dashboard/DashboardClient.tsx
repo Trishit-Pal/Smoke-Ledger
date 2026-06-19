@@ -35,6 +35,7 @@ import {
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
+import { isBirthdayToday } from '@/domain/age';
 import { formatInr, formatDelta } from '@/lib/format';
 import { isHomeTotalsHidden } from '@/lib/discreet';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
@@ -131,15 +132,34 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
   // days), fire the full milestone modal. Only fires when the value INCREASES
   // into a tier — so re-renders, refreshes, and history edits that drop the
   // streak don't re-trigger.
-  const prevStreakRef = React.useRef<number>(streak);
+  const prevStreakRef = React.useRef<number | null>(null);
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
-    const prev = prevStreakRef.current;
-    if (streak > prev) {
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, []);
+  React.useEffect(() => {
+    if (prevStreakRef.current === null) { prevStreakRef.current = streak; return; }
+    if (streak > prevStreakRef.current) {
       const m = milestoneForStreak(streak);
       if (m) dispatchMilestone(m);
     }
     prevStreakRef.current = streak;
   }, [streak]);
+
+  // Birthday celebration — fired once per session.
+  const birthdayFiredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (birthdayFiredRef.current || !profile?.dateOfBirth) return;
+    if (isBirthdayToday(profile.dateOfBirth)) {
+      dispatchMilestone({
+        type: 'birthday',
+        days: 0,
+        title: 'Happy Birthday!',
+        body: 'A special day for a special journey. Here is to another year of breathing easier.',
+      });
+      birthdayFiredRef.current = true;
+    }
+  }, [profile]);
 
   const runQuickLog = React.useCallback(
     async (opts: {
@@ -196,7 +216,8 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
             total != null ? ` · ${formatInr(total, { compact: true })}` : ''
           }`,
         );
-        window.setTimeout(() => setToast(null), 2500);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 2500);
         await revalidateAppViews();
         router.refresh();
       } catch (e) {

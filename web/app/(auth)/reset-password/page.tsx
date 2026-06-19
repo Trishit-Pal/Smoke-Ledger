@@ -15,6 +15,8 @@ import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { PRIMARY_CTA_STYLE } from '@web/lib/auth/inputStyle';
 import { toSafeErrorMessage } from '@/lib/errors';
 
+const RESET_SESS_HOLD_WEB = 2600;
+
 const schema = z
   .object({
     password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -31,6 +33,11 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
 
   const {
     register,
@@ -51,16 +58,21 @@ export default function ResetPasswordPage() {
     // valid session while the celebratory burst (~1.4s) plays — signing out first
     // can let middleware bounce the user to /login before the burst is seen. The
     // manual "Continue to sign in →" link lets impatient users skip ahead.
-    setTimeout(async () => {
+    timerRef.current = setTimeout(async () => {
       await supabase.auth.signOut();
       router.replace('/login');
-    }, 2600);
+    }, RESET_SESS_HOLD_WEB);
   };
+
+  const reduceMotion =
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
 
   if (success) {
     return (
       <div style={{ position: 'relative' }}>
-        <ConfettiBurst active />
+        <ConfettiBurst active={!reduceMotion} />
         <EditorialMasthead
           caption="Account · Updated"
           title={

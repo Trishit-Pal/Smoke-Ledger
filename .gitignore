@@ -17,5 +17,6 @@ test-results/
 .claude/*
 !.claude/agents/
 !.claude/skills/
+!.claude/workflows/
 !.claude/README.md
 supabase/.temp/
