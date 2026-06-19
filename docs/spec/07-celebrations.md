@@ -8,7 +8,7 @@ sources:
   - web/components/character/**
   - app/(tabs)/index.tsx
   - web/app/(app)/dashboard/**
-last_verified_commit: 4b286c1
+last_verified_commit: d7a8d67
 status: current
 ---
 
