@@ -65,6 +65,30 @@ export function normalizeToE164(raw: string, defaultCountryCode = '91'): string 
   return E164_RE.test(candidate) ? candidate : null;
 }
 
+/**
+ * Reduce loosely-typed input to the 10 local digits for the fixed-`+91` field.
+ * Tolerates a pasted country code and separators so the input never silently
+ * mangles a full number:
+ * - "+91 98765 43210" / "919876543210" → "9876543210" (drops the 91 prefix)
+ * - "09876543210" → "9876543210" (drops a leading 0 trunk prefix)
+ * - "9198765432" (a real 10-digit number starting 91) → unchanged
+ * - partial input ("98765") is preserved for as-you-type editing
+ * Always clamps to the first 10 digits.
+ */
+export function toLocalMobileDigits(raw: string): string {
+  if (typeof raw !== 'string') return '';
+  let digits = raw.replace(/\D/g, '');
+  // Only treat a leading 91 as a country code when there are extra digits
+  // beyond the 10-digit local number; never strip it from a genuine 10-digit
+  // number that happens to start with 91.
+  if (digits.length > 10 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  } else if (digits.length > 10 && digits.startsWith('0')) {
+    digits = digits.replace(/^0+/, '');
+  }
+  return digits.slice(0, 10);
+}
+
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**

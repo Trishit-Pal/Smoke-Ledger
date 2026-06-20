@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: 2fdf20b
+last_verified_commit: f1bd2bb
 status: current
 ---
 
@@ -29,7 +29,7 @@ Once inside, the Settings screen shows a **Profile** section with five rows:
 - **Name** — displayed, no edit control. Set once and done.
 - **Age** — displayed as "X years", derived live from the stored date of birth. No edit control.
 - **Gender** — displayed, no edit control.
-- **Mobile number** — editable in-place, India-only: a fixed, non-editable `+91` prefix sits before a 10-digit numeric field (first digit 6–9). Invalid input shows an inline error and is not saved. The Edit link is hidden when the 30-day change window is still open; when it is hidden, the sublabel shows the exact date the next change becomes available.
+- **Mobile number** — editable in-place, India-only: a fixed, non-editable `+91` prefix sits before a 10-digit numeric field (first digit 6–9). The field is paste-tolerant — pasting a full `+91…`/`91…`/leading-`0`/spaced number is reduced to the correct 10 local digits rather than silently truncated. While editing, a "10 digits, starting 6-9" hint sits below the field, Save stays disabled until the value is valid (or empty, which clears the number), and an invalid value paints the underline in the warn colour with the precise message "Enter a 10-digit Indian mobile starting 6-9." — never a generic error. The Edit link is hidden when the 30-day change window is still open; when it is hidden, the sublabel shows the exact date the next change becomes available.
 - **Place** — editable in-place, no rate-limit.
 
 The three read-only rows look visually identical to the editable ones — same hairline-rule table, same label-left / value-right layout — except there is no "Edit" link next to them. The UI does not explain why they cannot be changed; it simply doesn't offer the option.
@@ -85,7 +85,7 @@ The mobile number is optional and user-editable, but only once per 30 days. The 
 
 **In the client** — `canChangeMobile(mobileChangedAt, now)` in `src/lib/mobileNumber.ts:53` computes the same 30-day window client-side, using `THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000`. Settings uses this to decide whether to render the Edit link at all: if `canChangeMobile` returns false, the link is hidden and the sublabel shows the next-available date via `nextMobileChangeDate` (`app/(tabs)/settings.tsx:815`–`820`; `web/app/(app)/settings/SettingsClient.tsx:550`–`555`). The client check is a UX improvement only — it prevents the user from trying something that will fail — but the DB trigger is the actual enforcement.
 
-When a save does fail because the window is still open, both the mobile and web UIs catch the `rate_limited` AppError code and surface the message "You can change your mobile number only once every 30 days" as a specific string rather than the generic error copy (`app/(tabs)/settings.tsx:517`, `web/app/(app)/settings/SettingsClient.tsx:466`).
+When a save does fail because the window is still open, both the mobile and web UIs catch the `rate_limited` AppError code and surface a specific string with the exact next-available date — "You can change your number again on `<date>`" via `nextMobileChangeDate` — falling back to "You can change your mobile number only once every 30 days" when the date is unknown (`app/(tabs)/settings.tsx` `saveMobile`, `web/app/(app)/settings/SettingsClient.tsx` `onSaveMobile`).
 
 The error code path is: DB raises `54000` → PostgREST forwards → `mapDbError` at `src/db/repositories/_supabase.ts:45` maps `54000` to `rate_limited` AppError → UI catches `isAppError(e) && e.code === 'rate_limited'`.
 
@@ -102,7 +102,9 @@ Input is validated in two places before it reaches the database.
 
 The schema is strict — unknown keys are rejected (`src/lib/validation.ts:188`). `updateProfile` in the repository calls `parseOrThrow(ProfilePatchSchema, defined, 'profile')` before issuing any DB write (`src/db/repositories/profile.ts:87`).
 
-**India normalisation** (`src/lib/mobileNumber.ts`) runs client-side in the save handler before the number reaches `updateProfile`. `normalizeIndianMobile(raw)` accepts a bare 10-digit number (first digit 6–9) and prefixes `+91`, compacts separators, and validates against `INDIA_MOBILE_RE` (`^\+91[6-9]\d{9}$`). Anything else — a non-`+91` country code, a leading digit outside 6–9, wrong length — returns null and the UI rejects the input immediately with "Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9" before any DB call is made (`app/(tabs)/settings.tsx` `saveMobile`, `web/app/(app)/settings/SettingsClient.tsx` `onSaveMobile`). The legacy `normalizeToE164` (generic E.164) remains in the module but is no longer used by the profile save path.
+**India normalisation** (`src/lib/mobileNumber.ts`) runs client-side in the save handler before the number reaches `updateProfile`. As the user types, `toLocalMobileDigits(raw)` reduces input to the 10 local digits — stripping a pasted `91`/`+91` country code (only when there are extra digits beyond 10, so a genuine 10-digit number starting `91` is preserved), a leading `0` trunk prefix, and separators — then clamps to 10. On save, `normalizeIndianMobile(raw)` accepts that bare 10-digit number (first digit 6–9), prefixes `+91`, and validates against `INDIA_MOBILE_RE` (`^\+91[6-9]\d{9}$`). Anything else — a non-`+91` country code, a leading digit outside 6–9, wrong length — returns null and the UI rejects the input immediately with "Enter a 10-digit Indian mobile starting 6-9." before any DB call is made (`app/(tabs)/settings.tsx` `saveMobile`, `web/app/(app)/settings/SettingsClient.tsx` `onSaveMobile`). The legacy `normalizeToE164` (generic E.164) remains in the module but is no longer used by the profile save path.
+
+Any error that *does* escape a save (auth, network, an unexpected DB failure) is rendered through `describeError` (`src/lib/errors.ts`) rather than the old `toSafeErrorMessage` catch-all: it returns specific per-code copy (e.g. "Could not reach the server. Check your connection and try again."), shows authored validation messages verbatim, and filters raw Postgres detail so internals never leak. The DB write is also isolated from post-save view-cache revalidation, so a refresh hiccup can no longer present a successful save as a failure.
 
 The DB also has a `CHECK` constraint on `mobile_e164` (the generic `^\+[1-9][0-9]{7,14}$`, `supabase/migrations/20260616181124_profile_identity_fields.sql:65`). It is intentionally broader than the app's India-only rule and serves only as a last-resort format backstop; the India-only constraint is enforced at the Zod + handler layer, not the DB. (Tightening the DB CHECK to the India pattern is an optional future hardening step.)
 
@@ -134,7 +136,7 @@ These must never break.
 
 **Feb 29 birthdays.** `computeAge` reduces correctly: someone born on 2000-02-29 becomes 18 on 1 March 2018 in a non-leap year, not 28 February. The test at `src/tests/age.test.ts:21` pins this. The `isBirthdayToday` function follows the same convention, so their in-app birthday also triggers on 1 March in non-leap years.
 
-**The 42501 ambiguity.** The DB trigger for immutability raises `SQLSTATE 42501`, which is the same code as a genuine RLS policy violation. Both map to `authorization_error` in `mapDbError`. From the user's perspective the message is identical ("something went wrong"); the distinction only matters in server logs.
+**The 42501 ambiguity.** The DB trigger for immutability raises `SQLSTATE 42501`, which is the same code as a genuine RLS policy violation. Both map to `authorization_error` in `mapDbError`. From the user's perspective the message is identical — `describeError` renders both as "You do not have permission to do that." — so the distinction only matters in server logs.
 
 **The client-side rate-limit check can be wrong.** `canChangeMobile` reads `profile.mobileChangedAt`, which comes from the last `getProfile()` call. If the user changes their number on another device and then tries to change it on this one without refreshing, the client-side check may show the Edit link when the DB will reject the change. The DB trigger always wins; the client check is an optimistic short-circuit.
 
@@ -148,7 +150,7 @@ These must never break.
 
 **Age gate unit tests** — `src/tests/age.test.ts` covers `computeAge`, `isAdult`, and `isBirthdayToday` with cases for normal adults, exact 18th birthday, the day before turning 18, Feb-29 leap-year corner cases, and malformed / impossible dates. The test explicitly asserts `MIN_AGE === 18` so a constant change would be caught.
 
-**Mobile number unit tests** — `src/tests/mobileNumber.test.ts` covers `normalizeIndianMobile` + `INDIA_MOBILE_RE` (bare 10-digit with 6–9 lead → `+91…`, separator stripping, rejection of non-`+91` country codes, leading digit < 6, and wrong length), the legacy `normalizeToE164`, `nextMobileChangeDate` (null for never-set, correct `+30 days` computation, null for unparseable input), and `canChangeMobile` (allow when never set, block inside the window, allow once the window has elapsed). `src/tests/validation.profile.test.ts` additionally asserts the India-only schema rule rejects non-Indian/malformed numbers.
+**Mobile number unit tests** — `src/tests/mobileNumber.test.ts` covers `normalizeIndianMobile` + `INDIA_MOBILE_RE` (bare 10-digit with 6–9 lead → `+91…`, separator stripping, rejection of non-`+91` country codes, leading digit < 6, and wrong length), `toLocalMobileDigits` (preserves a bare or partial number, strips a pasted `+91`/`91`/leading-`0`, preserves a genuine 10-digit number starting `91`, clamps to 10), the legacy `normalizeToE164`, `nextMobileChangeDate` (null for never-set, correct `+30 days` computation, null for unparseable input), and `canChangeMobile` (allow when never set, block inside the window, allow once the window has elapsed). `src/tests/validation.profile.test.ts` additionally asserts the India-only schema rule rejects non-Indian/malformed numbers. The error copy that surfaces these failures is unit-tested separately in `src/tests/errors.test.ts` (`describeError`/`classifyError`: authored validation messages pass through, raw Postgres detail never leaks, per-code copy is specific).
 
 **Profile schema unit tests** — `src/tests/validation.profile.test.ts` exercises `ProfilePatchSchema` for valid and invalid values of each identity field: name length bounds, DOB format and calendar-validity, gender enum, mobile E.164 format, place length, and strict rejection of unknown keys.
 
@@ -162,4 +164,4 @@ These must never break.
 
 **`mobile_changed_at` visible in the client.** The field is read back from the DB and surfaced in `UserProfile` (`src/types/index.ts:119`). In the export flow (`exportAccountData`), if this field is included in the export envelope, it reveals the exact timestamp of the user's last mobile change. The current `ImportProfileSchema` (`src/lib/validation.ts:246`) does not include `mobile_changed_at`, so it is not round-tripped on import, but it may still appear in raw export payloads — worth checking when the export schema is next reviewed.
 
-**No Supabase MCP access for live schema verification.** The live DB schema for `user_profiles` was read from the migration files, not confirmed via MCP (the project permissions denied the `list_tables` call during spec generation). The migration `20260616181124_profile_identity_fields.sql` is the authoritative source, but live schema drift is not currently detectable from this tooling.
+**Live schema confirmed (2026-06-20).** The `user_profiles` constraints, the `trg_user_profiles_identity_rules` trigger, the `enforce_profile_identity_rules()` and `handle_new_user()` function bodies, and the full column list were read directly from the live DB (`tvcwrsglceahkjnfuzkn`) via Supabase MCP and match the migration files. Confirmed live: the `mobile_e164` `CHECK` is the broad generic-E.164 pattern (not the India rule), and a *first* mobile save is never rejected by the cooldown (`OLD.mobile_changed_at` is null). The DB-level India tightening remains an optional future hardening step.

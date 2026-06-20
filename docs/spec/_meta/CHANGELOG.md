@@ -4,6 +4,9 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-06-20 — f1bd2bb (web bug-fix follow-up: truthful errors, contact-number save, post-signup data sync)
+- identity-profile: mobile field is now paste-tolerant (`toLocalMobileDigits`) with as-you-type validation gating, Save disabled until valid, and a precise inline message; failures render through `describeError` (specific per-code copy, no raw-Postgres leak) instead of the `toSafeErrorMessage` catch-all; rate-limit copy shows the exact next-change date; live DB schema confirmed via MCP (closed the prior "no MCP verification" gap)
+
 ## 2026-06-20 — 2fdf20b (re-stamp: spec sections advanced from pre-commit a752d3c to actual commit sha)
 - architecture, data-model, auth, identity-profile, logging, celebrations, security-privacy: stamp-only advance; prose was already accurate to the 5-workstream commit (realtime sync, onboarding retention, India phone, themed gender, achievement cap)
 

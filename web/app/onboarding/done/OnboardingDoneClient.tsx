@@ -10,6 +10,7 @@ import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
 import { Figure } from '@web/components/character/Figure';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
+import { revalidateAppViews, revalidateBrands } from '@web/app/(app)/_actions/revalidate';
 import type { GoalType } from '@/types';
 
 const PRICE_PER_STICK = 18;
@@ -309,10 +310,21 @@ export function OnboardingDoneClient({
         </p>
         <div>
           <DashboardButton
-            onClick={() => {
+            onClick={async () => {
               // Onboarding finished — discard the in-memory draft.
               useOnboardingDraft.getState().clear();
+              // Bust the server caches that onboarding writes touched (brand
+              // favorites + every app view) so the dashboard's first render
+              // reflects the just-entered selections instead of a stale payload.
+              try {
+                await revalidateBrands();
+                await revalidateAppViews();
+              } catch {
+                // Best-effort cache busting; navigation + refresh below still
+                // forces a fresh server render.
+              }
               router.replace('/dashboard');
+              router.refresh();
             }}
           />
         </div>
