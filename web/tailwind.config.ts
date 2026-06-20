@@ -65,7 +65,10 @@ const config: Config = {
         pill: '999px',
       },
       fontSize: {
-        display: ['28px', { fontWeight: '700', letterSpacing: '-0.3px' }],
+        // Fluid: floor is the previous fixed 28px (phones unchanged), scaling up
+        // to 34px on large desktops so the biggest in-app heading doesn't look
+        // small on a wide canvas. Editorial numerals already clamp in globals.css.
+        display: ['clamp(28px, 1.6rem + 0.5vw, 34px)', { fontWeight: '700', letterSpacing: '-0.3px' }],
         h1: ['22px', { fontWeight: '700', letterSpacing: '-0.2px' }],
         h2: ['18px', { fontWeight: '600' }],
         h3: ['16px', { fontWeight: '600' }],

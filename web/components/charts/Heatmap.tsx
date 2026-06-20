@@ -60,16 +60,22 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
 
   const labelWidth = 18;
   const bottomPad = 18;
-  const innerWidth = Math.max(0, width - labelWidth);
+  // On a narrow phone, 24 hourly columns become unreadably thin. Enforce a
+  // minimum drawing width and let the container scroll horizontally instead
+  // (same pattern as MoodTriggerMatrix). On wider screens drawWidth === width,
+  // so there is no scroll.
+  const MIN_CHART_WIDTH = 360;
+  const drawWidth = width > 0 ? Math.max(width, MIN_CHART_WIDTH) : 0;
+  const innerWidth = Math.max(0, drawWidth - labelWidth);
   const innerHeight = Math.max(0, height - bottomPad);
   const cellW = innerWidth / 24;
   const cellH = innerHeight / 7;
   const gap = 1.5;
 
   return (
-    <div ref={containerRef} className="w-full" style={{ height }}>
+    <div ref={containerRef} className="w-full overflow-x-auto" style={{ height }}>
       {width > 0 ? (
-        <svg width={width} height={height} role="img" aria-label="Smoking activity heatmap">
+        <svg width={drawWidth} height={height} role="img" aria-label="Smoking activity heatmap">
           {DAY_LABELS.map((label, row) => (
             <text
               key={`day-${row}`}
