@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { DM_Sans, Fraunces } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
@@ -22,6 +22,16 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: 'Smoke Ledger',
   description: 'Smoking reduction and cessation support with secure tracking.',
+};
+
+// `viewportFit: 'cover'` is what makes the existing `env(safe-area-inset-*)`
+// usage (ThemeToggle, BottomNav) actually inset on notched devices — without it
+// the insets resolve to 0. themeColor matches the enforced dark default theme.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0B0F14',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

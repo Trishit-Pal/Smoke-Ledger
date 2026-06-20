@@ -14,10 +14,15 @@ import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-bg text-text">
+    <div className="flex min-h-dvh bg-bg text-text">
       <Sidebar />
-      <main className="flex-1 min-h-screen pb-20 md:pb-0">{children}</main>
-      <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
+      <main className="flex-1 min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        {children}
+      </main>
+      {/* The wrapper carries the safe-area inset (and a matching bg so the inset
+          strip is filled) so the nav itself stays a fixed 4rem of touch targets
+          — it can't grow under system font scaling and clip page content. */}
+      <div className="fixed bottom-0 left-0 right-0 md:hidden z-50 bg-card pb-[env(safe-area-inset-bottom)]">
         <BottomNav />
       </div>
       {/* CHARACTER: event-driven overlays. Order doesn't matter — both portal
