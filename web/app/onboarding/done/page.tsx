@@ -1,19 +1,41 @@
 import * as React from 'react';
-import { getProfile } from '@/db/repositories/profile';
-import { listActiveGoals } from '@/db/repositories/goals';
-import { listBrands } from '@/db/repositories/brands';
-import { getSetting } from '@/db/repositories/settings';
+import {
+  getServerProfile,
+  getServerGoals,
+  getServerBrandsWithVariants,
+  getServerSetting,
+} from '@web/lib/server/data';
 import { OnboardingDoneClient } from './OnboardingDoneClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OnboardingDonePage() {
+  // Read through the server data layer (real cookie-bound client). The earlier
+  // version used the shared @/db/repositories/* helpers, which the webpack alias
+  // resolves to the *browser* client — that has no session on the server, so
+  // every fetch threw and the summary silently showed 0 / "Skipped". These
+  // catches degrade gracefully but log the real failure server-side.
   const [profile, goals, brands, typicalDaily, purchasePref] = await Promise.all([
-    getProfile().catch(() => null),
-    listActiveGoals().catch(() => []),
-    listBrands().catch(() => []),
-    getSetting<number>('onboarding.typicalDaily').catch(() => null),
-    getSetting<'single' | 'pack' | 'mixed'>('onboarding.purchasePref').catch(() => null),
+    getServerProfile().catch((e) => {
+      console.error('[onboarding/done] getServerProfile failed', e);
+      return null;
+    }),
+    getServerGoals().catch((e) => {
+      console.error('[onboarding/done] getServerGoals failed', e);
+      return [];
+    }),
+    getServerBrandsWithVariants().catch((e) => {
+      console.error('[onboarding/done] getServerBrandsWithVariants failed', e);
+      return [];
+    }),
+    getServerSetting<number>('onboarding.typicalDaily').catch((e) => {
+      console.error('[onboarding/done] getServerSetting(typicalDaily) failed', e);
+      return null;
+    }),
+    getServerSetting<'single' | 'pack' | 'mixed'>('onboarding.purchasePref').catch((e) => {
+      console.error('[onboarding/done] getServerSetting(purchasePref) failed', e);
+      return null;
+    }),
   ]);
 
   const baselinePerDay =

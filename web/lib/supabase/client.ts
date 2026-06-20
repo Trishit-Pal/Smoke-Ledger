@@ -46,6 +46,17 @@ export function isSupabaseConfigured(): boolean {
 }
 
 export function getSupabase(): SupabaseClient {
+  // This is the browser cookie client; it reads the session from `document.cookie`
+  // and has no auth context on the server. Calling it from a server component or
+  // server action silently returns empty data (the original /onboarding/done bug),
+  // so fail loudly instead. Server code must use @web/lib/supabase/server
+  // (createClient) or the @web/lib/server/data helpers.
+  if (typeof window === 'undefined') {
+    throw new Error(
+      'getSupabase() (browser Supabase client) was called in a server context. ' +
+        'Use @web/lib/supabase/server (createClient) or @web/lib/server/data instead.',
+    );
+  }
   if (client) return client;
   const url = readSupabaseUrl();
   const key = readSupabaseAnonKey();
