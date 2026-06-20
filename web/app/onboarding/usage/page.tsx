@@ -6,6 +6,7 @@ import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { setSetting } from '@/db/repositories/settings';
 import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 const PRICE_PER_STICK = 18;
@@ -35,13 +36,21 @@ const PURCHASE_OPTIONS: PurchaseOption[] = [
 
 export default function OnboardingUsagePage() {
   const router = useRouter();
-  const [perDay, setPerDay] = React.useState('10');
-  const [pref, setPref] = React.useState<PurchaseOption['id'] | null>(null);
-  const [windowDays, setWindowDays] = React.useState<7 | 30>(30);
+  // Draft-backed so values survive back/forward navigation within the session.
+  const {
+    perDay: draftPerDay,
+    windowDays: draftWindow,
+    purchasePref: pref,
+    setUsage,
+  } = useOnboardingDraft();
+  const perDay = draftPerDay != null ? String(draftPerDay) : '10';
+  const windowDays = draftWindow ?? 30;
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const n = Math.max(0, Math.min(MAX_TICKS, Number(perDay) || 0));
+  const setPerDay = (value: string) =>
+    setUsage({ perDay: Math.max(0, Math.min(MAX_TICKS, Number(value) || 0)) });
   const dailySpend = n * PRICE_PER_STICK;
   const yearlySpend = dailySpend * 365;
 
@@ -266,7 +275,7 @@ export default function OnboardingUsagePage() {
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setWindowDays(opt.id)}
+                onClick={() => setUsage({ windowDays: opt.id })}
                 className="focus-ring"
                 style={{
                   flex: '1 1 200px',
@@ -307,7 +316,7 @@ export default function OnboardingUsagePage() {
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setPref(opt.id)}
+                onClick={() => setUsage({ purchasePref: opt.id })}
                 className="focus-ring"
                 style={{
                   height: 34,

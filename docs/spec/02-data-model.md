@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: fcabb85
+last_verified_commit: a752d3c
 status: current
 ---
 
@@ -69,7 +69,7 @@ A note on `baseline_per_day`: the initial migration declared this `numeric(5,2)`
 
 **RLS**: SELECT, INSERT, UPDATE each have a separate policy keyed on `id = (SELECT auth.uid())`. There is no DELETE policy — row deletion is never allowed by clients; account removal is handled server-side through `erase_account_data()`.
 
-**Realtime**: `user_profiles` is intended to be in `supabase_realtime` for settings sync across browser tabs (see `supabase/migrations/20260606000000_realtime_publications.sql`). At the time of live verification the publication showed no public tables — this is an open gap.
+**Realtime**: `user_profiles` is in the `supabase_realtime` publication (applied via `supabase/migrations/20260620130000_realtime_enable.sql`, verified live), so profile UPDATEs sync across tabs/devices. Subscribers filter on `id=eq.<uid>` (the PK), so default replica identity suffices — no `REPLICA IDENTITY FULL` needed here.
 
 ---
 
@@ -157,7 +157,7 @@ The central fact table. Every recorded smoking event is one row here.
 
 **RLS**: single `logs_all` policy FOR ALL using `user_id = (SELECT auth.uid())`.
 
-**Realtime**: `cigarette_logs` is intended to be in `supabase_realtime` (see Open gaps).
+**Realtime**: `cigarette_logs` is in the `supabase_realtime` publication and set to `REPLICA IDENTITY FULL` (migration `20260620130000_realtime_enable.sql`). FULL is required because subscribers filter on `user_id=eq.<uid>`, which is not the PK — without it, DELETE events would omit `user_id` and never reach the client.
 
 ---
 
@@ -182,7 +182,7 @@ User-defined targets evaluated against the logs.
 
 **RLS**: single `goals_all` policy FOR ALL using `user_id = (SELECT auth.uid())`.
 
-**Realtime**: `goals` is intended to be in `supabase_realtime` (see Open gaps).
+**Realtime**: `goals` is in the `supabase_realtime` publication and set to `REPLICA IDENTITY FULL` (migration `20260620130000_realtime_enable.sql`), for the same `user_id` filter reason as `cigarette_logs`.
 
 ---
 
@@ -518,7 +518,7 @@ These rules must never break:
 
 **`smoke_seed` tables have no RLS**. The advisor warning is real but not a security bug in practice: the tables have no data that could harm a user if read (they are public health facts and generic brand info), and the `REVOKE ALL … FROM PUBLIC` on the schema prevents direct client access via PostgREST. However, enabling RLS with appropriate policies (or keeping them as internal-only tables with no PostgREST exposure) is the cleaner long-term posture.
 
-**Realtime subscriptions may not be active**. The migration `20260606000000_realtime_publications.sql` adds `cigarette_logs`, `goals`, and `user_profiles` to the `supabase_realtime` publication. At live verification the publication contained no public tables. This means real-time sync across browser tabs is not currently active.
+**Realtime is active**. `cigarette_logs`, `goals`, and `user_profiles` are in the `supabase_realtime` publication — applied and verified live via `20260620130000_realtime_enable.sql` (the earlier `20260606000000_realtime_publications.sql` was authored but never applied, which is why the publication was empty). `cigarette_logs` and `goals` are `REPLICA IDENTITY FULL` so DELETE events carry `user_id` for the client filter. Both clients subscribe via `RealtimeRefresher` (web `router.refresh()`, mobile `useSession.refresh*`).
 
 **`onboarding_step` was widened post-launch**. The original constraint in `20260520000000` omitted `'usage'`. The app's first onboarding step writes that value, so every new signup rejected with `23514` until `20260523081444_align_onboarding_step_constraint.sql` widened the CHECK. The TS source of truth is `OnboardingStep` in `src/types/index.ts:95`.
 
@@ -531,7 +531,6 @@ These rules must never break:
 
 ## Open gaps
 
-- **Realtime publication not applied**. The `supabase_realtime` publication has no public tables in the live project as of the last verification, despite the migration running. The web client's cross-tab sync depends on this being in place. Investigate with `SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime'` on the live project.
 - **`smoke_seed` tables have RLS disabled**. The Supabase advisor flags `smoke_seed.brand_catalog`, `smoke_seed.smoking_facts`, and `smoke_seed.health_milestones` as critical. In practice, these tables have `REVOKE ALL … FROM PUBLIC` and are not directly reachable by PostgREST, but the belt-and-suspenders posture would be to add `ENABLE ROW LEVEL SECURITY` with no policies (which makes them default-deny) or to move them fully outside PostgREST's reach.
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
 - **`goals.start_date` and `end_date` are text**. Like `local_date` on logs, these are `YYYY-MM-DD` strings. They have no CHECK constraint ensuring they are valid dates or that `end_date >= start_date`. The validation lives only in TypeScript.

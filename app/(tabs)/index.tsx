@@ -14,6 +14,7 @@ import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
 import { spacing, typography, fonts, radius } from '@/constants/theme';
 import { useSession } from '@/store/session';
 import { useTheme } from '@/hooks/useTheme';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import {
   dailyStats,
   forecastMonthlySpend,
@@ -362,6 +363,10 @@ export default function Home() {
   const goals = useSession((s) => s.goals);
   const brands = useSession((s) => s.brands);
   const refreshLogs = useSession((s) => s.refreshLogs);
+  // Fallback for when realtime is unavailable: re-pull the high-churn logs on
+  // focus. Goals/profile arrive via realtime and brands change rarely, so we
+  // deliberately don't refetch them on every tab switch (free-tier egress).
+  useRefreshOnFocus(refreshLogs);
 
   const [refreshing, setRefreshing] = useState(false);
   const [quickLogPending, setQuickLogPending] = useState(false);

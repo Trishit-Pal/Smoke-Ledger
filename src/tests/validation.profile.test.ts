@@ -25,11 +25,19 @@ describe('ProfilePatchSchema — identity + optional fields', () => {
     expect(ok({ gender: 'x' })).toBe(false);
   });
 
-  it('accepts a valid mobile number and null, rejects junk', () => {
+  it('accepts a valid Indian mobile and null, rejects junk', () => {
     expect(ok({ mobileE164: '+919876543210' })).toBe(true);
     expect(ok({ mobileE164: null })).toBe(true);
     expect(ok({ mobileE164: '98765' })).toBe(false);
     expect(ok({ mobileE164: '+0123456789' })).toBe(false);
+  });
+
+  it('rejects non-Indian and malformed mobile numbers (India-only)', () => {
+    expect(ok({ mobileE164: '+14155552671' })).toBe(false); // US country code
+    expect(ok({ mobileE164: '+447911123456' })).toBe(false); // UK country code
+    expect(ok({ mobileE164: '+915876543210' })).toBe(false); // lead digit < 6
+    expect(ok({ mobileE164: '+9198765432' })).toBe(false); // too short
+    expect(ok({ mobileE164: '9876543210' })).toBe(false); // missing +91
   });
 
   it('accepts a place up to 80 chars and rejects longer', () => {

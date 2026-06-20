@@ -1,4 +1,53 @@
-import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import {
+  normalizeToE164,
+  normalizeIndianMobile,
+  INDIA_MOBILE_RE,
+  nextMobileChangeDate,
+  canChangeMobile,
+} from '@/lib/mobileNumber';
+
+describe('normalizeIndianMobile', () => {
+  it('prefixes +91 for a bare 10-digit Indian mobile (lead 6-9)', () => {
+    expect(normalizeIndianMobile('9876543210')).toBe('+919876543210');
+    expect(normalizeIndianMobile('6000000000')).toBe('+916000000000');
+  });
+
+  it('compacts separators and keeps a valid +91 number', () => {
+    expect(normalizeIndianMobile('+91 98765 43210')).toBe('+919876543210');
+    expect(normalizeIndianMobile('+91-98765-43210')).toBe('+919876543210');
+  });
+
+  it('adds the missing + when 91 + 10 digits is present', () => {
+    expect(normalizeIndianMobile('919876543210')).toBe('+919876543210');
+  });
+
+  it('rejects a leading digit outside 6-9', () => {
+    expect(normalizeIndianMobile('5876543210')).toBeNull();
+    expect(normalizeIndianMobile('0987654321')).toBeNull();
+    expect(normalizeIndianMobile('+915876543210')).toBeNull();
+  });
+
+  it('rejects non-Indian country codes', () => {
+    expect(normalizeIndianMobile('+14155552671')).toBeNull();
+    expect(normalizeIndianMobile('+447911123456')).toBeNull();
+  });
+
+  it('rejects wrong-length, empty, and junk input', () => {
+    expect(normalizeIndianMobile('98765432')).toBeNull();
+    expect(normalizeIndianMobile('98765432109')).toBeNull();
+    expect(normalizeIndianMobile('')).toBeNull();
+    expect(normalizeIndianMobile('abcd')).toBeNull();
+  });
+});
+
+describe('INDIA_MOBILE_RE', () => {
+  it('matches only +91 followed by 10 digits starting 6-9', () => {
+    expect(INDIA_MOBILE_RE.test('+919876543210')).toBe(true);
+    expect(INDIA_MOBILE_RE.test('+915876543210')).toBe(false);
+    expect(INDIA_MOBILE_RE.test('+9198765432')).toBe(false);
+    expect(INDIA_MOBILE_RE.test('9876543210')).toBe(false);
+  });
+});
 
 describe('normalizeToE164', () => {
   it('prefixes the default country code for a bare 10-digit Indian number', () => {

@@ -39,7 +39,7 @@ import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage, isAppError } from '@/lib/errors';
 import { dispatchFarewell } from '@/lib/character/mood';
 import { computeAge } from '@/domain/age';
-import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import { normalizeIndianMobile, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant } from '@/types';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
@@ -314,6 +314,14 @@ interface InlineEditRowProps {
   /** When false, the field is read-only (e.g. mobile is in its 30-day lock). */
   editable?: boolean;
   strongRule?: boolean;
+  /** Fixed, non-editable adornment shown before the input (e.g. "+91"). */
+  prefix?: string;
+  /** Cap the number of characters the user can type into the input. */
+  maxLength?: number;
+  /** Restrict input to digits only (strips everything else as typed). */
+  digitsOnly?: boolean;
+  /** Transform the stored value into the editable draft (e.g. strip "+91"). */
+  editValueTransform?: (value: string | null) => string;
   onSave: (value: string, onDone: () => void) => void;
 }
 
@@ -327,22 +335,28 @@ function InlineEditRow({
   busy,
   editable = true,
   strongRule,
+  prefix,
+  maxLength,
+  digitsOnly,
+  editValueTransform,
   onSave,
 }: InlineEditRowProps) {
   const theme = useTheme();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
+  const draftFor = (v: string | null) => (editValueTransform ? editValueTransform(v) : (v ?? ''));
+  const [draft, setDraft] = useState(draftFor(value));
 
   const isBusy = busy === busyKey;
   const isAnyBusy = busy !== null;
   const hasValue = !!value && value.trim() !== '';
 
+  const handleChange = (text: string) => setDraft(digitsOnly ? text.replace(/\D/g, '') : text);
   const handleEdit = () => {
-    setDraft(value ?? '');
+    setDraft(draftFor(value));
     setEditing(true);
   };
   const handleCancel = () => {
-    setDraft(value ?? '');
+    setDraft(draftFor(value));
     setEditing(false);
   };
   const handleSave = () => onSave(draft, () => setEditing(false));
@@ -355,10 +369,21 @@ function InlineEditRow({
       control={
         editing ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {prefix ? (
+              <Text
+                variant="small"
+                color={theme.textFaint}
+                style={{ fontFamily: fonts.bodyMedium }}
+                accessibilityElementsHidden
+              >
+                {prefix}
+              </Text>
+            ) : null}
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={handleChange}
               keyboardType={keyboardType}
+              maxLength={maxLength}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={handleSave}
@@ -512,9 +537,9 @@ export default function Settings() {
     setError(null);
     try {
       const trimmed = raw.trim();
-      const value = trimmed === '' ? null : normalizeToE164(trimmed);
+      const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
       if (trimmed !== '' && value === null) {
-        throw new Error('Enter a valid mobile number.');
+        throw new Error('Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9.');
       }
       await updateProfile({ mobileE164: value });
       await refreshProfile();
@@ -940,8 +965,12 @@ export default function Settings() {
               label="Mobile number"
               sublabel={mobileSublabel}
               value={profile.mobileE164 ?? null}
-              placeholder="+91…"
-              keyboardType="phone-pad"
+              placeholder="10-digit number"
+              keyboardType="number-pad"
+              prefix="+91"
+              maxLength={10}
+              digitsOnly
+              editValueTransform={(v) => (v ? v.replace(/^\+91/, '') : '')}
               busyKey="save-mobile"
               busy={busy}
               editable={mobileEditable}

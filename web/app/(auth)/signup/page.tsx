@@ -16,6 +16,7 @@ import { GENDER_VALUES } from '@/lib/validation';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { PasswordField } from '@web/components/auth/PasswordField';
+import { ThemedSelect } from '@web/components/ui/ThemedSelect';
 import {
   INPUT_STYLE,
   DATE_INPUT_STYLE,
@@ -219,8 +220,15 @@ export default function SignupPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
+
+  // Gender uses a custom themed dropdown (not a native <input>), so register it
+  // manually and drive it via setValue.
+  React.useEffect(() => {
+    register('gender');
+  }, [register]);
 
   const fullNameValue = watch('fullName');
   const emailValue = watch('email');
@@ -457,21 +465,18 @@ export default function SignupPage() {
           error={errors.gender?.message ?? null}
           hint="This can't be changed later."
         >
-          <select
-            defaultValue=""
-            style={INPUT_STYLE}
-            className="focus-ring"
-            {...register('gender')}
-          >
-            <option value="" disabled>
-              Select…
-            </option>
-            {GENDER_VALUES.map((g) => (
-              <option key={g} value={g}>
-                {GENDER_LABELS[g]}
-              </option>
-            ))}
-          </select>
+          <ThemedSelect
+            ariaLabel="Gender"
+            value={genderValue}
+            hasError={!!errors.gender}
+            onChange={(v) =>
+              setValue('gender', v as FormValues['gender'], {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            options={GENDER_VALUES.map((g) => ({ value: g, label: GENDER_LABELS[g] }))}
+          />
         </EditorialFieldRow>
         <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
           <PasswordField

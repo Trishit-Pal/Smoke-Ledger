@@ -7,6 +7,7 @@ import { Stamp } from '@web/components/onboarding/Stamp';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { saveComplianceConsents, setOnboardingStep } from '@/db/repositories/profile';
 import { setSetting } from '@/db/repositories/settings';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_LINKS, LEGAL_VERSIONS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -69,12 +70,8 @@ const REQUIRED_ROWS: ConsentRow[] = [
 
 export default function OnboardingPrivacyPage() {
   const router = useRouter();
-  const [ageConfirmed, setAgeConfirmed] = React.useState(false);
-  const [termsAccepted, setTermsAccepted] = React.useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = React.useState(false);
-  const [medicalAccepted, setMedicalAccepted] = React.useState(false);
-  const [dataProcessingAccepted, setDataProcessingAccepted] = React.useState(false);
-  const [analyticsOptIn, setAnalyticsOptIn] = React.useState(false);
+  // Draft-backed so ticked consents survive back/forward navigation.
+  const { consents, setConsent } = useOnboardingDraft();
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [welcome, setWelcome] = React.useState(false);
@@ -92,22 +89,14 @@ export default function OnboardingPrivacyPage() {
   }, [router]);
 
   const values: Record<RequiredKey | 'analytics', boolean> = {
-    age: ageConfirmed,
-    terms: termsAccepted,
-    privacy: privacyAccepted,
-    medical: medicalAccepted,
-    dataProcessing: dataProcessingAccepted,
-    analytics: analyticsOptIn,
+    age: consents.age ?? false,
+    terms: consents.terms ?? false,
+    privacy: consents.privacy ?? false,
+    medical: consents.medical ?? false,
+    dataProcessing: consents.dataProcessing ?? false,
+    analytics: consents.analytics ?? false,
   };
-
-  const setters: Record<RequiredKey | 'analytics', (next: boolean) => void> = {
-    age: setAgeConfirmed,
-    terms: setTermsAccepted,
-    privacy: setPrivacyAccepted,
-    medical: setMedicalAccepted,
-    dataProcessing: setDataProcessingAccepted,
-    analytics: setAnalyticsOptIn,
-  };
+  const analyticsOptIn = values.analytics;
 
   const canContinue = REQUIRED_ROWS.every((row) => values[row.id]);
   const allOn = canContinue && analyticsOptIn;
@@ -116,9 +105,9 @@ export default function OnboardingPrivacyPage() {
 
   const stampAll = () => {
     REQUIRED_ROWS.forEach((row, i) => {
-      setTimeout(() => setters[row.id](true), i * 130);
+      setTimeout(() => setConsent(row.id, true), i * 130);
     });
-    setTimeout(() => setters.analytics(true), REQUIRED_ROWS.length * 130);
+    setTimeout(() => setConsent('analytics', true), REQUIRED_ROWS.length * 130);
   };
 
   const onContinue = async () => {
@@ -198,7 +187,7 @@ export default function OnboardingPrivacyPage() {
                 type="checkbox"
                 className="ed-checkbox focus-ring"
                 checked={checked}
-                onChange={(e) => setters[row.id](e.target.checked)}
+                onChange={(e) => setConsent(row.id, e.target.checked)}
                 style={{ marginTop: 2 }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
@@ -254,7 +243,7 @@ export default function OnboardingPrivacyPage() {
             type="checkbox"
             className="ed-checkbox focus-ring"
             checked={analyticsOptIn}
-            onChange={(e) => setAnalyticsOptIn(e.target.checked)}
+            onChange={(e) => setConsent('analytics', e.target.checked)}
             style={{ marginTop: 2 }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>

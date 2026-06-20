@@ -9,6 +9,7 @@ import { ThemeToggle } from '@web/components/layout/ThemeToggle';
 import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
 import { Figure } from '@web/components/character/Figure';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import type { GoalType } from '@/types';
 
 const PRICE_PER_STICK = 18;
@@ -307,7 +308,13 @@ export function OnboardingDoneClient({
           learn.&rdquo;
         </p>
         <div>
-          <DashboardButton onClick={() => router.replace('/dashboard')} />
+          <DashboardButton
+            onClick={() => {
+              // Onboarding finished — discard the in-memory draft.
+              useOnboardingDraft.getState().clear();
+              router.replace('/dashboard');
+            }}
+          />
         </div>
       </div>
     </div>

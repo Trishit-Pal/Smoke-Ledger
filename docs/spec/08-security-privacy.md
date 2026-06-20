@@ -5,7 +5,7 @@ sources:
   - supabase/functions/**
   - web/lib/server/auth.ts
   - docs/security/**
-last_verified_commit: fcabb85
+last_verified_commit: a752d3c
 status: current
 ---
 
@@ -32,6 +32,8 @@ Every table in the `public` schema has Row Level Security enabled. This was conf
 The policy shape for most user-owned tables is a single FOR ALL policy that gates both `USING` and `WITH CHECK` on `user_id = (select auth.uid())`. The `(select ...)` wrapper is important: it causes Postgres to evaluate `auth.uid()` once as an InitPlan rather than once per row, which matters for table scans on large log sets. The rewrite was applied in `supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:22–46`.
 
 `rate_limit_counters` is the exception. It has RLS enabled but carries no policy at all, making it default-deny to every non-service-role caller. Only the `consume_rate_limit` SECURITY DEFINER function can touch it, and that function is granted only to `service_role`. An anon `SELECT` returns `42501`. This table is intentionally invisible to both `anon` and `authenticated` roles — nothing about its contents should ever be client-readable.
+
+**Realtime is gated by the same RLS.** `cigarette_logs`, `goals`, and `user_profiles` are in the `supabase_realtime` publication (`supabase/migrations/20260620130000_realtime_enable.sql`). Supabase applies each table's RLS SELECT policy before delivering any `postgres_changes` event to a subscriber, so realtime cannot leak another user's rows — a subscriber only receives changes to rows it could already SELECT (`user_id = auth.uid()` / `id = auth.uid()`). The client-side `filter` is defense-in-depth, not the primary guard. `REPLICA IDENTITY FULL` on the two `user_id`-filtered tables affects only the internal WAL stream (so DELETE events carry `user_id`); it exposes nothing extra to clients.
 
 `audit_events` and `error_events` have split policies. `audit_events` allows SELECT (own rows only) but has no INSERT policy for `authenticated` — clients cannot write directly to it; they call Edge Functions which use the service-role client. `error_events` allows SELECT and INSERT for own rows, but has no UPDATE or DELETE policy for `authenticated`, so users cannot modify rows once written. The INSERT policy explicitly blocks `category = 'compliance.delete'` for authenticated users (`supabase/migrations/20260520000000_security_correctness.sql:254–255`).
 

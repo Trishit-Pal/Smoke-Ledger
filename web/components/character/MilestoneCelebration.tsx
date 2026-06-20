@@ -22,6 +22,8 @@ import {
   type MilestoneEventDetail,
 } from '@web/lib/character/mood';
 import { useReduceMotion } from '@web/hooks/useReduceMotion';
+import { useSession } from '@/store/session';
+import { isAchievementSuppressed } from '@/lib/achievements';
 
 const AUTO_DISMISS_MS = 5200;
 
@@ -36,10 +38,24 @@ export function MilestoneCelebration() {
     setMounted(true);
   }, []);
 
+  // Deliberate dismissal (click/Escape/button) — counts toward the per-session
+  // cap. The 5.2s auto-timeout closes via setOpen(false) and does NOT count.
+  const handleDismiss = React.useCallback(() => {
+    if (dismissTimer.current) {
+      window.clearTimeout(dismissTimer.current);
+      dismissTimer.current = null;
+    }
+    useSession.getState().incrementAchievementDismiss();
+    setOpen(false);
+  }, []);
+
   React.useEffect(() => {
     function handler(ev: Event) {
       const d = (ev as CustomEvent<MilestoneEventDetail>).detail;
       if (!d) return;
+      // Suppress for the rest of the session once the user has deliberately
+      // dismissed achievements enough times — skip the modal and the confetti.
+      if (isAchievementSuppressed(useSession.getState().achievementDismissCount)) return;
       setDetail(d);
       setOpen(true);
       // also fire the masthead companion — victory pose for grand milestones
@@ -61,18 +77,18 @@ export function MilestoneCelebration() {
   React.useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') handleDismiss();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, handleDismiss]);
 
   if (!mounted || !open || !detail) return null;
 
   const node = (
     <div
       className="character-overlay"
-      onClick={() => setOpen(false)}
+      onClick={handleDismiss}
       role="dialog"
       aria-modal="true"
       aria-labelledby="character-milestone-title"
@@ -166,7 +182,7 @@ export function MilestoneCelebration() {
           </span>
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={handleDismiss}
             style={{
               background: 'transparent',
               color: 'var(--text)',

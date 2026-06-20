@@ -6,6 +6,7 @@ import { TiltCard } from '@web/components/onboarding/TiltCard';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { createGoal } from '@/db/repositories/goals';
 import { setOnboardingStep } from '@/db/repositories/profile';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import type { GoalType } from '@/types';
@@ -69,8 +70,10 @@ const GOAL_OPTIONS: GoalOption[] = [
 
 export default function OnboardingGoalPage() {
   const router = useRouter();
-  const [type, setType] = React.useState<GoalType | null>(null);
-  const [target, setTarget] = React.useState('');
+  // Draft-backed so the choice + target survive back/forward navigation.
+  const { goalType: type, goalTarget: target, setGoal } = useOnboardingDraft();
+  const setType = (goalType: GoalType) => setGoal({ goalType });
+  const setTarget = (goalTarget: string) => setGoal({ goalTarget });
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 

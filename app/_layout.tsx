@@ -25,6 +25,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { MilestoneCelebration } from '@/components/character/MilestoneCelebration';
 import { LogoutFarewell } from '@/components/character/LogoutFarewell';
+import { RealtimeRefresher } from '@/components/realtime/RealtimeRefresher';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -186,6 +187,10 @@ export default function RootLayout() {
             nothing until their event fires. */}
         <MilestoneCelebration />
         <LogoutFarewell />
+        {/* Subscribes to Supabase realtime CDC and refreshes the session store
+            so saved changes surface across devices/screens without a manual
+            refresh. Renders nothing. */}
+        <RealtimeRefresher />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

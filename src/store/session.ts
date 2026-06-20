@@ -8,6 +8,7 @@ import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
 import { makeNativeCatalogStorage } from '@/lib/catalogStorageNative';
 import * as goalsRepo from '@/db/repositories/goals';
 import * as profileRepo from '@/db/repositories/profile';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { daysAgoIst, todayIst } from '@/lib/date';
 
 // Initial hydration window. Trends/history screens fetch their own deeper
@@ -21,6 +22,10 @@ interface SessionState {
   logs: CigaretteLog[];
   brands: (Brand & { variants: BrandVariant[] })[];
   goals: Goal[];
+  // Deliberate achievement-animation dismissals this login session. In-memory
+  // only and zeroed in reset(), so it naturally resets per login. See
+  // `@/lib/achievements` for the suppression rule.
+  achievementDismissCount: number;
 
   boot: () => Promise<void>;
   reset: () => void;
@@ -28,6 +33,8 @@ interface SessionState {
   refreshBrands: () => Promise<void>;
   refreshGoals: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshAll: () => Promise<void>;
+  incrementAchievementDismiss: () => void;
 
   addLog: (draft: logsRepo.LogDraft) => Promise<CigaretteLog>;
   updateLog: (id: string, patch: Partial<CigaretteLog>) => Promise<void>;
@@ -40,15 +47,21 @@ export const useSession = create<SessionState>((set, get) => ({
   logs: [],
   brands: [],
   goals: [],
+  achievementDismissCount: 0,
 
-  reset: () =>
+  reset: () => {
+    // Clear the in-memory onboarding draft on logout so a different user does
+    // not inherit the previous session's un-committed input.
+    useOnboardingDraft.getState().clear();
     set({
       booted: false,
       profile: null,
       logs: [],
       brands: [],
       goals: [],
-    }),
+      achievementDismissCount: 0,
+    });
+  },
 
   boot: async () => {
     // Keep existing users in sync with the evolving default catalog (once per
@@ -85,6 +98,15 @@ export const useSession = create<SessionState>((set, get) => ({
     const profile = await profileRepo.getProfile();
     set({ profile });
   },
+  // Re-pull every slice at once. Used by the foreground/focus refetch fallback
+  // and after a backgrounded socket reconnects (see RealtimeRefresher).
+  refreshAll: async () => {
+    const { refreshLogs, refreshBrands, refreshGoals, refreshProfile } = get();
+    await Promise.all([refreshLogs(), refreshBrands(), refreshGoals(), refreshProfile()]);
+  },
+
+  incrementAchievementDismiss: () =>
+    set((s) => ({ achievementDismissCount: s.achievementDismissCount + 1 })),
 
   addLog: async (draft) => {
     const created = await logsRepo.createLog(draft);

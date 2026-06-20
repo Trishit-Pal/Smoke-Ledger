@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
 import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Button } from '@/components/ui/Button';
-import { Chip } from '@/components/ui/Chip';
+import { ThemedSelect } from '@/components/ui/ThemedSelect';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
@@ -142,16 +142,12 @@ export default function SignupScreen() {
               >
                 Gender
               </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                {GENDER_VALUES.map((g) => (
-                  <Chip
-                    key={g}
-                    label={GENDER_LABELS[g]}
-                    selected={gender === g}
-                    onPress={() => setGender(g)}
-                  />
-                ))}
-              </View>
+              <ThemedSelect
+                accessibilityLabel="Gender"
+                value={gender}
+                onChange={(v) => setGender(v as Gender)}
+                options={GENDER_VALUES.map((g) => ({ value: g, label: GENDER_LABELS[g] }))}
+              />
               <Text variant="small" muted>
                 This can&rsquo;t be changed later.
               </Text>

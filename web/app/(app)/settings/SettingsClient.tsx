@@ -54,7 +54,7 @@ import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/s
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
 import { computeAge } from '@/domain/age';
-import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import { normalizeIndianMobile, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
 
@@ -237,8 +237,11 @@ export function SettingsClient({
   const [editingBaseline, setEditingBaseline] = React.useState(false);
 
   // ── Profile (mobile + place) edit-in-place state ────────────────────────
+  // The draft holds only the 10 local digits; the "+91" prefix is fixed in the UI.
+  const localMobileDigits = (e164: string | null | undefined) =>
+    e164 ? e164.replace(/^\+91/, '') : '';
   const [editingMobile, setEditingMobile] = React.useState(false);
-  const [mobileDraft, setMobileDraft] = React.useState(profile.mobileE164 ?? '');
+  const [mobileDraft, setMobileDraft] = React.useState(localMobileDigits(profile.mobileE164));
   const [editingPlace, setEditingPlace] = React.useState(false);
   const [placeDraft, setPlaceDraft] = React.useState(profile.place ?? '');
 
@@ -522,9 +525,9 @@ export function SettingsClient({
     setError(null);
     try {
       const trimmed = mobileDraft.trim();
-      const value = trimmed === '' ? null : normalizeToE164(trimmed);
+      const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
       if (trimmed !== '' && value === null) {
-        throw new Error('Enter a valid mobile number.');
+        throw new Error('Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9.');
       }
       await updateProfile({ mobileE164: value });
       setEditingMobile(false);
@@ -766,13 +769,19 @@ export function SettingsClient({
               control={
                 editingMobile ? (
                   <div className="flex items-center gap-md">
+                    <span className="text-body text-text-faint" aria-hidden>
+                      +91
+                    </span>
                     <input
                       type="tel"
-                      inputMode="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       value={mobileDraft}
-                      onChange={(event) => setMobileDraft(event.target.value)}
+                      onChange={(event) =>
+                        setMobileDraft(event.target.value.replace(/\D/g, '').slice(0, 10))
+                      }
                       aria-label="Mobile number"
-                      placeholder="+91…"
+                      placeholder="10-digit number"
                       autoFocus
                       className="w-40 bg-transparent border-0 border-b text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)]"
                       style={{ borderBottomColor: 'var(--rule-strong)' }}
@@ -787,7 +796,7 @@ export function SettingsClient({
                     </TextLink>
                     <TextLink
                       onClick={() => {
-                        setMobileDraft(profile.mobileE164 ?? '');
+                        setMobileDraft(localMobileDigits(profile.mobileE164));
                         setEditingMobile(false);
                       }}
                       disabled={busy != null}
@@ -801,7 +810,7 @@ export function SettingsClient({
                     {mobileEditable ? (
                       <TextLink
                         onClick={() => {
-                          setMobileDraft(profile.mobileE164 ?? '');
+                          setMobileDraft(localMobileDigits(profile.mobileE164));
                           setEditingMobile(true);
                         }}
                         disabled={busy != null}

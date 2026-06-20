@@ -10,6 +10,7 @@ import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { saveComplianceConsents, setOnboardingStep } from '@/db/repositories/profile';
 import { setSetting } from '@/db/repositories/settings';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_URLS, LEGAL_VERSIONS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -64,30 +65,17 @@ export default function Privacy() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [medicalAccepted, setMedicalAccepted] = useState(false);
-  const [dataProcessingAccepted, setDataProcessingAccepted] = useState(false);
-  const [analyticsOptIn, setAnalyticsOptIn] = useState(false);
-
+  // Draft-backed so ticked consents survive back/forward navigation.
+  const { consents, setConsent } = useOnboardingDraft();
   const values: Record<string, boolean> = {
-    age: ageConfirmed,
-    terms: termsAccepted,
-    privacy: privacyAccepted,
-    medical: medicalAccepted,
-    dataProcessing: dataProcessingAccepted,
-    analytics: analyticsOptIn,
+    age: consents.age ?? false,
+    terms: consents.terms ?? false,
+    privacy: consents.privacy ?? false,
+    medical: consents.medical ?? false,
+    dataProcessing: consents.dataProcessing ?? false,
+    analytics: consents.analytics ?? false,
   };
-
-  const setters: Record<string, (v: boolean) => void> = {
-    age: setAgeConfirmed,
-    terms: setTermsAccepted,
-    privacy: setPrivacyAccepted,
-    medical: setMedicalAccepted,
-    dataProcessing: setDataProcessingAccepted,
-    analytics: setAnalyticsOptIn,
-  };
+  const analyticsOptIn = values.analytics;
 
   const required = CONSENT_ROWS.filter((r) => r.required);
   const canContinue = required.every((r) => values[r.id]);
@@ -95,7 +83,7 @@ export default function Privacy() {
 
   const stampAll = () => {
     CONSENT_ROWS.forEach((row, i) => {
-      setTimeout(() => setters[row.id](true), i * 120);
+      setTimeout(() => setConsent(row.id, true), i * 120);
     });
   };
 
@@ -191,7 +179,7 @@ export default function Privacy() {
                 sub={row.sub}
                 required={row.required}
                 value={checked}
-                onChange={setters[row.id]}
+                onChange={(v) => setConsent(row.id, v)}
                 showBottomRule={!isLast}
               />
             );
