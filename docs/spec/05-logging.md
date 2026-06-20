@@ -15,7 +15,7 @@ sources:
   - supabase/migrations/20260524050357_add_daily_summary.sql
   - supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql
   - src/tests/calculations.test.ts
-last_verified_commit: a752d3c
+last_verified_commit: 2fdf20b
 status: current
 ---
 

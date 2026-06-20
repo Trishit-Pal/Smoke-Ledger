@@ -4,6 +4,9 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-06-20 — 2fdf20b (re-stamp: spec sections advanced from pre-commit a752d3c to actual commit sha)
+- architecture, data-model, auth, identity-profile, logging, celebrations, security-privacy: stamp-only advance; prose was already accurate to the 5-workstream commit (realtime sync, onboarding retention, India phone, themed gender, achievement cap)
+
 ## 2026-06-20 — a752d3c (realtime sync, form retention, India phone, themed gender, achievement cap; stamped pre-commit on feat/emotional-animations)
 - architecture: added the realtime-sync data flow (RealtimeRefresher native+web → useSession.refresh*/router.refresh), the focus/foreground refetch fallback, the new `useOnboardingDraft` store, and `useSession.refreshAll`/`achievementDismissCount`
 - data-model: realtime is now live — `cigarette_logs`/`goals`/`user_profiles` in `supabase_realtime` (migration 20260620130000, applied + verified), FULL replica identity on the two user_id-filtered tables; removed the stale "publication not applied" gap

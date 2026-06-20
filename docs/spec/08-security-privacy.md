@@ -5,7 +5,7 @@ sources:
   - supabase/functions/**
   - web/lib/server/auth.ts
   - docs/security/**
-last_verified_commit: a752d3c
+last_verified_commit: 2fdf20b
 status: current
 ---
 
