@@ -1,6 +1,6 @@
 # 2026 cigarette MRP sources (India)
 
-Last reviewed: 2026-05-20
+Last reviewed: 2026-06-20
 
 ## Purpose
 
@@ -22,3 +22,24 @@ Seed prices in `smoke_seed.brand_catalog` are **pack MRP in INR**. They are cura
 ## Display note
 
 When `price_source` is `inferred` or `estimated`, UI may show “estimated from catalog” for transparency.
+
+## 2026-06-20 expansion (`20260620120000_indian_brand_catalog_2026_expansion.sql`)
+
+Added 17 rows (`sort_order` 204-220) for current Indian-market cigarette brands
+that were still missing — most notably **John Player Gold Leaf** (a major ITC
+brand absent from the catalog), plus **Charminar** and **Glamour** (VST), **Silk
+Cut** (imported), and popular capsule/line-extension variants of existing brands
+(Gold Flake Super Star / Indie Mint Burst, Classic Ice Burst / Menthol Rush,
+Capstan Fresh / Bold, Four Square Rich / Gold, Navy Cut Special).
+
+Prices are pack MRP (INR) curated for June 2026 and **aligned with peer brands in
+the same segment** already in the catalog (same approach as the 20260601120000
+Indian expansion) rather than a single citable per-brand source — treat them as
+reasonable starting defaults. Users can override any price in Settings (Brand
+catalog → edit price); overrides set `price_count = 1` so
+`refresh_seed_prices_from_catalog()` never clobbers them.
+
+Authored against the **live** catalog (max applied `sort_order` was 203). The
+range deliberately avoids 250-271, reserved by the not-yet-applied European
+migration `20260605000000`. Client re-sync forced by bumping
+`CATALOG_SYNC_VERSION` → `2026.2`.

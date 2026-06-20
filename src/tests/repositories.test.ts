@@ -12,7 +12,7 @@ jest.mock('@/lib/logger', () => ({
 }));
 
 import { mapDbError } from '@/db/repositories/_supabase';
-import { deleteBrand } from '@/db/repositories/brands';
+import { deleteBrand, setVariantPriceOverride } from '@/db/repositories/brands';
 import { listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
 import { getProfile } from '@/db/repositories/profile';
 import { AppError } from '@/lib/errors';
@@ -453,5 +453,135 @@ describe('deleteBrand — M7 ON DELETE RESTRICT surfaces conflict', () => {
   it('resolves successfully when no error is returned', async () => {
     stubBrandDelete(null);
     await expect(deleteBrand('brd_abc123')).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setVariantPriceOverride — direct price set (NOT the running-mean of upsertVariant)
+// ---------------------------------------------------------------------------
+//
+// upsertVariant treats a supplied price as one more observation and recomputes a
+// running mean. That is wrong for a deliberate user override ("this pack costs
+// ₹199, full stop"). setVariantPriceOverride sets avg/last/sum to the override and
+// price_count = 1 so:
+//   (a) the price the user sees equals exactly what they typed, and
+//   (b) refresh_seed_prices_from_catalog (guarded by `COALESCE(price_count,0) = 0`)
+//       will NOT overwrite it on the next catalog sync.
+// ---------------------------------------------------------------------------
+
+function makeVarRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 'var_x',
+    user_id: 'user-123',
+    brand_id: 'brd_x',
+    name: 'Kings',
+    default_pack_size: 10,
+    avg_price_inr: 230,
+    last_price_inr: 230,
+    last_priced_at: '2026-06-20T00:00:00Z',
+    price_sum_inr: 230,
+    price_count: 1,
+    ...over,
+  };
+}
+
+function stubVariantUpdate(result: { data?: unknown; error?: unknown }) {
+  const captured: { update?: Record<string, unknown>; eqs: Array<[string, unknown]> } = {
+    eqs: [],
+  };
+  const builder: Record<string, unknown> = {
+    single: jest
+      .fn()
+      .mockResolvedValue({ data: result.data ?? null, error: result.error ?? null }),
+  };
+  builder.from = jest.fn(() => builder);
+  builder.update = jest.fn((payload: Record<string, unknown>) => {
+    captured.update = payload;
+    return builder;
+  });
+  builder.eq = jest.fn((col: string, val: unknown) => {
+    captured.eqs.push([col, val]);
+    return builder;
+  });
+  builder.select = jest.fn(() => builder);
+  mockGetSupabase.mockReturnValue(builder);
+  return { builder, captured };
+}
+
+describe('setVariantPriceOverride — direct price set (not running mean)', () => {
+  beforeEach(() => {
+    mockGetSupabase.mockReset();
+  });
+
+  it('sets avg/last/sum to the override and price_count=1 so refresh cannot clobber it', async () => {
+    // Arrange
+    const { captured } = stubVariantUpdate({
+      data: makeVarRow({
+        avg_price_inr: 199,
+        last_price_inr: 199,
+        price_sum_inr: 199,
+        price_count: 1,
+      }),
+    });
+
+    // Act
+    const result = await setVariantPriceOverride('var_x', 199);
+
+    // Assert — the write payload is a definitive set, not a mean nudge
+    expect(captured.update).toMatchObject({
+      avg_price_inr: 199,
+      last_price_inr: 199,
+      price_sum_inr: 199,
+      price_count: 1,
+    });
+    expect(captured.update?.last_priced_at).toEqual(expect.any(String));
+    // Scoped to the row AND the owner (no cross-tenant write)
+    expect(captured.eqs).toContainEqual(['id', 'var_x']);
+    expect(captured.eqs).toContainEqual(['user_id', 'user-123']);
+    expect(result.avgPriceInr).toBe(199);
+    expect(result.lastPriceInr).toBe(199);
+  });
+
+  it('accepts a price at the 2000 INR cap boundary', async () => {
+    const { captured } = stubVariantUpdate({
+      data: makeVarRow({ avg_price_inr: 2_000, last_price_inr: 2_000 }),
+    });
+    await expect(setVariantPriceOverride('var_x', 2_000)).resolves.toBeDefined();
+    expect(captured.update).toMatchObject({ avg_price_inr: 2_000 });
+  });
+
+  it('accepts a price at the 0 INR floor boundary', async () => {
+    const { captured } = stubVariantUpdate({
+      data: makeVarRow({ avg_price_inr: 0, last_price_inr: 0, price_sum_inr: 0 }),
+    });
+    await expect(setVariantPriceOverride('var_x', 0)).resolves.toBeDefined();
+    expect(captured.update).toMatchObject({ avg_price_inr: 0, price_count: 1 });
+  });
+
+  it('rejects a price above the 2000 INR cap (validation error)', async () => {
+    stubVariantUpdate({ data: makeVarRow() });
+    await expect(setVariantPriceOverride('var_x', 2_500)).rejects.toThrow(
+      /Validation failed for price_inr/,
+    );
+  });
+
+  it('rejects a negative price', async () => {
+    stubVariantUpdate({ data: makeVarRow() });
+    await expect(setVariantPriceOverride('var_x', -1)).rejects.toThrow(
+      /Validation failed for price_inr/,
+    );
+  });
+
+  it('rejects an invalid (empty) variant id before touching the DB', async () => {
+    const { builder } = stubVariantUpdate({ data: makeVarRow() });
+    await expect(setVariantPriceOverride('', 100)).rejects.toThrow(
+      /Validation failed for variant_id/,
+    );
+    expect(builder.update).not.toHaveBeenCalled();
+  });
+
+  it('maps a DB error to AppError', async () => {
+    stubVariantUpdate({ error: { code: '42501', message: 'permission denied' } });
+    await expect(setVariantPriceOverride('var_x', 100)).rejects.toBeInstanceOf(AppError);
   });
 });
