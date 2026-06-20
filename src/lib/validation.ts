@@ -144,11 +144,22 @@ export const BrandSchema = z
 
 export type BrandInput = z.infer<typeof BrandSchema>;
 
+/**
+ * A single INR price (pack MRP or unit price). Capped at ₹2,000 — comfortably
+ * above any real cigarette pack — to keep the column from being abused. Reused
+ * by the variant schema and the direct price-override repo path. The bounds are
+ * exported so UI-layer guards reference one source of truth instead of repeating
+ * the literals.
+ */
+export const MIN_PRICE_INR = 0;
+export const MAX_PRICE_INR = 2_000;
+export const PriceInrSchema = z.number().min(MIN_PRICE_INR).max(MAX_PRICE_INR);
+
 export const BrandVariantSchema = z
   .object({
     name: BoundedString(100),
     defaultPackSize: z.number().int().min(1).max(100),
-    avgPriceInr: z.number().min(0).max(2_000).nullable(),
+    avgPriceInr: PriceInrSchema.nullable(),
   })
   .strict();
 

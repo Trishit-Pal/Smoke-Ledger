@@ -22,7 +22,7 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useSession } from '@/store/session';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSetting, setSetting } from '@/db/repositories/settings';
-import { createBrand, upsertVariant } from '@/db/repositories/brands';
+import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
@@ -41,7 +41,8 @@ import { dispatchFarewell } from '@/lib/character/mood';
 import { computeAge } from '@/domain/age';
 import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
-import type { Brand } from '@/types';
+import type { Brand, BrandVariant } from '@/types';
+import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,8 @@ type BusyAction =
   | 'toggle-discreet'
   | 'toggle-hide'
   | 'toggle-analytics'
-  | 'add-brand';
+  | 'add-brand'
+  | 'save-price';
 
 // ─── Small-caps section caption + deck ────────────────────────────────────────
 
@@ -455,6 +457,7 @@ export default function Settings() {
   const booted = useSession((s) => s.booted);
   const refreshProfile = useSession((s) => s.refreshProfile);
   const refreshBrands = useSession((s) => s.refreshBrands);
+  const brands = useSession((s) => s.brands);
   const boot = useSession((s) => s.boot);
 
   const [analyticsOptIn, setAnalyticsOptIn] = useState(false);
@@ -469,6 +472,11 @@ export default function Settings() {
   const [newPackSize, setNewPackSize] = useState('20');
   const [newAvgPrice, setNewAvgPrice] = useState('');
   const [newCategory, setNewCategory] = useState<Brand['category']>('regular');
+
+  // Brand catalog price editor
+  const [showPrices, setShowPrices] = useState(false);
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -644,6 +652,39 @@ export default function Settings() {
       setNewAvgPrice('');
       setNewCategory('regular');
       setShowAddBrand(false);
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'validation_error'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const beginEditPrice = (variant: BrandVariant) => {
+    setEditingVariantId(variant.id);
+    setPriceDraft(variant.avgPriceInr != null ? String(Math.round(variant.avgPriceInr)) : '');
+    setError(null);
+  };
+
+  const cancelEditPrice = () => {
+    setEditingVariantId(null);
+    setPriceDraft('');
+  };
+
+  const saveVariantPrice = async (variantId: string) => {
+    const parsed = Number(priceDraft);
+    if (!Number.isFinite(parsed) || parsed < MIN_PRICE_INR || parsed > MAX_PRICE_INR) {
+      setError(`Price must be a number between ${MIN_PRICE_INR} and ${MAX_PRICE_INR}.`);
+      return;
+    }
+    // Pack MRPs are whole rupees; round so the stored value matches the display.
+    const price = Math.round(parsed);
+    setBusy('save-price');
+    setError(null);
+    try {
+      await setVariantPriceOverride(variantId, price);
+      await refreshBrands();
+      setEditingVariantId(null);
+      setPriceDraft('');
     } catch (e) {
       setError(toSafeErrorMessage(e, 'validation_error'));
     } finally {
@@ -1137,6 +1178,139 @@ export default function Settings() {
                   Save brand
                 </TextLink>
               </View>
+            </View>
+          ) : null}
+
+          <PrefRow
+            label="Edit saved prices"
+            sublabel="Override the default price of any brand variant. Your price is kept and won't be reset by catalog updates."
+            control={
+              <TextLink
+                onPress={() => setShowPrices((open) => !open)}
+                disabled={busy !== null}
+                accessibilityLabel={showPrices ? 'Hide prices' : 'Edit prices'}
+              >
+                {showPrices ? 'Hide' : 'Edit prices'}
+              </TextLink>
+            }
+          />
+
+          {showPrices ? (
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: theme.rule,
+                paddingTop: spacing.md,
+                gap: spacing.lg,
+              }}
+            >
+              {brands.length === 0 ? (
+                <Text variant="small" muted>
+                  No brands yet.
+                </Text>
+              ) : (
+                brands.map((b) => (
+                  <View key={b.id} style={{ gap: spacing.xs }}>
+                    <Text
+                      variant="caption"
+                      color={theme.textMuted}
+                      style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
+                    >
+                      {b.name}
+                    </Text>
+                    {b.variants.length === 0 ? (
+                      <Text variant="small" muted>
+                        No variants.
+                      </Text>
+                    ) : (
+                      b.variants.map((v) => (
+                        <View
+                          key={v.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: spacing.md,
+                            borderTopWidth: 1,
+                            borderTopColor: theme.rule,
+                            paddingVertical: spacing.sm,
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text variant="body">
+                              {v.name}
+                              <Text
+                                variant="body"
+                                color={theme.textMuted}
+                              >{`  ·  ${v.defaultPackSize}s`}</Text>
+                            </Text>
+                          </View>
+                          {editingVariantId === v.id ? (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: spacing.sm,
+                              }}
+                            >
+                              <Text variant="body" color={theme.textMuted}>
+                                ₹
+                              </Text>
+                              <TextInput
+                                value={priceDraft}
+                                onChangeText={setPriceDraft}
+                                keyboardType="decimal-pad"
+                                autoFocus
+                                accessibilityLabel={`Price for ${b.name} ${v.name}`}
+                                style={{
+                                  width: 64,
+                                  color: theme.text,
+                                  fontFamily: fonts.body,
+                                  fontSize: typography.body.fontSize,
+                                  textAlign: 'right',
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: theme.ruleStrong,
+                                  paddingVertical: spacing.xs,
+                                }}
+                              />
+                              <TextLink onPress={cancelEditPrice} disabled={busy !== null}>
+                                Cancel
+                              </TextLink>
+                              <TextLink
+                                onPress={() => void saveVariantPrice(v.id)}
+                                busy={busy === 'save-price'}
+                                disabled={busy !== null}
+                                accessibilityLabel="Save price"
+                              >
+                                Save
+                              </TextLink>
+                            </View>
+                          ) : (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: spacing.md,
+                              }}
+                            >
+                              <Text variant="body">
+                                {v.avgPriceInr != null ? `₹${Math.round(v.avgPriceInr)}` : '—'}
+                              </Text>
+                              <TextLink
+                                onPress={() => beginEditPrice(v)}
+                                disabled={busy !== null}
+                                accessibilityLabel={`Edit price for ${b.name} ${v.name}`}
+                              >
+                                Edit
+                              </TextLink>
+                            </View>
+                          )}
+                        </View>
+                      ))
+                    )}
+                  </View>
+                ))
+              )}
             </View>
           ) : null}
         </View>

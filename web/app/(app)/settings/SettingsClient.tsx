@@ -51,7 +51,8 @@ import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
 import { toSafeErrorMessage, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
-import { createBrand, upsertVariant } from '@/db/repositories/brands';
+import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
+import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
 import { computeAge } from '@/domain/age';
 import { normalizeToE164, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
@@ -70,7 +71,8 @@ type BusyAction =
   | 'toggle-discreet'
   | 'toggle-hide'
   | 'toggle-analytics'
-  | 'add-brand';
+  | 'add-brand'
+  | 'save-price';
 
 export interface SettingsClientProps {
   profile: UserProfile;
@@ -222,7 +224,7 @@ function TextLink({
 
 export function SettingsClient({
   profile,
-  brands: _initialBrands,
+  brands: initialBrands,
   analyticsOptIn: initialAnalyticsOptIn,
   initialAction,
 }: SettingsClientProps) {
@@ -242,13 +244,27 @@ export function SettingsClient({
 
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(initialAnalyticsOptIn);
 
-  // ── Brand catalog add-form state ────────────────────────────────────────
+  // ── Brand catalog state ─────────────────────────────────────────────────
+  // Local mutable copy of the server-provided catalog so a price edit reflects
+  // immediately without a full reload. Other views are refreshed via revalidate.
+  const [brands, setBrands] = React.useState(initialBrands);
+  // Reconcile with the server prop whenever it changes (e.g. after add-brand's
+  // router.refresh()). useState seeds only once, so without this the panel would
+  // miss a newly added brand until a hard reload.
+  React.useEffect(() => {
+    setBrands(initialBrands);
+  }, [initialBrands]);
   const [showAddBrand, setShowAddBrand] = React.useState(false);
   const [newBrandName, setNewBrandName] = React.useState('');
   const [newVariantName, setNewVariantName] = React.useState('Regular');
   const [newPackSize, setNewPackSize] = React.useState('20');
   const [newAvgPrice, setNewAvgPrice] = React.useState('');
   const [newCategory, setNewCategory] = React.useState<Brand['category']>('regular');
+
+  // ── Brand catalog price-editor state ────────────────────────────────────
+  const [showPrices, setShowPrices] = React.useState(false);
+  const [editingVariantId, setEditingVariantId] = React.useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = React.useState('');
 
   // ── Status / toast state ────────────────────────────────────────────────
   const [error, setError] = React.useState<string | null>(null);
@@ -423,6 +439,50 @@ export function SettingsClient({
       setNewCategory('regular');
       setShowAddBrand(false);
       flashToast(`Added ${brandName}.`);
+    } catch (e) {
+      setError(toSafeErrorMessage(e, 'validation_error'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const beginEditPrice = (variant: BrandVariant) => {
+    setEditingVariantId(variant.id);
+    setPriceDraft(variant.avgPriceInr != null ? String(Math.round(variant.avgPriceInr)) : '');
+    setError(null);
+  };
+
+  const cancelEditPrice = () => {
+    setEditingVariantId(null);
+    setPriceDraft('');
+  };
+
+  const onSaveVariantPrice = async (variantId: string) => {
+    const parsed = Number(priceDraft);
+    if (!Number.isFinite(parsed) || parsed < MIN_PRICE_INR || parsed > MAX_PRICE_INR) {
+      setError(`Price must be a number between ${MIN_PRICE_INR} and ${MAX_PRICE_INR}.`);
+      return;
+    }
+    // Pack MRPs are whole rupees; round so the stored value matches what the
+    // editor displays (the list shows Math.round(price)).
+    const price = Math.round(parsed);
+    setBusy('save-price');
+    setError(null);
+    try {
+      const updated = await setVariantPriceOverride(variantId, price);
+      // Optimistic local update so the new price shows immediately.
+      setBrands((prev) =>
+        prev.map((b) => ({
+          ...b,
+          variants: b.variants.map((v) => (v.id === variantId ? updated : v)),
+        })),
+      );
+      setEditingVariantId(null);
+      setPriceDraft('');
+      // Refresh dashboard/trends/log caches that read variant prices.
+      await revalidateBrands();
+      await revalidateAppViews();
+      flashToast('Price updated.');
     } catch (e) {
       setError(toSafeErrorMessage(e, 'validation_error'));
     } finally {
@@ -976,6 +1036,93 @@ export function SettingsClient({
                   {busy === 'add-brand' ? 'Saving…' : 'Save brand'}
                 </TextLink>
               </div>
+            </div>
+          ) : null}
+
+          <dl className="flex flex-col">
+            <PrefRow
+              label="Edit saved prices"
+              sublabel="Override the default price of any brand variant. Your price is kept and won't be reset by catalog updates."
+              control={
+                <TextLink
+                  onClick={() => setShowPrices((open) => !open)}
+                  disabled={busy != null}
+                  ariaLabel={showPrices ? 'Hide prices' : 'Edit prices'}
+                >
+                  {showPrices ? 'Hide' : 'Edit prices'}
+                </TextLink>
+              }
+            />
+          </dl>
+
+          {showPrices ? (
+            <div className="rule-hair pt-md flex flex-col gap-lg">
+              {brands.length === 0 ? (
+                <p className="text-small text-text-muted">No brands yet.</p>
+              ) : (
+                brands.map((b) => (
+                  <div key={b.id} className="flex flex-col gap-xs">
+                    <span className="editorial-caption">{b.name}</span>
+                    {b.variants.length === 0 ? (
+                      <p className="text-small text-text-muted">No variants.</p>
+                    ) : (
+                      b.variants.map((v) => (
+                        <div
+                          key={v.id}
+                          className="rule-hair grid grid-cols-[1fr_auto] items-center gap-md py-sm"
+                        >
+                          <div className="min-w-0 text-body text-text truncate">
+                            {v.name}
+                            <span className="text-text-muted"> · {v.defaultPackSize}s</span>
+                          </div>
+                          {editingVariantId === v.id ? (
+                            <div className="flex items-center gap-sm">
+                              <span className="text-text-muted">₹</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={2000}
+                                step="1"
+                                inputMode="decimal"
+                                value={priceDraft}
+                                onChange={(event) => setPriceDraft(event.target.value)}
+                                autoFocus
+                                className="w-20 bg-transparent border-0 border-b nums-tabular text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)] py-xs"
+                                style={{ borderBottomColor: 'var(--rule-strong)' }}
+                                aria-label={`Price for ${b.name} ${v.name}`}
+                              />
+                              <TextLink onClick={cancelEditPrice} disabled={busy != null}>
+                                Cancel
+                              </TextLink>
+                              <TextLink
+                                onClick={() => void onSaveVariantPrice(v.id)}
+                                disabled={busy != null}
+                                busy={busy === 'save-price'}
+                                ariaLabel="Save price"
+                              >
+                                {busy === 'save-price' ? 'Saving…' : 'Save'}
+                              </TextLink>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-md">
+                              <span className="nums-tabular text-body text-text">
+                                {v.avgPriceInr != null ? `₹${Math.round(v.avgPriceInr)}` : '—'}
+                              </span>
+                              <TextLink
+                                onClick={() => beginEditPrice(v)}
+                                disabled={busy != null}
+                                ariaLabel={`Edit price for ${b.name} ${v.name}`}
+                              >
+                                Edit
+                              </TextLink>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           ) : null}
         </section>

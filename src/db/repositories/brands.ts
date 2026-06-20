@@ -8,6 +8,7 @@ import {
   BrandVariantSchema,
   IdSchema,
   parseOrThrow,
+  PriceInrSchema,
   type BrandInput,
   type BrandVariantInput,
 } from '@/lib/validation';
@@ -228,6 +229,43 @@ export async function upsertVariant(
       price_sum_inr: priceInr ?? 0,
       price_count: priceInr != null ? 1 : 0,
     })
+    .select('*')
+    .single();
+  if (error) throw mapDbError(error);
+  return rowToVariant(data as VarRow);
+}
+
+/**
+ * Sets a variant's price as a deliberate user override — distinct from
+ * {@link upsertVariant}, which folds a price into a running mean of observations.
+ *
+ * The override sets `avg_price_inr` / `last_price_inr` / `price_sum_inr` to the
+ * exact value the user typed and `price_count = 1`. The `price_count = 1` is
+ * load-bearing: `refresh_seed_prices_from_catalog` only rewrites prices where
+ * `COALESCE(price_count, 0) = 0`, so an override survives every future catalog
+ * sync. Treating the override as the first "observation" also keeps the
+ * running-mean model intact if the user later logs real purchase prices.
+ */
+export async function setVariantPriceOverride(
+  variantId: string,
+  priceInr: number,
+): Promise<BrandVariant> {
+  parseOrThrow(IdSchema, variantId, 'variant_id');
+  const price = parseOrThrow(PriceInrSchema, priceInr, 'price_inr');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('brand_variants')
+    .update({
+      avg_price_inr: price,
+      last_price_inr: price,
+      last_priced_at: now,
+      price_sum_inr: price,
+      price_count: 1,
+    })
+    .eq('id', variantId)
+    .eq('user_id', userId)
     .select('*')
     .single();
   if (error) throw mapDbError(error);
