@@ -139,9 +139,18 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
   }, []);
   React.useEffect(() => {
     if (prevStreakRef.current === null) { prevStreakRef.current = streak; return; }
-    if (streak > prevStreakRef.current) {
+    const prev = prevStreakRef.current;
+    if (streak > prev) {
       const m = milestoneForStreak(streak);
       if (m) dispatchMilestone(m);
+    } else if (streak === 0 && prev >= 3) {
+      // Streak broke after a meaningful run — a gentle, non-judgmental nudge
+      // (no modal; that would frame a setback as a celebration). The caption
+      // points forward, never guilt-trips.
+      dispatchMood('concern', {
+        caption: 'Streak reset — tomorrow is a fresh page.',
+        durationMs: 3800,
+      });
     }
     prevStreakRef.current = streak;
   }, [streak]);

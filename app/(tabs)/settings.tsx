@@ -772,6 +772,10 @@ export default function Settings() {
               } catch {
                 // Ignore — deletion already succeeded.
               }
+              // A warm wave-off before returning to sign-in — mirrors the
+              // sign-out farewell. Bridge the gap so the overlay is seen.
+              dispatchFarewell();
+              await new Promise((r) => setTimeout(r, 1600));
               router.replace('/login');
             } catch (e) {
               if (!isReauthRedirect) {

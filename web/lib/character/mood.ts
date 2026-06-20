@@ -53,6 +53,11 @@ export interface MilestoneEventDetail {
   title: string;
   /** Supporting copy. */
   body?: string;
+  /**
+   * Major milestone — render the `victory` pose with a fuller confetti burst
+   * instead of the standard `applaud`. Set on the long-haul tiers (60+ days).
+   */
+  grand?: boolean;
 }
 
 function safeDispatch<T>(name: string, detail: T): void {
@@ -80,12 +85,15 @@ export function dispatchFarewell(): void {
    right milestone copy is fired. Centralised here so milestone tiers
    stay consistent.
    ───────────────────────────────────────────────────────────────────── */
-const MILESTONE_TIERS: ReadonlyArray<{ days: number; title: string; body: string }> = [
-  { days: 1,  title: 'One day, quieter.',     body: 'The first day under your baseline is the hardest. You took it.' },
-  { days: 3,  title: 'Three days, quieter.',  body: 'A small rhythm is forming. Keep noticing what helped.' },
-  { days: 7,  title: 'Seven days, quieter.',  body: 'A full week under your baseline. The ledger keeps the receipt; you keep the wins.' },
-  { days: 14, title: 'Two weeks, quieter.',   body: 'Fourteen days. Your body has already started repaying you.' },
-  { days: 30, title: 'A month, quieter.',     body: 'Thirty days. This is no longer a streak — it is a habit.' },
+const MILESTONE_TIERS: ReadonlyArray<{ days: number; title: string; body: string; grand?: boolean }> = [
+  { days: 1,   title: 'One day, quieter.',     body: 'The first day under your baseline is the hardest. You took it.' },
+  { days: 3,   title: 'Three days, quieter.',  body: 'A small rhythm is forming. Keep noticing what helped.' },
+  { days: 7,   title: 'Seven days, quieter.',  body: 'A full week under your baseline. The ledger keeps the receipt; you keep the wins.' },
+  { days: 14,  title: 'Two weeks, quieter.',   body: 'Fourteen days. Your body has already started repaying you.' },
+  { days: 30,  title: 'A month, quieter.',     body: 'Thirty days. This is no longer a streak — it is a habit.' },
+  { days: 60,  title: 'Two months, quieter.',  body: 'Sixty days. The version of you that started is proud of this one.', grand: true },
+  { days: 100, title: 'One hundred days.',     body: 'Triple digits. This is a track record now, not a streak.', grand: true },
+  { days: 365, title: 'One year, quieter.',    body: 'A full year under your baseline. Whatever you tell yourself you cannot do — remember this.', grand: true },
 ];
 
 export function milestoneForStreak(days: number): MilestoneEventDetail | null {

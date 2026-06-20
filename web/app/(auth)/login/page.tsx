@@ -240,10 +240,12 @@ function LoginPageInner() {
     }
   }, [callbackError]);
 
-  // CHARACTER (2): greet on first render — the figure waves as the form loads.
+  // CHARACTER (2): greet on first render — the figure waves "welcome back" as
+  // the form loads. (Success redirects via a server action, so the warm beat
+  // lives here on arrival rather than after submit.)
   React.useEffect(() => {
     const t = window.setTimeout(
-      () => dispatchMood('greet', { durationMs: 2000 }),
+      () => dispatchMood('greet', { caption: 'Welcome back.', durationMs: 2400 }),
       500,
     );
     return () => window.clearTimeout(t);

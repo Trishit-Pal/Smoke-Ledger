@@ -15,6 +15,7 @@ import { ConfettiBurst } from './ConfettiBurst';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { fonts, radius, spacing } from '@/constants/theme';
 import {
   dispatchMood,
@@ -26,6 +27,7 @@ const AUTO_DISMISS_MS = 5200;
 
 export function MilestoneCelebration() {
   const theme = useTheme();
+  const reduced = useReduceMotion();
   const [open, setOpen] = React.useState(false);
   const [detail, setDetail] = React.useState<MilestoneEventDetail | null>(null);
   const dismissTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,8 +37,12 @@ export function MilestoneCelebration() {
       if (!d) return;
       setDetail(d);
       setOpen(true);
-      // Fire the masthead companion in parallel
-      dispatchMood('applaud', { caption: d.type === 'streak' ? `${d.days}-day streak.` : 'Happy Birthday!', durationMs: 3400 });
+      // Fire the masthead companion in parallel — victory pose for grand milestones
+      dispatchMood(d.grand ? 'victory' : 'applaud', {
+        caption: d.type === 'streak' ? `${d.days}-day streak.` : 'Happy Birthday!',
+        durationMs: 3400,
+        celebrate: true,
+      });
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
       dismissTimer.current = setTimeout(() => setOpen(false), AUTO_DISMISS_MS);
     });
@@ -93,8 +99,12 @@ export function MilestoneCelebration() {
           <View style={{ borderTopWidth: 1, borderTopColor: theme.ruleStrong, marginTop: spacing.xs }} />
 
           <View style={{ alignItems: 'center', paddingVertical: spacing.lg, position: 'relative' }}>
-            <ConfettiBurst active={open} seed={detail?.days ?? 0} />
-            <Figure mood="applaud" size={140} />
+            <ConfettiBurst
+              active={open && !reduced}
+              seed={detail?.days ?? 0}
+              count={detail?.grand ? 28 : 14}
+            />
+            <Figure mood={detail?.grand ? 'victory' : 'applaud'} size={140} />
           </View>
 
           <Text
