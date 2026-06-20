@@ -34,7 +34,7 @@ import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/da
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
-import { success } from '@/lib/haptics';
+import { success, warn } from '@/lib/haptics';
 import { CharacterCompanion } from '@/components/character/CharacterCompanion';
 import { dispatchMilestone, dispatchMood, milestoneForStreak } from '@/lib/character/mood';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
@@ -450,6 +450,15 @@ export default function Home() {
     if (streak > prev) {
       const milestone = milestoneForStreak(streak);
       if (milestone) dispatchMilestone(milestone);
+    } else if (streak === 0 && prev >= 3) {
+      // Streak broke after a meaningful run — a gentle, non-judgmental nudge
+      // (no modal; that would frame a setback as a celebration). Soft warning
+      // haptic + a forward-looking caption that never guilt-trips.
+      warn();
+      dispatchMood('concern', {
+        caption: 'Streak reset — tomorrow is a fresh page.',
+        durationMs: 3800,
+      });
     }
     prevStreakRef.current = streak;
   }, [streak]);

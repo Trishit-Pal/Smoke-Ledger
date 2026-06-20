@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Figure } from '@web/components/character/Figure';
 
 /**
  * Post-deletion confirmation banner for the public landing page.
@@ -41,6 +42,9 @@ export function AccountDeletedNotice() {
             borderBottom: '1px solid var(--rule)',
           }}
         >
+          {/* A small wave-off — warm, not guilt. The Figure self-collapses its
+              animation under prefers-reduced-motion. */}
+          <Figure mood="bye" size={44} />
           <p
             style={{
               margin: 0,

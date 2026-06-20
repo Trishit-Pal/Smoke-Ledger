@@ -11,8 +11,11 @@ import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Tilt } from '@/components/anim/Tilt';
 import { Pulse } from '@/components/anim/Pulse';
+import { Figure } from '@/components/character/Figure';
+import { ConfettiBurst } from '@/components/character/ConfettiBurst';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { getSetting } from '@/db/repositories/settings';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -31,11 +34,14 @@ interface SummaryRow {
 export default function Done() {
   const router = useRouter();
   const theme = useTheme();
+  const reduce = useReduceMotion();
   const profile = useSession((s) => s.profile);
   const brands = useSession((s) => s.brands);
   const [busy, setBusy] = useState(false);
   const [purchasePref, setPurchasePref] = useState<string | null>(null);
   const [printed, setPrinted] = useState(false);
+  // One-shot completion encouragement burst — gated by reduce-motion.
+  const [burst, setBurst] = useState(false);
   // Favorites count comes from the session brands (mobile brands screen writes
   // isFavorite directly via the brands repo; no settings_kv key is written for
   // the favorite name list on mobile).
@@ -62,6 +68,16 @@ export default function Done() {
     return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    if (reduce) return;
+    const on = setTimeout(() => setBurst(true), 500);
+    const off = setTimeout(() => setBurst(false), 2400);
+    return () => {
+      clearTimeout(on);
+      clearTimeout(off);
+    };
+  }, [reduce]);
+
   const goToDashboard = async (enableReminder: boolean) => {
     setBusy(true);
     try {
@@ -84,6 +100,14 @@ export default function Done() {
 
   return (
     <Screen>
+      {/* Completion encouragement — a victory wave + one-shot burst. The Figure
+          self-collapses its animation under reduced motion; the burst never
+          arms when reduce is set. */}
+      <View style={{ width: 72, height: 86, position: 'relative', marginBottom: spacing.xs }}>
+        <ConfettiBurst active={burst} count={22} />
+        <Figure mood="victory" size={72} />
+      </View>
+
       {/* Caption */}
       <FadeSlideIn index={0} delay={40}>
         <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>

@@ -21,10 +21,12 @@ import {
   dispatchMood,
   type MilestoneEventDetail,
 } from '@web/lib/character/mood';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 const AUTO_DISMISS_MS = 5200;
 
 export function MilestoneCelebration() {
+  const reduced = useReduceMotion();
   const [open, setOpen] = React.useState(false);
   const [detail, setDetail] = React.useState<MilestoneEventDetail | null>(null);
   const [mounted, setMounted] = React.useState(false);
@@ -40,10 +42,11 @@ export function MilestoneCelebration() {
       if (!d) return;
       setDetail(d);
       setOpen(true);
-      // also fire the masthead companion
-      dispatchMood('applaud', {
+      // also fire the masthead companion — victory pose for grand milestones
+      dispatchMood(d.grand ? 'victory' : 'applaud', {
         caption: d.type === 'streak' ? `${d.days}-day streak.` : 'Happy Birthday!',
-        durationMs: 3400
+        durationMs: 3400,
+        celebrate: true,
       });
       if (dismissTimer.current) window.clearTimeout(dismissTimer.current);
       dismissTimer.current = window.setTimeout(() => setOpen(false), AUTO_DISMISS_MS);
@@ -99,7 +102,7 @@ export function MilestoneCelebration() {
           borderRadius: 4,
         }}
       >
-        <ConfettiBurst active />
+        <ConfettiBurst active={!reduced} count={detail.grand ? 32 : 18} seed={detail.days} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span className="editorial-caption">Milestone</span>
           <span className="editorial-caption" style={{ color: 'var(--text-faint)' }}>
@@ -121,7 +124,7 @@ export function MilestoneCelebration() {
             padding: '20px 0 12px',
           }}
         >
-          <Figure mood="applaud" size={180} />
+          <Figure mood={detail.grand ? 'victory' : 'applaud'} size={180} />
         </div>
 
         <h2

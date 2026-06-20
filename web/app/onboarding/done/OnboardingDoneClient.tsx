@@ -7,6 +7,8 @@ import { SealCircle } from '@web/components/onboarding/SealCircle';
 import { PaperEdge } from '@web/components/onboarding/PaperEdge';
 import { ThemeToggle } from '@web/components/layout/ThemeToggle';
 import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
+import { Figure } from '@web/components/character/Figure';
+import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import type { GoalType } from '@/types';
 
 const PRICE_PER_STICK = 18;
@@ -55,10 +57,22 @@ export function OnboardingDoneClient({
   const router = useRouter();
   const reduce = useReduceMotion();
   const [printed, setPrinted] = React.useState(false);
+  // One-shot encouragement burst on completion — gated by reduce-motion.
+  const [burst, setBurst] = React.useState(false);
 
   React.useEffect(() => {
     const t = setTimeout(() => setPrinted(true), reduce ? 0 : 200);
     return () => clearTimeout(t);
+  }, [reduce]);
+
+  React.useEffect(() => {
+    if (reduce) return;
+    const on = setTimeout(() => setBurst(true), 500);
+    const off = setTimeout(() => setBurst(false), 2400);
+    return () => {
+      clearTimeout(on);
+      clearTimeout(off);
+    };
   }, [reduce]);
 
   const baseline = Math.max(0, Math.round(Number(baselinePerDay) || 0));
@@ -83,6 +97,13 @@ export function OnboardingDoneClient({
       <ThemeToggle placement="floating-onboarding" />
 
       <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Completion encouragement — a victory wave + a small one-shot burst.
+            The Figure self-collapses its animation under reduced motion, and the
+            confetti is gated on `burst` which never arms under reduced motion. */}
+        <div style={{ position: 'relative', alignSelf: 'flex-start', width: 72, height: 86 }}>
+          <ConfettiBurst active={burst} count={24} />
+          <Figure mood="victory" size={72} />
+        </div>
         <span className="editorial-caption">The ledger is open · {dateLine}</span>
         <h2
           className="editorial-headline"
