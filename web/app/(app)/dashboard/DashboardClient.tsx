@@ -238,7 +238,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
+    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
       <div className="editorial-stage flex flex-col gap-xxl">

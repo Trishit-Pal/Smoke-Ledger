@@ -628,7 +628,7 @@ export function SettingsClient({
   // Render
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 

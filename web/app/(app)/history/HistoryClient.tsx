@@ -146,7 +146,7 @@ export function HistoryClient({
   const trailingIndex = groups.length + 1;
 
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
@@ -325,7 +325,7 @@ export function HistoryClient({
           The one explicit call-to-action on this page. Reshaped from the
           accent-teal pill to the dark inverse used on the Dashboard empty
           state — it stays distinct without breaking the editorial register. */}
-      <div className="fixed right-lg bottom-20 md:bottom-lg z-10">
+      <div className="fixed right-lg bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-lg z-10">
         <Link
           href="/log/new"
           className="inline-flex items-center min-h-[44px] px-lg rounded-md bg-text text-bg font-medium text-body shadow-lg hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useReduceMotion } from '@web/hooks/useReduceMotion';
+import { useIsDesktop } from '@web/hooks/useMediaQuery';
 import {
   Bar,
   BarChart as RBarChart,
@@ -32,9 +33,13 @@ export function BarChart({
   const lastIndex = data.length - 1;
   const reduced = useReduceMotion();
   const fill = CHART_SERIES[0];
+  // Grow taller on desktop to use the wider content column; phones/tablets keep
+  // the passed height.
+  const isDesktop = useIsDesktop();
+  const h = isDesktop ? Math.round(height * 1.25) : height;
 
   return (
-    <div style={{ width: '100%', height }}>
+    <div style={{ width: '100%', height: h }}>
       <ResponsiveContainer width="100%" height="100%">
         <RBarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
