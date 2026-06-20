@@ -1,6 +1,7 @@
 import {
   normalizeToE164,
   normalizeIndianMobile,
+  toLocalMobileDigits,
   INDIA_MOBILE_RE,
   nextMobileChangeDate,
   canChangeMobile,
@@ -37,6 +38,35 @@ describe('normalizeIndianMobile', () => {
     expect(normalizeIndianMobile('98765432109')).toBeNull();
     expect(normalizeIndianMobile('')).toBeNull();
     expect(normalizeIndianMobile('abcd')).toBeNull();
+  });
+});
+
+describe('toLocalMobileDigits', () => {
+  it('keeps a bare 10-digit local number unchanged', () => {
+    expect(toLocalMobileDigits('9876543210')).toBe('9876543210');
+  });
+
+  it('preserves a partially-typed number for as-you-type input', () => {
+    expect(toLocalMobileDigits('98765')).toBe('98765');
+    expect(toLocalMobileDigits('')).toBe('');
+  });
+
+  it('strips a pasted +91 / 91 country code and separators', () => {
+    expect(toLocalMobileDigits('+919876543210')).toBe('9876543210');
+    expect(toLocalMobileDigits('+91 98765 43210')).toBe('9876543210');
+    expect(toLocalMobileDigits('919876543210')).toBe('9876543210');
+  });
+
+  it('strips a leading 0 trunk prefix when it overflows 10 digits', () => {
+    expect(toLocalMobileDigits('09876543210')).toBe('9876543210');
+  });
+
+  it('does NOT strip a 10-digit number that legitimately starts with 91', () => {
+    expect(toLocalMobileDigits('9198765432')).toBe('9198765432');
+  });
+
+  it('clamps to the first 10 digits', () => {
+    expect(toLocalMobileDigits('98765432109999')).toBe('9876543210');
   });
 });
 

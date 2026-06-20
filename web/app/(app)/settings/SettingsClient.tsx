@@ -49,12 +49,18 @@ import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
-import { toSafeErrorMessage, isAppError } from '@/lib/errors';
+import { describeError, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
 import { computeAge } from '@/domain/age';
-import { normalizeIndianMobile, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import {
+  normalizeIndianMobile,
+  toLocalMobileDigits,
+  INDIA_MOBILE_RE,
+  nextMobileChangeDate,
+  canChangeMobile,
+} from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
 
@@ -319,7 +325,7 @@ export function SettingsClient({
       await revalidateAppViews();
       router.refresh();
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -336,7 +342,7 @@ export function SettingsClient({
         await track(AnalyticsEvents.DISCREET_MODE_ENABLED, { enabled: true });
       }
     } catch (e) {
-      setError(toSafeErrorMessage(e));
+      setError(describeError(e));
     } finally {
       setBusy(null);
     }
@@ -350,7 +356,7 @@ export function SettingsClient({
       await revalidateAppViews();
       router.refresh();
     } catch (e) {
-      setError(toSafeErrorMessage(e));
+      setError(describeError(e));
     } finally {
       setBusy(null);
     }
@@ -371,7 +377,7 @@ export function SettingsClient({
       }
       setAnalyticsOptIn(value);
     } catch (e) {
-      setError(toSafeErrorMessage(e));
+      setError(describeError(e));
     } finally {
       setBusy(null);
     }
@@ -402,7 +408,7 @@ export function SettingsClient({
         flashToast('Export downloaded.');
       }
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
     }
@@ -443,7 +449,7 @@ export function SettingsClient({
       setShowAddBrand(false);
       flashToast(`Added ${brandName}.`);
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -487,7 +493,7 @@ export function SettingsClient({
       await revalidateAppViews();
       flashToast('Price updated.');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -500,7 +506,7 @@ export function SettingsClient({
       await getSupabase().auth.signOut();
       router.replace('/login');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'authentication_error'));
+      setError(describeError(e, 'authentication_error'));
     } finally {
       setBusy(null);
     }
@@ -513,7 +519,7 @@ export function SettingsClient({
       await getSupabase().auth.signOut();
       router.replace('/');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'authentication_error'));
+      setError(describeError(e, 'authentication_error'));
     } finally {
       setBusy(null);
       setConfirmAction(null);
@@ -521,26 +527,41 @@ export function SettingsClient({
   };
 
   const onSaveMobile = async () => {
+    const trimmed = mobileDraft.trim();
+    const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
+    // Block invalid input up front with a precise, actionable message — never a
+    // generic "something went wrong".
+    if (trimmed !== '' && value === null) {
+      setError('Enter a 10-digit Indian mobile starting 6-9.');
+      return;
+    }
     setBusy('save-mobile');
     setError(null);
     try {
-      const trimmed = mobileDraft.trim();
-      const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
-      if (trimmed !== '' && value === null) {
-        throw new Error('Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9.');
-      }
       await updateProfile({ mobileE164: value });
-      setEditingMobile(false);
-      flashToast(value ? 'Mobile number updated.' : 'Mobile number cleared.');
-      await revalidateAppViews();
-      router.refresh();
     } catch (e) {
       // The DB trigger rejects a change inside the 30-day window.
       if (isAppError(e) && e.code === 'rate_limited') {
-        setError('You can change your mobile number only once every 30 days.');
+        setError(
+          mobileNext
+            ? `You can change your number again on ${mobileNext.toLocaleDateString()}.`
+            : 'You can change your mobile number only once every 30 days.',
+        );
       } else {
-        setError(toSafeErrorMessage(e, 'validation_error'));
+        setError(describeError(e, 'dependency_failure'));
       }
+      setBusy(null);
+      return;
+    }
+    // The write succeeded — post-save revalidation must not present success as a
+    // failure, so it runs outside the try and only flips the UI on success.
+    setEditingMobile(false);
+    flashToast(value ? 'Mobile number updated.' : 'Mobile number cleared.');
+    try {
+      await revalidateAppViews();
+      router.refresh();
+    } catch {
+      // View cache refresh is best-effort; the value is already saved.
     } finally {
       setBusy(null);
     }
@@ -557,7 +578,7 @@ export function SettingsClient({
       await revalidateAppViews();
       router.refresh();
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -571,7 +592,7 @@ export function SettingsClient({
       await wipeSecureStore();
       router.replace('/onboarding/privacy');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
       setConfirmAction(null);
@@ -607,7 +628,7 @@ export function SettingsClient({
       // open so there is no flash before navigation lands.
       isReauthRedirect = isAppError(e) && e.code === 'authentication_error';
       if (!isReauthRedirect) {
-        setError(toSafeErrorMessage(e, 'dependency_failure'));
+        setError(describeError(e, 'dependency_failure'));
       }
     } finally {
       setBusy(null);
@@ -622,6 +643,8 @@ export function SettingsClient({
   const nameText = profile.fullName && profile.fullName.trim() !== '' ? profile.fullName : 'Not set';
   const mobileEditable = canChangeMobile(profile.mobileChangedAt ?? null, new Date());
   const mobileNext = nextMobileChangeDate(profile.mobileChangedAt ?? null);
+  // Empty is allowed (clears the number); otherwise it must be a valid +91 number.
+  const mobileDraftValid = mobileDraft.trim() === '' || INDIA_MOBILE_RE.test(`+91${mobileDraft}`);
   const mobileSublabel =
     !mobileEditable && mobileNext
       ? `Used for support only. Changeable once every 30 days — next change on ${mobileNext.toLocaleDateString()}.`
@@ -768,41 +791,51 @@ export function SettingsClient({
               sublabel={mobileSublabel}
               control={
                 editingMobile ? (
-                  <div className="flex items-center gap-md">
-                    <span className="text-body text-text-faint" aria-hidden>
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={mobileDraft}
-                      onChange={(event) =>
-                        setMobileDraft(event.target.value.replace(/\D/g, '').slice(0, 10))
-                      }
-                      aria-label="Mobile number"
-                      placeholder="10-digit number"
-                      autoFocus
-                      className="w-40 bg-transparent border-0 border-b text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)]"
-                      style={{ borderBottomColor: 'var(--rule-strong)' }}
-                    />
-                    <TextLink
-                      onClick={() => void onSaveMobile()}
-                      disabled={busy != null}
-                      busy={busy === 'save-mobile'}
-                      ariaLabel="Save mobile number"
-                    >
-                      {busy === 'save-mobile' ? 'Saving…' : 'Save'}
-                    </TextLink>
-                    <TextLink
-                      onClick={() => {
-                        setMobileDraft(localMobileDigits(profile.mobileE164));
-                        setEditingMobile(false);
-                      }}
-                      disabled={busy != null}
-                    >
-                      Cancel
-                    </TextLink>
+                  <div className="flex flex-col items-end gap-xs">
+                    <div className="flex items-center gap-md">
+                      <span className="text-body text-text-faint" aria-hidden>
+                        +91
+                      </span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={mobileDraft}
+                        onChange={(event) => {
+                          setMobileDraft(toLocalMobileDigits(event.target.value));
+                          if (error) setError(null);
+                        }}
+                        aria-label="Mobile number"
+                        aria-invalid={!mobileDraftValid}
+                        placeholder="10-digit number"
+                        autoFocus
+                        className="w-40 bg-transparent border-0 border-b text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)]"
+                        style={{
+                          borderBottomColor: mobileDraftValid
+                            ? 'var(--rule-strong)'
+                            : 'var(--warn-earth)',
+                        }}
+                      />
+                      <TextLink
+                        onClick={() => void onSaveMobile()}
+                        disabled={busy != null || !mobileDraftValid}
+                        busy={busy === 'save-mobile'}
+                        ariaLabel="Save mobile number"
+                      >
+                        {busy === 'save-mobile' ? 'Saving…' : 'Save'}
+                      </TextLink>
+                      <TextLink
+                        onClick={() => {
+                          setMobileDraft(localMobileDigits(profile.mobileE164));
+                          setError(null);
+                          setEditingMobile(false);
+                        }}
+                        disabled={busy != null}
+                      >
+                        Cancel
+                      </TextLink>
+                    </div>
+                    <span className="text-small text-text-muted">10 digits, starting 6-9</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-md">
