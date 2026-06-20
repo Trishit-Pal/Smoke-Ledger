@@ -36,10 +36,15 @@ import {
 } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { LEGAL_URLS } from '@/lib/legal';
-import { toSafeErrorMessage, isAppError } from '@/lib/errors';
+import { describeError, isAppError } from '@/lib/errors';
 import { dispatchFarewell } from '@/lib/character/mood';
 import { computeAge } from '@/domain/age';
-import { normalizeIndianMobile, nextMobileChangeDate, canChangeMobile } from '@/lib/mobileNumber';
+import {
+  normalizeIndianMobile,
+  toLocalMobileDigits,
+  nextMobileChangeDate,
+  canChangeMobile,
+} from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant } from '@/types';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
@@ -350,7 +355,9 @@ function InlineEditRow({
   const isAnyBusy = busy !== null;
   const hasValue = !!value && value.trim() !== '';
 
-  const handleChange = (text: string) => setDraft(digitsOnly ? text.replace(/\D/g, '') : text);
+  // For the mobile field (digitsOnly), tolerate a pasted +91/91/0 prefix and
+  // separators so a full number isn't silently truncated to the wrong digits.
+  const handleChange = (text: string) => setDraft(digitsOnly ? toLocalMobileDigits(text) : text);
   const handleEdit = () => {
     setDraft(draftFor(value));
     setEditing(true);
@@ -526,32 +533,45 @@ export default function Settings() {
       await refreshProfile();
       onDone();
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
   };
 
   const saveMobile = async (raw: string, onDone: () => void) => {
+    const trimmed = raw.trim();
+    const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
+    // Block invalid input up front with a precise, actionable message.
+    if (trimmed !== '' && value === null) {
+      setError('Enter a 10-digit Indian mobile starting 6-9.');
+      return;
+    }
     setBusy('save-mobile');
     setError(null);
     try {
-      const trimmed = raw.trim();
-      const value = trimmed === '' ? null : normalizeIndianMobile(trimmed);
-      if (trimmed !== '' && value === null) {
-        throw new Error('Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9.');
-      }
       await updateProfile({ mobileE164: value });
-      await refreshProfile();
-      onDone();
     } catch (e) {
       // The DB trigger rejects a change inside the 30-day window — surface the
       // specific disclaimer rather than the generic rate-limit copy.
       if (isAppError(e) && e.code === 'rate_limited') {
-        setError('You can change your mobile number only once every 30 days.');
+        setError(
+          mobileNext
+            ? `You can change your number again on ${mobileNext.toLocaleDateString()}.`
+            : 'You can change your mobile number only once every 30 days.',
+        );
       } else {
-        setError(toSafeErrorMessage(e, 'validation_error'));
+        setError(describeError(e, 'dependency_failure'));
       }
+      setBusy(null);
+      return;
+    }
+    // The write succeeded — a refresh failure must not look like a save failure.
+    onDone();
+    try {
+      await refreshProfile();
+    } catch {
+      // Best-effort; the value is already persisted and realtime will reconcile.
     } finally {
       setBusy(null);
     }
@@ -566,7 +586,7 @@ export default function Settings() {
       await refreshProfile();
       onDone();
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -586,7 +606,7 @@ export default function Settings() {
         void track(AnalyticsEvents.DISCREET_MODE_ENABLED, { enabled: true });
       }
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
     }
@@ -607,7 +627,7 @@ export default function Settings() {
       }
       setAnalyticsOptIn(value);
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
     }
@@ -641,7 +661,7 @@ export default function Settings() {
         );
       }
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
     }
@@ -678,7 +698,7 @@ export default function Settings() {
       setNewCategory('regular');
       setShowAddBrand(false);
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -711,7 +731,7 @@ export default function Settings() {
       setEditingVariantId(null);
       setPriceDraft('');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'validation_error'));
+      setError(describeError(e, 'validation_error'));
     } finally {
       setBusy(null);
     }
@@ -734,7 +754,7 @@ export default function Settings() {
             await getSupabase().auth.signOut();
             router.replace('/login');
           } catch (e) {
-            setError(toSafeErrorMessage(e, 'dependency_failure'));
+            setError(describeError(e, 'dependency_failure'));
           } finally {
             setBusy(null);
           }
@@ -761,7 +781,7 @@ export default function Settings() {
               await getSupabase().auth.signOut();
               router.replace('/login');
             } catch (e) {
-              setError(toSafeErrorMessage(e, 'dependency_failure'));
+              setError(describeError(e, 'dependency_failure'));
             } finally {
               setBusy(null);
             }
@@ -804,7 +824,7 @@ export default function Settings() {
               router.replace('/login');
             } catch (e) {
               if (!isReauthRedirect) {
-                setError(toSafeErrorMessage(e, 'dependency_failure'));
+                setError(describeError(e, 'dependency_failure'));
               }
             } finally {
               setBusy(null);
@@ -834,7 +854,7 @@ export default function Settings() {
               await boot();
               router.replace('/onboarding/welcome');
             } catch (e) {
-              setError(toSafeErrorMessage(e, 'dependency_failure'));
+              setError(describeError(e, 'dependency_failure'));
             } finally {
               setBusy(null);
             }
