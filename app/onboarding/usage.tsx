@@ -13,6 +13,7 @@ import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { setSetting } from '@/db/repositories/settings';
 import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 const PRICE_PER_STICK = 18;
@@ -44,9 +45,15 @@ export default function Usage() {
   const router = useRouter();
   const theme = useTheme();
 
-  const [perDay, setPerDay] = useState(10);
-  const [windowDays, setWindowDays] = useState<7 | 30>(30);
-  const [pref, setPref] = useState<PurchaseOption['id'] | null>(null);
+  // Draft-backed so values survive back/forward navigation within the session.
+  const {
+    perDay: draftPerDay,
+    windowDays: draftWindow,
+    purchasePref: pref,
+    setUsage,
+  } = useOnboardingDraft();
+  const perDay = draftPerDay ?? 10;
+  const windowDays = draftWindow ?? 30;
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -54,8 +61,8 @@ export default function Usage() {
   const dailySpend = n * PRICE_PER_STICK;
   const yearlySpend = dailySpend * 365;
 
-  const increment = () => setPerDay((v) => Math.min(MAX_STICKS, v + 1));
-  const decrement = () => setPerDay((v) => Math.max(0, v - 1));
+  const increment = () => setUsage({ perDay: Math.min(MAX_STICKS, perDay + 1) });
+  const decrement = () => setUsage({ perDay: Math.max(0, perDay - 1) });
 
   const onContinue = async () => {
     if (!pref) return;
@@ -275,7 +282,7 @@ export default function Usage() {
               return (
                 <Pressable
                   key={opt.id}
-                  onPress={() => setWindowDays(opt.id)}
+                  onPress={() => setUsage({ windowDays: opt.id })}
                   style={{
                     flex: 1,
                     padding: spacing.md,
@@ -313,7 +320,7 @@ export default function Usage() {
               return (
                 <Pressable
                   key={opt.id}
-                  onPress={() => setPref(opt.id)}
+                  onPress={() => setUsage({ purchasePref: opt.id })}
                   style={{
                     height: 36,
                     paddingHorizontal: spacing.lg,

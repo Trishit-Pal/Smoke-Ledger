@@ -8,7 +8,9 @@ sources:
   - src/db/repositories/profile.ts
   - app/(tabs)/settings.tsx
   - web/app/(app)/settings/**
-last_verified_commit: fcabb85
+  - src/components/ui/ThemedSelect.tsx
+  - web/components/ui/ThemedSelect.tsx
+last_verified_commit: 2fdf20b
 status: current
 ---
 
@@ -20,14 +22,14 @@ The profile is where the user is a person, not just a set of logs. It holds the 
 
 ## What the user experiences
 
-During signup, the user enters their full name, date of birth, and gender. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
+During signup, the user enters their full name, date of birth, and gender. Gender is chosen from a themed dropdown (`ThemedSelect`) whose option list paints in the active theme's background with opposite-color text and the selected option highlighted in the brand accent — replacing the older chip row (mobile) and native `<select>` (web), which could not be themed consistently. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
 
 Once inside, the Settings screen shows a **Profile** section with five rows:
 
 - **Name** — displayed, no edit control. Set once and done.
 - **Age** — displayed as "X years", derived live from the stored date of birth. No edit control.
 - **Gender** — displayed, no edit control.
-- **Mobile number** — editable in-place. The Edit link is hidden when the 30-day change window is still open; when it is hidden, the sublabel shows the exact date the next change becomes available.
+- **Mobile number** — editable in-place, India-only: a fixed, non-editable `+91` prefix sits before a 10-digit numeric field (first digit 6–9). Invalid input shows an inline error and is not saved. The Edit link is hidden when the 30-day change window is still open; when it is hidden, the sublabel shows the exact date the next change becomes available.
 - **Place** — editable in-place, no rate-limit.
 
 The three read-only rows look visually identical to the editable ones — same hairline-rule table, same label-left / value-right layout — except there is no "Edit" link next to them. The UI does not explain why they cannot be changed; it simply doesn't offer the option.
@@ -95,14 +97,14 @@ Input is validated in two places before it reaches the database.
 - `fullName`: trimmed, 1–80 characters, strip null bytes
 - `dateOfBirth`: matches `YmdSchema` — `YYYY-MM-DD` regex, then a round-trip through `Date.UTC` to reject calendar-impossible dates like `2000-02-30` (`src/lib/validation.ts:20`–`35`)
 - `gender`: one of the four allowed values
-- `mobileE164`: matches `^\+[1-9]\d{7,14}$` or null
+- `mobileE164`: India-only — matches `^\+91[6-9]\d{9}$` (i.e. `+91` followed by exactly 10 digits starting 6–9) or null
 - `place`: trimmed, max 80 characters, or null
 
 The schema is strict — unknown keys are rejected (`src/lib/validation.ts:188`). `updateProfile` in the repository calls `parseOrThrow(ProfilePatchSchema, defined, 'profile')` before issuing any DB write (`src/db/repositories/profile.ts:87`).
 
-**E.164 normalisation** (`src/lib/mobileNumber.ts`) runs client-side in the save handler before the number reaches `updateProfile`. Bare 10-digit Indian numbers are prefixed with `+91`; numbers with separators like spaces and dashes are compacted. If the result doesn't match the E.164 regex, the function returns null and the UI rejects the input immediately with "Enter a valid mobile number" — before any DB call is made (`app/(tabs)/settings.tsx:506`–`509`).
+**India normalisation** (`src/lib/mobileNumber.ts`) runs client-side in the save handler before the number reaches `updateProfile`. `normalizeIndianMobile(raw)` accepts a bare 10-digit number (first digit 6–9) and prefixes `+91`, compacts separators, and validates against `INDIA_MOBILE_RE` (`^\+91[6-9]\d{9}$`). Anything else — a non-`+91` country code, a leading digit outside 6–9, wrong length — returns null and the UI rejects the input immediately with "Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9" before any DB call is made (`app/(tabs)/settings.tsx` `saveMobile`, `web/app/(app)/settings/SettingsClient.tsx` `onSaveMobile`). The legacy `normalizeToE164` (generic E.164) remains in the module but is no longer used by the profile save path.
 
-The DB also has a `CHECK` constraint backing up the E.164 format: `mobile_e164 ~ '^\+[1-9][0-9]{7,14}$'` (`supabase/migrations/20260616181124_profile_identity_fields.sql:65`). It should never fire in practice because the application layer normalises first, but it is there as a final backstop.
+The DB also has a `CHECK` constraint on `mobile_e164` (the generic `^\+[1-9][0-9]{7,14}$`, `supabase/migrations/20260616181124_profile_identity_fields.sql:65`). It is intentionally broader than the app's India-only rule and serves only as a last-resort format backstop; the India-only constraint is enforced at the Zod + handler layer, not the DB. (Tightening the DB CHECK to the India pattern is an optional future hardening step.)
 
 ### Profile row lifecycle
 
@@ -126,7 +128,7 @@ These must never break.
 
 5. **Age is derived, never stored.** There is no `age` column. `computeAge` is always called at use time. Storing a number and leaving it to grow stale is not an option.
 
-6. **The E.164 format is enforced in two layers.** Zod validates before the DB call; the DB `CHECK` constraint validates at write time. A number that reaches the DB without a `+` and a non-zero country code should not be storable.
+6. **The mobile number is validated before it is stored.** The app layer (Zod `ProfileSchema.mobileE164` + the `normalizeIndianMobile` save-handler check) enforces the India-only rule `^\+91[6-9]\d{9}$`; the DB `CHECK` is a broader generic-E.164 backstop. An invalid number must surface an inline error and never reach a successful write.
 
 ## Edge cases & gotchas
 
@@ -146,7 +148,7 @@ These must never break.
 
 **Age gate unit tests** — `src/tests/age.test.ts` covers `computeAge`, `isAdult`, and `isBirthdayToday` with cases for normal adults, exact 18th birthday, the day before turning 18, Feb-29 leap-year corner cases, and malformed / impossible dates. The test explicitly asserts `MIN_AGE === 18` so a constant change would be caught.
 
-**Mobile number unit tests** — `src/tests/mobileNumber.test.ts` covers `normalizeToE164` (including bare 10-digit numbers, separator stripping, missing-`+` prefix, and rejection of junk), `nextMobileChangeDate` (null for never-set, correct `+30 days` computation, null for unparseable input), and `canChangeMobile` (allow when never set, block inside the window, allow once the window has elapsed).
+**Mobile number unit tests** — `src/tests/mobileNumber.test.ts` covers `normalizeIndianMobile` + `INDIA_MOBILE_RE` (bare 10-digit with 6–9 lead → `+91…`, separator stripping, rejection of non-`+91` country codes, leading digit < 6, and wrong length), the legacy `normalizeToE164`, `nextMobileChangeDate` (null for never-set, correct `+30 days` computation, null for unparseable input), and `canChangeMobile` (allow when never set, block inside the window, allow once the window has elapsed). `src/tests/validation.profile.test.ts` additionally asserts the India-only schema rule rejects non-Indian/malformed numbers.
 
 **Profile schema unit tests** — `src/tests/validation.profile.test.ts` exercises `ProfilePatchSchema` for valid and invalid values of each identity field: name length bounds, DOB format and calendar-validity, gender enum, mobile E.164 format, place length, and strict rejection of unknown keys.
 

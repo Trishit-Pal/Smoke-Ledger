@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
 import { useSession } from '@/store/session';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -22,6 +23,8 @@ export default function LogTab() {
   const logs = useSession((s) => s.logs);
   const profile = useSession((s) => s.profile);
   const refreshLogs = useSession((s) => s.refreshLogs);
+  // Fallback for when realtime is unavailable: re-pull logs on focus.
+  useRefreshOnFocus(refreshLogs);
   const discreet = isDiscreetMode(profile);
   const [error, setError] = useState<string | null>(null);
 

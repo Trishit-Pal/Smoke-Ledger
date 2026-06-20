@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/Button';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { fonts, radius, spacing } from '@/constants/theme';
+import { useSession } from '@/store/session';
+import { isAchievementSuppressed } from '@/lib/achievements';
 import {
   dispatchMood,
   onMilestone,
@@ -35,6 +37,10 @@ export function MilestoneCelebration() {
   React.useEffect(() => {
     const sub = onMilestone((d) => {
       if (!d) return;
+      // Suppress for the rest of the session once the user has deliberately
+      // dismissed achievements enough times — skip both the modal and the
+      // parallel companion confetti.
+      if (isAchievementSuppressed(useSession.getState().achievementDismissCount)) return;
       setDetail(d);
       setOpen(true);
       // Fire the masthead companion in parallel — victory pose for grand milestones
@@ -52,16 +58,28 @@ export function MilestoneCelebration() {
     };
   }, []);
 
+  // Deliberate dismissal (tap/backdrop/back/button) — counts toward the
+  // per-session cap. The 5.2s auto-timeout closes via setOpen(false) directly
+  // and does NOT count.
+  const handleDismiss = React.useCallback(() => {
+    if (dismissTimer.current) {
+      clearTimeout(dismissTimer.current);
+      dismissTimer.current = null;
+    }
+    useSession.getState().incrementAchievementDismiss();
+    setOpen(false);
+  }, []);
+
   return (
     <Modal
       visible={open && !!detail}
       transparent
       animationType="fade"
-      onRequestClose={() => setOpen(false)}
+      onRequestClose={handleDismiss}
       accessibilityViewIsModal
     >
       <Pressable
-        onPress={() => setOpen(false)}
+        onPress={handleDismiss}
         accessibilityLabel="Dismiss milestone"
         accessibilityRole="button"
         style={{
@@ -136,7 +154,7 @@ export function MilestoneCelebration() {
             <Text variant="caption" style={{ color: theme.textFaint }}>
               tap anywhere to dismiss
             </Text>
-            <Button title="Carry on" variant="secondary" size="sm" onPress={() => setOpen(false)} />
+            <Button title="Carry on" variant="secondary" size="sm" onPress={handleDismiss} />
           </View>
         </Pressable>
       </Pressable>

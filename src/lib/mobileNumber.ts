@@ -5,6 +5,35 @@
 const E164_RE = /^\+[1-9]\d{7,14}$/;
 const SEPARATORS_RE = /[\s\-()]/g;
 
+// India-only mobile: +91 followed by exactly 10 digits, first digit 6-9
+// (the valid first-digit range for Indian mobile numbers).
+export const INDIA_MOBILE_RE = /^\+91[6-9]\d{9}$/;
+
+/**
+ * Normalize loosely-typed input to a valid Indian mobile in E.164, or null.
+ * - "9876543210" (bare 10-digit, lead 6-9) → "+919876543210"
+ * - "+91 98765 43210" / "919876543210" → "+919876543210"
+ * - non-+91 country code, lead digit 0-5, or wrong length → null
+ */
+export function normalizeIndianMobile(raw: string): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  let candidate: string;
+  if (trimmed.startsWith('+')) {
+    candidate = '+' + trimmed.slice(1).replace(SEPARATORS_RE, '');
+  } else {
+    const digits = trimmed.replace(SEPARATORS_RE, '');
+    if (!/^\d+$/.test(digits)) return null;
+    // Bare 10-digit local number → prefix +91; otherwise assume it already
+    // carries the 91 country code, just missing the '+'.
+    candidate = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+  }
+
+  return INDIA_MOBILE_RE.test(candidate) ? candidate : null;
+}
+
 /**
  * Normalize loosely-typed input to E.164, or null if it can't be made valid.
  * - "+91 98765 43210" / "+919876543210" → "+919876543210"

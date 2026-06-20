@@ -189,9 +189,13 @@ export const ProfileSchema = z
     dateOfBirth: YmdSchema.optional(),
     gender: z.enum(GENDER_VALUES).optional(),
     // Optional, editable in Settings (mobile is rate-limited to once / 30 days).
+    // India-only: +91 followed by exactly 10 digits, first digit 6-9.
     mobileE164: z
       .string()
-      .regex(/^\+[1-9]\d{7,14}$/, 'Enter a valid mobile number')
+      .regex(
+        /^\+91[6-9]\d{9}$/,
+        'Enter a valid Indian mobile: +91 followed by 10 digits starting 6-9',
+      )
       .nullable()
       .optional(),
     place: z.string().trim().max(80).nullable().optional(),

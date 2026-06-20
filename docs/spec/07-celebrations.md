@@ -12,7 +12,7 @@ sources:
   - web/app/onboarding/done/**
   - web/app/(auth)/login/page.tsx
   - web/components/marketing/AccountDeletedNotice.tsx
-last_verified_commit: e91d105
+last_verified_commit: 2fdf20b
 status: current
 ---
 
@@ -43,6 +43,8 @@ On the dashboard, two kinds of moments trigger a celebration.
 **Re-login.** The login screen greets returning users with the `greet` figure and a "Welcome back." caption on arrival (success redirects via a server action, so the warm beat lives on arrival rather than after submit).
 
 For modal celebrations the overlay is semi-transparent and auto-dismisses after 5.2 seconds. The user can dismiss earlier by tapping anywhere outside the card, tapping "Carry on", or — on web — pressing Escape. The figure shown in the modal is `applaud` for standard tiers and `victory` for grand tiers.
+
+Achievement celebrations are also self-limiting per session: once the user has **deliberately** dismissed an achievement twice in a single login session, no further achievement modal (or its companion confetti) appears for the rest of that session. The cap resets on the next login. The 5.2-second auto-dismiss does not count toward the cap — only an intentional tap/button/back/Escape does.
 
 If the device has "Reduce Motion" enabled, every confetti burst is suppressed — the masthead `CharacterCompanion`, the celebration modal, and the onboarding bursts all gate on it. The figure's idle bob animation also freezes. Modals and figures still appear — only the moving flecks are removed.
 
@@ -89,12 +91,15 @@ The streak effect stores the previous streak value in `prevStreakRef`. It calls 
 
 ### The modal — `src/components/character/MilestoneCelebration.tsx`
 
-`MilestoneCelebration` mounts once at the app root (`app/_layout.tsx:187`). It subscribes to `character:milestone` events via `onMilestone` (`MilestoneCelebration.tsx:34`). When an event arrives it:
+`MilestoneCelebration` mounts once at the app root (`app/_layout.tsx`). It subscribes to `character:milestone` events via `onMilestone`. When an event arrives it:
 
-1. Stores the detail in `useState`.
-2. Opens the `Modal`.
-3. Calls `dispatchMood('applaud', { caption: ..., durationMs: 3400 })` to animate the masthead character in parallel (`MilestoneCelebration.tsx:39`).
-4. Sets a 5.2-second auto-dismiss timer (`MilestoneCelebration.tsx:41`).
+1. **Checks the per-session suppression gate first** — `isAchievementSuppressed(useSession.getState().achievementDismissCount)` (`src/lib/achievements.ts`, cap = 2). If suppressed, it returns immediately: no modal, no companion confetti.
+2. Stores the detail in `useState`.
+3. Opens the `Modal`.
+4. Calls `dispatchMood('applaud' | 'victory', { caption, durationMs: 3400, celebrate: true })` to animate the masthead character (and its confetti) in parallel.
+5. Sets a 5.2-second auto-dismiss timer.
+
+A **deliberate** dismissal (tap-outside, "Carry on", Android back, or Escape on web) calls `incrementAchievementDismiss()` on the session store; the auto-timeout path does not. The counter lives on `useSession` and is zeroed by `reset()` on logout, so the cap is naturally per-login-session. Both platforms implement this identically (`web/components/character/MilestoneCelebration.tsx`).
 
 The modal header shows "Milestone" (always) and the `Day N` label only when `detail.type === 'streak'`. For birthdays, that slot is empty. The modal figure is `victory` when `detail.grand` is set, otherwise `applaud`; the in-modal `ConfettiBurst` count is widened for grand milestones and is gated on `!reduce` (so reduce-motion suppresses it — see the fix below). The `seed` passed to `ConfettiBurst` is `detail.days`, which is `0` for birthdays — both produce a burst, but the distribution is re-randomised on each event arrival because `seed` changes between streak milestones.
 
@@ -120,7 +125,9 @@ The `seed` prop acts purely as a memoisation key. Changing `seed` regenerates th
 
 - A birthday celebration fires at most once per session, regardless of how many times the dashboard re-renders. The `birthdayFiredRef` guard ensures this.
 - A streak *milestone* fires only when the streak increases into a tier value — never on page load. A streak *break* nudge fires only on a drop to `0` from a prior value of `3`+. Both are enforced by the `prevStreakRef` pattern.
-- `MilestoneCelebration` mounts exactly once, at the root layout (`app/_layout.tsx:187`). A second instance would subscribe to the same event and open a second modal.
+- `MilestoneCelebration` mounts exactly once, at the root layout (`app/_layout.tsx`). A second instance would subscribe to the same event and open a second modal.
+
+- After two deliberate achievement dismissals in a login session, no further achievement modal or companion confetti fires until the next login. The counter is in-memory on `useSession` (zeroed in `reset()`); auto-timeout dismissals never increment it.
 - Every `ConfettiBurst` — the masthead companion, the celebration modal, and the onboarding-completion bursts — is suppressed when reduce-motion is on. The figure's idle bob is also suppressed. Modals and figures still appear; only animated flecks are removed.
 - The `Figure` in the celebration modal is `mood="victory"` for grand milestones (60/100/365) and `mood="applaud"` for all others.
 - Birthday dispatch passes `days: 0`. The `Day N` label in the modal header only renders for `type === 'streak'`, so birthday modals correctly show no day counter.

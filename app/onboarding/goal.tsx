@@ -15,6 +15,7 @@ import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { createGoal } from '@/db/repositories/goals';
 import { setOnboardingStep } from '@/db/repositories/profile';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -79,8 +80,10 @@ const GOAL_OPTIONS: GoalOption[] = [
 export default function GoalSetup() {
   const router = useRouter();
   const theme = useTheme();
-  const [type, setType] = useState<GoalType | null>(null);
-  const [target, setTarget] = useState<string>('');
+  // Draft-backed so the choice + target survive back/forward navigation.
+  const { goalType: type, goalTarget: target, setGoal } = useOnboardingDraft();
+  const setType = (goalType: GoalType) => setGoal({ goalType });
+  const setTarget = (goalTarget: string) => setGoal({ goalTarget });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 

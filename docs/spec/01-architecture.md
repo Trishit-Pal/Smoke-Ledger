@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: fcabb85
+last_verified_commit: 2fdf20b
 status: current
 ---
 
@@ -59,7 +59,7 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
 
 **Repository (`src/db/repositories/`).** One file per database table. Each function calls `requireUserId()` to confirm the caller is authenticated before touching data (`src/db/repositories/_supabase.ts:4–12`). Writes always run through `parseOrThrow(SomeSchema, input, 'label')` before the Supabase call. DB errors are mapped to typed `AppError` codes (`authentication_error`, `rate_limited`, `conflict`, etc.) so callers never see raw Postgres error strings (`src/db/repositories/_supabase.ts:27–68`). The native app talks to the same repository functions as the server; the difference is which Supabase client they receive.
 
-**Store (`src/store/`).** Three Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, active goals, and the profile. It populates itself on `boot()` with four parallel Supabase calls and is reset to empty on sign-out. `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). The stores are deliberately narrow: domain computation is never done inside them.
+**Store (`src/store/`).** Four Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, active goals, and the profile, plus a per-session `achievementDismissCount` (drives celebration suppression — see Celebrations). It populates itself on `boot()` with four parallel Supabase calls, exposes per-slice `refresh*` actions plus a `refreshAll()`, and is reset to empty on sign-out. `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). `useOnboardingDraft` (`src/store/onboardingDraft.ts`) holds the multi-step onboarding wizard's in-progress field values so back/forward navigation doesn't lose them; it is in-memory only and cleared on onboarding completion and on logout (via `useSession.reset()`). The stores are deliberately narrow: domain computation is never done inside them.
 
 **Server layer (`web/lib/server/data.ts`).** Next.js Server Components cannot use the Zustand stores — they run on the server, not in the browser. The server layer replicates the same data-fetching logic using React's `cache()` for per-request deduplication and Next.js `unstable_cache` for cross-request caching of slow or rarely-changing data like brands (`web/lib/server/data.ts:345–361`). Profile, logs, goals, and brands are fetched with the SSR Supabase client which reads its session from cookies set by `@supabase/ssr`. The page-level helpers (`getDashboardData`, `getTrendsPageData`, etc.) compose these cached fetchers and run everything in parallel with `Promise.all`.
 
@@ -69,6 +69,8 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
 2. `addLog` in `session.ts` calls `logsRepo.createLog(draft)`.
 3. `createLog` validates the draft against `CigaretteLogSchema`, then calls the `create_log_with_rate_limit` Supabase RPC (`src/db/repositories/logs.ts:203–246`). The RPC is a Postgres function that checks the rate limit and inserts the row atomically; it also accepts a `client_op_id` so a retry on a flaky network returns the original row rather than duplicating the entry.
 4. The returned row is mapped from snake_case to camelCase and prepended to the in-memory `logs` array in the store — no re-fetch needed.
+
+Cross-device/cross-screen freshness is handled by `RealtimeRefresher` (`src/components/realtime/RealtimeRefresher.tsx` native, `web/components/realtime/RealtimeRefresher.tsx` web), mounted once at the root. It subscribes to Supabase realtime CDC on `cigarette_logs`/`goals`/`user_profiles` (filtered to the current user) and, on a change, calls the matching `useSession.refresh*` (native) or `router.refresh()` (web), debounced. Native additionally re-pulls on screen focus and app-foreground as a fallback (`src/hooks/useRefreshOnFocus.ts`), since mobile sockets drop while backgrounded.
 
 ### Data flow: viewing the dashboard (web)
 

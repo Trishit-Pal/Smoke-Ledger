@@ -21,6 +21,7 @@ import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { requestPermissions, scheduleDailyReminder } from '@/services/notifications';
 import { useSession } from '@/store/session';
+import { useOnboardingDraft } from '@/store/onboardingDraft';
 
 const PRICE_PER_STICK = 18;
 
@@ -92,6 +93,8 @@ export default function Done() {
         baseline_per_day: baseline,
         goal_set: false,
       });
+      // Onboarding finished — discard the in-memory draft.
+      useOnboardingDraft.getState().clear();
       router.replace('/(tabs)');
     } finally {
       setBusy(false);
