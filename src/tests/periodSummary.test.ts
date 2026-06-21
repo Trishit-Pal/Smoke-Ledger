@@ -32,6 +32,11 @@ describe('totalsForWindow', () => {
     expect(totalsForWindow(rows, 30, TODAY)).toEqual({ sticks: 15, spendInr: 300 });
   });
 
+  it('sums all rows within the yearly window', () => {
+    // the Year case the migration exists to fix — all three rows are within 365 days
+    expect(totalsForWindow(rows, 365, TODAY)).toEqual({ sticks: 15, spendInr: 300 });
+  });
+
   it('reconciles: weekly total equals the sum of its 7 daily totals', () => {
     let daily = 0;
     let cur = TODAY;
@@ -57,6 +62,13 @@ describe('periodWithTrend', () => {
   it('reports +100% when previous period had nothing and current has data', () => {
     const t = periodWithTrend(rows, 1, TODAY); // today 3 vs yesterday-of-window empty? 06-20 has 5
     expect(t.current.sticks).toBe(3);
+  });
+
+  it('previous window abuts the current window with no overlap or gap', () => {
+    // previous must equal the same-length window ending the day before the current window starts
+    const prevEnd = '2026-06-14'; // dayShift(2026-06-21, -7)
+    const t = periodWithTrend(rows, 7, TODAY);
+    expect(t.previous).toEqual(totalsForWindow(rows, 7, prevEnd));
   });
 });
 
@@ -102,6 +114,15 @@ describe('streakFromRows', () => {
 
   it('is zero when today itself has logs', () => {
     expect(streakFromRows(rows, TODAY)).toBe(0);
+  });
+
+  it('treats a logged zero-stick day as smoke-free (matches smokeFreeStreak)', () => {
+    const r: DailySummaryRow[] = [
+      { date: '2026-06-18', sticks: 0, spendInr: 0, avgUnitPriceInr: null }, // logged, but no sticks
+      { date: '2026-06-15', sticks: 3, spendInr: 60, avgUnitPriceInr: 20 }, // last actual smoke
+    ];
+    // 06-21,20,19 absent (3) + 06-18 zero-stick (4) + 06-17,16 absent (6); 06-15 smoked → stop
+    expect(streakFromRows(r, TODAY)).toBe(6);
   });
 
   it('is zero when there are no rows at all', () => {

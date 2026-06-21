@@ -91,7 +91,9 @@ function savedOverRange(
     sticksAvoided += avoided;
     totalInr += avoided * unit;
   }
-  return { totalInr: round2(totalInr), sticksAvoided: round2(sticksAvoided) };
+  // sticksAvoided left raw (may be fractional when baseline is fractional),
+  // matching calc.ts:potentialSavings; only the money total is rounded.
+  return { totalInr: round2(totalInr), sticksAvoided };
 }
 
 /** Money not spent vs baseline over the trailing `windowDays`. */
@@ -106,7 +108,12 @@ export function savedForWindow(
   return savedOverRange(rows, baselinePerDay, fallbackUnitPrice, startYmd, endYmd);
 }
 
-/** Money not spent vs baseline from `sinceYmd` (e.g. onboarding) through `endYmd`. */
+/**
+ * Money not spent vs baseline from `sinceYmd` (e.g. onboarding) through `endYmd`.
+ * Iterates one entry per calendar day in range, so callers MUST bound `sinceYmd`
+ * (the wiring passes `max(onboardedAt, daysAgoIst(365))`, matching the RPC's
+ * 366-day cap) — an unbounded `sinceYmd` allocates one entry per day.
+ */
 export function savedAllTime(
   rows: DailySummaryRow[],
   baselinePerDay: number,
@@ -118,9 +125,11 @@ export function savedAllTime(
 }
 
 /**
- * Consecutive smoke-free days ending at `endYmd`. A day with logs appears as a
- * row (sticks >= 1); an absent day is smoke-free. Anchored at the earliest row
- * so an account with no recent data doesn't report an unbounded streak.
+ * Consecutive smoke-free days ending at `endYmd`. An absent day OR a logged
+ * zero-stick day is smoke-free; only a day with sticks > 0 ends the streak —
+ * matching `smokeFreeStreak`'s `sticks === 0` predicate in calc.ts so the two
+ * paths agree on overlapping inputs. Anchored at the earliest row so an account
+ * with no recent data doesn't report an unbounded streak.
  */
 export function streakFromRows(
   rows: DailySummaryRow[],
@@ -128,20 +137,25 @@ export function streakFromRows(
   maxLookback = 365,
 ): number {
   if (!rows.length) return 0;
-  const present = new Set(rows.map((r) => r.date));
+  const sticksByDate = new Map(rows.map((r) => [r.date, r.sticks]));
   const earliest = rows.reduce((a, r) => (r.date < a ? r.date : a), rows[0].date);
   let count = 0;
   let cur = endYmd;
   for (let i = 0; i < maxLookback; i++) {
     if (cur < earliest) break; // no evidence before the first logged day
-    if (present.has(cur)) break; // smoked that day
-    count += 1;
+    const sticks = sticksByDate.get(cur);
+    if (sticks !== undefined && sticks > 0) break; // smoked that day
+    count += 1; // absent or logged-zero day → smoke-free
     cur = dayShift(cur, -1);
   }
   return count;
 }
 
-/** Stick-weighted average unit price across rows that carry a known price, or null. */
+/**
+ * Stick-weighted average unit price across rows that carry a known price, or null.
+ * Mirrors `calc.ts:avgUnitPrice` (Σ(unit×qty)/Σqty) over daily-summary rows rather
+ * than raw logs — keep the two in lockstep if either changes.
+ */
 export function weightedAvgUnitPrice(rows: DailySummaryRow[]): number | null {
   let weighted = 0;
   let sticks = 0;
