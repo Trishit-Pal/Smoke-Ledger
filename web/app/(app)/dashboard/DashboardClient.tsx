@@ -1,37 +1,31 @@
 'use client';
 
 /*
- * Dashboard — "Quiet editorial · your own daily report"
+ * Dashboard — "Quiet editorial · your own report, across time"
  *
- * ─── CHARACTER ANIMATIONS INTEGRATION ──────────────────────────────────────
- * The five additions below are the ONLY changes vs the original file. Each is
- * tagged with `// CHARACTER:` so they're easy to lift if you want to apply a
- * surgical patch instead of replacing the file.
+ * The dashboard is now a TIMEFRAME HUB: a Day / Week / Month / Year switch drives
+ * four lead metrics — sticks + trend, spend, saved, and goal + streak — all derived
+ * from the canonical per-day daily-summary (src/domain/periodSummary), the single
+ * source of truth shared with Trends and mobile. Totals reconcile across windows
+ * (weekly == sum of its 7 daily totals) and across devices.
  *
- *   1. Imports for CharacterCompanion + the mood bus.
- *   2. Greet mood fired on first dashboard load.
- *   3. Streak-milestone detection — when streak crosses a tier, the milestone
- *      modal fires.
- *   4. Mood dispatched inside runQuickLog when a log lands (regret if under
- *      baseline, concern if it pushed the user over).
- *   5. <CharacterCompanion> rendered inside the masthead header.
- *
- * Everything else (data path, layout, copy, classes) is unchanged.
- * ───────────────────────────────────────────────────────────────────────────
+ * Character animations (greet, streak milestones, birthday, quick-log moods) are
+ * preserved; the streak now comes from the uncapped summary so it no longer
+ * truncates at the raw-log window.
  */
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { revalidateAppViews } from '../_actions/revalidate';
+import { dailyStats, dayShift, lastLog } from '@/domain/calc';
 import {
-  dailyStats,
-  sticksOn,
-  spendOn,
-  trendVsBaseline,
-  rollingAvgSticks,
-  smokeFreeStreak,
-  lastLog,
-} from '@/domain/calc';
+  type DailySummaryRow,
+  periodWithTrend,
+  savedAllTime,
+  streakFromRows,
+  totalsForWindow,
+  weightedAvgUnitPrice,
+} from '@/domain/periodSummary';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
@@ -46,7 +40,6 @@ import { toSafeErrorMessage } from '@/lib/errors';
 import { HealthMilestones } from '@web/components/ui/HealthMilestones';
 import { QuickLogStrip } from '@web/components/dashboard/QuickLogStrip';
 import { WeekStrip } from '@web/components/dashboard/WeekStrip';
-// CHARACTER (1): imports for the companion + mood bus.
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import {
   dispatchMood,
@@ -60,28 +53,67 @@ export interface DashboardClientProps {
   logs: CigaretteLog[];
   goals: Goal[];
   brands: (Brand & { variants: BrandVariant[] })[];
+  summary: DailySummaryRow[];
+  summarySinceYmd: string;
+}
+
+type WindowDays = 1 | 7 | 30 | 365;
+
+const WINDOWS: { days: WindowDays; label: string }[] = [
+  { days: 1, label: 'Day' },
+  { days: 7, label: 'Week' },
+  { days: 30, label: 'Month' },
+  { days: 365, label: 'Year' },
+];
+
+/** "today" / "this week" / "this month" / "this year". */
+function periodNoun(days: WindowDays): string {
+  switch (days) {
+    case 1:
+      return 'today';
+    case 7:
+      return 'this week';
+    case 30:
+      return 'this month';
+    case 365:
+      return 'this year';
+  }
+}
+
+/** "day" / "week" / "month" / "year" — for the "vs previous ___" comparison. */
+function periodUnit(days: WindowDays): string {
+  switch (days) {
+    case 1:
+      return 'day';
+    case 7:
+      return 'week';
+    case 30:
+      return 'month';
+    case 365:
+      return 'year';
+  }
 }
 
 function headlineDeck(opts: {
-  todaySticks: number;
-  baseline: number | null | undefined;
+  sticks: number;
+  windowDays: WindowDays;
+  deltaPct: number;
   streak: number;
   hidden: boolean;
 }): string {
-  if (opts.hidden) return 'Today — totals hidden.';
-  const { todaySticks, baseline, streak } = opts;
-  if (todaySticks === 0) {
-    if (streak >= 7) return `Smoke-free for ${streak} days. Quiet day.`;
-    if (streak >= 1) return `${streak === 1 ? 'A day' : `${streak} days`} smoke-free so far.`;
-    return 'Nothing logged yet today.';
+  if (opts.hidden) return 'Totals — hidden.';
+  const { sticks, windowDays, deltaPct, streak } = opts;
+  const noun = periodNoun(windowDays);
+  if (sticks === 0) {
+    if (streak >= 7) return `Smoke-free for ${streak} days. Nothing logged ${noun}.`;
+    if (streak >= 1) return `${streak === 1 ? 'A day' : `${streak} days`} smoke-free. Nothing ${noun}.`;
+    return `Nothing logged ${noun}.`;
   }
-  if (todaySticks === 1) return 'One cigarette today.';
-  if (baseline && baseline > 0) {
-    if (todaySticks < baseline) return `${todaySticks} today — below your usual day.`;
-    if (todaySticks === baseline) return `${todaySticks} today — at your usual.`;
-    return `${todaySticks} today — above your usual day.`;
+  const word = sticks === 1 ? 'cigarette' : 'cigarettes';
+  if (windowDays === 1) {
+    return `${sticks} ${word} today, ${formatDelta(deltaPct)} vs yesterday.`;
   }
-  return `${todaySticks} today.`;
+  return `${sticks} ${word} ${noun}, ${formatDelta(deltaPct)} vs the previous ${periodUnit(windowDays)}.`;
 }
 
 function trendTone(deltaPct: number): 'up' | 'down' | 'flat' {
@@ -91,17 +123,53 @@ function trendTone(deltaPct: number): 'up' | 'down' | 'flat' {
   return 'flat';
 }
 
-export function DashboardClient({ profile, logs, goals, brands }: DashboardClientProps) {
+export function DashboardClient({
+  profile,
+  logs,
+  goals,
+  brands,
+  summary,
+  summarySinceYmd,
+}: DashboardClientProps) {
   const router = useRouter();
   const [quickLogError, setQuickLogError] = React.useState<string | null>(null);
   const [quickLogPending, setQuickLogPending] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
+  const [windowDays, setWindowDays] = React.useState<WindowDays>(1);
 
   const today = todayIst();
-  const todaySticks = React.useMemo(() => sticksOn(logs, today), [logs, today]);
-  const todaySpend = React.useMemo(() => spendOn(logs, today), [logs, today]);
-  const avgPerDay = React.useMemo(() => rollingAvgSticks(logs, today, 7), [logs, today]);
-  const trend = React.useMemo(() => trendVsBaseline(logs, today, 7, 30), [logs, today]);
+  const hidden = isHomeTotalsHidden(profile);
+
+  // ── Canonical timeframe metrics (single source of truth = the daily summary) ──
+  const period = React.useMemo(
+    () => periodWithTrend(summary, windowDays, today),
+    [summary, windowDays, today],
+  );
+  const sticks = period.current.sticks;
+  const spend = period.current.spendInr;
+  const avgPerDay = sticks / windowDays;
+
+  const fallbackUnit = React.useMemo(() => weightedAvgUnitPrice(summary) ?? 0, [summary]);
+  const baseline = profile.baselinePerDay ?? 0;
+  const savedStart = React.useMemo(() => {
+    const windowStart = dayShift(today, -(windowDays - 1));
+    return windowStart > summarySinceYmd ? windowStart : summarySinceYmd;
+  }, [today, windowDays, summarySinceYmd]);
+  const periodSaved = React.useMemo(
+    () => savedAllTime(summary, baseline, fallbackUnit, savedStart, today),
+    [summary, baseline, fallbackUnit, savedStart, today],
+  );
+  const allTimeSaved = React.useMemo(
+    () => savedAllTime(summary, baseline, fallbackUnit, summarySinceYmd, today),
+    [summary, baseline, fallbackUnit, summarySinceYmd, today],
+  );
+  const streak = React.useMemo(() => streakFromRows(summary, today), [summary, today]);
+
+  // Today's count (independent of the selected window) — used for the quick-log mood.
+  const todaySticks = React.useMemo(() => totalsForWindow(summary, 1, today).sticks, [summary, today]);
+
+  // Week strip stays a fixed 7-day view; raw logs (60-day) cover it and sum quantity
+  // identically to the summary.
   const weekBars = React.useMemo(() => {
     const stats = dailyStats(logs, daysAgoIst(6), today);
     return stats.map((s) => ({
@@ -109,10 +177,8 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
       value: s.sticks,
     }));
   }, [logs, today]);
-  const streak = React.useMemo(() => smokeFreeStreak(logs, today), [logs, today]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
   const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
-  const hidden = isHomeTotalsHidden(profile);
 
   const activeGoal = goals[0] ?? null;
   const goalProgress = React.useMemo(
@@ -120,18 +186,13 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
     [activeGoal, logs, today],
   );
 
-  // CHARACTER (2): fire a soft greet on first dashboard render so the figure
-  // reaches its resting wave. We deliberately don't fire on every render —
-  // only on mount.
+  // CHARACTER: soft greet on first render only.
   React.useEffect(() => {
     const t = window.setTimeout(() => dispatchMood('greet', { durationMs: 1800 }), 400);
     return () => window.clearTimeout(t);
   }, []);
 
-  // CHARACTER (3): when the smoke-free streak crosses a tier (1, 3, 7, 14, 30
-  // days), fire the full milestone modal. Only fires when the value INCREASES
-  // into a tier — so re-renders, refreshes, and history edits that drop the
-  // streak don't re-trigger.
+  // CHARACTER: fire the milestone modal when the smoke-free streak crosses a tier.
   const prevStreakRef = React.useRef<number | null>(null);
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
@@ -144,9 +205,6 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
       const m = milestoneForStreak(streak);
       if (m) dispatchMilestone(m);
     } else if (streak === 0 && prev >= 3) {
-      // Streak broke after a meaningful run — a gentle, non-judgmental nudge
-      // (no modal; that would frame a setback as a celebration). The caption
-      // points forward, never guilt-trips.
       dispatchMood('concern', {
         caption: 'Streak reset — tomorrow is a fresh page.',
         durationMs: 3800,
@@ -155,7 +213,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
     prevStreakRef.current = streak;
   }, [streak]);
 
-  // Birthday celebration — fired once per session.
+  // Birthday celebration — once per session.
   const birthdayFiredRef = React.useRef(false);
   React.useEffect(() => {
     if (birthdayFiredRef.current || !profile?.dateOfBirth) return;
@@ -203,21 +261,15 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         });
         await track(AnalyticsEvents.QUICK_ADD_USED, {});
 
-        // CHARACTER (4): pick a mood based on the post-log day total vs
-        // baseline. Computed inline so we don't have to wait for the router
-        // refresh to update `todaySticks`.
+        // CHARACTER: mood based on the post-log day total vs baseline.
         const newDayTotal = todaySticks + opts.quantity;
-        const baseline = profile.baselinePerDay ?? null;
-        if (baseline && baseline > 0 && newDayTotal > baseline) {
+        if (baseline > 0 && newDayTotal > baseline) {
           dispatchMood('concern', {
             caption: 'Above your baseline — be kind to yourself.',
             durationMs: 3400,
           });
         } else {
-          dispatchMood('regret', {
-            caption: 'Noted. No judgment.',
-            durationMs: 3200,
-          });
+          dispatchMood('regret', { caption: 'Noted. No judgment.', durationMs: 3200 });
         }
 
         setToast(
@@ -235,14 +287,15 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         setQuickLogPending(false);
       }
     },
-    [router, todaySticks, profile.baselinePerDay],
+    [router, todaySticks, baseline],
   );
 
-  const deck = headlineDeck({ todaySticks, baseline: profile.baselinePerDay, streak, hidden });
-  const tTone = trendTone(trend.deltaPct);
+  const deck = headlineDeck({ sticks, windowDays, deltaPct: period.stickDeltaPct, streak, hidden });
+  const tTone = trendTone(period.stickDeltaPct);
   const trendColour =
     tTone === 'up' ? 'var(--warn-earth)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
   const streakColour = streak >= 1 ? 'var(--accent)' : 'var(--text)';
+  const periodCap = WINDOWS.find((w) => w.days === windowDays)?.label ?? 'Day';
 
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
@@ -258,48 +311,70 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
             <span className="editorial-caption nums-tabular">{formatIndianDate(today)}</span>
             <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
           </div>
-          <p className="text-small text-text-muted text-center italic">
-            Your daily ledger
-          </p>
-
-          {/* CHARACTER (5): the masthead companion. Hidden on narrow viewports
-              so it never collides with the rule on small screens. Position
-              is absolute against the header (header is relative above), so
-              it doesn't disturb the existing layout. */}
+          <p className="text-small text-text-muted text-center italic">Your ledger</p>
           <div className="hidden md:block absolute -top-2 right-0 pointer-events-none">
             <CharacterCompanion size={88} />
           </div>
         </header>
 
-        {/* ─────────────── Headline · the day in one number ─────────────── */}
-        <section style={idx(1)} aria-labelledby="today-heading" className="flex flex-col gap-lg">
-          <h2 id="today-heading" className="sr-only">
-            Today
-          </h2>
+        {/* ─────────────── Timeframe switch ─────────────── */}
+        <div
+          style={idx(1)}
+          role="tablist"
+          aria-label="Time frame"
+          className="flex items-center gap-xs self-center rounded-full border border-[var(--rule)] p-xs"
+        >
+          {WINDOWS.map((w) => {
+            const selected = windowDays === w.days;
+            return (
+              <button
+                key={w.days}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setWindowDays(w.days)}
+                className="min-h-[40px] px-md rounded-full text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                style={{
+                  background: selected ? 'var(--text)' : 'transparent',
+                  color: selected ? 'var(--bg)' : 'var(--text-muted)',
+                }}
+              >
+                {w.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ─────────────── Headline · the period in one number ─────────────── */}
+        <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col gap-lg">
+          <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
             <div className="flex flex-col">
-              <span className="editorial-caption mb-sm">Today</span>
+              <span className="editorial-caption mb-sm">{periodCap}</span>
               <div
                 className="editorial-numeral editorial-headline-rise"
                 aria-label={
                   hidden
-                    ? "Today's count: hidden"
-                    : `Today's count: ${todaySticks} ${todaySticks === 1 ? 'cigarette' : 'cigarettes'}`
+                    ? 'Count hidden'
+                    : `${sticks} ${sticks === 1 ? 'cigarette' : 'cigarettes'} ${periodNoun(windowDays)}`
                 }
               >
-                {hidden ? '••' : todaySticks}
+                {hidden ? '••' : sticks}
               </div>
             </div>
             <div className="flex flex-col items-end text-right ml-auto pb-sm">
               <span className="editorial-caption mb-sm">Spend</span>
-              <div className="editorial-numeral--small nums-tabular" aria-label={hidden ? 'Spend hidden' : `Spent today: ${formatInr(todaySpend)}`}>
-                {hidden ? '•••' : formatInr(todaySpend, { compact: true })}
+              <div
+                className="editorial-numeral--small nums-tabular"
+                aria-label={hidden ? 'Spend hidden' : `Spent ${formatInr(spend)}`}
+              >
+                {hidden ? '•••' : formatInr(spend, { compact: true })}
               </div>
             </div>
           </div>
 
-          <p className="text-body text-text-muted max-w-[36ch]">{deck}</p>
+          <p className="text-body text-text-muted max-w-[40ch]">{deck}</p>
 
           <div className="rule-hair pt-md">
             <QuickLogStrip
@@ -311,53 +386,60 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
               onAdvanced={() => router.push('/log/new')}
             />
             {toast ? (
-              <p
-                role="status"
-                aria-live="polite"
-                className="text-small text-accent mt-md"
-              >
-                {toast}
-              </p>
+              <p role="status" aria-live="polite" className="text-small text-accent mt-md">{toast}</p>
             ) : null}
             {quickLogError ? (
-              <p
-                role="alert"
-                className="text-small mt-md"
-                style={{ color: 'var(--warn-earth)' }}
-              >
+              <p role="alert" className="text-small mt-md" style={{ color: 'var(--warn-earth)' }}>
                 {quickLogError}
               </p>
             ) : null}
           </div>
         </section>
 
-        {/* ─────────────── Ledger — two typographic rows ─────────────── */}
-        <section style={idx(2)} aria-labelledby="ledger-heading" className="flex flex-col">
-          <h2 id="ledger-heading" className="editorial-caption mb-md">
-            The ledger
-          </h2>
+        {/* ─────────────── Ledger — period-aware rows ─────────────── */}
+        <section style={idx(3)} aria-labelledby="ledger-heading" className="flex flex-col">
+          <h2 id="ledger-heading" className="editorial-caption mb-md">The ledger</h2>
 
           <dl className="flex flex-col">
+            {/* Average per day + trend vs previous period */}
             <div className="rule-hair-strong grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
               <div>
-                <dt className="text-body text-text">Seven-day average</dt>
+                <dt className="text-body text-text">Average per day</dt>
                 <dd className="text-small text-text-muted nums-tabular">
                   Trend{' '}
                   <span style={{ color: trendColour }} className="nums-tabular">
-                    {formatDelta(trend.deltaPct)}
+                    {formatDelta(period.stickDeltaPct)}
                   </span>{' '}
-                  vs your 30-day baseline
+                  vs the previous {periodUnit(windowDays)}
                 </dd>
               </div>
               <dd
                 className="editorial-numeral--small nums-tabular text-right"
-                aria-label={hidden ? 'Seven-day average hidden' : `Seven-day average: ${avgPerDay.toFixed(1)} per day`}
+                aria-label={hidden ? 'Average per day hidden' : `Average per day: ${avgPerDay.toFixed(1)}`}
               >
                 {hidden ? '••' : avgPerDay.toFixed(1)}
                 <span className="text-small text-text-faint font-sans ml-xs">/d</span>
               </dd>
             </div>
 
+            {/* Money saved this period + all-time */}
+            <div className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
+              <div>
+                <dt className="text-body text-text">Saved {periodNoun(windowDays)}</dt>
+                <dd className="text-small text-text-muted nums-tabular">
+                  {hidden ? '•••' : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started`}
+                </dd>
+              </div>
+              <dd
+                className="editorial-numeral--small nums-tabular text-right"
+                style={{ color: periodSaved.totalInr > 0 ? 'var(--accent)' : 'var(--text)' }}
+                aria-label={hidden ? 'Saved hidden' : `Saved ${periodNoun(windowDays)}: ${formatInr(periodSaved.totalInr)}`}
+              >
+                {hidden ? '•••' : formatInr(periodSaved.totalInr, { compact: true })}
+              </dd>
+            </div>
+
+            {/* Smoke-free streak */}
             <div className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
               <div>
                 <dt className="text-body text-text">Smoke-free streak</dt>
@@ -379,10 +461,8 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
 
         {/* ─────────────── Goal verse ─────────────── */}
         {goalProgress ? (
-          <section style={idx(3)} aria-labelledby="goal-heading" className="flex flex-col gap-sm">
-            <h2 id="goal-heading" className="editorial-caption">
-              Your goal
-            </h2>
+          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col gap-sm">
+            <h2 id="goal-heading" className="editorial-caption">Your goal</h2>
             <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
               {goalProgress.label}
               <span className="text-text-faint"> · </span>
@@ -424,17 +504,15 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           </section>
         ) : null}
 
-        {/* ─────────────── The week ─────────────── */}
-        {logs.length > 0 ? (
-          <section style={idx(4)} aria-labelledby="week-heading">
+        {/* ─────────────── The last 7 days ─────────────── */}
+        {summary.length > 0 ? (
+          <section style={idx(5)} aria-labelledby="week-heading">
             <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
               <div className="flex items-baseline justify-between">
                 <h2 id="week-heading" className="editorial-caption" style={{ color: 'var(--ink-surface-muted)' }}>
-                  The week
+                  The last 7 days
                 </h2>
-                <span className="text-small ink-muted nums-tabular">
-                  Mon — Sun
-                </span>
+                <span className="text-small ink-muted nums-tabular">{dayOfWeekShort(daysAgoIst(6))} — {dayOfWeekShort(today)}</span>
               </div>
               <WeekStrip data={weekBars} inverted hidden={hidden} />
             </div>
@@ -442,19 +520,15 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         ) : null}
 
         {/* ─────────────── Body recovery ─────────────── */}
-        <section style={idx(5)} aria-labelledby="recovery-heading">
-          <h2 id="recovery-heading" className="editorial-caption mb-md">
-            Body recovery
-          </h2>
+        <section style={idx(6)} aria-labelledby="recovery-heading">
+          <h2 id="recovery-heading" className="editorial-caption mb-md">Body recovery</h2>
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </section>
 
         {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
-          <section style={idx(6)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
-            <h2 id="insight-heading" className="editorial-caption">
-              From your week
-            </h2>
+          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
+            <h2 id="insight-heading" className="editorial-caption">From your week</h2>
             <blockquote className="relative pl-lg border-l-2 border-[var(--rule-strong)]">
               <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
                 {insights[0]?.title}
@@ -467,14 +541,11 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         ) : null}
 
         {/* ─────────────── Empty state ─────────────── */}
-        {logs.length === 0 ? (
-          <section style={idx(7)} className="rule-hair pt-lg flex flex-col gap-sm">
-            <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
-              No entries yet.
-            </p>
+        {summary.length === 0 ? (
+          <section style={idx(8)} className="rule-hair pt-lg flex flex-col gap-sm">
+            <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">No entries yet.</p>
             <p className="text-body text-text-muted max-w-[40ch]">
-              Logging one cigarette is enough to start seeing your spend, your
-              cadence, and the days you skipped.
+              Logging one cigarette is enough to start seeing your spend, your cadence, and the days you skipped.
             </p>
             <button
               type="button"
@@ -487,7 +558,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
         ) : null}
 
         {/* ─────────────── Footer ─────────────── */}
-        <footer style={idx(8)} className="rule-hair pt-md flex items-center justify-between">
+        <footer style={idx(9)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.push('/log')}
@@ -496,9 +567,7 @@ export function DashboardClient({ profile, logs, goals, brands }: DashboardClien
           >
             View full history →
           </button>
-          <span className="text-caption text-text-faint italic">
-            Quiet, on purpose.
-          </span>
+          <span className="text-caption text-text-faint italic">Quiet, on purpose.</span>
         </footer>
       </div>
     </div>

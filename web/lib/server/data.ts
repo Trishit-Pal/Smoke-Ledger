@@ -5,6 +5,7 @@ import { createClient } from '@web/lib/supabase/server';
 import { createAdminClient } from '@web/lib/supabase/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoIst } from '@/lib/date';
+import type { DailySummaryRow } from '@/domain/periodSummary';
 import type {
   Brand,
   BrandVariant,
@@ -374,15 +375,41 @@ export async function getServerSetting<T>(key: string): Promise<T | null> {
   return data.value_json as T;
 }
 
+/** Boundary adapter: server DailySummary → the domain engine's DailySummaryRow. */
+export function toDailySummaryRow(d: DailySummary): DailySummaryRow {
+  return {
+    date: d.localDate,
+    sticks: d.sticks,
+    spendInr: d.totalSpendInr,
+    avgUnitPriceInr: d.avgUnitPriceInr,
+  };
+}
+
 export async function getDashboardData() {
+  const today = daysAgoIst(0);
+  const profile = await getServerProfile();
+  // The daily summary is the single source of truth for the dashboard's
+  // timeframe totals. Floor the range at onboarding so "saved" never counts
+  // pre-onboarding days as fully avoided (and at the RPC's 366-day cap).
+  const yearAgo = daysAgoIst(365);
+  const onboardYmd = profile.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
+  const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
+  // Raw logs (60-day) still power quick-log inference, insights, and the week strip.
   const fromDate = daysAgoIst(60);
-  const [profile, logs, goals, brands] = await Promise.all([
-    getServerProfile(),
+  const [logs, goals, brands, summary] = await Promise.all([
     getServerLogs({ fromDate }),
     getServerGoals(),
     getServerBrandsWithVariants(),
+    getServerDailySummary({ from: summarySinceYmd, to: today }),
   ]);
-  return { profile, logs, goals, brands };
+  return {
+    profile,
+    logs,
+    goals,
+    brands,
+    summary: summary.map(toDailySummaryRow),
+    summarySinceYmd,
+  };
 }
 
 export async function getLogPageData() {
