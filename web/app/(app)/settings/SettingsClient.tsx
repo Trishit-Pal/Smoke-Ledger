@@ -252,6 +252,12 @@ export function SettingsClient({
   const [placeDraft, setPlaceDraft] = React.useState(profile.place ?? '');
 
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(initialAnalyticsOptIn);
+  // Reconcile with the server prop after router.refresh() (e.g. consent changed
+  // in another tab) — useState seeds only once, so without this the toggle would
+  // show a stale value until a hard reload.
+  React.useEffect(() => {
+    setAnalyticsOptIn(initialAnalyticsOptIn);
+  }, [initialAnalyticsOptIn]);
 
   // ── Brand catalog state ─────────────────────────────────────────────────
   // Local mutable copy of the server-provided catalog so a price edit reflects

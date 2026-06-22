@@ -11,6 +11,8 @@ import { useSession } from '@/store/session';
 //   - cigarette_logs (user_id) → refreshLogs
 //   - goals          (user_id) → refreshGoals
 //   - user_profiles  (id)      → refreshProfile
+//   - brands         (user_id) → refreshBrands
+//   - brand_variants (user_id) → refreshBrands (favorites / new brands / price edits)
 //
 // Mobile WebSockets drop when the app is backgrounded, so on return to the
 // foreground we re-attach the channel AND run a full refresh to reconcile any
@@ -18,7 +20,7 @@ import { useSession } from '@/store/session';
 // unmount. Mount ONCE at the app root (app/_layout.tsx).
 
 const DEBOUNCE_MS = 400;
-type Slice = 'logs' | 'goals' | 'profile';
+type Slice = 'logs' | 'goals' | 'profile' | 'brands';
 
 export function RealtimeRefresher() {
   React.useEffect(() => {
@@ -30,12 +32,14 @@ export function RealtimeRefresher() {
       logs: null,
       goals: null,
       profile: null,
+      brands: null,
     };
 
     const refreshFor: Record<Slice, () => Promise<void>> = {
       logs: () => useSession.getState().refreshLogs(),
       goals: () => useSession.getState().refreshGoals(),
       profile: () => useSession.getState().refreshProfile(),
+      brands: () => useSession.getState().refreshBrands(),
     };
 
     const schedule = (slice: Slice) => {
@@ -99,6 +103,16 @@ export function RealtimeRefresher() {
           'postgres_changes' as never,
           { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `id=eq.${userId}` },
           () => schedule('profile'),
+        )
+        .on(
+          'postgres_changes' as never,
+          { event: '*', schema: 'public', table: 'brands', filter: `user_id=eq.${userId}` },
+          () => schedule('brands'),
+        )
+        .on(
+          'postgres_changes' as never,
+          { event: '*', schema: 'public', table: 'brand_variants', filter: `user_id=eq.${userId}` },
+          () => schedule('brands'),
         )
         .subscribe();
     };
