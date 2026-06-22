@@ -8,6 +8,9 @@ out/
 .env
 .env.local
 .env.*.local
+.env.e2e
+.env.e2e.*
+!.env.e2e.example
 .DS_Store
 coverage/
 test-results/
