@@ -44,13 +44,12 @@
 
 import * as React from 'react';
 import {
-  dailyStats,
   dayShift,
   hourDistribution,
   dowDistribution,
   brandSpendMix,
 } from '@/domain/calc';
-import { todayIst, daysAgoIst } from '@/lib/date';
+import { todayIst, daysAgoIst, dateRange } from '@/lib/date';
 import { formatDelta, formatInr } from '@/lib/format';
 import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
@@ -83,29 +82,21 @@ export interface TrendsClientProps {
 }
 
 /**
- * Returns a DailyStat array appropriate for the sticks/spend time-series charts.
- *
- * For windowDays === 365, transforms the pre-aggregated `dailySummary` (365 rows from
- * the server-side RPC) into DailyStat shape — giving true full-year accuracy without
- * pulling raw logs.
- *
- * For narrower windows (1/7/30), falls back to `dailyStats(logs, ...)` to retain the
- * full raw-log path (including hour-level granularity if any future chart needs it).
+ * Zero-filled DailyStat array over [startYmd, endYmd] sourced from the server
+ * `dailySummary` (quantity-correct, up to 365 days). ALL windows now use this
+ * single source so Day/Week/Month/Year totals reconcile with each other and with
+ * the dashboard, and none are silently truncated by the raw-log 200-row cap.
  */
-function pickDailyStats(
-  windowDays: WindowDays,
-  logs: CigaretteLog[],
+function summaryStats(
   dailySummary: DailySummary[],
   startYmd: string,
-  today: string,
+  endYmd: string,
 ): DailyStat[] {
-  if (windowDays === 365) {
-    return dailySummary
-      .filter((r) => r.localDate >= startYmd && r.localDate <= today)
-      .map((r) => ({ date: r.localDate, sticks: r.sticks, spendInr: r.totalSpendInr }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }
-  return dailyStats(logs, startYmd, today);
+  const byDate = new Map(dailySummary.map((r) => [r.localDate, r]));
+  return dateRange(startYmd, endYmd).map((d) => {
+    const r = byDate.get(d);
+    return { date: d, sticks: r?.sticks ?? 0, spendInr: r?.totalSpendInr ?? 0 };
+  });
 }
 
 /** Tone for delta percentage: terracotta for up, teal for down (positive),
@@ -168,8 +159,8 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
   const dependencyKey = `${windowDays}-${logs.length}-${dailySummary.length}`;
 
   const currentStats = React.useMemo(
-    () => pickDailyStats(windowDays, logs, dailySummary, startYmd, today),
-    [windowDays, logs, dailySummary, startYmd, today],
+    () => summaryStats(dailySummary, startYmd, today),
+    [dailySummary, startYmd, today],
   );
 
   const previousStart = React.useMemo(
@@ -177,11 +168,13 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
     [startYmd, windowDays],
   );
   const previousEnd = React.useMemo(() => dayShift(startYmd, -1), [startYmd]);
-  const previousStats = React.useMemo(() => {
-    // Previous-period comparison always uses raw logs (only the current period
-    // uses dailySummary for Year; prior-year comparison is out of F1a scope).
-    return dailyStats(logs, previousStart, previousEnd);
-  }, [logs, previousStart, previousEnd]);
+  const previousStats = React.useMemo(
+    // Same source as the current period, so Day/Week/Month deltas are accurate
+    // (no longer limited by the raw-log 200-row cap). Year's previous period sits
+    // outside the 365-day summary, so its delta reads as "no prior data".
+    () => summaryStats(dailySummary, previousStart, previousEnd),
+    [dailySummary, previousStart, previousEnd],
+  );
 
   const sticksLine = React.useMemo(
     () =>

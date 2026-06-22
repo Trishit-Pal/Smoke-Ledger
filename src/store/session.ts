@@ -8,8 +8,33 @@ import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
 import { makeNativeCatalogStorage } from '@/lib/catalogStorageNative';
 import * as goalsRepo from '@/db/repositories/goals';
 import * as profileRepo from '@/db/repositories/profile';
+import * as summaryRepo from '@/db/repositories/summary';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
+import type { DailySummaryRow as PeriodRow } from '@/domain/periodSummary';
 import { daysAgoIst, todayIst } from '@/lib/date';
+
+/** Earliest day "saved" should count from: onboarding, floored at the RPC's 366-day cap. */
+function summarySinceFor(profile: UserProfile | null): string {
+  const yearAgo = daysAgoIst(365);
+  const onboard = profile?.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
+  return onboard && onboard > yearAgo ? onboard : yearAgo;
+}
+
+/** Boundary adapter: repo DailySummaryRow → the domain engine's DailySummaryRow. */
+function toPeriodRow(r: summaryRepo.DailySummaryRow): PeriodRow {
+  return {
+    date: r.localDate,
+    sticks: r.sticks,
+    spendInr: r.totalSpendInr,
+    avgUnitPriceInr: r.avgUnitPriceInr,
+  };
+}
+
+/** Boot-time fetch — empty on error is acceptable (other slices fail loudly too). */
+async function fetchSummary(): Promise<PeriodRow[]> {
+  const rows = await summaryRepo.getDailySummary(daysAgoIst(365), todayIst()).catch(() => []);
+  return rows.map(toPeriodRow);
+}
 
 // Initial hydration window. Trends/history screens fetch their own deeper
 // windows on demand so we keep the boot payload small.
@@ -22,6 +47,11 @@ interface SessionState {
   logs: CigaretteLog[];
   brands: (Brand & { variants: BrandVariant[] })[];
   goals: Goal[];
+  // Canonical per-day daily-summary (quantity-correct, up to 365 days) — the
+  // single source of truth for dashboard/trends timeframe totals. `summarySinceYmd`
+  // floors "saved" so pre-onboarding days aren't counted.
+  summary: PeriodRow[];
+  summarySinceYmd: string;
   // Deliberate achievement-animation dismissals this login session. In-memory
   // only and zeroed in reset(), so it naturally resets per login. See
   // `@/lib/achievements` for the suppression rule.
@@ -33,6 +63,7 @@ interface SessionState {
   refreshBrands: () => Promise<void>;
   refreshGoals: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshSummary: () => Promise<void>;
   refreshAll: () => Promise<void>;
   incrementAchievementDismiss: () => void;
 
@@ -47,6 +78,8 @@ export const useSession = create<SessionState>((set, get) => ({
   logs: [],
   brands: [],
   goals: [],
+  summary: [],
+  summarySinceYmd: daysAgoIst(365),
   achievementDismissCount: 0,
 
   reset: () => {
@@ -59,6 +92,8 @@ export const useSession = create<SessionState>((set, get) => ({
       logs: [],
       brands: [],
       goals: [],
+      summary: [],
+      summarySinceYmd: daysAgoIst(365),
       achievementDismissCount: 0,
     });
   },
@@ -70,13 +105,22 @@ export const useSession = create<SessionState>((set, get) => ({
     // would re-run on every launch. The RPC is timeout-guarded internally.
     const catalogStorage = await makeNativeCatalogStorage();
     await maybeSyncDefaultBrandCatalog(catalogStorage).catch(() => undefined);
-    const [profile, logs, brands, goals] = await Promise.all([
+    const [profile, logs, brands, goals, summary] = await Promise.all([
       profileRepo.getProfile(),
       logsRepo.listLogs({ fromDate: daysAgoIst(LOG_LOOKBACK_DAYS), toDate: todayIst() }),
       brandsRepo.listBrandsWithVariants(),
       goalsRepo.listActiveGoals(),
+      fetchSummary(),
     ]);
-    set({ booted: true, profile, logs, brands, goals });
+    set({
+      booted: true,
+      profile,
+      logs,
+      brands,
+      goals,
+      summary,
+      summarySinceYmd: summarySinceFor(profile),
+    });
   },
 
   refreshLogs: async () => {
@@ -96,13 +140,29 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   refreshProfile: async () => {
     const profile = await profileRepo.getProfile();
-    set({ profile });
+    set({ profile, summarySinceYmd: summarySinceFor(profile) });
+  },
+  refreshSummary: async () => {
+    // Preserve the prior summary on a transient failure — a refresh after a log
+    // write must never blank the dashboard's totals.
+    try {
+      const rows = await summaryRepo.getDailySummary(daysAgoIst(365), todayIst());
+      set({ summary: rows.map(toPeriodRow) });
+    } catch {
+      // keep existing summary
+    }
   },
   // Re-pull every slice at once. Used by the foreground/focus refetch fallback
   // and after a backgrounded socket reconnects (see RealtimeRefresher).
   refreshAll: async () => {
-    const { refreshLogs, refreshBrands, refreshGoals, refreshProfile } = get();
-    await Promise.all([refreshLogs(), refreshBrands(), refreshGoals(), refreshProfile()]);
+    const { refreshLogs, refreshBrands, refreshGoals, refreshProfile, refreshSummary } = get();
+    await Promise.all([
+      refreshLogs(),
+      refreshBrands(),
+      refreshGoals(),
+      refreshProfile(),
+      refreshSummary(),
+    ]);
   },
 
   incrementAchievementDismiss: () =>
@@ -111,14 +171,18 @@ export const useSession = create<SessionState>((set, get) => ({
   addLog: async (draft) => {
     const created = await logsRepo.createLog(draft);
     set((s) => ({ logs: [created, ...s.logs] }));
+    // The dashboard/trends totals read `summary`; keep it in step after a write.
+    await get().refreshSummary();
     return created;
   },
   updateLog: async (id, patch) => {
     await logsRepo.updateLog(id, patch);
     set((s) => ({ logs: s.logs.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
+    await get().refreshSummary();
   },
   removeLog: async (id) => {
     await logsRepo.deleteLog(id);
     set((s) => ({ logs: s.logs.filter((l) => l.id !== id) }));
+    await get().refreshSummary();
   },
 }));
