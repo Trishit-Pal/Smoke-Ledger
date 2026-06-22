@@ -56,4 +56,13 @@ and boots `next dev` on port 4173 pointed at the `E2E_SUPABASE_*` project.
   (`web/e2e/security-extra.spec.ts` — protected-route redirects + bad-login, in
   smoke); authed input-validation + sign-out (`web/e2e/auth-session.spec.ts`).
   Run RLS with `npm test -- rls.integration` (needs `E2E_SUPABASE_*` + two users).
-- **D (planned):** local perf/load, edge/negative/regression.
+- **D (done):** local perf (`src/tests/perf.integration.test.ts` — `get_daily_summary`
+  SUM(quantity) at volume + budget, pagination, concurrency burst; run `npm run test:perf`
+  with `E2E_SUPABASE_*` + `SUPABASE_SERVICE_ROLE_KEY` pointed at a **local** stack);
+  regression guard (`web/__tests__/supabaseGuard.test.ts` — browser client refuses a
+  server context); engine edge cases (empty account, gap-day savings) in
+  `src/tests/periodSummary.test.ts`.
+
+## Remaining follow-ups (noted, not blocking)
+- UI input-validation breadth (signup DOB<18, more settings fields) beyond the mobile rule.
+- Wire the authenticated + perf suites into CI once secrets/a test project are provisioned.
