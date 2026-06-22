@@ -51,5 +51,9 @@ and boots `next dev` on port 4173 pointed at the `E2E_SUPABASE_*` project.
 - **B (done):** functional flow specs — onboarding→done, dashboard timeframe
   (Day/Week/Month/Year reconciliation), log entry, cross-device realtime sync.
   Run with `npm run test:e2e:authed` (needs `.env.e2e`).
-- **C (planned):** RLS/authz, web hardening, input/abuse, auth/session.
+- **C (done):** RLS/authz extended (brands, brand_variants, goals isolation +
+  anon RPC/select rejection in `src/tests/rls.integration.test.ts`); web hardening
+  (`web/e2e/security-extra.spec.ts` — protected-route redirects + bad-login, in
+  smoke); authed input-validation + sign-out (`web/e2e/auth-session.spec.ts`).
+  Run RLS with `npm test -- rls.integration` (needs `E2E_SUPABASE_*` + two users).
 - **D (planned):** local perf/load, edge/negative/regression.
