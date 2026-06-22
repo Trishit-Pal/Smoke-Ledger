@@ -20,13 +20,16 @@ import {
   forecastMonthlySpend,
   lastLog,
   rollingAvgSticks,
-  smokeFreeStreak,
   spendOn,
   sticksOn,
   trendVsBaseline,
 } from '@/domain/calc';
+import {
+  savedAllTime,
+  streakFromRows,
+  weightedAvgUnitPrice,
+} from '@/domain/periodSummary';
 import { isBirthdayToday } from '@/domain/age';
-import { potentialSavings } from '@/domain/savings';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { formatInr, formatDelta } from '@/lib/format';
@@ -362,6 +365,8 @@ export default function Home() {
   const profile = useSession((s) => s.profile);
   const goals = useSession((s) => s.goals);
   const brands = useSession((s) => s.brands);
+  const summary = useSession((s) => s.summary);
+  const summarySinceYmd = useSession((s) => s.summarySinceYmd);
   const refreshLogs = useSession((s) => s.refreshLogs);
   // Fallback for when realtime is unavailable: re-pull the high-churn logs on
   // focus. Goals/profile arrive via realtime and brands change rarely, so we
@@ -401,17 +406,18 @@ export default function Home() {
   const forecast = useMemo(() => forecastMonthlySpend(logs, today), [logs, today]);
   const insights = useMemo(() => generateInsights(logs, today), [logs, today]);
   const last = useMemo(() => lastLog(logs), [logs]);
-  const streak = useMemo(() => smokeFreeStreak(logs, today), [logs, today]);
+  // Streak + savings derive from the canonical daily summary (quantity-correct,
+  // up to 365 days), so the streak no longer truncates at the 90-day log window
+  // and savings is bounded at onboarding (no pre-onboarding inflation).
+  const streak = useMemo(() => streakFromRows(summary, today), [summary, today]);
 
   const savings = useMemo(() => {
-    if (!profile?.baselinePerDay) return null;
-    const since = profile.onboardedAt?.slice(0, 10) ?? daysAgoIst(30);
-    return potentialSavings({
-      logs,
-      baselinePerDay: profile.baselinePerDay,
-      sinceYmd: since,
-    });
-  }, [logs, profile]);
+    const baseline = profile?.baselinePerDay ?? 0;
+    if (!baseline) return null;
+    const unit = weightedAvgUnitPrice(summary) ?? 0;
+    const r = savedAllTime(summary, baseline, unit, summarySinceYmd, today);
+    return { totalInr: r.totalInr, sticksAvoided: r.sticksAvoided, avgUnitPriceUsed: unit };
+  }, [summary, profile, summarySinceYmd, today]);
 
   const activeGoal = goals[0] ?? null;
   const goalProgress = useMemo(
@@ -861,7 +867,7 @@ export default function Home() {
                   variant="caption"
                   style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
                 >
-                  Potential savings
+                  Saved since you started
                 </Text>
                 {hidden ? (
                   <Text
@@ -883,7 +889,7 @@ export default function Home() {
                   />
                 )}
                 <Text variant="small" muted>
-                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
+                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
                 </Text>
               </View>
 
