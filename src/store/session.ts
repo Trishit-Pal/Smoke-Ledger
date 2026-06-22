@@ -30,6 +30,7 @@ function toPeriodRow(r: summaryRepo.DailySummaryRow): PeriodRow {
   };
 }
 
+/** Boot-time fetch — empty on error is acceptable (other slices fail loudly too). */
 async function fetchSummary(): Promise<PeriodRow[]> {
   const rows = await summaryRepo.getDailySummary(daysAgoIst(365), todayIst()).catch(() => []);
   return rows.map(toPeriodRow);
@@ -142,7 +143,14 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ profile, summarySinceYmd: summarySinceFor(profile) });
   },
   refreshSummary: async () => {
-    set({ summary: await fetchSummary() });
+    // Preserve the prior summary on a transient failure — a refresh after a log
+    // write must never blank the dashboard's totals.
+    try {
+      const rows = await summaryRepo.getDailySummary(daysAgoIst(365), todayIst());
+      set({ summary: rows.map(toPeriodRow) });
+    } catch {
+      // keep existing summary
+    }
   },
   // Re-pull every slice at once. Used by the foreground/focus refetch fallback
   // and after a backgrounded socket reconnects (see RealtimeRefresher).

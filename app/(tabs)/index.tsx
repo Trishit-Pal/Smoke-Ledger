@@ -867,7 +867,7 @@ export default function Home() {
                   variant="caption"
                   style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
                 >
-                  Potential savings
+                  Saved since you started
                 </Text>
                 {hidden ? (
                   <Text
@@ -889,7 +889,7 @@ export default function Home() {
                   />
                 )}
                 <Text variant="small" muted>
-                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
+                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
                 </Text>
               </View>
 
