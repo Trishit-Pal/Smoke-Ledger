@@ -7,29 +7,22 @@ import { getSupabase } from '@web/lib/supabase/client';
 
 // RealtimeRefresher subscribes once-per-session to the tables whose changes need
 // to surface across tabs/devices:
-//   - cigarette_logs (any INSERT/UPDATE/DELETE for the current user)
-//   - goals          (any INSERT/UPDATE/DELETE for the current user)
-//   - user_profiles  (any UPDATE for the current user's profile row)
-//   - brands         (favorites / new brands for the current user)
-//   - brand_variants (price edits for the current user)
+//   - cigarette_logs / goals / brands / brand_variants (filtered by user_id)
+//   - user_profiles (filtered by id)
+// On any change it debounces ~400ms (trailing) and calls router.refresh(), which
+// re-runs the current route's server components (revalidatePath in the mutation
+// server actions has already invalidated the router cache, so the refresh refetches).
 //
-// Foreground reconcile: a backgrounded tab can miss events (or have its socket
-// dropped/throttled). On visibilitychange→visible or window focus we re-open the
-// channel ONLY if it actually dropped, then schedule a refresh to catch anything
-// missed while hidden. This is the web analogue of the mobile AppState reconcile.
+// Foreground reconcile: a backgrounded tab can have its socket suspended/dropped
+// and miss events. ONLY on a real hidden→visible transition (a true backgrounding)
+// do we re-open the channel and schedule a single refresh — never on ordinary
+// in-page focus changes, which would spam router.refresh() on every tab click.
 //
-// On any change it debounces by ~400ms (trailing) and calls router.refresh(),
-// which re-runs the current route's server components. revalidatePath in the
-// mutation server actions has already invalidated the router cache, so the
-// refresh re-fetches.
-//
-// Mount this once at the (app) layout level — NOT per page. Mounting per
-// page tears down + re-opens the WebSocket on every navigation, which is
-// wasteful and defeats the purpose.
-//
-// Channel teardown: the cleanup function calls supabase.removeChannel before
-// unmount AND when the auth state changes (sign-out, user switch). The next
-// auth state change re-attaches the channel for the new user.
+// Keep this in PARITY with the React Native port at
+// src/components/realtime/RealtimeRefresher.tsx — same channel name, same table
+// subscriptions, same opChain serialization (the foreground trigger differs:
+// AppState on mobile, visibilitychange here). Mount this ONCE at the (app)
+// layout — NOT per page, or every navigation tears down + re-opens the socket.
 
 const DEBOUNCE_MS = 400;
 
@@ -42,6 +35,15 @@ export function RealtimeRefresher() {
     let refreshTimer: number | null = null;
     let cancelled = false;
     let currentUid: string | null = null;
+
+    // Serialize attach/detach so the initial getUser() attach, the
+    // onAuthStateChange attach, and the foreground reconcile can't interleave
+    // into a double-subscribe / orphaned channel. Mirrors the mobile port.
+    let opChain: Promise<unknown> = Promise.resolve();
+    const enqueue = (fn: () => Promise<void>) => {
+      opChain = opChain.catch(() => undefined).then(fn);
+      return opChain;
+    };
 
     const scheduleRefresh = () => {
       if (refreshTimer != null) window.clearTimeout(refreshTimer);
@@ -71,36 +73,21 @@ export function RealtimeRefresher() {
       await detach();
       if (cancelled) return;
       currentUid = userId;
-      const next = supabase
+      channel = supabase
         .channel(`user-${userId}-realtime`)
         .on(
           'postgres_changes' as never,
-          {
-            event: '*',
-            schema: 'public',
-            table: 'cigarette_logs',
-            filter: `user_id=eq.${userId}`,
-          },
+          { event: '*', schema: 'public', table: 'cigarette_logs', filter: `user_id=eq.${userId}` },
           scheduleRefresh,
         )
         .on(
           'postgres_changes' as never,
-          {
-            event: '*',
-            schema: 'public',
-            table: 'goals',
-            filter: `user_id=eq.${userId}`,
-          },
+          { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` },
           scheduleRefresh,
         )
         .on(
           'postgres_changes' as never,
-          {
-            event: '*',
-            schema: 'public',
-            table: 'user_profiles',
-            filter: `id=eq.${userId}`,
-          },
+          { event: '*', schema: 'public', table: 'user_profiles', filter: `id=eq.${userId}` },
           scheduleRefresh,
         )
         .on(
@@ -114,50 +101,54 @@ export function RealtimeRefresher() {
           scheduleRefresh,
         )
         .subscribe();
-      channel = next;
     };
 
-    // Attach immediately if the user is already signed in (the common case
-    // for any (app) route — the auth gate above us already enforced it).
+    // Attach immediately if the user is already signed in (the common case for
+    // any (app) route — the auth gate above us already enforced it).
     void supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return;
       const uid = data.user?.id;
-      if (uid) void attach(uid);
+      if (uid) void enqueue(() => attach(uid));
     });
 
-    // Re-attach on auth state transitions so a sign-in after first render
-    // (e.g. via re-auth flow) doesn't leave the page subscription-less.
+    // Re-attach on sign-in / re-auth; detach + clear uid on sign-out.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user?.id;
       if (uid) {
-        currentUid = uid;
-        void attach(uid);
+        void enqueue(() => attach(uid));
       } else {
         currentUid = null;
-        void detach();
+        void enqueue(() => detach());
       }
     });
 
-    // Foreground reconcile: when the tab becomes visible/focused, re-open the
-    // channel only if it actually dropped while hidden, then refresh to catch
-    // anything missed. Cheap when the socket survived (no teardown).
-    const reconcile = () => {
-      if (cancelled || !currentUid) return;
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-      if (!channel || channel.state !== 'joined') {
-        void attach(currentUid);
+    // Foreground reconcile — only on a real hidden→visible transition, so we
+    // don't refresh on ordinary in-page focus churn. Re-open the (possibly
+    // suspended) socket unconditionally — a backgrounded WebSocket can still
+    // report `joined` while dead, so don't trust its state — then schedule one
+    // refresh to catch anything missed while hidden.
+    let wasHidden = document.visibilityState === 'hidden';
+    const onVisibility = () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+        return;
       }
-      scheduleRefresh();
+      if (!wasHidden) return; // became visible without a real backgrounding
+      wasHidden = false;
+      if (currentUid) {
+        const uid = currentUid;
+        void enqueue(() => attach(uid));
+        scheduleRefresh();
+      }
     };
-    document.addEventListener('visibilitychange', reconcile);
-    window.addEventListener('focus', reconcile);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', reconcile);
-      window.removeEventListener('focus', reconcile);
-      void detach();
+      document.removeEventListener('visibilitychange', onVisibility);
+      void enqueue(() => detach());
     };
   }, [router]);
 

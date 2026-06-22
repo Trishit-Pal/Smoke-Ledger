@@ -254,9 +254,13 @@ export function SettingsClient({
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(initialAnalyticsOptIn);
   // Reconcile with the server prop after router.refresh() (e.g. consent changed
   // in another tab) — useState seeds only once, so without this the toggle would
-  // show a stale value until a hard reload.
+  // show a stale value until a hard reload. Also invalidate the module-level
+  // analytics consent cache: the displayed value just moved to match the server,
+  // so the next track() must re-read the true consent rather than honor a stale
+  // cached value (otherwise the switch could read OFF while tracking continues).
   React.useEffect(() => {
     setAnalyticsOptIn(initialAnalyticsOptIn);
+    invalidateAnalyticsConsentCache();
   }, [initialAnalyticsOptIn]);
 
   // ── Brand catalog state ─────────────────────────────────────────────────
