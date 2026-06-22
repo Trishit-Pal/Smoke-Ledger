@@ -48,6 +48,8 @@ and boots `next dev` on port 4173 pointed at the `E2E_SUPABASE_*` project.
 
 - **A (done):** seeding/teardown harness, fixtures, env-driven config, fixed
   `authenticated-flows.spec.ts`.
-- **B (planned):** onboarding→done, dashboard timeframe, log entry, realtime sync.
+- **B (done):** functional flow specs — onboarding→done, dashboard timeframe
+  (Day/Week/Month/Year reconciliation), log entry, cross-device realtime sync.
+  Run with `npm run test:e2e:authed` (needs `.env.e2e`).
 - **C (planned):** RLS/authz, web hardening, input/abuse, auth/session.
 - **D (planned):** local perf/load, edge/negative/regression.
