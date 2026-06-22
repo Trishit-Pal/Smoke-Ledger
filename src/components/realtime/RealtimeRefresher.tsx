@@ -18,6 +18,11 @@ import { useSession } from '@/store/session';
 // foreground we re-attach the channel AND run a full refresh to reconcile any
 // changes missed while away. Re-attaches on auth transitions; tears down on
 // unmount. Mount ONCE at the app root (app/_layout.tsx).
+//
+// Keep this in PARITY with the web port at web/components/realtime/RealtimeRefresher.tsx
+// — same channel name, same table subscriptions, same opChain serialization. The
+// only intended difference is the foreground trigger (AppState here, visibilitychange
+// on web). Any change to the subscription set must be mirrored in both files.
 
 const DEBOUNCE_MS = 400;
 type Slice = 'logs' | 'goals' | 'profile' | 'brands';
