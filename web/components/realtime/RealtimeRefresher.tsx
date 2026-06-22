@@ -5,11 +5,18 @@ import { useRouter } from 'next/navigation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabase } from '@web/lib/supabase/client';
 
-// RealtimeRefresher subscribes once-per-session to the three tables whose
-// changes need to surface across tabs/devices:
+// RealtimeRefresher subscribes once-per-session to the tables whose changes need
+// to surface across tabs/devices:
 //   - cigarette_logs (any INSERT/UPDATE/DELETE for the current user)
 //   - goals          (any INSERT/UPDATE/DELETE for the current user)
 //   - user_profiles  (any UPDATE for the current user's profile row)
+//   - brands         (favorites / new brands for the current user)
+//   - brand_variants (price edits for the current user)
+//
+// Foreground reconcile: a backgrounded tab can miss events (or have its socket
+// dropped/throttled). On visibilitychange→visible or window focus we re-open the
+// channel ONLY if it actually dropped, then schedule a refresh to catch anything
+// missed while hidden. This is the web analogue of the mobile AppState reconcile.
 //
 // On any change it debounces by ~400ms (trailing) and calls router.refresh(),
 // which re-runs the current route's server components. revalidatePath in the
@@ -34,6 +41,7 @@ export function RealtimeRefresher() {
     let channel: RealtimeChannel | null = null;
     let refreshTimer: number | null = null;
     let cancelled = false;
+    let currentUid: string | null = null;
 
     const scheduleRefresh = () => {
       if (refreshTimer != null) window.clearTimeout(refreshTimer);
@@ -62,6 +70,7 @@ export function RealtimeRefresher() {
     const attach = async (userId: string) => {
       await detach();
       if (cancelled) return;
+      currentUid = userId;
       const next = supabase
         .channel(`user-${userId}-realtime`)
         .on(
@@ -94,6 +103,16 @@ export function RealtimeRefresher() {
           },
           scheduleRefresh,
         )
+        .on(
+          'postgres_changes' as never,
+          { event: '*', schema: 'public', table: 'brands', filter: `user_id=eq.${userId}` },
+          scheduleRefresh,
+        )
+        .on(
+          'postgres_changes' as never,
+          { event: '*', schema: 'public', table: 'brand_variants', filter: `user_id=eq.${userId}` },
+          scheduleRefresh,
+        )
         .subscribe();
       channel = next;
     };
@@ -111,15 +130,33 @@ export function RealtimeRefresher() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user?.id;
       if (uid) {
+        currentUid = uid;
         void attach(uid);
       } else {
+        currentUid = null;
         void detach();
       }
     });
 
+    // Foreground reconcile: when the tab becomes visible/focused, re-open the
+    // channel only if it actually dropped while hidden, then refresh to catch
+    // anything missed. Cheap when the socket survived (no teardown).
+    const reconcile = () => {
+      if (cancelled || !currentUid) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (!channel || channel.state !== 'joined') {
+        void attach(currentUid);
+      }
+      scheduleRefresh();
+    };
+    document.addEventListener('visibilitychange', reconcile);
+    window.addEventListener('focus', reconcile);
+
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', reconcile);
+      window.removeEventListener('focus', reconcile);
       void detach();
     };
   }, [router]);
