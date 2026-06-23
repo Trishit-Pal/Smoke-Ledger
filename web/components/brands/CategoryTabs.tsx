@@ -28,7 +28,7 @@ export function CategoryTabs({
 
   return (
     <div
-      role="tablist"
+      role="group"
       aria-label={ariaLabel}
       className="flex flex-wrap items-baseline gap-y-xs mb-sm"
     >
@@ -44,8 +44,7 @@ export function CategoryTabs({
             ) : null}
             <button
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               onClick={() => onChange(t)}
               className={
                 'editorial-caption px-xs py-xs rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +

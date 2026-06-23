@@ -19,7 +19,7 @@
  *  control, hairline beneath. That is the chosen form.
  *
  *  All data paths preserved: createLog, inferUnitPriceForVariant,
- *  deriveUnitPrice, the trigger/mood/context/purchase-mode enums, and the
+ *  resolveLogUnitPrice, the trigger/mood/context/purchase-mode enums, and the
  *  analytics emit are unchanged. Only the rendering changed.
  */
 
@@ -29,9 +29,9 @@ import { useRouter } from 'next/navigation';
 import { revalidateAppViews } from '../../_actions/revalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { resolveLogUnitPrice } from '@/domain/calc';
-import { formatInr, formatPerStick } from '@/lib/format';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
 import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
+import { buildPricePreview } from './pricePreview';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
 import { CONTEXT_OPTIONS } from '@/constants/contexts';
@@ -63,7 +63,7 @@ export interface LogNewClientProps {
 
 interface FieldRowProps {
   label: string;
-  sublabel?: string;
+  sublabel?: React.ReactNode;
   htmlFor?: string;
   children: React.ReactNode;
   hint?: React.ReactNode;
@@ -243,13 +243,10 @@ export function LogNewClient({ brands }: LogNewClientProps) {
 
   // Live per-stick preview: the typed value IS the per-stick price; show the
   // resulting total so there's no ambiguity before saving.
-  const pricePreview = React.useMemo(() => {
-    if (!priceText) return null;
-    const perStick = Number(priceText);
-    if (!Number.isFinite(perStick) || perStick < 0) return 'Enter a valid price per stick.';
-    const qty = Math.max(1, Number(quantity) || 1);
-    return `= ${formatInr(perStick * qty)} total · ${formatPerStick(perStick)}`;
-  }, [priceText, quantity]);
+  const pricePreview = React.useMemo(
+    () => buildPricePreview(priceText, quantity),
+    [priceText, quantity],
+  );
 
   const handleSave = async () => {
     try {
@@ -422,7 +419,13 @@ export function LogNewClient({ brands }: LogNewClientProps) {
           <FieldRow
             label="Price per stick (INR)"
             htmlFor="price-input"
-            sublabel="Optional — leave blank to estimate from your catalog."
+            sublabel={
+              <>
+                Optional — leave blank to estimate from your catalog.
+                <br />
+                Always per stick, even for a pack or carton.
+              </>
+            }
             hint={pricePreview}
           >
             <EditorialInput

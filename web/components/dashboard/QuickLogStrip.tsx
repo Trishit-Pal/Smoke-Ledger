@@ -51,14 +51,6 @@ export function QuickLogStrip({
   onAdvanced,
 }: QuickLogStripProps) {
   const discreet = profile.discreetMode;
-  const favorites = React.useMemo(
-    () =>
-      [...brands]
-        .filter((b) => b.isFavorite)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .slice(0, 4),
-    [brands],
-  );
 
   // Category tabs: 'All' shows every brand (favourites first); switching filters.
   const { category, setCategory, categories, filtered } = useBrandCategoryFilter(brands);
@@ -222,14 +214,6 @@ export function QuickLogStrip({
           ) : null}
         </div>
       )}
-
-      {/* When the replay actions are unavailable but a catalog exists, nudge to
-          the full form (which enforces brand selection). */}
-      {!noBrands && !canRepeatLast && favorites.length === 0 ? (
-        <p className="text-caption text-text-faint italic">
-          Pick a brand on the full entry to log your first stick.
-        </p>
-      ) : null}
 
       {onAdvanced ? (
         <button
