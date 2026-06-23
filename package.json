@@ -19,6 +19,7 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:perf": "jest perf.integration",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "spec:test": "node --test \"scripts/spec/**/*.test.mjs\"",

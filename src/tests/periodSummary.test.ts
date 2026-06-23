@@ -130,6 +130,27 @@ describe('streakFromRows', () => {
   });
 });
 
+describe('edge cases', () => {
+  it('returns zeros for an empty summary (new account)', () => {
+    expect(totalsForWindow([], 7, TODAY)).toEqual({ sticks: 0, spendInr: 0 });
+    expect(streakFromRows([], TODAY)).toBe(0);
+    // 30 absent days × baseline 10 × ₹20 → all counted as fully avoided.
+    expect(savedForWindow([], 10, 20, 30, TODAY)).toEqual({ totalInr: 6000, sticksAvoided: 300 });
+  });
+
+  it('counts an absent (gap) day as fully avoided in savings', () => {
+    const r: DailySummaryRow[] = [
+      { date: '2026-06-21', sticks: 4, spendInr: 80, avgUnitPriceInr: 20 },
+      // 2026-06-20 absent → gap day, counts as full baseline avoided
+      { date: '2026-06-19', sticks: 6, spendInr: 120, avgUnitPriceInr: 20 },
+    ];
+    // window 3 (06-19..06-21), baseline 10, fallback 20: 21→6, 20→10, 19→4 = 20 × 20 = 400
+    const out = savedForWindow(r, 10, 20, 3, TODAY);
+    expect(out.sticksAvoided).toBe(20);
+    expect(out.totalInr).toBe(400);
+  });
+});
+
 describe('weightedAvgUnitPrice', () => {
   it('weights each day price by its stick count', () => {
     const r: DailySummaryRow[] = [

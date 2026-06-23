@@ -425,6 +425,7 @@ function LoginPageInner() {
               ref={passwordEmailRef}
               type="email"
               name="email"
+              aria-label="Email"
               required
               maxLength={320}
               autoComplete="email"
@@ -436,6 +437,7 @@ function LoginPageInner() {
           <EditorialFieldRow label="Password">
             <PasswordField
               name="password"
+              aria-label="Password"
               required
               minLength={8}
               maxLength={128}

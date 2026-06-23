@@ -20,6 +20,11 @@ test.describe('cross-device realtime sync @slow', () => {
       await b.goto('/dashboard');
       await expect(b.getByLabel('0 cigarettes today', { exact: true })).toBeVisible();
 
+      // postgres_changes are NOT replayed on subscribe — give B's channel a moment
+      // to reach SUBSCRIBED before A writes, or the INSERT is missed (the page being
+      // rendered does not imply the WebSocket has joined yet).
+      await b.waitForTimeout(2500);
+
       // Log 2 in context A.
       await a.goto('/log/new');
       await a.getByRole('group', { name: 'Brand' }).getByRole('button').first().click();
