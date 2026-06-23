@@ -121,6 +121,60 @@ export async function seedLogs(userId: string, specs: LogSpec[]): Promise<void> 
   if (error) throw new Error(`seed: insert logs failed: ${error.message}`);
 }
 
+/** The IST calendar date `n` days ago as YYYY-MM-DD (matches the app's todayIst bucketing). */
+export function istYmdDaysAgo(n: number): string {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  ist.setUTCDate(ist.getUTCDate() - n);
+  return ist.toISOString().slice(0, 10);
+}
+
+/**
+ * Stamp the consents + onboarded_at + baseline the middleware checks, so a seeded
+ * user lands on /dashboard (not onboarding) after login. `onboardedAt` defaults to
+ * now; pass a far-past date (e.g. istYmdDaysAgo(400)) so the dashboard summary floor
+ * becomes the full 365-day window and seeded history shows. None of these columns
+ * are guarded by the identity-immutability trigger.
+ */
+export async function markOnboarded(
+  userId: string,
+  opts: { onboardedAt?: string; baselinePerDay?: number } = {},
+): Promise<void> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const now = new Date().toISOString();
+  const { error } = await a
+    .from('user_profiles')
+    .update({
+      onboarded_at: opts.onboardedAt ?? now,
+      onboarding_step: 'done',
+      age_confirmed_at: now,
+      terms_version: '1',
+      privacy_version: '1',
+      health_disclaimer_version: '1',
+      data_processing_consent_at: now,
+      baseline_per_day: opts.baselinePerDay ?? 10,
+      baseline_window_days: 30,
+    })
+    .eq('id', userId);
+  if (error) throw new Error(`seed: markOnboarded failed: ${error.message}`);
+}
+
+/** Favorite the user's first default brand (the wizard's Finish is disabled at 0). Returns its name. */
+export async function seedFavoriteBrand(userId: string): Promise<string | null> {
+  const a = getAdmin();
+  if (!a) return null;
+  const { data } = await a
+    .from('brands')
+    .select('id,name')
+    .eq('user_id', userId)
+    .order('name')
+    .limit(1);
+  const brand = data?.[0] as { id: string; name: string } | undefined;
+  if (!brand) return null;
+  await a.from('brands').update({ is_favorite: true }).eq('id', brand.id);
+  return brand.name;
+}
+
 /** Teardown: delete the auth user; CASCADE removes all their rows. Best-effort. */
 export async function deleteUser(userId: string): Promise<void> {
   const a = getAdmin();
