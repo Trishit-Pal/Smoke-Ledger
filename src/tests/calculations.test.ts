@@ -1,5 +1,6 @@
 import {
   deriveUnitPrice,
+  resolveLogUnitPrice,
   dailyStats,
   rollingAvgSticks,
   dayShift,
@@ -36,6 +37,42 @@ function mkLog(overrides: Partial<CigaretteLog>): CigaretteLog {
     updatedAt: overrides.updatedAt ?? '2025-03-01T10:00:00.000Z',
   };
 }
+
+describe('resolveLogUnitPrice (per-stick authority)', () => {
+  it('honours a typed per-stick price regardless of quantity', () => {
+    const r = resolveLogUnitPrice({ perStickInr: 25, quantity: 4 });
+    expect(r.unitPriceInr).toBe(25);
+    expect(r.totalPriceInr).toBe(100);
+    expect(r.source).toBe('exact');
+  });
+
+  it('typed per-stick price always wins over an inferred default', () => {
+    const r = resolveLogUnitPrice({ perStickInr: 30, quantity: 1, inferredUnitInr: 12 });
+    expect(r.unitPriceInr).toBe(30);
+    expect(r.source).toBe('exact');
+  });
+
+  it('falls back to inferred only when nothing is typed', () => {
+    const r = resolveLogUnitPrice({ perStickInr: null, quantity: 3, inferredUnitInr: 18.5 });
+    expect(r.unitPriceInr).toBe(18.5);
+    expect(r.totalPriceInr).toBe(55.5);
+    expect(r.source).toBe('inferred');
+  });
+
+  it('returns unknown when nothing typed and nothing inferred', () => {
+    const r = resolveLogUnitPrice({ perStickInr: null, quantity: 2 });
+    expect(r.unitPriceInr).toBeNull();
+    expect(r.totalPriceInr).toBeNull();
+    expect(r.source).toBe('unknown');
+  });
+
+  it('accepts a free stick (₹0) as an exact typed price', () => {
+    const r = resolveLogUnitPrice({ perStickInr: 0, quantity: 2, inferredUnitInr: 20 });
+    expect(r.unitPriceInr).toBe(0);
+    expect(r.totalPriceInr).toBe(0);
+    expect(r.source).toBe('exact');
+  });
+});
 
 describe('deriveUnitPrice', () => {
   it('computes single-stick price from explicit total', () => {

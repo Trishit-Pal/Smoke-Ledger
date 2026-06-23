@@ -30,7 +30,7 @@ import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { isBirthdayToday } from '@/domain/age';
-import { formatInr, formatDelta } from '@/lib/format';
+import { formatInr, formatDelta, formatPerStick } from '@/lib/format';
 import { isHomeTotalsHidden } from '@/lib/discreet';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { AnalyticsEvents } from '@/constants/events';
@@ -371,6 +371,11 @@ export function DashboardClient({
               >
                 {hidden ? '•••' : formatInr(spend, { compact: true })}
               </div>
+              {!hidden && sticks > 0 && spend > 0 ? (
+                <span className="text-caption text-text-faint nums-tabular mt-xs">
+                  {formatPerStick(spend / sticks, { compact: true })}
+                </span>
+              ) : null}
             </div>
           </div>
 

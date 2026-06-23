@@ -21,7 +21,7 @@
  *    brand, variant, purchase mode, quantity, pack size, price,
  *    trigger, mood-before, mood-after, craving, context, notes.
  *
- *  Data paths: createLog, inferUnitPriceForVariant, deriveUnitPrice,
+ *  Data paths: createLog, inferUnitPriceForVariant, resolveLogUnitPrice,
  *  analytics event (price_source), haptics — all unchanged.
  */
 
@@ -49,7 +49,7 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 
 import { useSession } from '@/store/session';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
-import { deriveUnitPrice } from '@/domain/calc';
+import { resolveLogUnitPrice } from '@/domain/calc';
 
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
@@ -360,15 +360,17 @@ export default function NewLog() {
     try {
       const qty = Math.max(1, Number(quantity) || 1);
       const ps = packSize ? Math.max(1, Number(packSize)) : null;
-      const totalPrice = priceText ? Number(priceText) : null;
+      // The price field is PER STICK and authoritative: a typed value is used
+      // as-is (total = per-stick × quantity); we only infer when it's blank.
+      const perStick = priceText ? Number(priceText) : null;
 
-      if (priceText && (!Number.isFinite(totalPrice) || (totalPrice ?? -1) < 0)) {
-        throw new Error('Enter a valid price.');
+      if (priceText && (!Number.isFinite(perStick) || (perStick ?? -1) < 0)) {
+        throw new Error('Enter a valid price per stick.');
       }
 
-      // Price inference: try log history first, then catalog
+      // Price inference (only when nothing is typed): log history first, then catalog.
       let inferred: number | null = null;
-      if (totalPrice == null && brandId) {
+      if (perStick == null && brandId) {
         inferred = await inferUnitPriceForVariant(variantName, brandId);
         if (inferred == null) {
           const v = selectedBrand?.variants.find((vt) => vt.name === variantName);
@@ -378,11 +380,9 @@ export default function NewLog() {
         }
       }
 
-      const priced = deriveUnitPrice({
+      const priced = resolveLogUnitPrice({
+        perStickInr: perStick,
         quantity: qty,
-        purchaseMode,
-        packSize: ps,
-        totalPriceInr: totalPrice,
         inferredUnitInr: inferred,
       });
 
@@ -505,15 +505,15 @@ export default function NewLog() {
             </View>
             <View style={{ flex: 1 }}>
               <FieldRow
-                label="Price (INR)"
-                sublabel="Optional — leave blank to estimate."
+                label="Price per stick (INR)"
+                sublabel="Optional — always per stick, even for a pack or carton."
               >
                 <Input
                   keyboardType="decimal-pad"
                   value={priceText}
                   onChangeText={setPriceText}
                   placeholder="0"
-                  accessibilityLabel="Total price in rupees"
+                  accessibilityLabel="Price per stick in rupees"
                   hint="We use your recent average if left blank"
                 />
               </FieldRow>

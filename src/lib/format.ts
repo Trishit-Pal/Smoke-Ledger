@@ -28,6 +28,18 @@ export function formatInr(value: number | null | undefined, opts?: { compact?: b
   return `${negative ? '-' : ''}₹${withCommas}${fracTrim}`;
 }
 
+/**
+ * Per-stick price label, e.g. "₹20 / stick". Use everywhere a unit price is shown
+ * so the per-stick rate is always explicit. Returns `fallback` for missing prices.
+ */
+export function formatPerStick(
+  unitPriceInr: number | null | undefined,
+  opts?: { fallback?: string; compact?: boolean },
+): string {
+  if (unitPriceInr == null || !Number.isFinite(unitPriceInr)) return opts?.fallback ?? '—';
+  return `${formatInr(unitPriceInr, { compact: opts?.compact })} / stick`;
+}
+
 export function formatCompactInt(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
