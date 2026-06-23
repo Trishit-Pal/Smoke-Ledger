@@ -109,6 +109,39 @@ export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+export interface PerStickPriceInput {
+  /** The price the user typed for ONE stick. null/undefined = not entered. */
+  perStickInr: number | null;
+  quantity: number;
+  /** Reference price used ONLY when the user typed nothing. */
+  inferredUnitInr?: number | null;
+}
+
+/**
+ * Resolve unit + total price for a log entry whose price field is **per stick**.
+ *
+ * The typed per-stick price is authoritative: it is the unit price as-is (total =
+ * unit × quantity) and is NEVER overridden by an inferred/catalog default. An
+ * inferred price is used only when the user typed nothing. This is the single
+ * source of truth for the web log form — it removes the total÷quantity surprise
+ * and the pack-size fall-through that previously dropped a typed price in favour
+ * of the default.
+ */
+export function resolveLogUnitPrice(i: PerStickPriceInput): UnitPriceResult {
+  const q = Math.max(1, i.quantity || 1);
+  const typed = i.perStickInr;
+  if (typed != null && Number.isFinite(typed) && typed >= 0) {
+    const unit = round2(typed);
+    return { unitPriceInr: unit, totalPriceInr: round2(unit * q), source: 'exact' };
+  }
+  const inferred = i.inferredUnitInr;
+  if (inferred != null && Number.isFinite(inferred) && inferred >= 0) {
+    const unit = round2(inferred);
+    return { unitPriceInr: unit, totalPriceInr: round2(unit * q), source: 'inferred' };
+  }
+  return { unitPriceInr: null, totalPriceInr: null, source: 'unknown' };
+}
+
 /** Group logs into DailyStat[], covering every day in [startYmd, endYmd] including zeros. */
 export function dailyStats(logs: CigaretteLog[], startYmd: string, endYmd: string): DailyStat[] {
   const map = new Map<string, DailyStat>();

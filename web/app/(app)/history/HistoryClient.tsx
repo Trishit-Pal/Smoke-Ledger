@@ -32,7 +32,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { formatInr } from '@/lib/format';
+import { formatInr, formatPerStick } from '@/lib/format';
 import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
 import dayjs from 'dayjs';
 import type { CigaretteLog, UserProfile } from '@/types';
@@ -274,8 +274,13 @@ export function HistoryClient({
                               <span>{qtyText}</span>
                             </dd>
                           </div>
-                          <dd className="text-body text-text nums-tabular text-right">
-                            {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
+                          <dd className="text-body text-text nums-tabular text-right flex flex-col items-end">
+                            <span>{maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}</span>
+                            {log.unitPriceInr != null ? (
+                              <span className="text-caption text-text-faint">
+                                {maskInr(log.unitPriceInr, discreet, (n) => formatPerStick(n))}
+                              </span>
+                            ) : null}
                           </dd>
                         </div>
                       );

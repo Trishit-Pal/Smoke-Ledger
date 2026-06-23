@@ -18,7 +18,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { todayIst, formatTime } from '@/lib/date';
-import { formatInr } from '@/lib/format';
+import { formatInr, formatPerStick } from '@/lib/format';
 import { triggerLabel } from '@/constants/triggers';
 import type { CigaretteLog, UserProfile } from '@/types';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
@@ -150,13 +150,22 @@ export function LogClient({ profile, logs }: LogClientProps) {
                         : `${log.quantity} stick${log.quantity > 1 ? 's' : ''}`}
                     </p>
                   </div>
-                  <p className="text-small text-text-muted nums-tabular text-right">
-                    {log.totalPriceInr != null
-                      ? maskInr(log.totalPriceInr, discreet, (n) =>
-                          formatInr(n, { compact: true }),
-                        )
-                      : '—'}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-small text-text-muted nums-tabular">
+                      {log.totalPriceInr != null
+                        ? maskInr(log.totalPriceInr, discreet, (n) =>
+                            formatInr(n, { compact: true }),
+                          )
+                        : '—'}
+                    </p>
+                    {log.unitPriceInr != null ? (
+                      <p className="text-caption text-text-faint nums-tabular">
+                        {maskInr(log.unitPriceInr, discreet, (n) =>
+                          formatPerStick(n, { compact: true }),
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -199,12 +208,21 @@ export function LogClient({ profile, logs }: LogClientProps) {
                       ×{discreet ? '•' : log.quantity}
                     </span>
                   </span>
-                  <span className="text-small text-text-muted nums-tabular text-right">
-                    {log.totalPriceInr != null
-                      ? maskInr(log.totalPriceInr, discreet, (n) =>
-                          formatInr(n, { compact: true }),
-                        )
-                      : '—'}
+                  <span className="text-small text-text-muted nums-tabular text-right flex flex-col items-end">
+                    <span>
+                      {log.totalPriceInr != null
+                        ? maskInr(log.totalPriceInr, discreet, (n) =>
+                            formatInr(n, { compact: true }),
+                          )
+                        : '—'}
+                    </span>
+                    {log.unitPriceInr != null ? (
+                      <span className="text-caption text-text-faint">
+                        {maskInr(log.unitPriceInr, discreet, (n) =>
+                          formatPerStick(n, { compact: true }),
+                        )}
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               ))}

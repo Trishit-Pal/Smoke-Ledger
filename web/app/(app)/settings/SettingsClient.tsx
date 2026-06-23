@@ -1041,7 +1041,7 @@ export function SettingsClient({
                   />
                 </label>
                 <label className="flex flex-col gap-xs">
-                  <span className="editorial-caption">Avg price (INR)</span>
+                  <span className="editorial-caption">Price per stick (INR)</span>
                   <input
                     type="number"
                     min={0}
@@ -1049,7 +1049,8 @@ export function SettingsClient({
                     inputMode="decimal"
                     value={newAvgPrice}
                     onChange={(event) => setNewAvgPrice(event.target.value)}
-                    placeholder="optional"
+                    placeholder="per stick, optional"
+                    aria-label="Price per stick in rupees"
                     className="w-full bg-transparent border-0 border-b nums-tabular text-body text-text focus:outline-none focus-visible:border-[var(--text)] py-xs"
                     style={{ borderBottomColor: 'var(--rule-strong)' }}
                   />
@@ -1094,7 +1095,7 @@ export function SettingsClient({
           <dl className="flex flex-col">
             <PrefRow
               label="Edit saved prices"
-              sublabel="Override the default price of any brand variant. Your price is kept and won't be reset by catalog updates."
+              sublabel="Override the per-stick price of any brand variant. Your price is kept and won't be reset by catalog updates."
               control={
                 <TextLink
                   onClick={() => setShowPrices((open) => !open)}
@@ -1141,7 +1142,7 @@ export function SettingsClient({
                                 autoFocus
                                 className="w-20 bg-transparent border-0 border-b nums-tabular text-body text-text text-right focus:outline-none focus-visible:border-[var(--text)] py-xs"
                                 style={{ borderBottomColor: 'var(--rule-strong)' }}
-                                aria-label={`Price for ${b.name} ${v.name}`}
+                                aria-label={`Price per stick for ${b.name} ${v.name}`}
                               />
                               <TextLink onClick={cancelEditPrice} disabled={busy != null}>
                                 Cancel

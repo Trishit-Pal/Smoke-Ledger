@@ -25,6 +25,8 @@ import * as React from 'react';
 import { formatInr } from '@/lib/format';
 import { maskBrandName, maskInr } from '@/lib/discreet';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
+import { CategoryTabs } from '@web/components/brands/CategoryTabs';
+import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
 
 export interface QuickLogStripProps {
   profile: UserProfile;
@@ -56,6 +58,19 @@ export function QuickLogStrip({
         .sort((a, b) => a.name.localeCompare(b.name))
         .slice(0, 4),
     [brands],
+  );
+
+  // Category tabs: 'All' shows every brand (favourites first); switching filters.
+  const { category, setCategory, categories, filtered } = useBrandCategoryFilter(brands);
+  const quickPick = React.useMemo(
+    () =>
+      [...filtered]
+        .sort((a, b) => {
+          if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, 8),
+    [filtered],
   );
 
   const noBrands = brands.length === 0;
@@ -156,13 +171,16 @@ export function QuickLogStrip({
             +2
           </button>
 
-          {favorites.length > 0 ? (
-            <>
-              <span className="text-caption text-text-faint ml-sm" aria-hidden>
-                ·
-              </span>
+          {quickPick.length > 0 ? (
+            <div className="basis-full flex flex-col gap-xs mt-xs">
+              <CategoryTabs
+                categories={categories}
+                value={category}
+                onChange={setCategory}
+                ariaLabel="Brand category"
+              />
               <ul className="flex flex-wrap items-center gap-sm" role="list">
-                {favorites.map((brand) => {
+                {quickPick.map((brand) => {
                   const variant = brand.variants?.[0];
                   const isLast = lastLog?.brandId === brand.id;
                   return (
@@ -189,13 +207,18 @@ export function QuickLogStrip({
                         "
                         style={{ textDecorationColor: 'var(--rule-strong)' }}
                       >
+                        {brand.isFavorite ? (
+                          <span aria-hidden className="mr-xs">
+                            ★
+                          </span>
+                        ) : null}
                         {maskBrandName(brand.name, discreet)}
                       </button>
                     </li>
                   );
                 })}
               </ul>
-            </>
+            </div>
           ) : null}
         </div>
       )}

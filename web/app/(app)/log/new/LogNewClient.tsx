@@ -28,7 +28,10 @@ import { useRouter } from 'next/navigation';
 
 import { revalidateAppViews } from '../../_actions/revalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
-import { deriveUnitPrice } from '@/domain/calc';
+import { resolveLogUnitPrice } from '@/domain/calc';
+import { formatInr, formatPerStick } from '@/lib/format';
+import { CategoryTabs } from '@web/components/brands/CategoryTabs';
+import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
 import { CONTEXT_OPTIONS } from '@/constants/contexts';
@@ -227,7 +230,26 @@ export function LogNewClient({ brands }: LogNewClientProps) {
     [sortedBrands, brandId],
   );
 
+  // Category tabs: 'All' lists every brand; switching filters. The selected brand
+  // is always kept in the list (even when its category is filtered out) so the
+  // choice stays visible and retained across tab switches.
+  const { category, setCategory, categories, filtered } = useBrandCategoryFilter(sortedBrands);
+  const pillBrands = React.useMemo(() => {
+    if (!selectedBrand || filtered.some((b) => b.id === selectedBrand.id)) return filtered;
+    return [selectedBrand, ...filtered];
+  }, [filtered, selectedBrand]);
+
   const showPackInput = purchaseMode === 'pack' || purchaseMode === 'carton';
+
+  // Live per-stick preview: the typed value IS the per-stick price; show the
+  // resulting total so there's no ambiguity before saving.
+  const pricePreview = React.useMemo(() => {
+    if (!priceText) return null;
+    const perStick = Number(priceText);
+    if (!Number.isFinite(perStick) || perStick < 0) return 'Enter a valid price per stick.';
+    const qty = Math.max(1, Number(quantity) || 1);
+    return `= ${formatInr(perStick * qty)} total · ${formatPerStick(perStick)}`;
+  }, [priceText, quantity]);
 
   const handleSave = async () => {
     try {
@@ -236,17 +258,18 @@ export function LogNewClient({ brands }: LogNewClientProps) {
 
       const qty = Math.max(1, Number(quantity) || 1);
       const ps = packSize ? Math.max(1, Number(packSize)) : null;
-      const totalPrice = priceText ? Number(priceText) : null;
-      if (priceText && (!Number.isFinite(totalPrice) || (totalPrice ?? -1) < 0)) {
-        throw new Error('Enter a valid price.');
+      // The price field is PER STICK and authoritative. A typed value is used
+      // as-is (total = per-stick × quantity); we only infer when it's blank.
+      const perStick = priceText ? Number(priceText) : null;
+      if (priceText && (!Number.isFinite(perStick) || (perStick ?? -1) < 0)) {
+        throw new Error('Enter a valid price per stick.');
       }
 
-      const inferred = await inferUnitPriceForVariant(variantName, brandId);
-      const result = deriveUnitPrice({
+      const inferred =
+        perStick == null ? await inferUnitPriceForVariant(variantName, brandId) : null;
+      const result = resolveLogUnitPrice({
+        perStickInr: perStick,
         quantity: qty,
-        purchaseMode,
-        packSize: ps,
-        totalPriceInr: totalPrice,
         inferredUnitInr: inferred,
       });
 
@@ -331,27 +354,35 @@ export function LogNewClient({ brands }: LogNewClientProps) {
                 Add a brand in Settings →
               </a>
             ) : (
-              <EditorialPillRow
-                ariaLabel="Brand"
-                items={sortedBrands.map((b) => ({
-                  key: b.id,
-                  label: b.isFavorite ? (
-                    <>
-                      <span aria-hidden className="mr-xs">
-                        ★
-                      </span>
-                      {b.name}
-                    </>
-                  ) : (
-                    b.name
-                  ),
-                  selected: brandId === b.id,
-                  onPress: () => {
-                    setBrandId(b.id);
-                    setVariantName(null);
-                  },
-                }))}
-              />
+              <>
+                <CategoryTabs
+                  categories={categories}
+                  value={category}
+                  onChange={setCategory}
+                  ariaLabel="Brand category"
+                />
+                <EditorialPillRow
+                  ariaLabel="Brand"
+                  items={pillBrands.map((b) => ({
+                    key: b.id,
+                    label: b.isFavorite ? (
+                      <>
+                        <span aria-hidden className="mr-xs">
+                          ★
+                        </span>
+                        {b.name}
+                      </>
+                    ) : (
+                      b.name
+                    ),
+                    selected: brandId === b.id,
+                    onPress: () => {
+                      setBrandId(b.id);
+                      setVariantName(null);
+                    },
+                  }))}
+                />
+              </>
             )}
           </FieldRow>
         </section>
@@ -389,9 +420,10 @@ export function LogNewClient({ brands }: LogNewClientProps) {
             />
           </FieldRow>
           <FieldRow
-            label="Price (INR)"
+            label="Price per stick (INR)"
             htmlFor="price-input"
             sublabel="Optional — leave blank to estimate from your catalog."
+            hint={pricePreview}
           >
             <EditorialInput
               id="price-input"
@@ -402,7 +434,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               placeholder="0"
               value={priceText}
               onChange={(e) => setPriceText(e.target.value)}
-              aria-label="Total price in rupees"
+              aria-label="Price per stick in rupees"
             />
           </FieldRow>
         </section>
