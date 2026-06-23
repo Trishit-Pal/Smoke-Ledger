@@ -15,6 +15,7 @@ const describeIfEnv = hasEnv ? describe : describe.skip;
 describeIfEnv('RLS cross-user isolation (integration)', () => {
   let clientA: SupabaseClient;
   let clientB: SupabaseClient;
+  let clientAnon: SupabaseClient;
   let userAId: string;
 
   beforeAll(async () => {
@@ -23,6 +24,7 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
 
     clientA = createClient(supabaseUrl, anonKey);
     clientB = createClient(supabaseUrl, anonKey);
+    clientAnon = createClient(supabaseUrl, anonKey); // never signed in
 
     const signInA = await clientA.auth.signInWithPassword({
       email: process.env.E2E_USER_A_EMAIL!,
@@ -298,6 +300,95 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
       expect(data).toHaveLength(0);
     } finally {
       await clientA.from('cigarette_logs').delete().eq('id', probeId);
+    }
+  });
+
+  // ── Phase C: cross-user isolation for brands / brand_variants / goals ───────
+
+  it('C: prevents one user from reading/deleting another user brand', async () => {
+    const id = `brand_rls_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const insert = await clientA
+      .from('brands')
+      .insert({ id, user_id: userAId, name: 'RLS Probe Brand', created_at: nowIso, updated_at: nowIso })
+      .select('id')
+      .single();
+    expect(insert.error).toBeNull();
+
+    try {
+      const byB = await clientB.from('brands').select('id').eq('id', id).maybeSingle();
+      expect(byB.error).toBeNull();
+      expect(byB.data).toBeNull();
+
+      await clientB.from('brands').delete().eq('id', id);
+      const still = await clientA.from('brands').select('id').eq('id', id).maybeSingle();
+      expect(still.data?.id).toBe(id);
+    } finally {
+      await clientA.from('brands').delete().eq('id', id);
+    }
+  });
+
+  it('C: user B cannot read user A brand_variants', async () => {
+    const aOwn = await clientA.from('brand_variants').select('id').eq('user_id', userAId).limit(1);
+    expect(aOwn.error).toBeNull();
+    const bOnA = await clientB.from('brand_variants').select('id').eq('user_id', userAId);
+    expect(bOnA.error).toBeNull();
+    expect(bOnA.data).toHaveLength(0);
+  });
+
+  it('C: prevents one user from reading another user goal', async () => {
+    const id = `goal_rls_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const insert = await clientA
+      .from('goals')
+      .insert({
+        id,
+        user_id: userAId,
+        type: 'daily_cap',
+        target_value: 5,
+        start_date: nowIso.slice(0, 10),
+        created_at: nowIso,
+      })
+      .select('id')
+      .single();
+    expect(insert.error).toBeNull();
+
+    try {
+      const byB = await clientB.from('goals').select('id').eq('id', id).maybeSingle();
+      expect(byB.error).toBeNull();
+      expect(byB.data).toBeNull();
+    } finally {
+      await clientA.from('goals').delete().eq('id', id);
+    }
+  });
+
+  it('C: user B cannot insert a goal owned by user A (RLS WITH CHECK)', async () => {
+    const nowIso = new Date().toISOString();
+    const { error } = await clientB.from('goals').insert({
+      id: `goal_rls_x_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      user_id: userAId,
+      type: 'daily_cap',
+      target_value: 5,
+      start_date: nowIso.slice(0, 10),
+      created_at: nowIso,
+    });
+    expect(error).toBeTruthy();
+  });
+
+  // ── Phase C: anonymous (signed-out) access is denied ────────────────────────
+
+  it('C: anonymous client cannot call the get_daily_summary SECURITY DEFINER RPC', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { error } = await clientAnon.rpc('get_daily_summary', { p_from: today, p_to: today });
+    expect(error).toBeTruthy(); // RPC raises 'not authenticated' when auth.uid() is null
+  });
+
+  it('C: anonymous client reads zero rows from RLS-protected tables', async () => {
+    for (const table of ['cigarette_logs', 'goals', 'brands', 'user_profiles']) {
+      const { data, error } = await clientAnon.from(table).select('id').limit(1);
+      // RLS with no anon policy yields an empty set (or an error) — never another
+      // user's data.
+      expect(Boolean(error) || (data ?? []).length === 0).toBe(true);
     }
   });
 });

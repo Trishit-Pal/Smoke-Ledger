@@ -12,8 +12,8 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test e2e/auth-smoke.spec.ts e2e/security.spec.ts",
-    "test:e2e:authed": "playwright test e2e/authenticated-flows.spec.ts e2e/onboarding.spec.ts e2e/dashboard-timeframe.spec.ts e2e/log-entry.spec.ts e2e/realtime-sync.spec.ts"
+    "test:e2e:smoke": "playwright test e2e/auth-smoke.spec.ts e2e/security.spec.ts e2e/security-extra.spec.ts",
+    "test:e2e:authed": "playwright test e2e/authenticated-flows.spec.ts e2e/onboarding.spec.ts e2e/dashboard-timeframe.spec.ts e2e/log-entry.spec.ts e2e/realtime-sync.spec.ts e2e/auth-session.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",
