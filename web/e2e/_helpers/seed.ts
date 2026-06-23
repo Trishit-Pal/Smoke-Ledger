@@ -8,7 +8,8 @@
  *   - seedLogs() inserts historical rows directly (service role bypasses RLS) so
  *     timeframe specs have multi-day / multi-quantity data.
  *   - deleteUser() removes the auth user; FK ON DELETE CASCADE wipes their
- *     profile/logs/goals/brands, leaving prod clean.
+ *     profile/logs/goals/brands. error_events is SET NULL, so it's deleted
+ *     explicitly first. Prod stays clean.
  *
  * Requires SUPABASE_SERVICE_ROLE_KEY + a Supabase URL/anon key (E2E_* preferred,
  * NEXT_PUBLIC_* fallback). When unset, canSeed() is false and authenticated specs
@@ -175,10 +176,19 @@ export async function seedFavoriteBrand(userId: string): Promise<string | null> 
   return brand.name;
 }
 
-/** Teardown: delete the auth user; CASCADE removes all their rows. Best-effort. */
+/**
+ * Teardown: delete the auth user. FK ON DELETE CASCADE removes profile/logs/goals/
+ * brands/etc. — but error_events.user_id is ON DELETE SET NULL, so those rows
+ * would survive (anonymized) as orphans; delete them explicitly first. Best-effort.
+ */
 export async function deleteUser(userId: string): Promise<void> {
   const a = getAdmin();
   if (!a) return;
+  try {
+    await a.from('error_events').delete().eq('user_id', userId);
+  } catch {
+    // best-effort
+  }
   await a.auth.admin.deleteUser(userId).catch(() => undefined);
 }
 

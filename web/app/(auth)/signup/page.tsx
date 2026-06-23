@@ -440,6 +440,7 @@ export default function SignupPage() {
         <EditorialFieldRow label="Email" error={errors.email?.message ?? liveEmailError}>
           <input
             type="email"
+            aria-label="Email"
             autoComplete="email"
             placeholder="you@example.com"
             style={INPUT_STYLE}
@@ -454,6 +455,7 @@ export default function SignupPage() {
         >
           <input
             type="date"
+            aria-label="Date of birth"
             autoComplete="bday"
             style={DATE_INPUT_STYLE}
             className="focus-ring"
@@ -480,6 +482,7 @@ export default function SignupPage() {
         </EditorialFieldRow>
         <EditorialFieldRow label="Password" error={errors.password?.message ?? null}>
           <PasswordField
+            aria-label="Password"
             autoComplete="new-password"
             placeholder="At least 8 characters"
             {...register('password')}
@@ -490,6 +493,7 @@ export default function SignupPage() {
           error={errors.confirmPassword?.message ?? null}
         >
           <PasswordField
+            aria-label="Confirm password"
             autoComplete="new-password"
             placeholder="Repeat password"
             {...register('confirmPassword')}

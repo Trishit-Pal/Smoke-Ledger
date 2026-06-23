@@ -32,9 +32,11 @@ interface Fixtures {
 
 export const test = base.extend<Fixtures>({
   seeded: async ({}, use) => {
+    // Create first; if ANY pre-use seeding throws, the finally still tears the
+    // user down (no leaked prod account).
     const user = await createConfirmedUser('fresh');
-    const favoriteBrand = await seedFavoriteBrand(user.id);
     try {
+      const favoriteBrand = await seedFavoriteBrand(user.id);
       await use({ ...user, favoriteBrand });
     } finally {
       await deleteUser(user.id);
@@ -42,10 +44,10 @@ export const test = base.extend<Fixtures>({
   },
   onboarded: async ({}, use) => {
     const user = await createConfirmedUser('onb');
-    // Onboarded far in the past so summarySinceYmd = the 365-day floor → seeded
-    // history (within a year) shows on the dashboard.
-    await markOnboarded(user.id, { onboardedAt: istYmdDaysAgo(400), baselinePerDay: 10 });
     try {
+      // Onboarded far in the past so summarySinceYmd = the 365-day floor → seeded
+      // history (within a year) shows on the dashboard.
+      await markOnboarded(user.id, { onboardedAt: istYmdDaysAgo(400), baselinePerDay: 10 });
       await use(user);
     } finally {
       await deleteUser(user.id);
@@ -73,7 +75,11 @@ export async function login(page: Page, user: { email: string; password: string 
 export async function completeOnboarding(page: Page, opts: { baseline?: string } = {}): Promise<void> {
   await expect(page).toHaveURL(/\/onboarding\/privacy/);
   await page.getByRole('button', { name: 'Stamp all consents' }).click();
-  await page.getByRole('button', { name: /Continue/ }).click();
+  // "Stamp all" sets the 5 required consents on staggered timers (~520ms) and
+  // Continue is disabled until all land — wait for enabled before clicking.
+  const privacyContinue = page.getByRole('button', { name: /Continue/ });
+  await expect(privacyContinue).toBeEnabled();
+  await privacyContinue.click();
 
   await expect(page).toHaveURL(/\/onboarding\/usage/);
   await page.getByLabel('Sticks per day').fill(opts.baseline ?? '8');

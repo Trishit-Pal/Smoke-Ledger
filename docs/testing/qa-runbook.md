@@ -36,13 +36,22 @@ and boots `next dev` on port 4173 pointed at the `E2E_SUPABASE_*` project.
 
 - Accounts are created via the service role with `email_confirm: true` (no email
   step) and a unique `e2e+…@smoke-ledger-e2e.test` address — see `e2e/_helpers/seed.ts`.
-- The `seeded` fixture (`e2e/_helpers/fixtures.ts`) deletes the user in `finally`;
-  FK `ON DELETE CASCADE` removes its profile/logs/goals/brands.
+- The `seeded`/`onboarded` fixtures (`e2e/_helpers/fixtures.ts`) create the user,
+  then do all pre-`use` seeding inside a `try` so the `finally` always deletes it.
+  FK `ON DELETE CASCADE` removes profile/logs/goals/brands; `error_events` is
+  `ON DELETE SET NULL`, so `deleteUser` deletes those rows explicitly first.
 - Specs **skip** entirely when `SUPABASE_SERVICE_ROLE_KEY` / URL / anon are absent
   (`canSeed()` is false), so nothing runs — and nothing hits prod — on an
   unconfigured machine or in CI without secrets.
 - Teardown self-check: `countLeftoverTestUsers()` should return 0 after a run.
-- **Never** run load or heavy-volume seeding against prod — use a local stack.
+- **Load / heavy-volume perf is enforced local-only**: `perf.integration.test.ts`
+  skips unless the target URL is `127.0.0.1`/`localhost` — it can never seed or
+  load a remote (prod) DB even if `.env.e2e` holds prod creds.
+
+### Gotchas
+- `reuseExistingServer` is on locally: if a `next dev` is already on :4173 with a
+  different env, Playwright reuses it and ignores the config's Supabase mapping.
+  Stop any stray dev server before running the authed suite against a new target.
 
 ## Phase status
 
