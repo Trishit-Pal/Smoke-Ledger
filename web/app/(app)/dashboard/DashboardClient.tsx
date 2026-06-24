@@ -15,6 +15,7 @@
  */
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { revalidateAppViews } from '../_actions/revalidate';
 import { dailyStats, dayShift, lastLog } from '@/domain/calc';
@@ -27,11 +28,12 @@ import {
   weightedAvgUnitPrice,
 } from '@/domain/periodSummary';
 import { evaluateGoal } from '@/domain/goals';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { isBirthdayToday } from '@/domain/age';
 import { formatInr, formatDelta, formatPerStick } from '@/lib/format';
-import { isHomeTotalsHidden } from '@/lib/discreet';
+import { isHomeTotalsHidden, isDiscreetMode } from '@/lib/discreet';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { AnalyticsEvents } from '@/constants/events';
 import { track } from '@/services/analytics';
@@ -185,6 +187,13 @@ export function DashboardClient({
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
     [activeGoal, logs, today],
   );
+  // Spend caps embed ₹ in evaluateGoal().label — show a money-free label under discreet mode.
+  const goalHeading =
+    activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile)
+      ? goalTypeLabel(activeGoal.type)
+      : goalProgress?.label ?? null;
+  // `goals` here is the active-only set from getServerGoals; >1 means others aren't shown.
+  const hasMoreGoals = goals.length > 1;
 
   // CHARACTER: soft greet on first render only.
   React.useEffect(() => {
@@ -467,9 +476,18 @@ export function DashboardClient({
         {/* ─────────────── Goal verse ─────────────── */}
         {goalProgress ? (
           <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col gap-sm">
-            <h2 id="goal-heading" className="editorial-caption">Your goal</h2>
+            <div className="flex items-baseline justify-between gap-md">
+              <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
+                Your goal
+              </Link>
+              {hasMoreGoals ? (
+                <Link href="/goals" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+                  View all goals →
+                </Link>
+              ) : null}
+            </div>
             <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
-              {goalProgress.label}
+              {goalHeading}
               <span className="text-text-faint"> · </span>
               <span
                 className="nums-tabular"

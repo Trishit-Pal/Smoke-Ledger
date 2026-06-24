@@ -17,14 +17,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { evaluateGoal } from '@/domain/goals';
-import { GOAL_TYPE_META } from '@/domain/goalForm';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { isDiscreetMode } from '@/lib/discreet';
 import { todayIst } from '@/lib/date';
 import type { Goal } from '@/types';
-
-function tlabel(type: Goal['type']): string {
-  return GOAL_TYPE_META.find((m) => m.type === type)?.label ?? 'Goal';
-}
 
 export default function GoalsTab() {
   const router = useRouter();
@@ -82,7 +78,7 @@ export default function GoalsTab() {
   function GoalRow({ goal }: { goal: Goal }) {
     const progress = evaluateGoal(goal, logs, today);
     const hideMoney = goal.type === 'spend_cap_daily' && discreet;
-    const heading = hideMoney ? tlabel(goal.type) : progress.label;
+    const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
     const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;
     const pct = Math.round(Math.max(0, Math.min(100, progress.percent)));
     const tone = progress.atRisk ? 'warn' : progress.isOnTrack ? 'success' : 'default';

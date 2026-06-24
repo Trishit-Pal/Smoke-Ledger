@@ -3,7 +3,7 @@
 import * as React from 'react';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import { evaluateGoal } from '@/domain/goals';
-import { GOAL_TYPE_META } from '@/domain/goalForm';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
 import { ProgressBar } from '@web/components/ui/ProgressBar';
@@ -19,17 +19,13 @@ export interface GoalCardProps {
   onDelete: (goal: Goal) => void;
 }
 
-function tlabel(type: Goal['type']): string {
-  return GOAL_TYPE_META.find((m) => m.type === type)?.label ?? 'Goal';
-}
-
 export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, onDelete }: GoalCardProps) {
   const progress = evaluateGoal(goal, logs, today);
   // Spend goals embed ₹ values in their label/explanation — hide those under discreet mode.
   const hideMoney = goal.type === 'spend_cap_daily' && isDiscreetMode(profile);
   const pct = Math.round(Math.max(0, Math.min(100, progress.percent)));
   const tone = progress.atRisk ? 'warn' : progress.isOnTrack ? 'success' : 'default';
-  const heading = hideMoney ? tlabel(goal.type) : progress.label;
+  const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
   const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;
 
   return (
@@ -50,7 +46,7 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
         </span>
       </div>
 
-      <ProgressBar value={pct} tone={tone} aria-label={`${tlabel(goal.type)} progress`} />
+      <ProgressBar value={pct} tone={tone} aria-label={`${goalTypeLabel(goal.type)} progress`} />
 
       <p className="text-small text-text-muted">{explanation}</p>
 

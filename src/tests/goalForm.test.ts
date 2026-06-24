@@ -1,13 +1,14 @@
 import {
   GOAL_TYPE_META,
   emptyGoalForm,
+  goalToFormState,
   deriveReductionBaseline,
   buildGoalPayload,
   buildGoalPatch,
   type GoalFormState,
 } from '@/domain/goalForm';
 import { daysUntil } from '@/lib/date';
-import type { CigaretteLog } from '@/types';
+import type { CigaretteLog, Goal } from '@/types';
 
 function mkLog(overrides: Partial<CigaretteLog>): CigaretteLog {
   return {
@@ -136,6 +137,74 @@ describe('buildGoalPayload', () => {
       ok: true,
       payload: { type: 'quit_date', targetValue: 7, endDate: '2025-04-06', currentBaseline: null },
     });
+  });
+});
+
+function mkGoal(overrides: Partial<Goal>): Goal {
+  return {
+    id: overrides.id ?? 'gol_1',
+    type: overrides.type ?? 'daily_cap',
+    targetValue: overrides.targetValue ?? 5,
+    currentBaseline: overrides.currentBaseline ?? null,
+    startDate: overrides.startDate ?? '2025-03-01',
+    endDate: overrides.endDate ?? null,
+    status: overrides.status ?? 'active',
+    meta: overrides.meta ?? null,
+    createdAt: overrides.createdAt ?? '2025-03-01T00:00:00.000Z',
+  };
+}
+
+describe('goalToFormState (edit prefill round-trip)', () => {
+  it('round-trips a daily_cap through buildGoalPatch', () => {
+    const goal = mkGoal({ type: 'daily_cap', targetValue: 4 });
+    const r = buildGoalPatch(goalToFormState(goal), [], TODAY);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 4 } });
+  });
+
+  it('round-trips a spend_cap_daily', () => {
+    const goal = mkGoal({ type: 'spend_cap_daily', targetValue: 250 });
+    const r = buildGoalPatch(goalToFormState(goal), [], TODAY);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 250 } });
+  });
+
+  it('round-trips a reduction_target keeping target below baseline', () => {
+    const goal = mkGoal({ type: 'reduction_target', targetValue: 3, currentBaseline: 8 });
+    const form = goalToFormState(goal);
+    expect(form.target).toBe('3');
+    expect(form.baseline).toBe('8');
+    const r = buildGoalPatch(form, [], TODAY);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 3, currentBaseline: 8 } });
+  });
+
+  it('round-trips a no_smoke_window from meta hours (blank scalar target)', () => {
+    const goal = mkGoal({ type: 'no_smoke_window', targetValue: 1, meta: { startHour: 21, endHour: 5 } });
+    const form = goalToFormState(goal);
+    expect(form.target).toBe('');
+    expect(form.startHour).toBe(21);
+    expect(form.endHour).toBe(5);
+    const r = buildGoalPatch(form, [], TODAY);
+    expect(r).toEqual({
+      ok: true,
+      patch: { targetValue: 1, meta: { startHour: 21, endHour: 5 } },
+    });
+  });
+
+  it('round-trips a quit_date (blank scalar target, recomputed days from endDate)', () => {
+    const goal = mkGoal({ type: 'quit_date', targetValue: 99, endDate: '2025-04-06', currentBaseline: 2 });
+    const form = goalToFormState(goal);
+    expect(form.target).toBe('');
+    expect(form.quitDate).toBe('2025-04-06');
+    expect(form.baseline).toBe('2');
+    const r = buildGoalPatch(form, [], TODAY);
+    // targetValue recomputed from the date, not the stale stored 99.
+    expect(r).toEqual({ ok: true, patch: { targetValue: 7, endDate: '2025-04-06', currentBaseline: 2 } });
+  });
+
+  it('falls back to default hours when meta is missing', () => {
+    const goal = mkGoal({ type: 'no_smoke_window', targetValue: 1, meta: null });
+    const form = goalToFormState(goal);
+    expect(form.startHour).toBe(22);
+    expect(form.endHour).toBe(6);
   });
 });
 

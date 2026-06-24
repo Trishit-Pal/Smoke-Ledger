@@ -31,9 +31,10 @@ import {
 } from '@/domain/periodSummary';
 import { isBirthdayToday } from '@/domain/age';
 import { evaluateGoal } from '@/domain/goals';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
 import { formatInr, formatDelta } from '@/lib/format';
-import { isHomeTotalsHidden, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
+import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
@@ -424,6 +425,14 @@ export default function Home() {
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
     [activeGoal, logs, today],
   );
+  // Spend caps embed ₹ in evaluateGoal().label/explanation — hide under discreet mode.
+  const goalHideMoney = activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile);
+  const goalHeading = goalProgress
+    ? (goalHideMoney ? goalTypeLabel(activeGoal!.type) : goalProgress.label)
+    : null;
+  const goalExplanation = goalProgress
+    ? (goalHideMoney ? 'Spend hidden in discreet mode.' : goalProgress.explanation)
+    : null;
 
   const hidden = isHomeTotalsHidden(profile);
 
@@ -760,19 +769,29 @@ export default function Home() {
       {/* ── Goal verse ── */}
       {goalProgress ? (
         <FadeSlideIn index={3}>
-          <View style={{ gap: spacing.sm }}>
-            <Text
-              variant="caption"
-              style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
-            >
-              Your goal
-            </Text>
+          <Pressable
+            onPress={() => router.push('/goals')}
+            accessibilityRole="button"
+            accessibilityLabel="Your goal — open goals"
+            style={{ gap: spacing.sm }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <Text
+                variant="caption"
+                style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+              >
+                Your goal
+              </Text>
+              {goals.length > 1 ? (
+                <Text variant="small" style={{ color: theme.textMuted }}>View all →</Text>
+              ) : null}
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: spacing.xs }}>
               <Text
                 variant="h2"
                 style={{ fontFamily: fonts.display }}
               >
-                {goalProgress.label}
+                {goalHeading}
               </Text>
               <Text variant="h2" faint> · </Text>
               <Text
@@ -794,10 +813,10 @@ export default function Home() {
               tone={goalProgress.atRisk ? 'warn' : goalProgress.isOnTrack ? 'success' : 'default'}
               height={2}
             />
-            {goalProgress.explanation ? (
-              <Text variant="small" muted>{goalProgress.explanation}</Text>
+            {goalExplanation ? (
+              <Text variant="small" muted>{goalExplanation}</Text>
             ) : null}
-          </View>
+          </Pressable>
         </FadeSlideIn>
       ) : null}
 

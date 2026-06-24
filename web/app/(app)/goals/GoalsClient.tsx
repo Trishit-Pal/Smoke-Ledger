@@ -9,6 +9,7 @@ import { toSafeErrorMessage } from '@/lib/errors';
 import {
   GOAL_TYPE_META,
   emptyGoalForm,
+  goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
   deriveReductionBaseline,
@@ -246,19 +247,8 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   }
 
   function openEdit(goal: Goal) {
-    const meta = goal.meta as Record<string, unknown> | null;
-    const editForm: GoalFormState = {
-      type: goal.type,
-      target: goal.type === 'no_smoke_window' ? '' : String(
-        goal.type === 'quit_date' ? '' : goal.targetValue
-      ),
-      baseline: goal.currentBaseline != null ? String(goal.currentBaseline) : '',
-      startHour: typeof meta?.startHour === 'number' ? meta.startHour : 22,
-      endHour: typeof meta?.endHour === 'number' ? meta.endHour : 6,
-      quitDate: goal.endDate ?? '',
-    };
     setEditing(goal);
-    setFormState(editForm);
+    setFormState(goalToFormState(goal));
     setFormError(null);
     setShowForm(true);
   }

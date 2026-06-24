@@ -52,19 +52,6 @@ function rowToGoal(r: Row): Goal {
   };
 }
 
-export async function listActiveGoals(): Promise<Goal[]> {
-  const supabase = getSupabase();
-  const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-  if (error) throw mapDbError(error);
-  return (data as Row[]).map(rowToGoal);
-}
-
 export async function listAllGoals(): Promise<Goal[]> {
   const supabase = getSupabase();
   const userId = await requireUserId();

@@ -17,6 +17,7 @@ import { useSession } from '@/store/session';
 import {
   GOAL_TYPE_META,
   emptyGoalForm,
+  goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
   deriveReductionBaseline,
@@ -24,6 +25,13 @@ import {
 } from '@/domain/goalForm';
 import { todayIst } from '@/lib/date';
 import type { Goal } from '@/types';
+
+/** Clamp a typed hour string into the valid 0–23 range (mirrors the web min/max). */
+function clampHour(v: string): number {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(23, n));
+}
 
 export default function GoalNewScreen() {
   const router = useRouter();
@@ -43,20 +51,9 @@ export default function GoalNewScreen() {
 
   const isEdit = existingGoal !== null;
 
-  const [form, setForm] = useState<GoalFormState>(() => {
-    if (!existingGoal) return emptyGoalForm();
-    const meta = existingGoal.meta as Record<string, unknown> | null;
-    return {
-      type: existingGoal.type,
-      target: existingGoal.type === 'no_smoke_window' || existingGoal.type === 'quit_date'
-        ? ''
-        : String(existingGoal.targetValue),
-      baseline: existingGoal.currentBaseline != null ? String(existingGoal.currentBaseline) : '',
-      startHour: typeof meta?.startHour === 'number' ? meta.startHour : 22,
-      endHour: typeof meta?.endHour === 'number' ? meta.endHour : 6,
-      quitDate: existingGoal.endDate ?? '',
-    };
-  });
+  const [form, setForm] = useState<GoalFormState>(() =>
+    existingGoal ? goalToFormState(existingGoal) : emptyGoalForm(),
+  );
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,8 +199,9 @@ export default function GoalNewScreen() {
                 <Input
                   label="Start hour (0–23)"
                   keyboardType="number-pad"
+                  maxLength={2}
                   value={String(form.startHour)}
-                  onChangeText={(v) => patch({ startHour: parseInt(v, 10) || 0 })}
+                  onChangeText={(v) => patch({ startHour: clampHour(v) })}
                   editable={!busy}
                 />
               </View>
@@ -211,8 +209,9 @@ export default function GoalNewScreen() {
                 <Input
                   label="End hour (0–23)"
                   keyboardType="number-pad"
+                  maxLength={2}
                   value={String(form.endHour)}
-                  onChangeText={(v) => patch({ endHour: parseInt(v, 10) || 0 })}
+                  onChangeText={(v) => patch({ endHour: clampHour(v) })}
                   editable={!busy}
                 />
               </View>

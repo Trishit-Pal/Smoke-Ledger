@@ -2,7 +2,7 @@
 // forms and unit-tested. Maps UI form state to repository create/update inputs
 // per goal type, with cheap pre-validation before the Zod schema runs.
 
-import type { CigaretteLog, GoalType } from '@/types';
+import type { CigaretteLog, Goal, GoalType } from '@/types';
 import type { GoalPatchInput } from '@/lib/validation';
 import { rollingAvgSticks } from './calc';
 import { daysUntil, todayIst } from '@/lib/date';
@@ -27,6 +27,14 @@ export const GOAL_TYPE_META: readonly GoalTypeMeta[] = [
   { type: 'no_smoke_window', label: 'No-smoke window', blurb: 'Avoid smoking during set hours.', targetUnit: null },
   { type: 'quit_date', label: 'Quit by a date', blurb: 'Work toward a quit date.', targetUnit: null },
 ];
+
+/**
+ * Generic, money-free display label for a goal type. Safe to show under discreet
+ * mode (unlike `evaluateGoal().label`, which embeds the ₹ target for spend caps).
+ */
+export function goalTypeLabel(type: GoalType): string {
+  return GOAL_TYPE_META.find((m) => m.type === type)?.label ?? 'Goal';
+}
 
 /** Form state captured by the goal form UI. Web and mobile share this shape. */
 export interface GoalFormState {
@@ -63,6 +71,34 @@ export type GoalPatchResult =
 /** Empty form state for a given type (used to seed a fresh create form). */
 export function emptyGoalForm(type: GoalType = 'daily_cap'): GoalFormState {
   return { type, target: '', baseline: '', startHour: 22, endHour: 6, quitDate: '' };
+}
+
+/** Hours fall back to the default no-smoke window when absent/invalid. */
+const DEFAULT_START_HOUR = 22;
+const DEFAULT_END_HOUR = 6;
+
+/**
+ * Seed form state from an existing goal for editing — the inverse of
+ * `buildGoalPayload`'s field mapping. Only the four scalar-target types expose a
+ * numeric `target`; `quit_date` and `no_smoke_window` derive their stored value
+ * from the date/window instead, so their `target` stays blank. Shared by both
+ * the web and mobile edit forms so the prefill never drifts between platforms.
+ */
+export function goalToFormState(goal: Goal): GoalFormState {
+  const meta = goal.meta as Record<string, unknown> | null;
+  const hasScalarTarget =
+    goal.type === 'daily_cap' ||
+    goal.type === 'weekly_target' ||
+    goal.type === 'spend_cap_daily' ||
+    goal.type === 'reduction_target';
+  return {
+    type: goal.type,
+    target: hasScalarTarget ? String(goal.targetValue) : '',
+    baseline: goal.currentBaseline != null ? String(goal.currentBaseline) : '',
+    startHour: typeof meta?.startHour === 'number' ? meta.startHour : DEFAULT_START_HOUR,
+    endHour: typeof meta?.endHour === 'number' ? meta.endHour : DEFAULT_END_HOUR,
+    quitDate: goal.endDate ?? '',
+  };
 }
 
 /** Rounded 30-day rolling daily average — the default baseline for reduction/quit goals. */
