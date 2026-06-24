@@ -19,6 +19,7 @@ export async function revalidateAppViews(): Promise<void> {
   revalidatePath('/trends');
   revalidatePath('/settings');
   revalidatePath('/log/new');
+  revalidatePath('/goals');
 }
 
 // Busts the per-user brand+variant Data Cache (getServerBrandsWithVariants)

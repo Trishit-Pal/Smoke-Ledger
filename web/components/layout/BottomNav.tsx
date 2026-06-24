@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ScrollText,
   Settings,
+  Target,
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@web/components/ui/cn';
@@ -24,6 +25,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/log', label: 'History', icon: ScrollText },
   { href: '/trends', label: 'Trends', icon: TrendingUp },
+  { href: '/goals', label: 'Goals', icon: Target },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

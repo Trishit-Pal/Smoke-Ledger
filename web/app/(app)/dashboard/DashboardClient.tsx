@@ -180,7 +180,7 @@ export function DashboardClient({
   const last = React.useMemo(() => lastLog(logs), [logs]);
   const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
 
-  const activeGoal = goals[0] ?? null;
+  const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = React.useMemo(
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
     [activeGoal, logs, today],

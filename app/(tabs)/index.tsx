@@ -419,7 +419,7 @@ export default function Home() {
     return { totalInr: r.totalInr, sticksAvoided: r.sticksAvoided, avgUnitPriceUsed: unit };
   }, [summary, profile, summarySinceYmd, today]);
 
-  const activeGoal = goals[0] ?? null;
+  const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = useMemo(
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
     [activeGoal, logs, today],

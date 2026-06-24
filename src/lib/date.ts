@@ -60,6 +60,11 @@ export function daysBetween(a: string, b: string): number {
   return Math.abs(dayjs(b).diff(dayjs(a), 'day'));
 }
 
+/** Signed whole-day difference from `fromYmd` to `toYmd` (positive = `toYmd` is in the future). */
+export function daysUntil(fromYmd: string, toYmd: string): number {
+  return dayjs(toYmd).diff(dayjs(fromYmd), 'day');
+}
+
 export function startOfWeekIst(ymd?: string): string {
   // Week starts Monday for India convention in this app.
   const d = ymd

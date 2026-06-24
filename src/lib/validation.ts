@@ -132,6 +132,19 @@ export const GoalSchema = z
 
 export type GoalInput = z.infer<typeof GoalSchema>;
 
+/**
+ * Patch for editing an existing goal's values. Type and startDate are immutable
+ * (they anchor the goal's meaning and baseline), so they are not patchable.
+ */
+export const GoalPatchSchema = z.object({
+  targetValue: z.number().positive().max(1_000).optional(),
+  currentBaseline: z.number().min(0).max(1_000).nullable().optional(),
+  endDate: YmdSchema.nullable().optional(),
+  meta: z.record(z.unknown()).nullable().optional(),
+});
+
+export type GoalPatchInput = z.infer<typeof GoalPatchSchema>;
+
 /* ---------- Brands ---------- */
 
 export const BrandSchema = z

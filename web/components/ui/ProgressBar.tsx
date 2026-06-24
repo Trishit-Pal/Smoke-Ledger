@@ -8,6 +8,7 @@ export interface ProgressBarProps {
   tone?: Tone;
   height?: number;
   className?: string;
+  'aria-label'?: string;
 }
 
 const TONE_CLASS: Record<Tone, string> = {
@@ -17,11 +18,12 @@ const TONE_CLASS: Record<Tone, string> = {
   success: 'bg-success',
 };
 
-export function ProgressBar({ value, tone = 'default', height = 8, className }: ProgressBarProps) {
+export function ProgressBar({ value, tone = 'default', height = 8, className, 'aria-label': ariaLabel }: ProgressBarProps) {
   const safe = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
     <div
       role="progressbar"
+      aria-label={ariaLabel}
       aria-valuenow={Math.round(safe)}
       aria-valuemin={0}
       aria-valuemax={100}
