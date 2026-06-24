@@ -482,7 +482,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </p>
               {isYear ? (
                 <p className="text-caption text-text-faint italic">
-                  — Showing the last 90 days. Longer history coming soon.
+                  — Breakdown based on your last 90 days of data.
                 </p>
               ) : null}
             </section>
@@ -506,7 +506,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </p>
               {isYear ? (
                 <p className="text-caption text-text-faint italic">
-                  — Showing the last 90 days. Longer history coming soon.
+                  — Breakdown based on your last 90 days of data.
                 </p>
               ) : null}
             </section>
@@ -529,7 +529,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </p>
               {isYear ? (
                 <p className="text-caption text-text-faint italic">
-                  — Showing the last 90 days. Longer history coming soon.
+                  — Breakdown based on your last 90 days of data.
                 </p>
               ) : null}
             </section>
@@ -553,7 +553,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </p>
               {isYear ? (
                 <p className="text-caption text-text-faint italic">
-                  — Showing the last 90 days. Longer history coming soon.
+                  — Breakdown based on your last 90 days of data.
                 </p>
               ) : null}
             </section>
@@ -646,7 +646,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                     className="text-caption italic"
                     style={{ color: 'var(--ink-surface-muted)' }}
                   >
-                    — Showing the last 90 days. Longer history coming soon.
+                    — Breakdown based on your last 90 days of data.
                   </p>
                 ) : null}
               </div>

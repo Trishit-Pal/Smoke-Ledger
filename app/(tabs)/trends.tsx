@@ -161,7 +161,7 @@ function YearNote({ show }: YearNoteProps) {
   if (!show) return null;
   return (
     <Text variant="small" faint style={{ fontStyle: 'italic', marginTop: spacing.xs }}>
-      — Showing the last 90 days. Full-year breakdowns coming soon.
+      — Breakdown based on your last 90 days of data.
     </Text>
   );
 }

@@ -50,6 +50,7 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useSession } from '@/store/session';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { resolveLogUnitPrice } from '@/domain/calc';
+import { buildPricePreview } from '@/lib/pricePreview';
 
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
@@ -352,6 +353,11 @@ export default function NewLog() {
     [selectedBrand, variantName],
   );
 
+  const priceHint = useMemo(
+    () => buildPricePreview(priceText, quantity) ?? 'We use your recent average if left blank.',
+    [priceText, quantity],
+  );
+
   // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -514,7 +520,7 @@ export default function NewLog() {
                   onChangeText={setPriceText}
                   placeholder="0"
                   accessibilityLabel="Price per stick in rupees"
-                  hint="We use your recent average if left blank"
+                  hint={priceHint}
                 />
               </FieldRow>
             </View>
