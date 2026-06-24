@@ -38,6 +38,9 @@
   --ink-surface-text: #E6EAEF;
   --ink-surface-muted: #8C95A1;
   --ink-surface-rule: #2A333F;
+  /* Softer ink for the second inversion slot — warm beige in light mode so the
+     two ink surfaces step clearly (true ink → soft ink). */
+  --ink-soft: #F2E9DD;
   /* Data-viz palette — higher-contrast, theme-aware (charts). Ticks are darker
      than --text-muted so axis labels stay legible; gridlines visible but soft. */
   --chart-grid: #D2D8E0;
@@ -85,6 +88,8 @@
   --ink-surface-text: #0B0F14;
   --ink-surface-muted: #5A6673;
   --ink-surface-rule: #C7CED8;
+  /* Soft ink in dark mode: deep ink one step up from the page background. */
+  --ink-soft: #1F2630;
   /* Data-viz palette — dark variants. Brighter series + ticks for legibility on
      the dark surface; gridlines a touch more visible than --border. */
   --chart-grid: #2F3947;
@@ -160,7 +165,8 @@
 
   /* Editorial display number — clamp-scaled, Fraunces tuned to display optical
      size with restrained weight + slight negative tracking so big numerals don't
-     look bloated. */
+     look bloated. Tightened lower bound from 5.5rem → 4rem so the numeral fits
+     inside a 320px viewport without horizontal scroll. */
   .editorial-numeral {
     font-family: var(--font-display);
     font-weight: 380;
@@ -168,7 +174,7 @@
     font-variant-numeric: lining-nums;
     letter-spacing: -0.04em;
     line-height: 0.9;
-    font-size: clamp(5.5rem, 18vw, 11rem);
+    font-size: clamp(4rem, 18vw, 11rem);
   }
   .editorial-numeral--small {
     font-family: var(--font-display);
@@ -177,7 +183,18 @@
     font-variant-numeric: tabular-nums lining-nums;
     letter-spacing: -0.02em;
     line-height: 1;
-    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-size: clamp(1.75rem, 5vw, 2.75rem);
+  }
+  /* Even smaller numeral for inline metrics (ledger rows, recap stats).
+     Tabular so columns of figures line up. */
+  .editorial-numeral--micro {
+    font-family: var(--font-display);
+    font-weight: 440;
+    font-variation-settings: 'opsz' 36, 'SOFT' 30;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    font-size: clamp(1.125rem, 2.2vw, 1.375rem);
   }
 
   /* Editorial display headline (used for greeting / section verses). */
@@ -187,6 +204,20 @@
     font-variation-settings: 'opsz' 144, 'SOFT' 60;
     letter-spacing: -0.015em;
     line-height: 1.08;
+  }
+
+  /* Pullquote — used for Editor's note / insight blocks. Slightly larger than
+     body but not a headline; italic Fraunces with text-balance so the lines
+     don't visually fight. */
+  .editorial-pullquote {
+    font-family: var(--font-display);
+    font-weight: 360;
+    font-style: italic;
+    font-variation-settings: 'opsz' 24, 'SOFT' 50;
+    letter-spacing: -0.005em;
+    line-height: 1.35;
+    font-size: clamp(1.0625rem, 1.6vw, 1.1875rem);
+    text-wrap: balance;
   }
 
   /* Section caption — small-caps style without true smallcaps; uppercase + wide
@@ -234,10 +265,33 @@
     border-color: var(--ink-surface-rule);
   }
 
+  /* Softer ink panel — sits one step lighter than .ink-panel so a page can carry
+     two inversions (week strip + money lens) without losing hierarchy.
+     In light mode: warm beige instead of true ink. In dark mode: barely-elevated
+     near-paper so it still reads as a contrast surface, not "more dark". */
+  .ink-soft-panel {
+    background-color: var(--ink-soft);
+    color: var(--ink-surface-text);
+  }
+  .ink-soft-panel .ink-muted {
+    color: var(--ink-surface-muted);
+  }
+  .ink-soft-panel .ink-rule {
+    border-color: var(--ink-surface-rule);
+  }
+
   /* ───────── Editorial stagger reveal ─────────
      A single page-load choreography. CSS keyframes so we don't depend on JS-side
      framer-motion for the new dashboard. Each immediate child of .editorial-stage
-     animates in sequence with a slow, gravitational ease — no spring. */
+     animates in sequence with a slow, gravitational ease — no spring.
+
+     Rhythm tokens keep the cascade tunable in one place. The default step
+     (90ms) + lead-in (60ms) matches the original timing; pages can override
+     --ed-step to tighten or loosen. */
+  .editorial-stage {
+    --ed-step: 90ms;
+    --ed-lead: 60ms;
+  }
   @keyframes editorial-rise {
     from {
       opacity: 0;
@@ -251,7 +305,7 @@
   .editorial-stage > * {
     opacity: 0;
     animation: editorial-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: calc(var(--ed-index, 0) * 90ms + 60ms);
+    animation-delay: calc(var(--ed-index, 0) * var(--ed-step, 90ms) + var(--ed-lead, 60ms));
     will-change: opacity, transform;
   }
 
@@ -276,7 +330,7 @@
   .rule-draw {
     transform-origin: left center;
     animation: rule-draw 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: calc(var(--ed-index, 0) * 90ms + 120ms);
+    animation-delay: calc(var(--ed-index, 0) * var(--ed-step, 90ms) + 120ms);
   }
 
   /* ───────── Onboarding editorial motion (new in 0.2.0 redesign) ─────────

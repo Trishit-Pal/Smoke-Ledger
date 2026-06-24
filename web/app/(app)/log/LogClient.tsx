@@ -22,6 +22,7 @@ import { formatInr, formatPerStick } from '@/lib/format';
 import { triggerLabel } from '@/constants/triggers';
 import type { CigaretteLog, UserProfile } from '@/types';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
+import { SectionLabel } from '@web/components/visual';
 
 export interface LogClientProps {
   profile: UserProfile;
@@ -92,10 +93,10 @@ export function LogClient({ profile, logs }: LogClientProps) {
         <section style={idx(1)} aria-labelledby="today-heading" className="flex flex-col">
           <header className="rule-hair-strong grid grid-cols-[1fr_auto] items-baseline gap-md pt-md pb-md">
             <div>
-              <h2 id="today-heading" className="editorial-caption">
+              <SectionLabel id="today-heading" spacing="none">
                 Today
-              </h2>
-              <p className="text-small text-text-muted nums-tabular">
+              </SectionLabel>
+              <p className="text-small text-text-muted nums-tabular mt-xs">
                 {todaysLogs.length === 0
                   ? 'Nothing logged today.'
                   : maskInr(todayTotalSpend, discreet, (n) =>
@@ -176,10 +177,10 @@ export function LogClient({ profile, logs }: LogClientProps) {
         {recentLogs.length > 0 ? (
           <section style={idx(2)} aria-labelledby="recent-heading" className="flex flex-col">
             <header className="rule-hair-strong pt-md pb-md">
-              <h2 id="recent-heading" className="editorial-caption">
+              <SectionLabel id="recent-heading" spacing="none">
                 The last thirty entries
-              </h2>
-              <p className="text-small text-text-muted italic">
+              </SectionLabel>
+              <p className="text-small text-text-muted italic mt-xs">
                 Reverse chronological. The deeper archive is at{' '}
                 <button
                   type="button"

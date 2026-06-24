@@ -43,6 +43,7 @@ import { HealthMilestones } from '@web/components/ui/HealthMilestones';
 import { QuickLogStrip } from '@web/components/dashboard/QuickLogStrip';
 import { WeekStrip } from '@web/components/dashboard/WeekStrip';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
+import { SectionLabel, MetricRow } from '@web/components/visual';
 import {
   dispatchMood,
   dispatchMilestone,
@@ -303,7 +304,6 @@ export function DashboardClient({
   const tTone = trendTone(period.stickDeltaPct);
   const trendColour =
     tTone === 'up' ? 'var(--warn-earth)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
-  const streakColour = streak >= 1 ? 'var(--accent)' : 'var(--text)';
   const periodCap = WINDOWS.find((w) => w.days === windowDays)?.label ?? 'Day';
 
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
@@ -412,64 +412,63 @@ export function DashboardClient({
 
         {/* ─────────────── Ledger — period-aware rows ─────────────── */}
         <section style={idx(3)} aria-labelledby="ledger-heading" className="flex flex-col">
-          <h2 id="ledger-heading" className="editorial-caption mb-md">The ledger</h2>
+          <SectionLabel id="ledger-heading">The ledger</SectionLabel>
 
           <dl className="flex flex-col">
             {/* Average per day + trend vs previous period */}
-            <div className="rule-hair-strong grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
-              <div>
-                <dt className="text-body text-text">Average per day</dt>
-                <dd className="text-small text-text-muted nums-tabular">
+            <MetricRow
+              variant="first"
+              label="Average per day"
+              subtitle={
+                <>
                   Trend{' '}
                   <span style={{ color: trendColour }} className="nums-tabular">
                     {formatDelta(period.stickDeltaPct)}
                   </span>{' '}
                   vs the previous {periodUnit(windowDays)}
-                </dd>
-              </div>
-              <dd
-                className="editorial-numeral--small nums-tabular text-right"
-                aria-label={hidden ? 'Average per day hidden' : `Average per day: ${avgPerDay.toFixed(1)}`}
-              >
-                {hidden ? '••' : avgPerDay.toFixed(1)}
-                <span className="text-small text-text-faint font-sans ml-xs">/d</span>
-              </dd>
-            </div>
+                </>
+              }
+              value={
+                <>
+                  {hidden ? '••' : avgPerDay.toFixed(1)}
+                  <span className="text-small text-text-faint font-sans ml-xs">/d</span>
+                </>
+              }
+              ariaLabel={
+                hidden ? 'Average per day hidden' : `Average per day: ${avgPerDay.toFixed(1)}`
+              }
+            />
 
             {/* Money saved this period + all-time */}
-            <div className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
-              <div>
-                <dt className="text-body text-text">Saved {periodNoun(windowDays)}</dt>
-                <dd className="text-small text-text-muted nums-tabular">
-                  {hidden ? '•••' : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started`}
-                </dd>
-              </div>
-              <dd
-                className="editorial-numeral--small nums-tabular text-right"
-                style={{ color: periodSaved.totalInr > 0 ? 'var(--accent)' : 'var(--text)' }}
-                aria-label={hidden ? 'Saved hidden' : `Saved ${periodNoun(windowDays)}: ${formatInr(periodSaved.totalInr)}`}
-              >
-                {hidden ? '•••' : formatInr(periodSaved.totalInr, { compact: true })}
-              </dd>
-            </div>
+            <MetricRow
+              label={`Saved ${periodNoun(windowDays)}`}
+              subtitle={
+                hidden
+                  ? '•••'
+                  : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started`
+              }
+              value={hidden ? '•••' : formatInr(periodSaved.totalInr, { compact: true })}
+              tone={periodSaved.totalInr > 0 ? 'accent' : 'neutral'}
+              ariaLabel={
+                hidden
+                  ? 'Saved hidden'
+                  : `Saved ${periodNoun(windowDays)}: ${formatInr(periodSaved.totalInr)}`
+              }
+            />
 
             {/* Smoke-free streak */}
-            <div className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md">
-              <div>
-                <dt className="text-body text-text">Smoke-free streak</dt>
-                <dd className="text-small text-text-muted">
-                  {last ? `Last logged ${formatIndianDate(last.localDate)}` : 'No logs yet'}
-                </dd>
-              </div>
-              <dd
-                className="editorial-numeral--small nums-tabular text-right"
-                style={{ color: streakColour }}
-                aria-label={`Smoke-free streak: ${streak} ${streak === 1 ? 'day' : 'days'}`}
-              >
-                {streak}
-                <span className="text-small text-text-faint font-sans ml-xs">d</span>
-              </dd>
-            </div>
+            <MetricRow
+              label="Smoke-free streak"
+              subtitle={last ? `Last logged ${formatIndianDate(last.localDate)}` : 'No logs yet'}
+              value={
+                <>
+                  {streak}
+                  <span className="text-small text-text-faint font-sans ml-xs">d</span>
+                </>
+              }
+              tone={streak >= 1 ? 'accent' : 'neutral'}
+              ariaLabel={`Smoke-free streak: ${streak} ${streak === 1 ? 'day' : 'days'}`}
+            />
           </dl>
         </section>
 
@@ -490,7 +489,7 @@ export function DashboardClient({
               {goalHeading}
               <span className="text-text-faint"> · </span>
               <span
-                className="nums-tabular"
+                className="editorial-numeral--micro"
                 style={{
                   color: goalProgress.atRisk
                     ? 'var(--warn-earth)'
@@ -532,9 +531,9 @@ export function DashboardClient({
           <section style={idx(5)} aria-labelledby="week-heading">
             <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
               <div className="flex items-baseline justify-between">
-                <h2 id="week-heading" className="editorial-caption" style={{ color: 'var(--ink-surface-muted)' }}>
+                <SectionLabel id="week-heading" tone="inverse" spacing="none">
                   The last 7 days
-                </h2>
+                </SectionLabel>
                 <span className="text-small ink-muted nums-tabular">{dayOfWeekShort(daysAgoIst(6))} — {dayOfWeekShort(today)}</span>
               </div>
               <WeekStrip data={weekBars} inverted hidden={hidden} />
@@ -544,16 +543,16 @@ export function DashboardClient({
 
         {/* ─────────────── Body recovery ─────────────── */}
         <section style={idx(6)} aria-labelledby="recovery-heading">
-          <h2 id="recovery-heading" className="editorial-caption mb-md">Body recovery</h2>
+          <SectionLabel id="recovery-heading">Body recovery</SectionLabel>
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </section>
 
         {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
           <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
-            <h2 id="insight-heading" className="editorial-caption">From your week</h2>
+            <SectionLabel id="insight-heading">From your week</SectionLabel>
             <blockquote className="relative pl-lg border-l-2 border-[var(--rule-strong)]">
-              <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
+              <p className="editorial-pullquote text-text">
                 {insights[0]?.title}
               </p>
               {insights[0]?.explanation ? (
