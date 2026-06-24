@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type { Brand, BrandVariant, CigaretteLog, Goal, UserProfile } from '@/types';
+import type { GoalPatchInput } from '@/lib/validation';
 import * as logsRepo from '@/db/repositories/logs';
 import * as brandsRepo from '@/db/repositories/brands';
 import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
@@ -70,6 +71,11 @@ interface SessionState {
   addLog: (draft: logsRepo.LogDraft) => Promise<CigaretteLog>;
   updateLog: (id: string, patch: Partial<CigaretteLog>) => Promise<void>;
   removeLog: (id: string) => Promise<void>;
+
+  addGoal: (input: Parameters<typeof goalsRepo.createGoal>[0]) => Promise<Goal>;
+  updateGoal: (id: string, patch: GoalPatchInput) => Promise<Goal>;
+  setGoalStatus: (id: string, status: Goal['status']) => Promise<void>;
+  removeGoal: (id: string) => Promise<void>;
 }
 
 export const useSession = create<SessionState>((set, get) => ({
@@ -109,7 +115,7 @@ export const useSession = create<SessionState>((set, get) => ({
       profileRepo.getProfile(),
       logsRepo.listLogs({ fromDate: daysAgoIst(LOG_LOOKBACK_DAYS), toDate: todayIst() }),
       brandsRepo.listBrandsWithVariants(),
-      goalsRepo.listActiveGoals(),
+      goalsRepo.listAllGoals(),
       fetchSummary(),
     ]);
     set({
@@ -135,7 +141,7 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ brands });
   },
   refreshGoals: async () => {
-    const goals = await goalsRepo.listActiveGoals();
+    const goals = await goalsRepo.listAllGoals();
     set({ goals });
   },
   refreshProfile: async () => {
@@ -184,5 +190,24 @@ export const useSession = create<SessionState>((set, get) => ({
     await logsRepo.deleteLog(id);
     set((s) => ({ logs: s.logs.filter((l) => l.id !== id) }));
     await get().refreshSummary();
+  },
+
+  addGoal: async (input) => {
+    const created = await goalsRepo.createGoal(input);
+    set((s) => ({ goals: [created, ...s.goals] }));
+    return created;
+  },
+  updateGoal: async (id, patch) => {
+    const updated = await goalsRepo.updateGoal(id, patch);
+    set((s) => ({ goals: s.goals.map((g) => (g.id === id ? updated : g)) }));
+    return updated;
+  },
+  setGoalStatus: async (id, status) => {
+    await goalsRepo.setGoalStatus(id, status);
+    set((s) => ({ goals: s.goals.map((g) => (g.id === id ? { ...g, status } : g)) }));
+  },
+  removeGoal: async (id) => {
+    await goalsRepo.deleteGoal(id);
+    set((s) => ({ goals: s.goals.filter((g) => g.id !== id) }));
   },
 }));

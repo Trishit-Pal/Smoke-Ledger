@@ -292,6 +292,19 @@ export const getServerGoals = cache(async (): Promise<Goal[]> => {
   return (data as GoalRow[]).map(mapGoal);
 });
 
+/** All goals regardless of status — for the goals management page. */
+export const getServerAllGoals = cache(async (): Promise<Goal[]> => {
+  const supabase = createClient();
+  const userId = await requireServerUserId();
+  const { data, error } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as GoalRow[]).map(mapGoal);
+});
+
 /** Per-user cache tag for the brand+variant Data Cache. Bust via `revalidateBrands()`. */
 export function brandsCacheTag(userId: string): string {
   return `brands:${userId}`;
@@ -501,6 +514,18 @@ export async function getTrendsPageData() {
 export async function getNewLogPageData() {
   const brands = await getServerBrandsWithVariants();
   return { brands };
+}
+
+export async function getGoalsPageData() {
+  const today = daysAgoIst(0);
+  // 60-day raw logs power evaluateGoal's daily/weekly/rolling-average reads.
+  const fromDate = daysAgoIst(60);
+  const [profile, goals, logs] = await Promise.all([
+    getServerProfile(),
+    getServerAllGoals(),
+    getServerLogs({ fromDate }),
+  ]);
+  return { profile, goals, logs, today };
 }
 
 export async function getSettingsPageData() {

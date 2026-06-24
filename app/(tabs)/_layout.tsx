@@ -26,6 +26,7 @@ const TABS = [
   { name: 'log',      glyph: '+', label: 'Log',      a11y: 'Log a cigarette tab' },
   { name: 'trends',   glyph: '~', label: 'Trends',   a11y: 'Trends and patterns tab' },
   { name: 'history',  glyph: '≡', label: 'History',  a11y: 'History of logs tab' },
+  { name: 'goals',    glyph: '◎', label: 'Goals',    a11y: 'Goals tab' },
   { name: 'settings', glyph: '⚙', label: 'Settings', a11y: 'Settings tab' },
 ];
 
@@ -185,6 +186,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="log"      options={{ title: 'Log' }} />
       <Tabs.Screen name="trends"   options={{ title: 'Trends' }} />
       <Tabs.Screen name="history"  options={{ title: 'History' }} />
+      <Tabs.Screen name="goals"    options={{ title: 'Goals' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>
   );

@@ -180,6 +180,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="log/new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="goals/new" options={{ presentation: 'modal' }} />
         </Stack>
         </ErrorBoundary>
         {/* Character listeners — mounted once at the root so dispatchMilestone()

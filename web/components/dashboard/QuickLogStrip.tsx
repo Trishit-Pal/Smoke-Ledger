@@ -81,6 +81,11 @@ export function QuickLogStrip({
       ? maskInr(lastLog.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
       : null;
 
+  const lastTotal =
+    lastLog?.totalPriceInr != null && (lastLog.quantity ?? 1) > 1
+      ? maskInr(lastLog.totalPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      : null;
+
   const logLast = (quantity: number) => {
     if (!lastLog?.brandId) return;
     return onLog({
@@ -103,7 +108,10 @@ export function QuickLogStrip({
           <>
             <span className="text-text-faint">Last:&nbsp;</span>
             <span className="text-text">{lastBrandLabel}</span>
-            {lastPrice ? <span className="text-text-faint"> · {lastPrice}</span> : null}
+            {lastPrice ? (
+              <span className="text-text-faint"> · {lastPrice}/stick</span>
+            ) : null}
+            {lastTotal ? <span className="text-text-faint"> · {lastTotal} total</span> : null}
           </>
         ) : (
           <span className="italic">No cigarettes logged yet.</span>

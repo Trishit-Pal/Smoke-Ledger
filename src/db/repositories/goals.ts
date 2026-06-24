@@ -5,9 +5,11 @@ import { getSupabase } from '@/lib/supabase';
 import { mapDbError, requireUserId } from '@/db/repositories/_supabase';
 import {
   GoalSchema,
+  GoalPatchSchema,
   GoalStatusSchema,
   IdSchema,
   parseOrThrow,
+  type GoalPatchInput,
 } from '@/lib/validation';
 
 type Row = {
@@ -48,19 +50,6 @@ function rowToGoal(r: Row): Goal {
     meta,
     createdAt: r.created_at,
   };
-}
-
-export async function listActiveGoals(): Promise<Goal[]> {
-  const supabase = getSupabase();
-  const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-  if (error) throw mapDbError(error);
-  return (data as Row[]).map(rowToGoal);
 }
 
 export async function listAllGoals(): Promise<Goal[]> {
@@ -115,6 +104,27 @@ export async function createGoal(input: {
     })
     .select('*')
     .single();
+  if (error) throw mapDbError(error);
+  return rowToGoal(data as Row);
+}
+
+export async function updateGoal(id: string, patch: GoalPatchInput): Promise<Goal> {
+  parseOrThrow(IdSchema, id, 'goal_id');
+  const validated = parseOrThrow(GoalPatchSchema, patch, 'goal_patch');
+  const update: Record<string, unknown> = {};
+  if (validated.targetValue !== undefined) update.target_value = validated.targetValue;
+  if (validated.currentBaseline !== undefined) update.current_baseline = validated.currentBaseline;
+  if (validated.endDate !== undefined) update.end_date = validated.endDate;
+  if (validated.meta !== undefined) update.meta_json = validated.meta;
+
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  // Empty patch is a no-op: return the current row rather than issue a blank UPDATE.
+  const query =
+    Object.keys(update).length === 0
+      ? supabase.from('goals').select('*').eq('user_id', userId).eq('id', id).single()
+      : supabase.from('goals').update(update).eq('user_id', userId).eq('id', id).select('*').single();
+  const { data, error } = await query;
   if (error) throw mapDbError(error);
   return rowToGoal(data as Row);
 }
