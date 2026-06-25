@@ -13,3 +13,5 @@ export type { SectionLabelTone, SectionLabelProps } from './SectionLabel';
 export type { MetricRowProps, MetricRowTone } from './MetricRow';
 export { InlineRule } from './InlineRule';
 export type { InlineRuleProps } from './InlineRule';
+export { ChoiceRun } from './ChoiceRun';
+export type { ChoiceRunProps } from './ChoiceRun';

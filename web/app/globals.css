@@ -239,6 +239,21 @@
     border-top: 1px solid var(--rule-strong);
   }
 
+  /* Disclosure reveal — a gentle entrance for content that appears on user
+     action (e.g. the custom datetime picker under "When"). Mount-triggered by
+     the interaction, so it's safe from the hidden-tab reveal trap. Matches the
+     editorial-rise easing so it reads as the same motion vocabulary. */
+  @keyframes field-reveal {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .field-reveal {
+    animation: field-reveal 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .field-reveal { animation: none; }
+  }
+
   /* Masthead atmospheric layer — extremely subtle ink-on-paper noise. Always
      paired with aria-hidden in JSX since it carries no information. */
   .paper-noise {

@@ -86,7 +86,28 @@ export const ContextTagSchema = z.enum(CONTEXT_TAGS);
 
 /* ---------- Cigarette log ---------- */
 
-export const CigaretteLogSchema = z
+/** Maximum window a CigaretteLog may be backdated, in milliseconds.
+ *  Centralised so the UI (BackdateTimeField) and the Zod cap agree. */
+export const MAX_BACKDATE_MS = 24 * 60 * 60 * 1000;
+
+/** Refinement: tsUtc must be ≤ now AND ≥ now - MAX_BACKDATE_MS.
+ *  Kept as a standalone function so it can be composed with both
+ *  CigaretteLogSchema (via .superRefine) and other shapes that include a
+ *  tsUtc field. */
+export const backdateCap = (v: { tsUtc: string }, ctx: z.RefinementCtx): void => {
+  const ts = Date.parse(v.tsUtc);
+  if (!Number.isFinite(ts)) return; // IsoUtcSchema will reject malformed.
+  const now = Date.now();
+  if (ts > now || ts < now - MAX_BACKDATE_MS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Logs can only be backdated up to 24 hours.',
+      path: ['tsUtc'],
+    });
+  }
+};
+
+const CigaretteLogShape = z
   .object({
     brandId: IdSchema.nullable(),
     brandNameSnap: BoundedString(100).nullable(),
@@ -109,9 +130,18 @@ export const CigaretteLogSchema = z
   })
   .strict();
 
-export type CigaretteLogInput = z.infer<typeof CigaretteLogSchema>;
+// Cap is enforced both here and in the UI form so a stale state or a future
+// mobile client can't stamp a log more than 24h back. We compose the cap as
+// a .superRefine on a *derived* schema so the underlying CigaretteLogShape
+// retains its .partial() / .extend() for CigaretteLogPatchSchema and
+// ImportLogSchema below (Zod's .superRefine / .refine both return ZodEffects
+// which loses those methods).
+export const CigaretteLogSchema: z.ZodType<CigaretteLogInput> =
+  CigaretteLogShape.superRefine(backdateCap);
 
-export const CigaretteLogPatchSchema = CigaretteLogSchema.partial().strict();
+export type CigaretteLogInput = z.infer<typeof CigaretteLogShape>;
+
+export const CigaretteLogPatchSchema = CigaretteLogShape.partial().strict();
 
 /* ---------- Goals ---------- */
 
@@ -222,7 +252,7 @@ export const ProfilePatchSchema = ProfileSchema.partial().strict();
 
 /* ---------- Import envelope ---------- */
 
-export const ImportLogSchema = CigaretteLogSchema.extend({
+export const ImportLogSchema = CigaretteLogShape.extend({
   id: IdSchema,
   localDate: YmdSchema,
   localHour: z.number().int().min(0).max(23),

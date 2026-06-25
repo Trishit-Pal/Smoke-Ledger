@@ -36,6 +36,37 @@ export function formatTime(tsUtc: string): string {
   return dayjs.utc(tsUtc).tz(IST).format('HH:mm');
 }
 
+/**
+ * Format an absolute instant as a `datetime-local` value string
+ * (`YYYY-MM-DDTHH:mm`) expressed in IST wall-clock. Used to seed the native
+ * datetime-local picker plus its min/max so the widget always shows IST,
+ * regardless of the device timezone. Returns '' for null/invalid input.
+ */
+export function formatDatetimeLocalIst(d: Date | null): string {
+  if (!d || Number.isNaN(d.getTime())) return '';
+  // `[T]` escapes the literal T so it isn't mistaken for a format token.
+  return dayjs(d).tz(IST).format('YYYY-MM-DD[T]HH:mm');
+}
+
+/**
+ * Parse a `datetime-local` value string (`YYYY-MM-DDTHH:mm`) as IST wall-clock
+ * and return the corresponding absolute instant. The native input is
+ * timezone-naive; interpreting it as IST (not the device tz) keeps the stored
+ * tsUtc and the derived local_date / local_hour correct on non-IST devices.
+ * Returns null for empty/invalid input.
+ */
+export function parseDatetimeLocalIst(value: string): Date | null {
+  if (!value) return null;
+  // datetime-local emits `YYYY-MM-DDTHH:mm`; normalise the `T` to a space and
+  // drop any seconds so the string matches the format dayjs parses cleanly
+  // (the same shape startOfWeekIst relies on).
+  const normalized = value.replace('T', ' ').slice(0, 16);
+  // dayjs.tz throws on an unparseable string, so confirm the shape with a
+  // strict, tz-free parse first; only then interpret it as IST wall-clock.
+  if (!dayjs(normalized, 'YYYY-MM-DD HH:mm', true).isValid()) return null;
+  return dayjs.tz(normalized, 'YYYY-MM-DD HH:mm', IST).toDate();
+}
+
 export function todayIst(): string {
   return dayjs().tz(IST).format('YYYY-MM-DD');
 }

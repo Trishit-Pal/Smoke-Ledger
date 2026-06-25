@@ -1,0 +1,84 @@
+# Design
+
+## Theme
+
+Editorial "ink on paper" — a printed-journal aesthetic rendered for screen. Default theme
+is **dark**; light is a first-class alternate (class-based, `next-themes`, system disabled).
+The surface reads as a quiet publication: Fraunces display serif over DM Sans body, hairline
+rules doing layout work, small-caps section captions, and a faint paper-noise atmosphere
+behind mastheads. Color strategy is **restrained** — tinted near-neutral surfaces with a
+single teal accent and a terracotta "concern" tone; chrome is minimal and typography carries
+the hierarchy.
+
+## Color
+
+Semantic tokens are CSS variables that swap by theme (`.dark`). All pairings verified for
+WCAG AA in both themes.
+
+### Light
+- `--bg` `#F6F7F9` (cool near-white) · `--bg-elevated` / `--card` `#FFFFFF`
+- `--text` `#0B0F14` · `--text-muted` `#5A6673` · `--text-faint` `#A9B3BF`
+- `--border` `#E1E5EB` · `--rule` `#D6DBE2` · `--rule-strong` `#B9C1CC`
+- `--accent` `#2FA39B` (teal) — reserved for genuinely positive states; ≤10% of surface
+- `--warn-earth` `#B86A4A` (terracotta) — concern / up-trend, **not** alarm-red
+- `--ink-surface` `#14191F` + `--ink-soft` `#F2E9DD` — inversion slots for contrast sections
+
+### Dark (default)
+- `--bg` `#0B0F14` · `--bg-elevated` `#11161D` · `--card` `#1A2029`
+- `--text` `#E6EAEF` · `--text-muted` `#A9B3BF` · `--text-faint` `#5A6673`
+- `--rule` `#2A333F` · `--rule-strong` `#3A4452`
+- `--accent` `#2FA39B` · `--warn-earth` `#D08267` (lightened for the dark surface)
+
+### Data-viz
+Six theme-aware series (teal, terracotta, blue, violet, amber, green). Ticks darker than
+`--text-muted` for axis legibility; gridlines soft.
+
+## Typography
+
+- **Display:** Fraunces (variable serif) — `--font-display`, via `next/font`. Numerals,
+  headlines, pullquotes. Tuned per role with `font-variation-settings` (`opsz`, `SOFT`, `WONK`).
+- **Body / UI:** DM Sans — `--font-sans`. Tabular figures (`tnum`) on all ledger numbers.
+- **Pairing axis:** serif display + sans body — a real contrast axis, not two similar sans.
+
+### Roles
+- `editorial-numeral` `clamp(4rem, 18vw, 11rem)` · `--small` `clamp(1.75, 5vw, 2.75rem)` ·
+  `--micro` `clamp(1.125, 2.2vw, 1.375rem)`
+- `editorial-headline` opsz 144, weight 360, ls −0.015em
+- `editorial-pullquote` italic, opsz 24, `text-wrap: balance`
+- `editorial-caption` — uppercase 11px, tracking 0.18em — the small-caps section label
+- UI scale: display `clamp(28→34)` · h1 22 · h2 18 · h3 16 · body 15 · small 13 · caption 12
+
+## Spacing & Radius
+
+- Spacing: `xs` 4 · `sm` 8 · `md` 12 · `lg` 16 · `xl` 24 · `xxl` 32 · `xxxl` 48
+- Radius: `sm` 6 · `md` 10 · `lg` 14 · `xl` 20 · `pill` 999
+
+## Components / Primitives
+
+- **SectionLabel** — `<h2 editorial-caption>` opening every section; optional hairline below.
+- **MetricRow** — `grid [1fr_auto]` hairline ledger row: label + subtitle / `editorial-numeral`
+  value, tone-colored (neutral / accent / warn / danger).
+- **InlineRule** & `rule-hair[-strong]` — hairline dividers that do layout work; optional
+  left-to-right `rule-draw` entrance.
+- **ChoiceRun** — small-caps choices separated by middots, active = underline. The chip
+  replacement (purchase mode, trigger, mood, context, backdate presets).
+- **EditorialInput** — borderless input with a single hairline underline that strengthens on
+  focus; tabular figures.
+- **EditorialPillRow** — horizontally-scrolling hairline-outline pills (brand / variant pickers).
+
+## Motion
+
+- **editorial-stage** — page-load choreography: each child rises (opacity + translate) on a
+  staggered delay (`--ed-step` 90ms, `--ed-lead` 60ms), 720ms `cubic-bezier(0.16, 1, 0.3, 1)`
+  — slow, gravitational, no spring, no bounce.
+- **rule-draw** — left-to-right hairline fill, staggered by section index.
+- **Reduced motion:** all reveals degrade to crossfade / instant under
+  `prefers-reduced-motion: reduce`.
+- **Materials:** transform / opacity primarily; paper-noise + `mix-blend-mode` for atmosphere.
+
+## Accessibility
+
+WCAG AA in both themes. `color-scheme` ties native controls (date / select popups, scrollbars)
+to the app theme so they stay legible in dark mode. Focus-visible rings (accent, 2px, offset).
+Touch targets ≥44px. Tabular figures keep ledger columns aligned. Discreet/masking modes never
+drop below AA contrast.

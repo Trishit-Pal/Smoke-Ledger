@@ -74,7 +74,8 @@ const VALID_LOG_INPUT = {
   craving: null,
   contextTag: null,
   notes: null,
-  tsUtc: '2025-05-01T10:00:00.000Z',
+  // Use `now` so the backdate cap (24h) doesn't reject the fixture.
+  tsUtc: new Date().toISOString(),
 };
 
 test('CigaretteLogSchema parses a minimal valid log identically via both paths', () => {
