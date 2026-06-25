@@ -150,9 +150,9 @@ export function HistoryClient({
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm">
+        <header style={idx(0)} className="flex flex-col group-tight">
           <div className="flex items-center gap-md">
             <span
               aria-hidden
@@ -175,7 +175,7 @@ export function HistoryClient({
 
         {groups.length === 0 ? (
           /* ─────────────── Empty state — a quiet invitation ─────────────── */
-          <section style={idx(1)} className="rule-hair pt-lg flex flex-col gap-sm">
+          <section style={idx(1)} className="rule-hair pt-lg flex flex-col subsection-gap">
             <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
               No entries yet.
             </p>

@@ -668,12 +668,12 @@ export function SettingsClient({
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ───────────────
             The h1 carries the accessible name "Settings" so the existing
             Playwright spec (`heading { name: 'Settings' }`) keeps matching.
             Visually, the caption reads as a masthead rule pair. */}
-        <header style={stageIndex(0)} className="flex flex-col gap-sm">
+        <header style={stageIndex(0)} className="flex flex-col group-tight">
           <div className="flex items-center gap-md">
             <span
               aria-hidden

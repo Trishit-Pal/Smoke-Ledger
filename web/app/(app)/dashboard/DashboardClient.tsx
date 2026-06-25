@@ -312,9 +312,9 @@ export function DashboardClient({
     <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm relative">
+        <header style={idx(0)} className="flex flex-col group-tight relative">
           <div className="flex items-center gap-md">
             <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
             <span className="editorial-caption nums-tabular">{formatIndianDate(today)}</span>
@@ -355,7 +355,7 @@ export function DashboardClient({
         </div>
 
         {/* ─────────────── Headline · the period in one number ─────────────── */}
-        <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col gap-lg">
+        <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col subsection-gap">
           <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
@@ -474,7 +474,7 @@ export function DashboardClient({
 
         {/* ─────────────── Goal verse ─────────────── */}
         {goalProgress ? (
-          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col gap-sm">
+          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
                 Your goal
@@ -549,7 +549,7 @@ export function DashboardClient({
 
         {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
-          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
+          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col subsection-gap">
             <SectionLabel id="insight-heading">From your week</SectionLabel>
             <blockquote className="relative pl-lg border-l-2 border-[var(--rule-strong)]">
               <p className="editorial-pullquote text-text">

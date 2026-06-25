@@ -329,7 +329,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   const cardBusy = busy !== null && busy !== 'submit';
 
   return (
-    <div className="flex flex-col gap-xl max-w-2xl mx-auto">
+    <div className="editorial-stage flex flex-col subsection-gap max-w-2xl mx-auto px-lg md:px-xxl">
       {/* Header */}
       <div className="flex items-center justify-between gap-md">
         <div className="flex items-center gap-sm">
