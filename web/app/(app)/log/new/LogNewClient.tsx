@@ -31,6 +31,8 @@ import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { resolveLogUnitPrice } from '@/domain/calc';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
 import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
+import { ChoiceRun } from '@web/components/visual';
+import { BackdateTimeField, maxBackdateMs } from './BackdateTimeField';
 import { buildPricePreview } from './pricePreview';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
@@ -87,58 +89,6 @@ function FieldRow({ label, sublabel, htmlFor, children, hint }: FieldRowProps) {
       </div>
       <div>{children}</div>
       {hint ? <p className="text-caption text-text-faint nums-tabular">{hint}</p> : null}
-    </div>
-  );
-}
-
-interface ChoiceRunProps<T extends string | number> {
-  options: readonly { value: T; label: string }[];
-  value: T | null;
-  onSelect: (next: T | null) => void;
-  /** When true (default), clicking the active choice clears it. */
-  allowClear?: boolean;
-  /** Optional accessible group name. */
-  ariaLabel?: string;
-}
-
-/** Small-caps text choices separated by middots — the publication's chip
- *  replacement. Used for purchase mode, trigger, mood, context, craving. */
-function ChoiceRun<T extends string | number>({
-  options,
-  value,
-  onSelect,
-  allowClear = true,
-  ariaLabel,
-}: ChoiceRunProps<T>) {
-  return (
-    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap items-baseline">
-      {options.map((opt, i) => {
-        const active = opt.value === value;
-        return (
-          <React.Fragment key={String(opt.value)}>
-            {i > 0 ? (
-              <span aria-hidden className="text-text-faint mx-xs select-none">
-                ·
-              </span>
-            ) : null}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => onSelect(active && allowClear ? null : opt.value)}
-              className={
-                'editorial-caption px-xs py-xs rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
-                (active
-                  ? 'text-text underline underline-offset-4 decoration-1'
-                  : 'text-text-muted hover:text-text')
-              }
-              style={active ? { textDecorationColor: 'var(--rule-strong)' } : undefined}
-            >
-              {opt.label}
-            </button>
-          </React.Fragment>
-        );
-      })}
     </div>
   );
 }
@@ -215,6 +165,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
   const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [backdate, setBackdate] = React.useState<Date | null>(null);
 
   const sortedBrands = React.useMemo(
     () =>
@@ -270,8 +221,20 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         inferredUnitInr: inferred,
       });
 
+      // Backdated timestamps are capped at 24h back, never in the future.
+      // The UI also caps; this is the in-form guard so a stale state or a
+      // browser bug never lets an out-of-range ts through.
+      const now = new Date();
+      const requestedTs = backdate ?? now;
+      if (requestedTs.getTime() > now.getTime()) {
+        throw new Error("A log can't be dated in the future.");
+      }
+      if (requestedTs.getTime() < maxBackdateMs(now)) {
+        throw new Error('Logs can only be backdated up to 24 hours.');
+      }
+
       await createLog({
-        tsUtc: new Date().toISOString(),
+        tsUtc: requestedTs.toISOString(),
         brandId,
         brandNameSnap: selectedBrand?.name ?? null,
         variantSnap: variantName,
@@ -442,8 +405,18 @@ export function LogNewClient({ brands }: LogNewClientProps) {
           </FieldRow>
         </section>
 
-        {/* ── Show / hide advanced ── */}
+        {/* ── When ── (backdate, capped at 24h back) */}
         <section style={idx(4)}>
+          <FieldRow
+            label="When"
+            sublabel="Stamp this line with a specific moment. Useful when you log a few minutes after the fact."
+          >
+            <BackdateTimeField value={backdate} onChange={setBackdate} />
+          </FieldRow>
+        </section>
+
+        {/* ── Show / hide advanced ── */}
+        <section style={idx(5)}>
           <button
             type="button"
             onClick={() => setShowAdvanced((s) => !s)}
@@ -458,7 +431,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         {/* ── Advanced ── */}
         {showAdvanced ? (
           <>
-            <section style={idx(5)}>
+            <section style={idx(6)}>
               <FieldRow label="Purchase" sublabel="How this stick was bought.">
                 <ChoiceRun
                   options={purchaseChoices}
@@ -471,7 +444,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
             </section>
 
             {showPackInput ? (
-              <section style={idx(6)}>
+              <section style={idx(7)}>
                 <FieldRow
                   label="Pack size"
                   htmlFor="pack-input"
@@ -492,7 +465,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </section>
             ) : null}
 
-            <section style={idx(7)}>
+            <section style={idx(8)}>
               <FieldRow label="Quantity (preset)" sublabel="Pick a common count, or type above.">
                 <ChoiceRun
                   options={quantityChoices}
@@ -504,7 +477,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(8)}>
+            <section style={idx(9)}>
               <FieldRow label="Trigger" sublabel="What prompted this stick?">
                 <ChoiceRun
                   options={triggerChoices}
@@ -515,7 +488,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(9)}>
+            <section style={idx(10)}>
               <FieldRow label="Mood before" sublabel="How you felt going in.">
                 <ChoiceRun
                   options={moodChoices}
@@ -526,7 +499,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(10)}>
+            <section style={idx(11)}>
               <FieldRow label="Mood after" sublabel="And how you felt at the end.">
                 <ChoiceRun
                   options={moodChoices}
@@ -537,7 +510,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(11)}>
+            <section style={idx(12)}>
               <FieldRow label="Craving (0–10)" sublabel="Honest scale — zero is none.">
                 <ChoiceRun
                   options={cravingChoices}
@@ -548,7 +521,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(12)}>
+            <section style={idx(13)}>
               <FieldRow label="Context" sublabel="Where or with whom.">
                 <ChoiceRun
                   options={contextChoices}
@@ -559,7 +532,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               </FieldRow>
             </section>
 
-            <section style={idx(13)}>
+            <section style={idx(14)}>
               <FieldRow
                 label="Notes"
                 htmlFor="notes-input"
@@ -580,7 +553,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         ) : null}
 
         {/* ── Save + Cancel ── */}
-        <section style={idx(14)} className="flex flex-col items-center gap-sm pt-xl">
+        <section style={idx(15)} className="flex flex-col items-center gap-sm pt-xl">
           {error ? (
             <p
               role="alert"
@@ -615,7 +588,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         </section>
 
         {/* ── End-mark ── */}
-        <footer style={idx(15)} className="rule-hair pt-md text-center">
+        <footer style={idx(16)} className="rule-hair pt-md text-center">
           <span className="text-caption text-text-faint italic">
             One line at a time.
           </span>

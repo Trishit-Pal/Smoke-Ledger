@@ -211,6 +211,9 @@ export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
   const id = makeId('log');
   const localDate = draft.localDate ?? toLocalDate(draft.tsUtc);
   const localHour = draft.localHour ?? toLocalHour(draft.tsUtc);
+  // CigaretteLogSchema applies the 24h backdate cap as a refinement — see
+  // MAX_BACKDATE_MS in src/lib/validation.ts. The UI form repeats the same
+  // guard for a friendlier error message; this is the server-side guarantee.
   const validated = parseOrThrow(
     CigaretteLogSchema,
     { ...draft, localDate, localHour },

@@ -57,6 +57,7 @@ import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/ch
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@web/components/anim/dynamic';
+import { SectionLabel } from '@web/components/visual';
 import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
 
@@ -416,9 +417,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Daily sticks — the line ─────────────── */}
             <section style={idx(3)} aria-labelledby="sticks-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="sticks-heading" className="editorial-caption">
+                <SectionLabel id="sticks-heading" spacing="none">
                   Daily sticks
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint nums-tabular">
                   {windowDays} {windowDays === 1 ? 'day' : 'days'}
                 </span>
@@ -442,9 +443,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Daily spend — bars ─────────────── */}
             <section style={idx(4)} aria-labelledby="spend-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="spend-heading" className="editorial-caption">
+                <SectionLabel id="spend-heading" spacing="none">
                   Daily spend
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint nums-tabular">
                   {maskInr(summary.spend, discreet, (n) => formatInr(n, { compact: true }))} total
                 </span>
@@ -466,9 +467,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Day × hour heatmap ─────────────── */}
             <section style={idx(5)} aria-labelledby="heatmap-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="heatmap-heading" className="editorial-caption">
+                <SectionLabel id="heatmap-heading" spacing="none">
                   Day × hour
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint">
                   When the week breathes
                 </span>
@@ -490,9 +491,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Time of day ─────────────── */}
             <section style={idx(6)} aria-labelledby="hour-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="hour-heading" className="editorial-caption">
+                <SectionLabel id="hour-heading" spacing="none">
                   Time of day
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint">
                   24-hour distribution
                 </span>
@@ -514,9 +515,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Day of week ─────────────── */}
             <section style={idx(7)} aria-labelledby="dow-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="dow-heading" className="editorial-caption">
+                <SectionLabel id="dow-heading" spacing="none">
                   Day of week
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint">
                   Mon — Sun
                 </span>
@@ -537,9 +538,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             {/* ─────────────── Mood × trigger ─────────────── */}
             <section style={idx(8)} aria-labelledby="mood-heading" className="flex flex-col gap-md">
               <div className="rule-hair-strong pt-md flex items-baseline justify-between gap-md">
-                <h2 id="mood-heading" className="editorial-caption">
+                <SectionLabel id="mood-heading" spacing="none">
                   Mood × trigger
-                </h2>
+                </SectionLabel>
                 <span className="text-caption text-text-faint">
                   Where it tends to start
                 </span>
