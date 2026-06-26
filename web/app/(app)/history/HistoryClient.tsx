@@ -32,12 +32,18 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { MoreVertical } from 'lucide-react';
 import { formatInr, formatPerStick } from '@/lib/format';
 import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import { deleteLog } from '@/db/repositories/logs';
 import dayjs from 'dayjs';
-import type { CigaretteLog, UserProfile } from '@/types';
+import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
+import { revalidateAppViews } from '../_actions/revalidate';
+import { toSafeErrorMessage } from '@/lib/errors';
+import { LogEditModal } from '@web/components/modals/LogEditModal';
+import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
@@ -90,6 +96,7 @@ function dateSpanLabel(groups: Group[]): string | null {
 export interface HistoryClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+  brands: (Brand & { variants: BrandVariant[] })[];
   /**
    * Initial pagination cursor from the SSR fetch. Non-null means there are
    * older logs beyond the initial 200-row / 60-day window. The "Load older"
@@ -102,6 +109,7 @@ export interface HistoryClientProps {
 export function HistoryClient({
   profile,
   logs: initialLogs,
+  brands,
   nextCursor: initialCursor,
 }: HistoryClientProps) {
   const router = useRouter();
@@ -114,6 +122,29 @@ export function HistoryClient({
   const [cursor, setCursor] = React.useState<LogCursor | null>(initialCursor ?? null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isPending, startTransition] = React.useTransition();
+
+  // Edit/delete modals
+  const [editingLog, setEditingLog] = React.useState<CigaretteLog | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<CigaretteLog | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const logId = deleteTarget.id;
+    setDeleteTarget(null);
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteLog(logId);
+      await revalidateAppViews();
+      router.refresh();
+    } catch (err) {
+      setDeleteError(toSafeErrorMessage(err));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   const groups = React.useMemo(() => groupLogs(logs), [logs]);
 
@@ -256,7 +287,7 @@ export function HistoryClient({
                       return (
                         <div
                           key={log.id}
-                          className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md"
+                          className="rule-hair grid grid-cols-[1fr_auto_auto] items-baseline gap-md py-md"
                         >
                           <div className="min-w-0 flex flex-col">
                             <dt className="text-body text-text truncate">
@@ -282,6 +313,14 @@ export function HistoryClient({
                               </span>
                             ) : null}
                           </dd>
+                          <button
+                            type="button"
+                            aria-label={`Edit ${brand}`}
+                            onClick={() => setEditingLog(log)}
+                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md text-text-muted hover:bg-bg hover:text-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent -mr-sm"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
                         </div>
                       );
                     })}
@@ -338,6 +377,46 @@ export function HistoryClient({
           New log
         </Link>
       </div>
+
+      {/* ─────────────── Edit modal ─────────────────────────────────── */}
+      <LogEditModal
+        open={editingLog !== null}
+        log={editingLog}
+        brands={brands}
+        onOpenChange={(open) => {
+          if (!open) setEditingLog(null);
+        }}
+        onSaved={() => {
+          setEditingLog(null);
+        }}
+        onDelete={(log) => {
+          setDeleteTarget(log);
+        }}
+      />
+
+      {/* ─────────────── Delete confirmation ──────────────────────────── */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget ? `Delete "${deleteTarget.brandNameSnap ?? 'entry'}"?` : 'Delete entry?'}
+        description="This entry will be removed from your history. You can't undo this."
+        confirmLabel="Delete entry"
+        destructive
+        loading={isDeleting}
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      />
+
+      {/* Show delete error if any */}
+      {deleteError && (
+        <div className="fixed bottom-8 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-40 p-md bg-bg border border-[var(--warn-earth)] rounded-md shadow-lg">
+          <p className="text-small text-[var(--warn-earth)]">{deleteError}</p>
+        </div>
+      )}
     </div>
   );
 }
