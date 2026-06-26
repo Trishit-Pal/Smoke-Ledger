@@ -139,6 +139,7 @@ export function DashboardClient({
   const [quickLogPending, setQuickLogPending] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(1);
+  const [lastLogParams, setLastLogParams] = React.useState<{ brandId: string | null; brandName: string | null; variantName: string | null; quantity: number } | null>(null);
 
   const today = todayIst();
   const hidden = isHomeTotalsHidden(profile);
@@ -287,12 +288,14 @@ export function DashboardClient({
             total != null ? ` · ${formatInr(total, { compact: true })}` : ''
           }`,
         );
+        setQuickLogError(null);
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToast(null), 2500);
         await revalidateAppViews();
         router.refresh();
       } catch (e) {
-        setQuickLogError(toSafeErrorMessage(e, 'dependency_failure'));
+        setLastLogParams(opts);
+        setQuickLogError(`Error: log not saved. ${toSafeErrorMessage(e, 'dependency_failure')}`);
       } finally {
         setQuickLogPending(false);
       }
@@ -403,9 +406,21 @@ export function DashboardClient({
               <p role="status" aria-live="polite" className="text-small text-accent mt-md">{toast}</p>
             ) : null}
             {quickLogError ? (
-              <p role="alert" className="text-small mt-md" style={{ color: 'var(--warn-earth)' }}>
-                {quickLogError}
-              </p>
+              <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
+                <p className="text-small flex-1" style={{ color: 'var(--warn-earth)' }}>
+                  {quickLogError}
+                </p>
+                {lastLogParams && (
+                  <button
+                    type="button"
+                    onClick={() => runQuickLog(lastLogParams)}
+                    disabled={quickLogPending}
+                    className="shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {quickLogPending ? 'Retrying…' : 'Retry'}
+                  </button>
+                )}
+              </div>
             ) : null}
           </div>
         </section>
