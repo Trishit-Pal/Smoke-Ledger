@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { revalidateAppViews } from '@web/app/(app)/_actions/revalidate';
 import { updateLog } from '@/db/repositories/logs';
+import { round2 } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
@@ -124,8 +125,9 @@ export function LogEditModal({
       setError('Brand is required. Please select a brand before saving.');
       return;
     }
-    if (!quantity || Number(quantity) <= 0) {
-      setError('Quantity must be at least 0.25 sticks. Please enter a valid amount.');
+    const qty = Number(quantity);
+    if (!quantity || !Number.isInteger(qty) || qty < 1) {
+      setError('Quantity must be a whole number of sticks (1 or more).');
       return;
     }
 
@@ -133,16 +135,20 @@ export function LogEditModal({
     setError(null);
 
     try {
-      const qty = Number(quantity);
-      const unit = price ? Number(price) : null;
+      const unit = price ? round2(Number(price)) : null;
+      // Preserve the original variant snapshot when the brand is unchanged and
+      // the stored variant is no longer in the catalog, so an unrelated edit
+      // (e.g. only the note) can't silently erase historical detail. A real
+      // brand switch clears it.
+      const brandChanged = selectedBrand.id !== log.brandId;
       await updateLog(log.id, {
         brandId: selectedBrand.id,
         brandNameSnap: selectedBrand.name,
-        variantSnap: selectedVariant?.name ?? null,
+        variantSnap: selectedVariant?.name ?? (brandChanged ? null : log.variantSnap),
         quantity: qty,
         unitPriceInr: unit,
         // Keep the stored total consistent with the edited per-stick price.
-        totalPriceInr: unit != null ? unit * qty : null,
+        totalPriceInr: unit != null ? round2(unit * qty) : null,
         moodBefore: mood,
         triggerTag: trigger,
         contextTag: context,
@@ -247,12 +253,12 @@ export function LogEditModal({
             ) : null}
 
             {/* Quantity */}
-            <FieldRow label="Quantity" hint="0.25 sticks or more" htmlFor="edit-qty">
+            <FieldRow label="Quantity" hint="Whole sticks, 1 or more" htmlFor="edit-qty">
               <input
                 id="edit-qty"
                 type="number"
-                min="0.25"
-                step="0.25"
+                min="1"
+                step="1"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 disabled={saving}
