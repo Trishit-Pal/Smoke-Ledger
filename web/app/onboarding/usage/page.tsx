@@ -240,7 +240,7 @@ export default function OnboardingUsagePage() {
                   transform: on ? `translateZ(${i * 0.6}px)` : 'translateZ(0)',
                   transformStyle: 'preserve-3d',
                   transition:
-                    'height 360ms cubic-bezier(0.34, 1.56, 0.64, 1), background 140ms ease, opacity 200ms ease, transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    'height 360ms cubic-bezier(0.16, 1, 0.3, 1), background 140ms ease, opacity 200ms ease, transform 360ms cubic-bezier(0.16, 1, 0.3, 1)',
                   transitionDelay: `${i * 8}ms`,
                   boxShadow: on ? '0 1px 0 rgba(47,163,155,0.15)' : 'none',
                 }}

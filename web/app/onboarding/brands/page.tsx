@@ -320,7 +320,7 @@ export default function OnboardingBrandsPage() {
                     fontSize: 14,
                     fontWeight: 700,
                     marginRight: 8,
-                    transition: 'all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
                     transform: selected ? 'scale(1.05)' : 'scale(1)',
                   }}
                 >
@@ -356,7 +356,7 @@ export default function OnboardingBrandsPage() {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  animation: 'chipPopIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both',
+                  animation: 'chipPopIn 320ms cubic-bezier(0.16, 1, 0.3, 1) both',
                   animationDelay: `${idx * 40}ms`,
                   boxShadow: '0 4px 12px -4px rgba(47, 163, 155, 0.45)',
                   transition: 'transform 120ms ease, box-shadow 200ms ease',

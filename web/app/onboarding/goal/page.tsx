@@ -191,7 +191,7 @@ export default function OnboardingGoalPage() {
                       fontStyle: 'italic',
                       lineHeight: 1,
                       transition:
-                        'color 240ms ease, transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        'color 240ms ease, transform 360ms cubic-bezier(0.16, 1, 0.3, 1)',
                       transform: isSelected
                         ? 'scale(1.15) translateZ(20px)'
                         : 'scale(1)',
@@ -218,7 +218,7 @@ export default function OnboardingGoalPage() {
                     borderRadius: 999,
                     border: isSelected ? 'none' : '1.5px solid var(--rule-strong)',
                     background: isSelected ? 'var(--accent)' : 'transparent',
-                    transition: 'all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
                     transform: isSelected ? 'scale(1.1)' : 'scale(1)',
                     display: 'inline-flex',
                     alignItems: 'center',
