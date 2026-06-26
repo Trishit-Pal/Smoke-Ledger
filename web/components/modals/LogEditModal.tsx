@@ -108,7 +108,17 @@ export function LogEditModal({
       setSelectedBrand(brand ?? null);
       setSelectedVariant(variant ?? null);
       setQuantity(String(log.quantity));
-      setPrice(log.unitPriceInr ? String(log.unitPriceInr) : '');
+      // Seed the per-stick price. Fall back to total/quantity when only the
+      // total was recorded (e.g. imported logs), and use a null check so a
+      // genuine ₹0 survives — otherwise an unrelated edit would reconstruct
+      // totalPriceInr from an empty price and silently erase the stored total.
+      setPrice(
+        log.unitPriceInr != null
+          ? String(log.unitPriceInr)
+          : log.totalPriceInr != null && log.quantity > 0
+            ? String(round2(log.totalPriceInr / log.quantity))
+            : '',
+      );
       setMood(log.moodBefore ?? null);
       setTrigger(log.triggerTag ?? null);
       setContext(log.contextTag ?? null);
@@ -126,8 +136,13 @@ export function LogEditModal({
       return;
     }
     const qty = Number(quantity);
-    if (!quantity || !Number.isInteger(qty) || qty < 1) {
-      setError('Quantity must be a whole number of sticks (1 or more).');
+    if (!quantity || !Number.isInteger(qty) || qty < 1 || qty > 100) {
+      setError('Quantity must be a whole number of sticks between 1 and 100.');
+      return;
+    }
+    const unit = price ? round2(Number(price)) : null;
+    if (unit != null && (Number.isNaN(unit) || unit < 0 || unit > 2000)) {
+      setError('Price per stick must be between ₹0 and ₹2,000.');
       return;
     }
 
@@ -135,7 +150,6 @@ export function LogEditModal({
     setError(null);
 
     try {
-      const unit = price ? round2(Number(price)) : null;
       // Preserve the original variant snapshot when the brand is unchanged and
       // the stored variant is no longer in the catalog, so an unrelated edit
       // (e.g. only the note) can't silently erase historical detail. A real
@@ -149,6 +163,8 @@ export function LogEditModal({
         unitPriceInr: unit,
         // Keep the stored total consistent with the edited per-stick price.
         totalPriceInr: unit != null ? round2(unit * qty) : null,
+        // A user-entered price is an exact figure; fall back to unknown if cleared.
+        priceSource: unit != null ? 'exact' : 'unknown',
         moodBefore: mood,
         triggerTag: trigger,
         contextTag: context,
@@ -176,6 +192,9 @@ export function LogEditModal({
 
         {/* Modal */}
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,40rem)] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card border border-border shadow-xl overflow-y-auto">
+          <Dialog.Description className="sr-only">
+            Edit the details of this log entry, then save or delete it.
+          </Dialog.Description>
           {/* Header */}
           <div className="sticky top-0 bg-card border-b border-border p-lg flex items-center justify-between">
             <Dialog.Title asChild>

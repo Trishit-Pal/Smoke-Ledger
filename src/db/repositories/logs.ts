@@ -212,8 +212,11 @@ export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
   const localDate = draft.localDate ?? toLocalDate(draft.tsUtc);
   const localHour = draft.localHour ?? toLocalHour(draft.tsUtc);
   // CigaretteLogSchema applies the 24h backdate cap as a refinement — see
-  // MAX_BACKDATE_MS in src/lib/validation.ts. The UI form repeats the same
-  // guard for a friendlier error message; this is the server-side guarantee.
+  // MAX_BACKDATE_MS in src/lib/validation.ts. This parse runs in the client
+  // Supabase context, so the cap is a client-side guard (RLS scopes any forged
+  // ts_utc to the caller's own rows), not a DB-enforced constraint. The
+  // rate-limit RPC counts its window off server-set created_at, not the
+  // now-backdatable ts_utc, so backdating can't evade it.
   const validated = parseOrThrow(
     CigaretteLogSchema,
     { ...draft, localDate, localHour },

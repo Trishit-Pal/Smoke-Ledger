@@ -124,9 +124,11 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
   const handleSelect = (next: BackdatePreset) => {
     setPreset(next);
     if (next === 'custom') {
-      // Seed the picker draft from the existing value, or "now − 30 min".
+      // Seed the picker draft from the existing value, or "now − 30 min", and
+      // resolve it now so value/draft/preview agree before the first edit.
       const seed = value ?? new Date(now.getTime() - 30 * 60 * 1000);
       setCustomDraft(formatDatetimeLocalIst(seed));
+      onChange(seed);
       return;
     }
     const resolved = presetToDate(next, now);
@@ -142,6 +144,11 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
     const clamped = new Date(
       Math.max(minMs, Math.min(now.getTime(), parsed.getTime())),
     );
+    // If the typed value fell outside the window, snap the visible input to the
+    // clamped instant so the picker and the resolution preview never disagree.
+    if (clamped.getTime() !== parsed.getTime()) {
+      setCustomDraft(formatDatetimeLocalIst(clamped));
+    }
     onChange(clamped);
   };
 

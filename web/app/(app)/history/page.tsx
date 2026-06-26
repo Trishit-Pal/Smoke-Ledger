@@ -3,7 +3,9 @@ import { listBrandsWithVariants } from '@/db/repositories/brands';
 import { HistoryClient } from './HistoryClient';
 
 export default async function HistoryPage() {
-  const { profile, logs, nextCursor } = await getHistoryPageData();
-  const brands = await listBrandsWithVariants();
+  const [{ profile, logs, nextCursor }, brands] = await Promise.all([
+    getHistoryPageData(),
+    listBrandsWithVariants(),
+  ]);
   return <HistoryClient profile={profile} logs={logs} brands={brands} nextCursor={nextCursor} />;
 }

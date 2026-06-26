@@ -19,7 +19,7 @@
 import * as React from 'react';
 import { cn } from '@web/components/ui/cn';
 
-export type MetricRowTone = 'neutral' | 'accent' | 'warn' | 'danger';
+export type MetricRowTone = 'neutral' | 'accent' | 'warn';
 
 export interface MetricRowProps {
   label: React.ReactNode;
@@ -42,7 +42,6 @@ const TONE_COLOR: Record<MetricRowTone, string | undefined> = {
   neutral: undefined,
   accent: 'var(--accent)',
   warn: 'var(--warn-earth)',
-  danger: 'var(--danger, #C85A54)',
 };
 
 export function MetricRow({
@@ -68,7 +67,7 @@ export function MetricRow({
       )}
     >
       <div className={cn('min-w-0', labelClassName)}>
-        <dt className={cn('text-body text-text ed-mr-label', isInteractive && 'group-hover:text-text')}>
+        <dt className={cn('text-body text-text ed-mr-label')}>
           {label}
         </dt>
         {subtitle ? (
