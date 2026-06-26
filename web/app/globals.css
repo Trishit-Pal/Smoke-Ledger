@@ -134,6 +134,42 @@
 }
 
 @layer utilities {
+  /* ───────────────────────────────────────────────────────────────
+     Responsive Spacing System
+     ───────────────────────────────────────────────────────────────
+     Pages breathe with device width. On mobile: tighter padding/gaps.
+     On tablet+: generous margins for rhythm. The scale never changes,
+     but its application adapts to viewport constraints.
+
+     Pattern: sm screens use base values, md+ add breathing room via
+     scale multipliers (1x → 1.2x) or explicit lg variants.
+  ─────────────────────────────────────────────────────────────── */
+
+  /* Major section gaps — between distinct editorial blocks */
+  .section-gap {
+    gap: 32px;
+  }
+  @media (min-width: 768px) {
+    .section-gap {
+      gap: clamp(32px, 2rem + 1vw, 48px);
+    }
+  }
+
+  /* Subsection gaps — between related groups within a section */
+  .subsection-gap {
+    gap: 16px;
+  }
+  @media (min-width: 768px) {
+    .subsection-gap {
+      gap: 24px;
+    }
+  }
+
+  /* Tight grouping — labels, captions, close siblings */
+  .group-tight {
+    gap: 8px;
+  }
+
   /* Scroll snap for carousels */
   .snap-x-mandatory {
     scroll-snap-type: x mandatory;

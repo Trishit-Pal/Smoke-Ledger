@@ -32,12 +32,18 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { MoreVertical, Search } from 'lucide-react';
 import { formatInr, formatPerStick } from '@/lib/format';
 import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import { deleteLog } from '@/db/repositories/logs';
 import dayjs from 'dayjs';
-import type { CigaretteLog, UserProfile } from '@/types';
+import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
+import { revalidateAppViews } from '../_actions/revalidate';
+import { toSafeErrorMessage } from '@/lib/errors';
+import { LogEditModal } from '@web/components/modals/LogEditModal';
+import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
@@ -71,13 +77,11 @@ function relativeDayLabel(ymd: string, today: string, yesterday: string): string
   return null;
 }
 
-/** Compute a date-span subtitle for the masthead, e.g. "Mar — May 2026". When
- *  the range spans a single month, collapses to "May 2026". */
-function dateSpanLabel(groups: Group[]): string | null {
-  if (groups.length === 0) return null;
-  // Groups are sorted DESC by date — index 0 is the newest, last is the oldest.
-  const newest = dayjs(groups[0]!.date);
-  const oldest = dayjs(groups[groups.length - 1]!.date);
+/** Compute a date-span subtitle for the masthead, e.g. "Mar — May 2026", from
+ *  the oldest/newest day present. Collapses to "May 2026" within one month. */
+function dateSpanLabel(oldestYmd: string, newestYmd: string): string | null {
+  const newest = dayjs(newestYmd);
+  const oldest = dayjs(oldestYmd);
   if (newest.isSame(oldest, 'month')) {
     return newest.format('MMM YYYY');
   }
@@ -90,6 +94,7 @@ function dateSpanLabel(groups: Group[]): string | null {
 export interface HistoryClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+  brands: (Brand & { variants: BrandVariant[] })[];
   /**
    * Initial pagination cursor from the SSR fetch. Non-null means there are
    * older logs beyond the initial 200-row / 60-day window. The "Load older"
@@ -102,6 +107,7 @@ export interface HistoryClientProps {
 export function HistoryClient({
   profile,
   logs: initialLogs,
+  brands,
   nextCursor: initialCursor,
 }: HistoryClientProps) {
   const router = useRouter();
@@ -115,11 +121,61 @@ export function HistoryClient({
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isPending, startTransition] = React.useTransition();
 
-  const groups = React.useMemo(() => groupLogs(logs), [logs]);
+  // Edit/delete modals
+  const [editingLog, setEditingLog] = React.useState<CigaretteLog | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<CigaretteLog | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    const logId = deleteTarget.id;
+    setDeleteTarget(null);
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteLog(logId);
+      await revalidateAppViews();
+      router.refresh();
+    } catch (err) {
+      setDeleteError(toSafeErrorMessage(err));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  // Client-side filter over the loaded ledger. ponytail: searches only the
+  // logs already in state (the initial 60-day window + any "Load older"
+  // pages) — a brand last used outside that window won't match until more
+  // pages load. Server-side search is the upgrade path if that proves narrow.
+  const [query, setQuery] = React.useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const filteredLogs = React.useMemo(() => {
+    if (!normalizedQuery) return logs;
+    return logs.filter((log) => {
+      const haystack =
+        `${log.brandNameSnap ?? ''} ${log.variantSnap ?? ''} ${log.notes ?? ''}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [logs, normalizedQuery]);
+
+  const groups = React.useMemo(() => groupLogs(filteredLogs), [filteredLogs]);
 
   const today = React.useMemo(() => todayIst(), []);
   const yesterday = React.useMemo(() => daysAgoIst(1), []);
-  const spanLabel = React.useMemo(() => dateSpanLabel(groups), [groups]);
+  // Span reflects the full loaded window, not the filtered view, so the
+  // masthead identity stays stable while the user searches.
+  const spanLabel = React.useMemo(() => {
+    if (logs.length === 0) return null;
+    let oldest = logs[0]!.localDate;
+    let newest = logs[0]!.localDate;
+    for (const log of logs) {
+      if (log.localDate < oldest) oldest = log.localDate;
+      if (log.localDate > newest) newest = log.localDate;
+    }
+    return dateSpanLabel(oldest, newest);
+  }, [logs]);
 
   const handleLoadMore = React.useCallback(() => {
     if (!cursor || isPending) return;
@@ -141,18 +197,19 @@ export function HistoryClient({
 
   // Index allocation:
   //   0 = masthead
-  //   1..N = day groups (one per day, in order)
-  //   N+1 = trailing affordance (load-more OR end-mark)
-  const trailingIndex = groups.length + 1;
+  //   1 = filter bar
+  //   2..N+1 = day groups (one per day, in order)
+  //   N+2 = trailing affordance (load-more OR end-mark)
+  const trailingIndex = groups.length + 2;
 
   return (
     <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm">
+        <header style={idx(0)} className="flex flex-col group-tight">
           <div className="flex items-center gap-md">
             <span
               aria-hidden
@@ -173,9 +230,9 @@ export function HistoryClient({
           </p>
         </header>
 
-        {groups.length === 0 ? (
-          /* ─────────────── Empty state — a quiet invitation ─────────────── */
-          <section style={idx(1)} className="rule-hair pt-lg flex flex-col gap-sm">
+        {logs.length === 0 ? (
+          /* ─────────── Empty state — no entries in the ledger at all ─────── */
+          <section style={idx(1)} className="rule-hair pt-lg flex flex-col subsection-gap">
             <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
               No entries yet.
             </p>
@@ -193,8 +250,75 @@ export function HistoryClient({
           </section>
         ) : (
           <>
+            {/* ─────────────── Filter — search the loaded ledger ───────────── */}
+            <div style={idx(1)} className="flex flex-col gap-xs">
+              <div className="flex items-center gap-sm border-b border-[var(--rule-strong)] pb-sm transition-colors focus-within:border-[var(--text)]">
+                <Search aria-hidden className="w-4 h-4 text-text-faint shrink-0" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setQuery('');
+                  }}
+                  placeholder="Search by brand, variant, or note…"
+                  aria-label="Search entries by brand, variant, or note"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="flex-1 min-w-0 bg-transparent border-0 p-0 text-body text-text placeholder:text-text-faint focus:outline-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    aria-label="Clear search"
+                    className="shrink-0 text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+                    style={{ textDecorationColor: 'var(--rule-strong)' }}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              {normalizedQuery ? (
+                <p
+                  className="editorial-caption nums-tabular"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {filteredLogs.length}{' '}
+                  {filteredLogs.length === 1 ? 'entry' : 'entries'}
+                  {cursor !== null ? ' · loaded ledger only' : ''}
+                </p>
+              ) : null}
+            </div>
+
             {/* ─────────────── Day groups — typographic ledger ─────────────── */}
-            {groups.map((group, gi) => {
+            {groups.length === 0 ? (
+              /* Active query with no matches in the loaded ledger. */
+              <section
+                style={idx(2)}
+                className="rule-hair pt-lg flex flex-col subsection-gap"
+              >
+                <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">
+                  Nothing matches “{query.trim()}”.
+                </p>
+                <p className="text-body text-text-muted max-w-[44ch]">
+                  No loaded entry carries that brand, variant, or note.
+                  {cursor !== null
+                    ? ' Older entries might — load more below to widen the search.'
+                    : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="self-start mt-sm text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+                  style={{ textDecorationColor: 'var(--rule-strong)' }}
+                >
+                  Clear search
+                </button>
+              </section>
+            ) : (
+              groups.map((group, gi) => {
               const relLabel = relativeDayLabel(group.date, today, yesterday);
               const sortedRows = [...group.rows].sort((a, b) =>
                 b.tsUtc.localeCompare(a.tsUtc),
@@ -202,7 +326,7 @@ export function HistoryClient({
               return (
                 <section
                   key={group.date}
-                  style={idx(gi + 1)}
+                  style={idx(gi + 2)}
                   aria-labelledby={`day-${group.date}`}
                   className="flex flex-col"
                 >
@@ -256,7 +380,7 @@ export function HistoryClient({
                       return (
                         <div
                           key={log.id}
-                          className="rule-hair grid grid-cols-[1fr_auto] items-baseline gap-md py-md"
+                          className="rule-hair grid grid-cols-[1fr_auto_auto] items-baseline gap-md py-md"
                         >
                           <div className="min-w-0 flex flex-col">
                             <dt className="text-body text-text truncate">
@@ -282,13 +406,22 @@ export function HistoryClient({
                               </span>
                             ) : null}
                           </dd>
+                          <button
+                            type="button"
+                            aria-label={`Edit ${brand}`}
+                            onClick={() => setEditingLog(log)}
+                            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md text-text-muted hover:bg-bg hover:text-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent -mr-sm"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
                         </div>
                       );
                     })}
                   </dl>
                 </section>
               );
-            })}
+              })
+            )}
 
             {/* ─────────────── Trailing affordance — load more OR end-mark ───── */}
             <footer
@@ -338,6 +471,46 @@ export function HistoryClient({
           New log
         </Link>
       </div>
+
+      {/* ─────────────── Edit modal ─────────────────────────────────── */}
+      <LogEditModal
+        open={editingLog !== null}
+        log={editingLog}
+        brands={brands}
+        onOpenChange={(open) => {
+          if (!open) setEditingLog(null);
+        }}
+        onSaved={() => {
+          setEditingLog(null);
+        }}
+        onDelete={(log) => {
+          setDeleteTarget(log);
+        }}
+      />
+
+      {/* ─────────────── Delete confirmation ──────────────────────────── */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget ? `Delete "${deleteTarget.brandNameSnap ?? 'entry'}"?` : 'Delete entry?'}
+        description="This entry will be removed from your history. You can't undo this."
+        confirmLabel="Delete entry"
+        destructive
+        loading={isDeleting}
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      />
+
+      {/* Show delete error if any */}
+      {deleteError && (
+        <div className="fixed bottom-8 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-40 p-md bg-bg border border-[var(--warn-earth)] rounded-md shadow-lg">
+          <p className="text-small text-[var(--warn-earth)]">{deleteError}</p>
+        </div>
+      )}
     </div>
   );
 }

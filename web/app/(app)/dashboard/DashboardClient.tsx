@@ -139,6 +139,7 @@ export function DashboardClient({
   const [quickLogPending, setQuickLogPending] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(1);
+  const [lastLogParams, setLastLogParams] = React.useState<{ brandId: string | null; brandName: string | null; variantName: string | null; quantity: number } | null>(null);
 
   const today = todayIst();
   const hidden = isHomeTotalsHidden(profile);
@@ -287,12 +288,14 @@ export function DashboardClient({
             total != null ? ` · ${formatInr(total, { compact: true })}` : ''
           }`,
         );
+        setQuickLogError(null);
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToast(null), 2500);
         await revalidateAppViews();
         router.refresh();
       } catch (e) {
-        setQuickLogError(toSafeErrorMessage(e, 'dependency_failure'));
+        setLastLogParams(opts);
+        setQuickLogError(`Error: log not saved. ${toSafeErrorMessage(e, 'dependency_failure')}`);
       } finally {
         setQuickLogPending(false);
       }
@@ -312,9 +315,9 @@ export function DashboardClient({
     <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm relative">
+        <header style={idx(0)} className="flex flex-col group-tight relative">
           <div className="flex items-center gap-md">
             <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)] rule-draw" style={idx(0)} />
             <span className="editorial-caption nums-tabular">{formatIndianDate(today)}</span>
@@ -355,7 +358,7 @@ export function DashboardClient({
         </div>
 
         {/* ─────────────── Headline · the period in one number ─────────────── */}
-        <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col gap-lg">
+        <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col subsection-gap">
           <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
@@ -403,9 +406,21 @@ export function DashboardClient({
               <p role="status" aria-live="polite" className="text-small text-accent mt-md">{toast}</p>
             ) : null}
             {quickLogError ? (
-              <p role="alert" className="text-small mt-md" style={{ color: 'var(--warn-earth)' }}>
-                {quickLogError}
-              </p>
+              <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
+                <p className="text-small flex-1" style={{ color: 'var(--warn-earth)' }}>
+                  {quickLogError}
+                </p>
+                {lastLogParams && (
+                  <button
+                    type="button"
+                    onClick={() => runQuickLog(lastLogParams)}
+                    disabled={quickLogPending}
+                    className="shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {quickLogPending ? 'Retrying…' : 'Retry'}
+                  </button>
+                )}
+              </div>
             ) : null}
           </div>
         </section>
@@ -474,7 +489,7 @@ export function DashboardClient({
 
         {/* ─────────────── Goal verse ─────────────── */}
         {goalProgress ? (
-          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col gap-sm">
+          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
                 Your goal
@@ -549,7 +564,7 @@ export function DashboardClient({
 
         {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
-          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col gap-md">
+          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col subsection-gap">
             <SectionLabel id="insight-heading">From your week</SectionLabel>
             <blockquote className="relative pl-lg border-l-2 border-[var(--rule-strong)]">
               <p className="editorial-pullquote text-text">

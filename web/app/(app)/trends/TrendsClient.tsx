@@ -277,9 +277,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
-      <div className="editorial-stage flex flex-col gap-xxl">
+      <div className="editorial-stage flex flex-col section-gap">
         {/* ─────────────── Masthead ─────────────── */}
-        <header style={idx(0)} className="flex flex-col gap-sm">
+        <header style={idx(0)} className="flex flex-col group-tight">
           <div className="flex items-center gap-md">
             <span
               aria-hidden
