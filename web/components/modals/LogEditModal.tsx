@@ -15,7 +15,16 @@ import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { MOOD_OPTIONS } from '@/constants/moods';
 import { CONTEXT_OPTIONS } from '@/constants/contexts';
-import type { Brand, BrandVariant, CigaretteLog } from '@/types';
+import type {
+  Brand,
+  BrandVariant,
+  CigaretteLog,
+  Mood,
+  TriggerTag,
+  ContextTag,
+} from '@/types';
+
+type BrandWithVariants = Brand & { variants: BrandVariant[] };
 
 interface LogEditModalProps {
   open: boolean;
@@ -72,41 +81,43 @@ export function LogEditModal({
   const [error, setError] = React.useState<string | null>(null);
 
   // Form state
-  const [selectedBrand, setSelectedBrand] = React.useState<Brand | null>(null);
+  const [selectedBrand, setSelectedBrand] = React.useState<BrandWithVariants | null>(null);
   const [selectedVariant, setSelectedVariant] = React.useState<BrandVariant | null>(null);
   const [quantity, setQuantity] = React.useState<string>('1');
   const [price, setPrice] = React.useState<string>('');
-  const [mood, setMood] = React.useState<string>('');
-  const [trigger, setTrigger] = React.useState<string>('');
-  const [context, setContext] = React.useState<string>('');
+  const [mood, setMood] = React.useState<Mood | null>(null);
+  const [trigger, setTrigger] = React.useState<TriggerTag | null>(null);
+  const [context, setContext] = React.useState<ContextTag | null>(null);
   const [notes, setNotes] = React.useState<string>('');
 
   // Category filter
   const {
-    activeCategory,
-    setActiveCategory,
-    filteredBrands: visibleBrands,
+    category,
+    setCategory,
+    categories,
+    filtered: visibleBrands,
   } = useBrandCategoryFilter(brands);
 
   // Initialize form when log opens
   React.useEffect(() => {
     if (open && log) {
       const brand = brands.find((b) => b.id === log.brandId);
-      const variant = brand?.variants.find((v) => v.id === log.variantId);
+      // Logs snapshot the variant name, not its id, so re-link by name.
+      const variant = brand?.variants.find((v) => v.name === log.variantSnap);
       setSelectedBrand(brand ?? null);
       setSelectedVariant(variant ?? null);
       setQuantity(String(log.quantity));
       setPrice(log.unitPriceInr ? String(log.unitPriceInr) : '');
-      setMood(log.moodBefore ?? '');
-      setTrigger(log.triggerTag ?? '');
-      setContext(log.contextTag ?? '');
+      setMood(log.moodBefore ?? null);
+      setTrigger(log.triggerTag ?? null);
+      setContext(log.contextTag ?? null);
       setNotes(log.notes ?? '');
       setError(null);
       if (brand) {
-        setActiveCategory(brand.category);
+        setCategory(brand.category);
       }
     }
-  }, [open, log, brands, setActiveCategory]);
+  }, [open, log, brands, setCategory]);
 
   async function handleSave() {
     if (!log || !selectedBrand) {
@@ -122,14 +133,19 @@ export function LogEditModal({
     setError(null);
 
     try {
+      const qty = Number(quantity);
+      const unit = price ? Number(price) : null;
       await updateLog(log.id, {
         brandId: selectedBrand.id,
-        variantId: selectedVariant?.id ?? null,
-        quantity: Number(quantity),
-        unitPriceInr: price ? Number(price) : null,
-        moodBefore: mood || null,
-        triggerTag: trigger || null,
-        contextTag: context || null,
+        brandNameSnap: selectedBrand.name,
+        variantSnap: selectedVariant?.name ?? null,
+        quantity: qty,
+        unitPriceInr: unit,
+        // Keep the stored total consistent with the edited per-stick price.
+        totalPriceInr: unit != null ? unit * qty : null,
+        moodBefore: mood,
+        triggerTag: trigger,
+        contextTag: context,
         notes: notes || null,
       });
 
@@ -175,8 +191,9 @@ export function LogEditModal({
             {/* Category tabs */}
             <FieldRow label="Category" sublabel="Narrows your brand list">
               <CategoryTabs
-                activeCategory={activeCategory}
-                onCategoryChange={setActiveCategory}
+                categories={categories}
+                value={category}
+                onChange={setCategory}
               />
             </FieldRow>
 
@@ -264,8 +281,8 @@ export function LogEditModal({
               <ChoiceRun
                 value={mood}
                 options={MOOD_OPTIONS}
-                onChange={setMood}
-                disabled={saving}
+                onSelect={setMood}
+                ariaLabel="Mood before"
               />
             </FieldRow>
 
@@ -274,8 +291,8 @@ export function LogEditModal({
               <ChoiceRun
                 value={trigger}
                 options={TRIGGER_OPTIONS}
-                onChange={setTrigger}
-                disabled={saving}
+                onSelect={setTrigger}
+                ariaLabel="Trigger"
               />
             </FieldRow>
 
@@ -284,8 +301,8 @@ export function LogEditModal({
               <ChoiceRun
                 value={context}
                 options={CONTEXT_OPTIONS}
-                onChange={setContext}
-                disabled={saving}
+                onSelect={setContext}
+                ariaLabel="Context"
               />
             </FieldRow>
 
