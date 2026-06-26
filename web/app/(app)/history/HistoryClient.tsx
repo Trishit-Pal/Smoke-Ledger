@@ -198,9 +198,11 @@ export function HistoryClient({
   // Index allocation:
   //   0 = masthead
   //   1 = filter bar
-  //   2..N+1 = day groups (one per day, in order)
+  //   2..N+1 = day groups (one per day, in order), or the no-match section at 2
   //   N+2 = trailing affordance (load-more OR end-mark)
-  const trailingIndex = groups.length + 2;
+  // When there are no groups (active query, no matches) the no-match section
+  // occupies index 2, so clamp N to >=1 to keep the footer one beat behind it.
+  const trailingIndex = (groups.length || 1) + 2;
 
   return (
     <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
