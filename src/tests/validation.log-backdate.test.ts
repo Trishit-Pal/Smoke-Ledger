@@ -55,20 +55,23 @@ describe('CigaretteLogSchema — backdate cap', () => {
   });
 
   it('accepts a tsUtc exactly MAX_BACKDATE_MS in the past (boundary)', () => {
-    // The cap is `(now - MAX_BACKDATE_MS) <= tsUtc <= now`; we compute the
-    // boundary against a fixed `t` and re-use it inside the parse to avoid
-    // the ms-level race where Date.now() advances between the two reads.
-    const t = Date.now();
-    const boundary = new Date(t - MAX_BACKDATE_MS).toISOString();
-    const result = CigaretteLogSchema.safeParse(
-      baseLog({ tsUtc: boundary }),
-      { errorMap: () => ({ message: 'ignored' }) },
-    );
-    expect(result.success).toBe(true);
-    // Sanity: boundary is exactly t - MAX_BACKDATE_MS (use `t`, not a fresh
-    // Date.now(), to avoid the same ms-level race we guarded above).
-    expect(Date.parse(boundary)).toBe(t - MAX_BACKDATE_MS);
-    expect(Date.parse(boundary)).toBeLessThanOrEqual(Date.now());
+    // The cap is `(now - MAX_BACKDATE_MS) <= tsUtc <= now`. The refine reads
+    // its OWN `Date.now()` at parse time, so the exact lower edge is only
+    // testable with a frozen clock — otherwise any time elapsing between
+    // building `boundary` and the parse pushes it just past the window and
+    // the assertion can never reliably pass.
+    const FIXED = Date.parse('2026-06-20T00:00:00.000Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(FIXED);
+    try {
+      const boundary = new Date(FIXED - MAX_BACKDATE_MS).toISOString();
+      const result = CigaretteLogSchema.safeParse(baseLog({ tsUtc: boundary }));
+      expect(result.success).toBe(true);
+      // Boundary is exactly now - MAX_BACKDATE_MS and within the window.
+      expect(Date.parse(boundary)).toBe(FIXED - MAX_BACKDATE_MS);
+      expect(Date.parse(boundary)).toBeLessThanOrEqual(Date.now());
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('rejects a tsUtc MAX_BACKDATE_MS + 1ms in the past', () => {
