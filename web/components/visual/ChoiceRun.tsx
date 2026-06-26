@@ -17,7 +17,7 @@ export interface ChoiceRunProps<T extends string | number> {
   onSelect: (next: T | null) => void;
   /** When true (default), clicking the active choice clears it. */
   allowClear?: boolean;
-  /** Accessible group name for the radiogroup. */
+  /** Accessible group name for the toggle-button group. */
   ariaLabel?: string;
 }
 
@@ -29,7 +29,7 @@ export function ChoiceRun<T extends string | number>({
   ariaLabel,
 }: ChoiceRunProps<T>) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap items-baseline">
+    <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-baseline">
       {options.map((opt, i) => {
         const active = opt.value === value;
         return (
@@ -41,8 +41,7 @@ export function ChoiceRun<T extends string | number>({
             ) : null}
             <button
               type="button"
-              role="radio"
-              aria-checked={active}
+              aria-pressed={active}
               onClick={() => onSelect(active && allowClear ? null : opt.value)}
               className={
                 'editorial-caption px-xs py-xs rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +

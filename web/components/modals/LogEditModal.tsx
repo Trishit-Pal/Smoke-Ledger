@@ -108,7 +108,17 @@ export function LogEditModal({
       setSelectedBrand(brand ?? null);
       setSelectedVariant(variant ?? null);
       setQuantity(String(log.quantity));
-      setPrice(log.unitPriceInr ? String(log.unitPriceInr) : '');
+      // Seed the per-stick price. Fall back to total/quantity when only the
+      // total was recorded (e.g. imported logs), and use a null check so a
+      // genuine ₹0 survives — otherwise an unrelated edit would reconstruct
+      // totalPriceInr from an empty price and silently erase the stored total.
+      setPrice(
+        log.unitPriceInr != null
+          ? String(log.unitPriceInr)
+          : log.totalPriceInr != null && log.quantity > 0
+            ? String(round2(log.totalPriceInr / log.quantity))
+            : '',
+      );
       setMood(log.moodBefore ?? null);
       setTrigger(log.triggerTag ?? null);
       setContext(log.contextTag ?? null);
