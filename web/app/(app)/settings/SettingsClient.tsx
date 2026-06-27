@@ -42,6 +42,7 @@ import { revalidateAppViews, revalidateBrands } from '../_actions/revalidate';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSupabase } from '@web/lib/supabase/client';
+import { dispatchFarewell } from '@web/lib/character/mood';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { eraseAllUserData } from '@/services/cloudErase';
@@ -513,6 +514,17 @@ export function SettingsClient({
     setBusy('signout');
     setError(null);
     try {
+      // CHARACTER: play the logout farewell wave-off (the <LogoutFarewell>
+      // portal mounted in (app)/layout) before redirecting, so the user doesn't
+      // watch a blank flash. Skipped under prefers-reduced-motion — the
+      // overlay's motion would be suppressed anyway — for an instant sign-out.
+      const reduceMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduceMotion) {
+        dispatchFarewell();
+        await new Promise((r) => setTimeout(r, 1600));
+      }
       await getSupabase().auth.signOut();
       router.replace('/login');
     } catch (e) {
