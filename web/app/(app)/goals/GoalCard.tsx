@@ -6,7 +6,6 @@ import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
-import { ProgressBar } from '@web/components/ui/ProgressBar';
 
 export interface GoalCardProps {
   goal: Goal;
@@ -24,33 +23,64 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
   // Spend goals embed ₹ values in their label/explanation — hide those under discreet mode.
   const hideMoney = goal.type === 'spend_cap_daily' && isDiscreetMode(profile);
   const pct = Math.round(Math.max(0, Math.min(100, progress.percent)));
-  const tone = progress.atRisk ? 'warn' : progress.isOnTrack ? 'success' : 'default';
+  // Concern is terracotta (--warn-earth), positive is teal (--accent) — never
+  // alarm-red. Same tokens for the figure and the gauge so they read as one mark.
+  const toneColor = progress.atRisk
+    ? 'var(--warn-earth)'
+    : progress.isOnTrack
+      ? 'var(--accent)'
+      : 'var(--text-muted)';
   const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
   const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;
 
+  // Surface remaining headroom for cap-type goals — data evaluateGoal already returns.
+  const isCap =
+    goal.type === 'daily_cap' || goal.type === 'weekly_target' || goal.type === 'spend_cap_daily';
+  const remainingText =
+    !isCap || hideMoney || !progress.isOnTrack
+      ? null
+      : goal.type === 'spend_cap_daily'
+        ? `₹${Math.round(progress.remaining)} of ₹${progress.valueTarget} left today`
+        : `${progress.remaining} of ${progress.valueTarget} left ${goal.type === 'weekly_target' ? 'this week' : 'today'}`;
+
   return (
-    <div className="border border-border rounded-lg p-lg flex flex-col gap-sm bg-card">
-      <div className="flex items-baseline justify-between gap-md">
-        <h3 className="text-body-strong text-text">{heading}</h3>
+    <article className="rule-hair py-md flex flex-col gap-sm">
+      <div className="grid grid-cols-[1fr_auto] items-baseline gap-md">
+        <h3 className="text-body text-text min-w-0">{heading}</h3>
         <span
-          className="text-small nums-tabular shrink-0"
-          style={{
-            color: progress.atRisk
-              ? 'var(--warn-earth)'
-              : progress.isOnTrack
-              ? 'var(--accent)'
-              : 'var(--text-muted)',
-          }}
+          className="editorial-numeral--micro nums-tabular text-right shrink-0"
+          style={{ color: toneColor }}
         >
           {pct}%
         </span>
       </div>
 
-      <ProgressBar value={pct} tone={tone} aria-label={`${goalTypeLabel(goal.type)} progress`} />
+      {/* Hairline gauge — square-edged, brand tokens only (no pill, no amber/red). */}
+      <div
+        role="progressbar"
+        aria-label={`${goalTypeLabel(goal.type)} progress`}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="w-full overflow-hidden"
+        style={{ height: 2, background: 'var(--rule)' }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: toneColor,
+            transition: 'width 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        />
+      </div>
 
-      <p className="text-small text-text-muted">{explanation}</p>
+      <p className="text-small text-text-muted">
+        {explanation}
+        {remainingText ? <span className="text-text-faint"> · {remainingText}</span> : null}
+      </p>
 
-      <div className="flex flex-wrap gap-sm mt-sm">
+      <div className="flex flex-wrap gap-sm mt-xs">
         <Button title="Edit" variant="ghost" size="sm" disabled={busy} onPress={() => onEdit(goal)} />
         {goal.status === 'active' ? (
           <Button title="Pause" variant="ghost" size="sm" disabled={busy} onPress={() => onStatus(goal, 'paused')} />
@@ -68,7 +98,7 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
         ) : null}
         <Button title="Delete" variant="danger" size="sm" disabled={busy} onPress={() => onDelete(goal)} />
       </div>
-    </div>
+    </article>
   );
 }
 

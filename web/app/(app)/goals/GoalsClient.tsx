@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Target } from 'lucide-react';
 import { revalidateAppViews } from '../_actions/revalidate';
 import { createGoal, updateGoal, setGoalStatus, deleteGoal } from '@/db/repositories/goals';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -22,6 +21,8 @@ import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { EmptyState } from '@web/components/ui/EmptyState';
 import { Text } from '@web/components/ui/Text';
 import { cn } from '@web/components/ui/cn';
+import { SectionLabel } from '@web/components/visual';
+import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 
 export interface GoalsClientProps {
@@ -214,16 +215,6 @@ function GoalForm({
   );
 }
 
-// ── Section header ──────────────────────────────────────────────────────────
-
-function SectionLabel({ label }: { label: string }) {
-  return (
-    <p className="text-caption uppercase text-text-muted tracking-wider px-sm pt-sm pb-xs">
-      {label}
-    </p>
-  );
-}
-
 // ── Main client ─────────────────────────────────────────────────────────────
 
 export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
@@ -327,15 +318,17 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   }
 
   const cardBusy = busy !== null && busy !== 'submit';
+  const idx = (n: number): React.CSSProperties => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
     <div className="editorial-stage flex flex-col subsection-gap max-w-2xl mx-auto px-lg md:px-xxl">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-md">
-        <div className="flex items-center gap-sm">
-          <Target className="w-6 h-6 text-text-muted" aria-hidden />
-          <Text variant="h2">Goals</Text>
-        </div>
+      {/* Masthead */}
+      <div style={idx(0)} className="flex items-start justify-between gap-md">
+        <EditorialMasthead
+          caption="the ledger"
+          title="Goals"
+          subtitle="Set a cap, a window, or a quit date. Reviewed quietly."
+        />
         {!showForm ? (
           <Button title="New goal" variant="secondary" size="sm" onPress={openCreate} />
         ) : null}
@@ -343,34 +336,38 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
 
       {/* Create / edit form */}
       {showForm ? (
-        <GoalForm
-          form={formState}
-          logs={logs}
-          today={today}
-          isEdit={editing !== null}
-          busy={busy === 'submit'}
-          error={formError}
-          onFormChange={patchForm}
-          onSubmit={handleSubmit}
-          onCancel={closeForm}
-        />
+        <div style={idx(1)}>
+          <GoalForm
+            form={formState}
+            logs={logs}
+            today={today}
+            isEdit={editing !== null}
+            busy={busy === 'submit'}
+            error={formError}
+            onFormChange={patchForm}
+            onSubmit={handleSubmit}
+            onCancel={closeForm}
+          />
+        </div>
       ) : null}
 
       {/* Empty state */}
       {goals.length === 0 && !showForm ? (
-        <EmptyState
-          title="No goals yet"
-          description="Set a daily cap, a spend limit, or a quit date to start tracking progress."
-          actionLabel="Set your first goal"
-          onAction={openCreate}
-        />
+        <div style={idx(1)}>
+          <EmptyState
+            title="No goals yet"
+            description="Set a daily cap, a spend limit, or a quit date to start tracking progress."
+            actionLabel="Set your first goal"
+            onAction={openCreate}
+          />
+        </div>
       ) : null}
 
       {/* Active */}
       {active.length > 0 ? (
-        <section aria-label="Active goals">
-          <SectionLabel label="Active" />
-          <div className="flex flex-col gap-md">
+        <section style={idx(2)} aria-labelledby="goals-active">
+          <SectionLabel id="goals-active">Active</SectionLabel>
+          <div className="flex flex-col">
             {active.map((g) => (
               <GoalCard
                 key={g.id}
@@ -390,9 +387,9 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
 
       {/* Paused */}
       {paused.length > 0 ? (
-        <section aria-label="Paused goals">
-          <SectionLabel label="Paused" />
-          <div className="flex flex-col gap-md">
+        <section style={idx(3)} aria-labelledby="goals-paused">
+          <SectionLabel id="goals-paused">Paused</SectionLabel>
+          <div className="flex flex-col">
             {paused.map((g) => (
               <GoalCard
                 key={g.id}
@@ -412,9 +409,9 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
 
       {/* Completed / abandoned */}
       {done.length > 0 ? (
-        <section aria-label="Completed and abandoned goals">
-          <SectionLabel label="Completed & abandoned" />
-          <div className="flex flex-col gap-md">
+        <section style={idx(4)} aria-labelledby="goals-done">
+          <SectionLabel id="goals-done">Completed &amp; abandoned</SectionLabel>
+          <div className="flex flex-col">
             {done.map((g) => (
               <GoalCard
                 key={g.id}
