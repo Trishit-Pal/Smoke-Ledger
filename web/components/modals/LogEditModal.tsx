@@ -8,6 +8,7 @@ import { revalidateAppViews } from '@web/app/(app)/_actions/revalidate';
 import { updateLog } from '@/db/repositories/logs';
 import { round2 } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { MAX_PRICE_INR } from '@/lib/validation';
 import { Button } from '@web/components/ui/Button';
 import { Text } from '@web/components/ui/Text';
 import { ChoiceRun } from '@web/components/visual';
@@ -141,8 +142,8 @@ export function LogEditModal({
       return;
     }
     const unit = price ? round2(Number(price)) : null;
-    if (unit != null && (Number.isNaN(unit) || unit < 0 || unit > 2000)) {
-      setError('Price per stick must be between ₹0 and ₹2,000.');
+    if (unit != null && (Number.isNaN(unit) || unit < 0 || unit > MAX_PRICE_INR)) {
+      setError(`Price per stick must be between ₹0 and ₹${MAX_PRICE_INR.toLocaleString('en-IN')}.`);
       return;
     }
 
