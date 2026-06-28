@@ -20,6 +20,8 @@ import {
   goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
+  blockingSameTypeGoal,
+  goalTypeLabel,
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
@@ -84,6 +86,13 @@ export default function GoalNewScreen() {
         setBusy(false);
       }
     } else {
+      const blocker = blockingSameTypeGoal(form.type, goals);
+      if (blocker) {
+        setError(
+          `You already have a ${goalTypeLabel(form.type).toLowerCase()} goal. Complete it before adding another.`,
+        );
+        return;
+      }
       const result = buildGoalPayload(form, logs, today);
       if (!result.ok) { setError(result.error); return; }
       setBusy(true);

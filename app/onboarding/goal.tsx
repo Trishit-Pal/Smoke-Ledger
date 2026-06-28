@@ -14,6 +14,7 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { createGoal } from '@/db/repositories/goals';
+import { buildGoalPayload, emptyGoalForm } from '@/domain/goalForm';
 import { setOnboardingStep } from '@/db/repositories/profile';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { track } from '@/services/analytics';
@@ -31,7 +32,12 @@ interface GoalOption {
   placeholder: string;
   defaultTarget: number;
   prefix?: string;
+  /** A time-window goal — no numeric target; persists a default window to refine in-app. */
+  window?: boolean;
 }
+
+// The default no-smoke window seeded at signup (refine the exact hours in-app).
+const DEFAULT_WINDOW_LABEL = '10:00 pm – 6:00 am';
 
 const GOAL_OPTIONS: GoalOption[] = [
   {
@@ -56,24 +62,15 @@ const GOAL_OPTIONS: GoalOption[] = [
     prefix: '₹',
   },
   {
-    id: 'reduction_target',
-    roman: 'III.',
-    label: 'Reduction target',
-    hint: 'A direction — percent below baseline',
-    example: 'e.g. 20% less than I do now',
-    unit: '% below baseline',
-    placeholder: '20',
-    defaultTarget: 20,
-  },
-  {
     id: 'no_smoke_window',
-    roman: 'IV.',
+    roman: 'III.',
     label: 'No-smoke window',
     hint: 'Protected hours each day',
-    example: 'e.g. nothing in the first 4 hours after waking',
-    unit: 'hours protected',
-    placeholder: '4',
-    defaultTarget: 4,
+    example: 'e.g. nothing from 10pm to 6am',
+    unit: '',
+    placeholder: '',
+    defaultTarget: 0,
+    window: true,
   },
 ];
 
@@ -88,19 +85,26 @@ export default function GoalSetup() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const selected = GOAL_OPTIONS.find((g) => g.id === type) ?? null;
-  const canSetGoal = type !== null && target !== '' && Number(target) > 0;
+  const canSetGoal =
+    selected !== null && (Boolean(selected.window) || (target !== '' && Number(target) > 0));
 
   const onSetGoal = async () => {
     if (!type) return;
-    const parsed = Number(target);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setErrorMsg('Enter a valid target value.');
-      return;
-    }
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      await createGoal({ type, targetValue: parsed });
+      // Route through the same payload builder the in-app goal form uses, so a
+      // goal set at signup persists identically to one set later (no theater).
+      const form =
+        type === 'no_smoke_window'
+          ? emptyGoalForm('no_smoke_window')
+          : { ...emptyGoalForm(type), target };
+      const result = buildGoalPayload(form, []);
+      if (!result.ok) {
+        setErrorMsg(result.error);
+        return;
+      }
+      await createGoal(result.payload);
       await track(AnalyticsEvents.GOAL_CREATED, { type });
       await setOnboardingStep('brands');
       router.push('/onboarding/brands');
@@ -246,24 +250,33 @@ export default function GoalSetup() {
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.2 }}>
-                  TARGET
+                  {selected.window ? 'QUIET HOURS' : 'TARGET'}
                 </Text>
                 <Text variant="caption" color={theme.textMuted} style={{ fontStyle: 'italic' }}>
                   {selected.label}
                 </Text>
               </View>
-              <Input
-                label={
-                  selected.prefix
-                    ? `${selected.prefix} Amount (${selected.unit})`
-                    : `Value (${selected.unit})`
-                }
-                keyboardType="number-pad"
-                value={target}
-                onChangeText={setTarget}
-                placeholder={selected.placeholder}
-                autoFocus
-              />
+              {selected.window ? (
+                <View style={{ gap: spacing.xs }}>
+                  <Text variant="h2">{DEFAULT_WINDOW_LABEL}</Text>
+                  <Text variant="small" muted>
+                    Fine-tune the exact hours in the app.
+                  </Text>
+                </View>
+              ) : (
+                <Input
+                  label={
+                    selected.prefix
+                      ? `${selected.prefix} Amount (${selected.unit})`
+                      : `Value (${selected.unit})`
+                  }
+                  keyboardType="number-pad"
+                  value={target}
+                  onChangeText={setTarget}
+                  placeholder={selected.placeholder}
+                  autoFocus
+                />
+              )}
             </View>
           </Card>
         </Reveal>

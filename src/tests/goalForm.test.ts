@@ -5,6 +5,7 @@ import {
   deriveReductionBaseline,
   buildGoalPayload,
   buildGoalPatch,
+  blockingSameTypeGoal,
   type GoalFormState,
 } from '@/domain/goalForm';
 import { daysUntil } from '@/lib/date';
@@ -221,5 +222,34 @@ describe('buildGoalPatch', () => {
 
   it('propagates validation failures', () => {
     expect(buildGoalPatch(form({ type: 'daily_cap', target: '-1' }), [], TODAY).ok).toBe(false);
+  });
+});
+
+describe('blockingSameTypeGoal (dedup rule)', () => {
+  it('blocks an active same-type goal', () => {
+    const goals = [mkGoal({ type: 'daily_cap', status: 'active' })];
+    expect(blockingSameTypeGoal('daily_cap', goals)?.status).toBe('active');
+  });
+
+  it('blocks a paused same-type goal', () => {
+    const goals = [mkGoal({ type: 'daily_cap', status: 'paused' })];
+    expect(blockingSameTypeGoal('daily_cap', goals)?.status).toBe('paused');
+  });
+
+  it('allows a new goal once the prior is completed or abandoned', () => {
+    const goals = [
+      mkGoal({ id: 'g1', type: 'daily_cap', status: 'completed' }),
+      mkGoal({ id: 'g2', type: 'daily_cap', status: 'abandoned' }),
+    ];
+    expect(blockingSameTypeGoal('daily_cap', goals)).toBeNull();
+  });
+
+  it('does not block a different type', () => {
+    const goals = [mkGoal({ type: 'daily_cap', status: 'active' })];
+    expect(blockingSameTypeGoal('spend_cap_daily', goals)).toBeNull();
+  });
+
+  it('returns null for an empty list', () => {
+    expect(blockingSameTypeGoal('daily_cap', [])).toBeNull();
   });
 });
