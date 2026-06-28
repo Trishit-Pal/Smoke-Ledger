@@ -23,13 +23,12 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
   // Spend goals embed ₹ values in their label/explanation — hide those under discreet mode.
   const hideMoney = goal.type === 'spend_cap_daily' && isDiscreetMode(profile);
   const pct = Math.round(Math.max(0, Math.min(100, progress.percent)));
-  // Concern is terracotta (--warn-earth), positive is teal (--accent) — never
-  // alarm-red. Same tokens for the figure and the gauge so they read as one mark.
-  const toneColor = progress.atRisk
-    ? 'var(--warn-earth)'
-    : progress.isOnTrack
-      ? 'var(--accent)'
-      : 'var(--text-muted)';
+  // Teal only when genuinely on track; terracotta for any concern — approaching
+  // OR over the limit. Never alarm-red, and never a muted bar for a breached cap:
+  // the worst state must read as the loudest, not the quietest. Same token for
+  // the figure and the gauge so they read as one mark.
+  const toneColor =
+    progress.isOnTrack && !progress.atRisk ? 'var(--accent)' : 'var(--warn-earth)';
   const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
   const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;
 
@@ -77,7 +76,7 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
 
       <p className="text-small text-text-muted">
         {explanation}
-        {remainingText ? <span className="text-text-faint"> · {remainingText}</span> : null}
+        {remainingText ? <span className="text-text-muted"> · {remainingText}</span> : null}
       </p>
 
       <div className="flex flex-wrap gap-sm mt-xs">

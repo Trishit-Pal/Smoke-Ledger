@@ -526,11 +526,14 @@ export function SettingsClient({
         await new Promise((r) => setTimeout(r, 1600));
       }
       await getSupabase().auth.signOut();
-      router.replace('/login');
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
     } finally {
       setBusy(null);
+      // Always leave — sign-out is best-effort, and navigating away unmounts the
+      // (app)-group farewell overlay. Without this, a thrown signOut() would
+      // strand the user behind the full-screen wave-off with no way to dismiss it.
+      router.replace('/login');
     }
   };
 
