@@ -45,20 +45,6 @@ export function LandingFooter() {
           Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent)' }}> Ledger</span>{' '}
           · Vol. I · Est. 2026
         </p>
-        <p
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 14,
-            color: 'var(--text-muted)',
-            margin: 0,
-            lineHeight: 1.55,
-            maxWidth: 560,
-          }}
-        >
-          Body set in DM Sans. Display in Fraunces. Hairlines in <span className="nums-tabular">1px</span>.
-          Editorial restraint by design.
-        </p>
         <div
           aria-hidden
           style={{ borderTop: '1px solid var(--rule)', width: 60, marginTop: 4 }}

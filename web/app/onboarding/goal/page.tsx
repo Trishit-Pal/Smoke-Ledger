@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TiltCard } from '@web/components/onboarding/TiltCard';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { createGoal } from '@/db/repositories/goals';
+import { buildGoalPayload, emptyGoalForm } from '@/domain/goalForm';
 import { setOnboardingStep } from '@/db/repositories/profile';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { track } from '@/services/analytics';
@@ -22,7 +23,12 @@ interface GoalOption {
   placeholder: string;
   defaultTarget: number;
   prefix?: string;
+  /** A time-window goal — no numeric target; persists a default window to refine in-app. */
+  window?: boolean;
 }
+
+// The default no-smoke window seeded at signup (refine the exact hours in-app).
+const DEFAULT_WINDOW_LABEL = '10:00 pm – 6:00 am';
 
 const GOAL_OPTIONS: GoalOption[] = [
   {
@@ -47,24 +53,15 @@ const GOAL_OPTIONS: GoalOption[] = [
     prefix: '₹',
   },
   {
-    id: 'reduction_target',
-    roman: 'III.',
-    label: 'Reduction target',
-    hint: 'A direction — percent below baseline',
-    example: 'e.g. 20% less than I do now',
-    unit: '% below baseline',
-    placeholder: '20',
-    defaultTarget: 20,
-  },
-  {
     id: 'no_smoke_window',
-    roman: 'IV.',
+    roman: 'III.',
     label: 'No-smoke window',
     hint: 'Protected hours each day',
-    example: 'e.g. nothing in the first 4 hours after waking',
-    unit: 'hours protected',
-    placeholder: '4',
-    defaultTarget: 4,
+    example: 'e.g. nothing from 10pm to 6am',
+    unit: '',
+    placeholder: '',
+    defaultTarget: 0,
+    window: true,
   },
 ];
 
@@ -79,19 +76,25 @@ export default function OnboardingGoalPage() {
 
   const selected = GOAL_OPTIONS.find((g) => g.id === type) ?? null;
   const canContinue =
-    type !== null && target !== '' && Number(target) > 0;
+    selected !== null && (Boolean(selected.window) || (target !== '' && Number(target) > 0));
 
   const onSetGoal = async () => {
     if (!type) return;
-    const parsed = Number(target);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError('Enter a valid target value.');
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
-      await createGoal({ type, targetValue: parsed });
+      // Route through the same payload builder the in-app goal form uses, so a
+      // goal set at signup persists identically to one set later (no theater).
+      const form =
+        type === 'no_smoke_window'
+          ? emptyGoalForm('no_smoke_window')
+          : { ...emptyGoalForm(type), target };
+      const result = buildGoalPayload(form, []);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      await createGoal(result.payload);
       await track(AnalyticsEvents.GOAL_CREATED, { type });
       await setOnboardingStep('brands');
       router.push('/onboarding/brands');
@@ -158,7 +161,7 @@ export default function OnboardingGoalPage() {
               glare
               onClick={() => {
                 setType(g.id);
-                setTarget(String(g.defaultTarget));
+                setTarget(g.window ? '' : String(g.defaultTarget));
               }}
               ariaLabel={`Choose ${g.label}`}
               style={{
@@ -276,7 +279,7 @@ export default function OnboardingGoalPage() {
               flexWrap: 'wrap',
             }}
           >
-            <span className="editorial-caption">Target</span>
+            <span className="editorial-caption">{selected.window ? 'Quiet hours' : 'Target'}</span>
             <span
               style={{
                 fontSize: 12,
@@ -288,43 +291,61 @@ export default function OnboardingGoalPage() {
               {selected.label}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            {selected.prefix ? (
+          {selected.window ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 40,
-                  color: 'var(--text-muted)',
-                  lineHeight: 1,
+                  fontSize: 32,
+                  color: 'var(--text)',
+                  lineHeight: 1.1,
                 }}
               >
-                {selected.prefix}
+                {DEFAULT_WINDOW_LABEL}
               </span>
-            ) : null}
-            <input
-              autoFocus
-              type="number"
-              min={1}
-              step="0.1"
-              inputMode="decimal"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder={selected.placeholder}
-              className="nums-tabular focus-ring"
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 56,
-                color: 'var(--text)',
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                width: 200,
-                padding: 0,
-                lineHeight: 1,
-              }}
-            />
-            <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{selected.unit}</span>
-          </div>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Fine-tune the exact hours in the app.
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              {selected.prefix ? (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 40,
+                    color: 'var(--text-muted)',
+                    lineHeight: 1,
+                  }}
+                >
+                  {selected.prefix}
+                </span>
+              ) : null}
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                step="0.1"
+                inputMode="decimal"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder={selected.placeholder}
+                className="nums-tabular focus-ring"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 56,
+                  color: 'var(--text)',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  width: 200,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              />
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>{selected.unit}</span>
+            </div>
+          )}
         </div>
       ) : null}
 

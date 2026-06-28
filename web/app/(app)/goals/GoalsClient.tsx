@@ -11,6 +11,8 @@ import {
   goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
+  blockingSameTypeGoal,
+  goalTypeLabel,
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
@@ -272,6 +274,13 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         setBusy(null);
       }
     } else {
+      const blocker = blockingSameTypeGoal(formState.type, goals);
+      if (blocker) {
+        setFormError(
+          `You already have a ${goalTypeLabel(formState.type).toLowerCase()} goal. Complete it before adding another.`,
+        );
+        return;
+      }
       const result = buildGoalPayload(formState, logs, today);
       if (!result.ok) { setFormError(result.error); return; }
       setBusy('submit');

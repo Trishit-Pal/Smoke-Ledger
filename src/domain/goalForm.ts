@@ -36,6 +36,18 @@ export function goalTypeLabel(type: GoalType): string {
   return GOAL_TYPE_META.find((m) => m.type === type)?.label ?? 'Goal';
 }
 
+/**
+ * The existing goal of the same type that blocks creating a new one. A user may
+ * hold at most ONE active-or-paused goal per type; a same-type goal can only be
+ * created again once the prior is completed or abandoned. Editing is unaffected.
+ * Shared by both platforms so the rule reads identically on web and mobile.
+ */
+export function blockingSameTypeGoal(type: GoalType, goals: readonly Goal[]): Goal | null {
+  return (
+    goals.find((g) => g.type === type && (g.status === 'active' || g.status === 'paused')) ?? null
+  );
+}
+
 /** Form state captured by the goal form UI. Web and mobile share this shape. */
 export interface GoalFormState {
   type: GoalType;

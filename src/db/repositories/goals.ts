@@ -2,6 +2,7 @@ import type { Goal, GoalType } from '@/types';
 import { makeId } from '@/lib/id';
 import { todayIst } from '@/lib/date';
 import { getSupabase } from '@/lib/supabase';
+import { AppError } from '@/lib/errors';
 import { mapDbError, requireUserId } from '@/db/repositories/_supabase';
 import {
   GoalSchema,
@@ -86,6 +87,20 @@ export async function createGoal(input: {
   );
   const supabase = getSupabase();
   const userId = await requireUserId();
+  // Dedup: at most one active-or-paused goal per type. A same-type goal can be
+  // created again once the prior is completed/abandoned. The form guards this for
+  // UX; this catches direct/API/race paths.
+  const { data: clashing, error: clashErr } = await supabase
+    .from('goals')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', validated.type)
+    .in('status', ['active', 'paused'])
+    .limit(1);
+  if (clashErr) throw mapDbError(clashErr);
+  if (clashing && clashing.length > 0) {
+    throw new AppError('conflict', 'A goal of this type is already active.');
+  }
   const id = makeId('gol');
   const now = new Date().toISOString();
   const { data, error } = await supabase
