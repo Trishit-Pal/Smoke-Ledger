@@ -79,6 +79,35 @@ export function onFarewell(handler: () => void): EmitterSubscription {
   return DeviceEventEmitter.addListener(CHARACTER_FAREWELL_EVENT, handler);
 }
 
+// ── Goal moments — restrained editorial overlays (no confetti, no badges). ────
+export const CHARACTER_GOAL_COMPLETION_EVENT = 'character:goal-completion';
+export const CHARACTER_GOAL_DELETION_EVENT = 'character:goal-deletion';
+
+export interface GoalMomentDetail {
+  /** Editorial headline, shown large. */
+  title: string;
+  /** Supporting line under the headline. */
+  body: string;
+}
+
+/** Fire the quiet goal-completion overlay (figure applauds; no confetti). */
+export function dispatchGoalCompletion(detail: GoalMomentDetail): void {
+  DeviceEventEmitter.emit(CHARACTER_GOAL_COMPLETION_EVENT, detail);
+}
+
+/** Fire the sentimental overlay shown when an unaccomplished goal is deleted. */
+export function dispatchGoalDeletion(detail: GoalMomentDetail): void {
+  DeviceEventEmitter.emit(CHARACTER_GOAL_DELETION_EVENT, detail);
+}
+
+export function onGoalCompletion(handler: (detail: GoalMomentDetail) => void): EmitterSubscription {
+  return DeviceEventEmitter.addListener(CHARACTER_GOAL_COMPLETION_EVENT, handler);
+}
+
+export function onGoalDeletion(handler: (detail: GoalMomentDetail) => void): EmitterSubscription {
+  return DeviceEventEmitter.addListener(CHARACTER_GOAL_DELETION_EVENT, handler);
+}
+
 // ── Streak milestone tiers — mirrors web/lib/character/mood.ts MILESTONE_TIERS ──
 const MILESTONE_TIERS: ReadonlyArray<MilestoneEventDetail> = [
   { days: 1,   title: 'One day, quieter.',    body: 'The first day under your baseline is the hardest. You took it.' },
