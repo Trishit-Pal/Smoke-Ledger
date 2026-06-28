@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Divider } from '@/components/ui/Divider';
 import { HealthMilestones } from '@/components/ui/HealthMilestones';
+import { FactsCarousel } from '@/components/ui/FactsCarousel';
 import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
@@ -838,6 +839,11 @@ export default function Home() {
           </Text>
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </View>
+      </FadeSlideIn>
+
+      {/* ── Did you know — sourced facts ── */}
+      <FadeSlideIn index={6}>
+        <FactsCarousel count={4} />
       </FadeSlideIn>
 
       {/* ── Editor's note — single insight ── */}

@@ -141,6 +141,30 @@ export const SMOKING_FACTS: readonly SmokingFact[] = [
     body: 'Over 20 years invested at 10% annual return, that grows to ~₹31 lakh — real generational money.',
     source: 'Calculation', weight: 1,
   },
+  {
+    id: 'fact_craving_window', category: 'recovery',
+    headline: 'A craving peaks fast and passes in 3–5 minutes',
+    body: 'Nicotine reaches the brain in about 10 seconds, which is why urges feel so urgent. But a single craving typically crests and fades within a few minutes whether or not you smoke — riding one out is the whole skill.',
+    source: 'NHS UK', sourceUrl: 'https://www.nhs.uk/live-well/quit-smoking/', weight: 2,
+  },
+  {
+    id: 'fact_withdrawal_curve', category: 'recovery',
+    headline: 'Withdrawal is worst on days 2–3, then steadily eases',
+    body: 'Physical nicotine withdrawal usually peaks around 48–72 hours after the last cigarette and largely settles within two to four weeks. Knowing the curve makes the hard days easier to place.',
+    source: 'American Cancer Society', weight: 2,
+  },
+  {
+    id: 'fact_trigger_unlearn', category: 'recovery',
+    headline: 'Trigger-linked urges weaken the more you don’t act on them',
+    body: 'A craving tied to a coffee, a break or a commute fades each time the cue isn’t followed by a cigarette. The association unlearns with repetition — not willpower alone.',
+    source: 'National Cancer Institute (smokefree.gov)', sourceUrl: 'https://smokefree.gov/', weight: 1,
+  },
+  {
+    id: 'fact_support_doubles', category: 'recovery',
+    headline: 'A plan plus support roughly doubles your odds of quitting',
+    body: 'Combining intent with a method — a quitline, behavioural support, or nicotine-replacement therapy — consistently outperforms going it alone. Wanting to stop is the start; a method carries it.',
+    source: 'NHS UK / Cochrane reviews', sourceUrl: 'https://www.nhs.uk/live-well/quit-smoking/', weight: 1,
+  },
 ] as const;
 
 export function pickRandomFacts(n: number, seenIds: ReadonlySet<string> = new Set()): SmokingFact[] {

@@ -40,6 +40,7 @@ import { track } from '@/services/analytics';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 import { HealthMilestones } from '@web/components/ui/HealthMilestones';
+import { FactsCarousel } from '@web/components/ui/FactsCarousel';
 import { QuickLogStrip } from '@web/components/dashboard/QuickLogStrip';
 import { WeekStrip } from '@web/components/dashboard/WeekStrip';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
@@ -560,6 +561,11 @@ export function DashboardClient({
         <section style={idx(6)} aria-labelledby="recovery-heading">
           <SectionLabel id="recovery-heading">Body recovery</SectionLabel>
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
+        </section>
+
+        {/* ─────────────── Did you know — sourced facts ─────────────── */}
+        <section style={idx(6.5)} aria-label="Did you know facts">
+          <FactsCarousel count={4} />
         </section>
 
         {/* ─────────────── Editor's note ─────────────── */}
