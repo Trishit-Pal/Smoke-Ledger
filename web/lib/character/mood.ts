@@ -80,6 +80,27 @@ export function dispatchFarewell(): void {
   safeDispatch<void>(CHARACTER_FAREWELL_EVENT, undefined as unknown as void);
 }
 
+// ── Goal moments — restrained editorial overlays (no confetti, no badges). ────
+export const CHARACTER_GOAL_COMPLETION_EVENT = 'character:goal-completion';
+export const CHARACTER_GOAL_DELETION_EVENT = 'character:goal-deletion';
+
+export interface GoalMomentDetail {
+  /** Editorial headline, shown large. */
+  title: string;
+  /** Supporting line under the headline. */
+  body: string;
+}
+
+/** Fire the quiet goal-completion signet overlay (figure applauds; no confetti). */
+export function dispatchGoalCompletion(detail: GoalMomentDetail): void {
+  safeDispatch<GoalMomentDetail>(CHARACTER_GOAL_COMPLETION_EVENT, detail);
+}
+
+/** Fire the sentimental overlay shown when an unaccomplished goal is deleted. */
+export function dispatchGoalDeletion(detail: GoalMomentDetail): void {
+  safeDispatch<GoalMomentDetail>(CHARACTER_GOAL_DELETION_EVENT, detail);
+}
+
 /* ─────────────────────────────────────────────────────────────────────
    Streak helpers — call from DashboardClient when streak changes so the
    right milestone copy is fired. Centralised here so milestone tiers

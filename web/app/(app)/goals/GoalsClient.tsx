@@ -26,6 +26,7 @@ import { cn } from '@web/components/ui/cn';
 import { SectionLabel } from '@web/components/visual';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
+import { dispatchGoalCompletion, dispatchGoalDeletion } from '@web/lib/character/mood';
 
 export interface GoalsClientProps {
   goals: Goal[];
@@ -301,6 +302,12 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
     setBusy(goal.id);
     try {
       await setGoalStatus(goal.id, status);
+      if (status === 'completed') {
+        dispatchGoalCompletion({
+          title: 'Well kept.',
+          body: `You stayed true to your ${goalTypeLabel(goal.type).toLowerCase()}. That counts.`,
+        });
+      }
       await revalidateAppViews();
       router.refresh();
     } catch {
@@ -312,11 +319,18 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const id = deleteTarget.id;
+    const { id, status } = deleteTarget;
     setDeleteTarget(null);
     setBusy(id);
     try {
       await deleteGoal(id);
+      // Sentiment only when an unaccomplished goal is let go — not a completed/abandoned one.
+      if (status === 'active' || status === 'paused') {
+        dispatchGoalDeletion({
+          title: 'No judgment.',
+          body: 'Every attempt teaches you something.',
+        });
+      }
       await revalidateAppViews();
       router.refresh();
     } catch {

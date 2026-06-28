@@ -18,6 +18,7 @@ import { useSession } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
+import { dispatchGoalCompletion, dispatchGoalDeletion } from '@/lib/character/mood';
 import { isDiscreetMode } from '@/lib/discreet';
 import { todayIst } from '@/lib/date';
 import type { Goal } from '@/types';
@@ -48,6 +49,12 @@ export default function GoalsTab() {
     setBusy(goal.id);
     try {
       await setGoalStatus(goal.id, status);
+      if (status === 'completed') {
+        dispatchGoalCompletion({
+          title: 'Well kept.',
+          body: `You stayed true to your ${goalTypeLabel(goal.type).toLowerCase()}. That counts.`,
+        });
+      }
     } finally {
       setBusy(null);
     }
@@ -66,6 +73,13 @@ export default function GoalsTab() {
             setBusy(goal.id);
             try {
               await removeGoal(goal.id);
+              // Sentiment only when an unaccomplished goal is let go.
+              if (goal.status === 'active' || goal.status === 'paused') {
+                dispatchGoalDeletion({
+                  title: 'No judgment.',
+                  body: 'Every attempt teaches you something.',
+                });
+              }
             } finally {
               setBusy(null);
             }
