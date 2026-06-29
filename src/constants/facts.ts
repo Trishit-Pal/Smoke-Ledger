@@ -156,9 +156,9 @@ export const SMOKING_FACTS: readonly SmokingFact[] = [
   },
   {
     id: 'fact_trigger_unlearn', category: 'recovery',
-    headline: ‘Trigger-linked urges weaken the more you don’t act on them’,
-    body: ‘A craving tied to a coffee, a break or a commute fades each time the cue isn’t followed by a cigarette. The association unlearns with repetition — not willpower alone.’,
-    source: ‘National Cancer Institute (smokefree.gov)’, sourceUrl: ‘https://smokefree.gov/’, weight: 1,
+    headline: 'Trigger-linked urges weaken the more you don’t act on them',
+    body: 'A craving tied to a coffee, a break or a commute fades each time the cue isn’t followed by a cigarette. The association unlearns with repetition — not willpower alone.',
+    source: 'National Cancer Institute (smokefree.gov)', sourceUrl: 'https://smokefree.gov/', weight: 1,
   },
   {
     id: 'fact_support_doubles', category: 'recovery',
