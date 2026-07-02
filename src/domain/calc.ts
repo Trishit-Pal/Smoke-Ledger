@@ -157,6 +157,24 @@ export function dailyStats(logs: CigaretteLog[], startYmd: string, endYmd: strin
   return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * Average self-rated craving intensity (0..10) across logs with a non-null
+ * `craving` value in [startYmd, endYmd]. Requires at least 3 tagged logs to
+ * avoid a misleading average from sparse data — returns null below that
+ * threshold, mirroring generateInsights()'s existing `logs.length >= 3` gate.
+ */
+export function avgCravingInWindow(
+  logs: CigaretteLog[],
+  startYmd: string,
+  endYmd: string,
+): number | null {
+  const vals = logs
+    .filter((l) => l.localDate >= startYmd && l.localDate <= endYmd && l.craving != null)
+    .map((l) => l.craving as number);
+  if (vals.length < 3) return null;
+  return vals.reduce((acc, v) => acc + v, 0) / vals.length;
+}
+
 /** Rolling average sticks per day over a trailing window ending at endYmd (inclusive). */
 export function rollingAvgSticks(
   logs: CigaretteLog[],

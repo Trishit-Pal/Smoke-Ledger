@@ -6,6 +6,7 @@ import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
+import { ProgressRing } from '@web/components/ui/ProgressRing';
 
 export interface GoalCardProps {
   goal: Goal;
@@ -44,34 +45,23 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
 
   return (
     <article className="rule-hair py-md flex flex-col gap-sm">
-      <div className="grid grid-cols-[1fr_auto] items-baseline gap-md">
-        <h3 className="text-body text-text min-w-0">{heading}</h3>
-        <span
-          className="editorial-numeral--micro nums-tabular text-right shrink-0"
-          style={{ color: toneColor }}
-        >
-          {pct}%
-        </span>
-      </div>
-
-      {/* Hairline gauge — square-edged, brand tokens only (no pill, no amber/red). */}
-      <div
-        role="progressbar"
-        aria-label={`${goalTypeLabel(goal.type)} progress`}
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        className="w-full overflow-hidden"
-        style={{ height: 2, background: 'var(--rule)' }}
-      >
+      <div className="flex items-center justify-between gap-md">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-body text-text min-w-0">{heading}</h3>
+          <span className="editorial-numeral--micro nums-tabular" style={{ color: toneColor }}>
+            {pct}%
+          </span>
+        </div>
         <div
-          style={{
-            width: `${pct}%`,
-            height: '100%',
-            background: toneColor,
-            transition: 'width 500ms cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
-        />
+          role="progressbar"
+          aria-label={`${goalTypeLabel(goal.type)} progress`}
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="shrink-0"
+        >
+          <ProgressRing percent={pct} color={toneColor} ringBg="var(--rule)" size={44} strokeWidth={4} />
+        </div>
       </div>
 
       <p className="text-small text-text-muted">
