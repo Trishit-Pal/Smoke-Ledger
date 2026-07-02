@@ -2,7 +2,13 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { TiltCard } from '@web/components/onboarding/TiltCard';
+import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
+import { dispatchMood } from '@web/lib/character/mood';
+
+// Deferred + client-only: the WebGL scene is code-split and never blocks the hero LCP.
+const HeroBackground = dynamic(() => import('./HeroBackground'), { ssr: false });
 
 const PRIMARY_CTA_STYLE: React.CSSProperties = {
   height: 56,
@@ -31,6 +37,24 @@ const PILLARS: { num: string; title: string; copy: string }[] = [
 ];
 
 export function LandingHero() {
+  // Greet on load — mirrors the dashboard's soft entrance beat. (Resting mood is
+  // already `greet`, so the figure degrades to a static greet with no JS too.)
+  React.useEffect(() => {
+    const t = window.setTimeout(() => dispatchMood('greet', { durationMs: 1800 }), 400);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Celebrate when the visitor reaches for the primary CTA — throttled so
+  // repeated hover/focus doesn't spam. Confetti auto-skips under reduced motion
+  // inside CharacterCompanion.
+  const lastCelebrateRef = React.useRef(0);
+  const celebrate = React.useCallback(() => {
+    const now = Date.now();
+    if (now - lastCelebrateRef.current < 3000) return;
+    lastCelebrateRef.current = now;
+    dispatchMood('applaud', { celebrate: true });
+  }, []);
+
   return (
     <section
       aria-labelledby="landing-hero-heading"
@@ -41,6 +65,36 @@ export function LandingHero() {
         background: 'var(--bg)',
       }}
     >
+      <HeroBackground />
+
+      {/* Contrast scrim — keeps hero text ≥AA over the scene, biased to the text side. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          background:
+            'radial-gradient(120% 120% at 30% 40%, var(--bg) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 45%, transparent 72%)',
+        }}
+      />
+
+      {/* Character companion — greets on load, applauds on CTA reach. Hidden on
+          narrow screens so it never crowds the headline. */}
+      <div
+        className="hidden md:block"
+        style={{
+          position: 'absolute',
+          top: 'clamp(16px, 3vw, 40px)',
+          right: 'clamp(20px, 5vw, 64px)',
+          zIndex: 1,
+          pointerEvents: 'none',
+        }}
+      >
+        <CharacterCompanion size={72} showCaption={false} />
+      </div>
+
       <div
         aria-hidden
         style={{
@@ -125,7 +179,7 @@ export function LandingHero() {
             flexWrap: 'wrap',
           }}
         >
-          <Link href="/signup" style={PRIMARY_CTA_STYLE}>
+          <Link href="/signup" style={PRIMARY_CTA_STYLE} onMouseEnter={celebrate} onFocus={celebrate}>
             Begin the ledger
             <span aria-hidden style={{ fontSize: 18 }}>
               →
