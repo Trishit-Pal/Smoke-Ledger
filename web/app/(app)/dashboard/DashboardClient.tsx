@@ -18,7 +18,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { revalidateAppViews } from '../_actions/revalidate';
-import { dailyStats, dayShift, lastLog } from '@/domain/calc';
+import { avgCravingInWindow, dailyStats, dayShift, lastLog } from '@/domain/calc';
 import {
   type DailySummaryRow,
   periodWithTrend,
@@ -41,9 +41,13 @@ import { toSafeErrorMessage } from '@/lib/errors';
 
 import { HealthMilestones } from '@web/components/ui/HealthMilestones';
 import { FactsCarousel } from '@web/components/ui/FactsCarousel';
+import { KpiCard } from '@web/components/ui/KpiCard';
+import { ProgressRing } from '@web/components/ui/ProgressRing';
 import { QuickLogStrip } from '@web/components/dashboard/QuickLogStrip';
 import { WeekStrip } from '@web/components/dashboard/WeekStrip';
+import { ActivityLog } from '@web/components/dashboard/ActivityLog';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
+import { FloatingOrb } from '@web/components/visual/FloatingOrb';
 import { SectionLabel, MetricRow } from '@web/components/visual';
 import {
   dispatchMood,
@@ -185,11 +189,48 @@ export function DashboardClient({
   const last = React.useMemo(() => lastLog(logs), [logs]);
   const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
 
+  // Gated real substitute for "cravings resisted" (unobservable, and the
+  // concept doesn't exist in the domain model): the average self-rated
+  // craving intensity on days you did log, over the same trailing week as
+  // the week strip. Requires >=3 tagged logs so a sparse tag doesn't read as
+  // a headline stat.
+  const avgCraving = React.useMemo(
+    () => avgCravingInWindow(logs, daysAgoIst(6), today),
+    [logs, today],
+  );
+
+  // Recent activity — last 5 logs, most-recent first regardless of the
+  // order the server returned them in. Reveals per-log brand + quantity, so it
+  // is suppressed entirely whenever home totals are hidden (the hide-on-home
+  // toggle OR full discreet mode) — the same threat model that masks the
+  // headline count. Nothing sensitive is even constructed when hidden.
+  const activities = React.useMemo(
+    () =>
+      hidden
+        ? []
+        : [...logs]
+            .sort((a, b) => b.tsUtc.localeCompare(a.tsUtc))
+            .slice(0, 5)
+            .map((log) => ({
+              message: `Logged ${log.quantity} ${log.brandNameSnap ?? 'cigarette'}(s)`,
+              subtitle: `${log.variantSnap ?? 'Standard'} · ${log.purchaseMode}`,
+              when: formatIndianDate(log.localDate),
+            })),
+    [logs, hidden],
+  );
+
   const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = React.useMemo(
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
     [activeGoal, logs, today],
   );
+  const goalToneColor = goalProgress
+    ? goalProgress.atRisk
+      ? 'var(--warn-earth)'
+      : goalProgress.isOnTrack
+        ? 'var(--accent)'
+        : 'var(--text-muted)'
+    : 'var(--text-muted)';
   // Spend caps embed ₹ in evaluateGoal().label — show a money-free label under discreet mode.
   const goalHeading =
     activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile)
@@ -363,7 +404,8 @@ export function DashboardClient({
           <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
-            <div className="flex flex-col">
+            <div className="relative flex flex-col">
+              <FloatingOrb className="absolute -z-10 -left-8 -top-6" />
               <span className="editorial-caption mb-sm">{periodCap}</span>
               <div
                 className="editorial-numeral editorial-headline-rise"
@@ -426,8 +468,36 @@ export function DashboardClient({
           </div>
         </section>
 
+        {/* ─────────────── KPI strip ─────────────── */}
+        <section style={idx(3)} aria-label="Key numbers at a glance" className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            label="Today"
+            value={hidden ? '••' : todaySticks}
+            unit={todaySticks === 1 ? 'cigarette' : 'cigarettes'}
+            progress={!hidden && baseline > 0 ? (todaySticks / baseline) * 100 : undefined}
+          />
+          <KpiCard
+            label="Smoke-free streak"
+            value={streak}
+            unit={streak === 1 ? 'day' : 'days'}
+          />
+          <KpiCard
+            label="Spend, last 7 days"
+            value={hidden ? '•••' : formatInr(totalsForWindow(summary, 7, today).spendInr, { compact: true })}
+          />
+          {avgCraving !== null ? (
+            <KpiCard
+              label="Avg craving intensity"
+              value={avgCraving.toFixed(1)}
+              unit="/10"
+              progress={avgCraving * 10}
+              progressColor={avgCraving >= 7 ? 'var(--warn-earth)' : 'var(--accent)'}
+            />
+          ) : null}
+        </section>
+
         {/* ─────────────── Ledger — period-aware rows ─────────────── */}
-        <section style={idx(3)} aria-labelledby="ledger-heading" className="flex flex-col">
+        <section style={idx(4)} aria-labelledby="ledger-heading" className="flex flex-col">
           <SectionLabel id="ledger-heading">The ledger</SectionLabel>
 
           <dl className="flex flex-col">
@@ -490,7 +560,7 @@ export function DashboardClient({
 
         {/* ─────────────── Goal verse ─────────────── */}
         {goalProgress ? (
-          <section style={idx(4)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
+          <section style={idx(5)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
                 Your goal
@@ -501,50 +571,37 @@ export function DashboardClient({
                 </Link>
               ) : null}
             </div>
-            <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
-              {goalHeading}
-              <span className="text-text-faint"> · </span>
-              <span
-                className="editorial-numeral--micro"
-                style={{
-                  color: goalProgress.atRisk
-                    ? 'var(--warn-earth)'
-                    : goalProgress.isOnTrack
-                    ? 'var(--accent)'
-                    : 'var(--text-muted)',
-                }}
-              >
-                {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
-              </span>
-            </p>
-            <div
-              className="relative h-px w-full bg-[var(--rule)] mt-sm overflow-hidden"
-              role="progressbar"
-              aria-valuenow={Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Goal progress"
-            >
+            <div className="flex items-center justify-between gap-md">
+              <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
+                {goalHeading}
+                <span className="text-text-faint"> · </span>
+                <span className="editorial-numeral--micro" style={{ color: goalToneColor }}>
+                  {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
+                </span>
+              </p>
               <div
-                className="absolute inset-y-[-1px] left-0"
-                style={{
-                  width: `${Math.max(0, Math.min(100, goalProgress.percent))}%`,
-                  height: 2,
-                  background: goalProgress.atRisk
-                    ? 'var(--warn-earth)'
-                    : goalProgress.isOnTrack
-                    ? 'var(--accent)'
-                    : 'var(--text-muted)',
-                  transition: 'width 600ms cubic-bezier(0.16,1,0.3,1)',
-                }}
-              />
+                role="progressbar"
+                aria-valuenow={Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Goal progress"
+                className="shrink-0"
+              >
+                <ProgressRing
+                  percent={goalProgress.percent}
+                  color={goalToneColor}
+                  ringBg="var(--rule)"
+                  size={48}
+                  strokeWidth={4}
+                />
+              </div>
             </div>
           </section>
         ) : null}
 
         {/* ─────────────── The last 7 days ─────────────── */}
         {summary.length > 0 ? (
-          <section style={idx(5)} aria-labelledby="week-heading">
+          <section style={idx(6)} aria-labelledby="week-heading">
             <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
               <div className="flex items-baseline justify-between">
                 <SectionLabel id="week-heading" tone="inverse" spacing="none">
@@ -557,20 +614,33 @@ export function DashboardClient({
           </section>
         ) : null}
 
+        {/* ─────────────── Recent activity ─────────────── */}
+        {activities.length > 0 ? (
+          <section style={idx(7)} aria-labelledby="activity-heading" className="flex flex-col subsection-gap">
+            <div className="flex items-baseline justify-between gap-md">
+              <SectionLabel id="activity-heading" spacing="none">Recent activity</SectionLabel>
+              <Link href="/log" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+                View all →
+              </Link>
+            </div>
+            <ActivityLog events={activities} />
+          </section>
+        ) : null}
+
         {/* ─────────────── Body recovery ─────────────── */}
-        <section style={idx(6)} aria-labelledby="recovery-heading">
+        <section style={idx(8)} aria-labelledby="recovery-heading">
           <SectionLabel id="recovery-heading">Body recovery</SectionLabel>
           <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
         </section>
 
         {/* ─────────────── Did you know — sourced facts ─────────────── */}
-        <section style={idx(6.5)} aria-label="Did you know facts">
+        <section style={idx(8.5)} aria-label="Did you know facts">
           <FactsCarousel count={4} />
         </section>
 
         {/* ─────────────── Editor's note ─────────────── */}
         {insights.length > 0 ? (
-          <section style={idx(7)} aria-labelledby="insight-heading" className="flex flex-col subsection-gap">
+          <section style={idx(9)} aria-labelledby="insight-heading" className="flex flex-col subsection-gap">
             <SectionLabel id="insight-heading">From your week</SectionLabel>
             <blockquote className="relative pl-lg border-l-2 border-[var(--rule-strong)]">
               <p className="editorial-pullquote text-text">
@@ -585,7 +655,7 @@ export function DashboardClient({
 
         {/* ─────────────── Empty state ─────────────── */}
         {summary.length === 0 ? (
-          <section style={idx(8)} className="rule-hair pt-lg flex flex-col gap-sm">
+          <section style={idx(10)} className="rule-hair pt-lg flex flex-col gap-sm">
             <p className="editorial-headline text-[clamp(1.125rem,2vw,1.375rem)] text-text">No entries yet.</p>
             <p className="text-body text-text-muted max-w-[40ch]">
               Logging one cigarette is enough to start seeing your spend, your cadence, and the days you skipped.
@@ -601,7 +671,7 @@ export function DashboardClient({
         ) : null}
 
         {/* ─────────────── Footer ─────────────── */}
-        <footer style={idx(9)} className="rule-hair pt-md flex items-center justify-between">
+        <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.push('/log')}

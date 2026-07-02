@@ -23,6 +23,7 @@
     "@radix-ui/react-tooltip": "^1.1.2",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.49.1",
+    "@types/three": "^0.185.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.11",
@@ -36,6 +37,7 @@
     "react-hook-form": "^7.51.0",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.4.0",
+    "three": "^0.185.1",
     "zod": "^3.23.8",
     "zustand": "^4.5.2"
   },

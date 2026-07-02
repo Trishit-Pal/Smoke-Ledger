@@ -20,6 +20,9 @@
   --accent-soft: #E4F3F1;
   --accent-glow: rgba(47, 163, 155, 0.25);
   --shadow-card: 0 8px 32px rgba(11, 15, 20, 0.06);
+  /* Lifted elevation — hover states and the ink-panel "visual climax" surfaces.
+     One step past --shadow-card's resting depth. */
+  --shadow-card-lift: 0 16px 40px rgba(11, 15, 20, 0.10);
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
 
@@ -76,6 +79,7 @@
   --accent-soft: #163230;
   --accent-glow: rgba(47, 163, 155, 0.18);
   --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --shadow-card-lift: 0 20px 56px rgba(0, 0, 0, 0.45);
 
   /* Editorial tokens — dark variants */
   --rule: #2A333F;
@@ -304,10 +308,13 @@
     opacity: 0.35;
   }
 
-  /* Inverted ink panel — used once on the dashboard for editorial contrast. */
+  /* Inverted ink panel — used once on the dashboard for editorial contrast.
+     Carries a permanent lift shadow — each page's one "visual climax" surface
+     is meant to read as physically raised, not just color-inverted. */
   .ink-panel {
     background-color: var(--ink-surface);
     color: var(--ink-surface-text);
+    box-shadow: var(--shadow-card-lift);
   }
   .ink-panel .ink-muted {
     color: var(--ink-surface-muted);
@@ -323,12 +330,44 @@
   .ink-soft-panel {
     background-color: var(--ink-soft);
     color: var(--ink-surface-text);
+    box-shadow: var(--shadow-card-lift);
   }
   .ink-soft-panel .ink-muted {
     color: var(--ink-surface-muted);
   }
   .ink-soft-panel .ink-rule {
     border-color: var(--ink-surface-rule);
+  }
+
+  /* ───────── Editorial depth (3D-depth pilot) ─────────
+     Minimum real surface to replace the no-op glass/card-3d classnames a prior
+     pass left undefined. Opaque and tokenized — no blur/translucency, that's
+     the literal glassmorphism-SaaS look this system deliberately avoids. */
+  .elevated {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+  }
+  .elevated-hover {
+    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+  .elevated-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card-lift);
+  }
+  /* Perspective context for BarChart3D's bar-tilt transform. */
+  .scene-3d {
+    perspective: 1000px;
+  }
+  /* Ambient drift for the restrained FloatingOrb accent glow. */
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .animate-float-slow {
+    animation: float-slow 6s ease-in-out infinite;
   }
 
   /* ───────── Editorial stagger reveal ─────────
@@ -511,6 +550,15 @@
     .rule-draw {
       opacity: 1 !important;
       transform: none !important;
+      animation: none !important;
+    }
+    .elevated-hover {
+      transition: none !important;
+    }
+    .elevated-hover:hover {
+      transform: none !important;
+    }
+    .animate-float-slow {
       animation: none !important;
     }
   }

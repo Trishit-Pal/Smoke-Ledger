@@ -8,6 +8,7 @@ import {
   trendVsBaseline,
   smokeFreeStreak,
   forecastMonthlySpend,
+  avgCravingInWindow,
 } from '@/domain/calc';
 import { potentialSavings, actualSavings, deriveBaselinePerDay } from '@/domain/savings';
 import type { CigaretteLog } from '@/types';
@@ -255,5 +256,46 @@ describe('forecastMonthlySpend', () => {
     const r = forecastMonthlySpend(logs, '2025-03-02');
     // perDay = 200/2 = 100; days-in-month March = 31
     expect(r.forecast).toBeCloseTo(3100);
+  });
+});
+
+describe('avgCravingInWindow', () => {
+  it('returns null when fewer than 3 tagged logs in range', () => {
+    const logs = [
+      mkLog({ localDate: '2025-03-01', craving: 5 }),
+      mkLog({ localDate: '2025-03-02', craving: 7 }),
+    ];
+    expect(avgCravingInWindow(logs, '2025-03-01', '2025-03-07')).toBeNull();
+  });
+
+  it('averages tagged logs once the 3-log threshold is met', () => {
+    const logs = [
+      mkLog({ localDate: '2025-03-01', craving: 4 }),
+      mkLog({ localDate: '2025-03-02', craving: 6 }),
+      mkLog({ localDate: '2025-03-03', craving: 8 }),
+    ];
+    expect(avgCravingInWindow(logs, '2025-03-01', '2025-03-07')).toBe(6);
+  });
+
+  it('excludes logs with a null craving from both the count and the average', () => {
+    const logs = [
+      mkLog({ localDate: '2025-03-01', craving: 10 }),
+      mkLog({ localDate: '2025-03-02', craving: 10 }),
+      mkLog({ localDate: '2025-03-03', craving: 10 }),
+      mkLog({ localDate: '2025-03-04', craving: null }),
+      mkLog({ localDate: '2025-03-05', craving: null }),
+    ];
+    expect(avgCravingInWindow(logs, '2025-03-01', '2025-03-07')).toBe(10);
+  });
+
+  it('only counts logs within the [start, end] window boundaries', () => {
+    const logs = [
+      mkLog({ localDate: '2025-02-28', craving: 1 }), // before window
+      mkLog({ localDate: '2025-03-01', craving: 9 }), // start boundary, included
+      mkLog({ localDate: '2025-03-02', craving: 9 }),
+      mkLog({ localDate: '2025-03-03', craving: 9 }), // end boundary, included
+      mkLog({ localDate: '2025-03-04', craving: 1 }), // after window
+    ];
+    expect(avgCravingInWindow(logs, '2025-03-01', '2025-03-03')).toBe(9);
   });
 });

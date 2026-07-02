@@ -54,6 +54,7 @@ import { formatDelta, formatInr } from '@/lib/format';
 import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
+import { BarChart3D } from '@web/components/charts/BarChart3D';
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@web/components/anim/dynamic';
@@ -523,7 +524,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart data={dowBars} height={160} />
+                <BarChart3D data={dowBars} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 The shape of your week. Weekends and weekdays rarely match.
