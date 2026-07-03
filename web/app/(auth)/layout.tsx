@@ -1,11 +1,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
+import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 import { LEGAL_LINKS } from '@web/lib/legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <EditorialPageShell maxWidth={520}>
+    <EditorialPageShell maxWidth={520} backdrop={<SceneBackdrop intensity="full" />}>
       {children}
       <footer
         style={{

@@ -25,7 +25,6 @@ import { Text } from '@web/components/ui/Text';
 import { cn } from '@web/components/ui/cn';
 import { SectionLabel } from '@web/components/visual';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
-import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import { dispatchGoalCompletion, dispatchGoalDeletion } from '@web/lib/character/mood';
 
@@ -345,15 +344,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   const idx = (n: number): React.CSSProperties => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
-    <>
-      {/* Quiet fixed WebGL backdrop — sibling BEFORE the veil so its z-0 canvas
-          stays behind the content. Product page → dimmer than the homepage. */}
-      <SceneBackdrop intensity="quiet" />
-      <div
-        className="relative min-h-dvh"
-        style={{ zIndex: 1, background: 'color-mix(in srgb, var(--bg) 91%, transparent)' }}
-      >
-        <div className="editorial-stage flex flex-col subsection-gap max-w-2xl mx-auto px-lg md:px-xxl">
+    <div className="editorial-stage flex flex-col subsection-gap max-w-2xl mx-auto px-lg md:px-xxl">
       {/* Masthead */}
       <div style={idx(0)} className="flex items-start justify-between gap-md">
         <EditorialMasthead
@@ -472,9 +463,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         onConfirm={handleDelete}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
       />
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 

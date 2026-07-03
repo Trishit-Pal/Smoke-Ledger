@@ -3,16 +3,19 @@
 /*
  * SceneBackground — a deferred, tokenized WebGL ambient scene pinned to the
  * viewport. Reconciled to the brand:
- *   - three.js is loaded LAZILY (`await import('three')` inside the mount effect)
+ *   - three.js (+ its bundled addons) is loaded LAZILY inside the mount effect
  *     so it lands in a separate async chunk and never blocks first paint / LCP.
- *   - Colors read from the live CSS-var tokens (--accent, --bg), so the scene
- *     matches the theme and recolors when it flips (via next-themes).
- *   - Refractive glass shards + a faint wireframe knot + additive particle haze
- *     + mouse parallax. No low-poly human figures.
+ *   - Colors read from the live CSS-var tokens (--accent, --bg); recolors on
+ *     theme flip (next-themes).
+ *   - Refractive glass shards (now with a real environment map for genuine
+ *     reflection/refraction) + a faint wireframe knot + additive particle haze
+ *     + mouse parallax + a very slow camera orbit. No low-poly human figures.
  *   - `position: fixed` so it stays put and keeps animating while the page
  *     scrolls over it (content rides a translucent veil above it — see callers).
- *   - `intensity` scales the scene's opacities down for a quieter presence on
- *     product (task-focused) pages vs the marketing homepage.
+ *   - `intensity` picks the tier:
+ *       'full'  (brand: homepage, login) — full opacity + UnrealBloom glow.
+ *       'quiet' (product: app pages)     — dimmed opacity, NO bloom pass
+ *                                          (direct render → also cheaper).
  *   - Renders nothing under prefers-reduced-motion or when WebGL is unavailable
  *     (progressive enhancement); pauses its RAF loop only when the tab is hidden.
  *
@@ -29,7 +32,7 @@ const PARTICLE_COUNT = 500;
 export type SceneIntensity = 'full' | 'quiet';
 
 export interface SceneBackgroundProps {
-  /** Scales scene opacity down for calmer product-page presence. Default 'full'. */
+  /** 'full' = brand (opacity + bloom); 'quiet' = product (dim, no bloom). Default 'full'. */
   intensity?: SceneIntensity;
 }
 
@@ -60,15 +63,26 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (reduce.matches || !hasWebGL()) return;
 
-    // Quieter presence on product pages: dim every layer's opacity.
-    const dim = intensity === 'quiet' ? 0.55 : 1;
+    const dim = intensity === 'quiet' ? 0.55 : 1; // opacity tier
+    const useBloom = intensity === 'full'; // boldness reserved for brand surfaces
 
     let disposed = false;
     let cleanup = () => {};
 
-    // Defer the heavy lib: this import is a separate async chunk fetched after
-    // hydration, so it never sits on the LCP path.
-    void import('three').then((THREE) => {
+    // Resolve ALL dynamic imports up front, THEN build — so an unmount between
+    // awaits can never leak a half-constructed renderer. three + its addons all
+    // ship in the `three` package (no extra npm dependency) and land in the
+    // deferred async chunk.
+    void (async () => {
+      const THREE = await import('three');
+      const { RoomEnvironment } = await import('three/examples/jsm/environments/RoomEnvironment.js');
+      const bloomKit = useBloom
+        ? await Promise.all([
+            import('three/examples/jsm/postprocessing/EffectComposer.js'),
+            import('three/examples/jsm/postprocessing/RenderPass.js'),
+            import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
+          ])
+        : null;
       if (disposed || !canvasRef.current) return;
 
       const accent = new THREE.Color(readVar('--accent', '#2FA39B'));
@@ -81,6 +95,12 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
       camera.position.set(0, 0, 22);
+
+      // Real environment map → the glass actually reflects/refracts. Computed
+      // once (PMREM), cheap thereafter.
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envRT.texture;
 
       const currentBg = bg.clone();
       const targetBg = bg.clone();
@@ -110,10 +130,12 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       for (let i = 0; i < GLASS_COUNT; i++) {
         const mat = new THREE.MeshPhysicalMaterial({
           color: accent,
-          roughness: 0.15,
+          roughness: 0.12,
           metalness: 0.05,
-          transmission: 0.85,
-          thickness: 1.2,
+          transmission: 0.9,
+          thickness: 1.4,
+          ior: 1.3,
+          envMapIntensity: 1.1,
           transparent: true,
           opacity: 0.42 * dim,
           clearcoat: 1,
@@ -182,6 +204,39 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       const particles = new THREE.Points(particleGeo, particleMat);
       scene.add(particles);
 
+      // Postprocessing — bloom on brand surfaces only. Product renders direct.
+      // EffectComposer is a three addon (not in the core types), so type it
+      // structurally by the members we use.
+      type Composer = {
+        render: () => void;
+        setSize: (w: number, h: number) => void;
+        dispose: () => void;
+        addPass: (pass: unknown) => void;
+      };
+      let composer: Composer | null = null;
+      let bloomPass: { dispose?: () => void } | null = null;
+      if (bloomKit) {
+        // Degrade to a plain direct render if the composer can't be built on
+        // this GPU, rather than blanking the whole scene.
+        try {
+          const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }] = bloomKit;
+          const c = new EffectComposer(renderer) as unknown as Composer;
+          c.addPass(new RenderPass(scene, camera));
+          const bp = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.65, // strength
+            0.85, // radius
+            0.82, // threshold — only the brightest accents/particles glow
+          );
+          c.addPass(bp);
+          composer = c;
+          bloomPass = bp as unknown as { dispose?: () => void };
+        } catch {
+          composer = null;
+          bloomPass = null;
+        }
+      }
+
       // Interaction + responsiveness.
       let mouseX = 0;
       let mouseY = 0;
@@ -193,6 +248,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        composer?.setSize(window.innerWidth, window.innerHeight);
       };
       window.addEventListener('mousemove', onMouse, { passive: true });
       window.addEventListener('resize', onResize);
@@ -231,11 +287,15 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         }
         particleGeo.attributes.position.needsUpdate = true;
 
-        camera.position.x += (mouseX * 3 - camera.position.x) * 0.03;
-        camera.position.y += (-mouseY * 2 - camera.position.y) * 0.03;
+        // Mouse parallax + a very slow gravitational camera orbit (no spring).
+        const orbitX = Math.sin(t * 0.04) * 1.6;
+        const orbitY = Math.cos(t * 0.05) * 1.0;
+        camera.position.x += (mouseX * 3 + orbitX - camera.position.x) * 0.03;
+        camera.position.y += (-mouseY * 2 + orbitY - camera.position.y) * 0.03;
         camera.lookAt(4, 0, -8);
 
-        renderer.render(scene, camera);
+        if (composer) composer.render();
+        else renderer.render(scene, camera);
         raf = requestAnimationFrame(frame);
       };
       const start = () => {
@@ -260,12 +320,16 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         window.removeEventListener('resize', onResize);
         document.removeEventListener('visibilitychange', onVisibility);
         setBgTargetRef.current = null;
+        composer?.dispose();
+        bloomPass?.dispose?.();
+        envRT.dispose();
+        pmrem.dispose();
         spriteTex.dispose();
         for (const g of geos) g.dispose();
         for (const m of mats) m.dispose();
         renderer.dispose();
       };
-    });
+    })();
 
     return () => {
       disposed = true;

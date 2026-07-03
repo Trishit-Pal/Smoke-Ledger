@@ -12,13 +12,26 @@ import { GoalMoment } from '@web/components/character/GoalMoment';
 // user's cigarette_logs / goals / user_profiles rows change. Cross-tab and
 // cross-device updates flow through here.
 import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
+// One shared fixed WebGL backdrop for the whole authenticated app. Mounted once
+// here (not per-page) so it survives in-app navigation without rebuilding, and
+// covers dashboard/log/trends/history/goals/settings uniformly. Quiet tier
+// (dimmed, no bloom) so task-focused pages stay legible.
+import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh bg-bg text-text">
+    <div className="relative flex min-h-dvh bg-bg text-text">
+      <SceneBackdrop intensity="quiet" />
       <Sidebar />
       <main className="flex-1 min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
-        {children}
+        {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
+            WCAG-AA contrast over the moving scene. */}
+        <div
+          className="relative min-h-dvh"
+          style={{ zIndex: 1, background: 'color-mix(in srgb, var(--bg) 91%, transparent)' }}
+        >
+          {children}
+        </div>
       </main>
       {/* The wrapper carries the safe-area inset (and a matching bg so the inset
           strip is filled) so the nav itself stays a fixed 4rem of touch targets

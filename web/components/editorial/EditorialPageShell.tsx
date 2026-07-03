@@ -8,6 +8,13 @@ export interface EditorialPageShellProps {
   maxWidth?: number;
   showGoHome?: boolean;
   centered?: boolean;
+  /**
+   * Optional pinned backdrop (e.g. the fixed WebGL SceneBackground). Rendered
+   * behind everything; when present, the content column rides a translucent
+   * `--bg` veil so text keeps WCAG-AA contrast over the moving scene. Absent →
+   * the shell renders exactly as before (legal/static callers are unaffected).
+   */
+  backdrop?: React.ReactNode;
 }
 
 export function EditorialPageShell({
@@ -15,6 +22,7 @@ export function EditorialPageShell({
   maxWidth = 640,
   showGoHome = true,
   centered = false,
+  backdrop,
 }: EditorialPageShellProps) {
   return (
     <div
@@ -25,6 +33,7 @@ export function EditorialPageShell({
         color: 'var(--text)',
       }}
     >
+      {backdrop}
       <div
         aria-hidden
         className="paper-noise"
@@ -41,6 +50,8 @@ export function EditorialPageShell({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: centered ? 'center' : 'flex-start',
+          // Veil the content column over the fixed scene (brand tier → 85%).
+          background: backdrop ? 'color-mix(in srgb, var(--bg) 85%, transparent)' : undefined,
         }}
       >
         <div
