@@ -40,7 +40,7 @@ export function LandingProductBento() {
       aria-labelledby="landing-preview-heading"
       style={{
         padding: 'clamp(56px, 8vw, 96px) clamp(20px, 5vw, 64px)',
-        background: 'var(--bg)',
+        background: 'transparent',
       }}
     >
       <div

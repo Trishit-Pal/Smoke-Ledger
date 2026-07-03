@@ -18,7 +18,7 @@ export function LandingFooter() {
     <footer
       style={{
         padding: 'clamp(48px, 6vw, 72px) clamp(20px, 5vw, 64px)',
-        background: 'var(--bg)',
+        background: 'transparent',
         borderTop: '1px solid var(--rule-strong)',
       }}
     >

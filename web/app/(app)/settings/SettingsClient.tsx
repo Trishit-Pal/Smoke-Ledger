@@ -63,6 +63,7 @@ import {
   canChangeMobile,
 } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
+import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
 
 type BusyAction =
@@ -679,6 +680,14 @@ export function SettingsClient({
   // Render
   // ─────────────────────────────────────────────────────────────────────────
   return (
+    <>
+      {/* Quiet fixed WebGL backdrop — sibling BEFORE the veil so its z-0 canvas
+          stays behind the content. Product page → dimmer than the homepage. */}
+      <SceneBackdrop intensity="quiet" />
+      <div
+        className="relative min-h-dvh"
+        style={{ zIndex: 1, background: 'color-mix(in srgb, var(--bg) 91%, transparent)' }}
+      >
     <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
@@ -1386,5 +1395,7 @@ export function SettingsClient({
         onOpenChange={(open) => !open && setConfirmAction(null)}
       />
     </div>
+      </div>
+    </>
   );
 }

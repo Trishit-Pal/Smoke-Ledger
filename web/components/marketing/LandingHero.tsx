@@ -2,13 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { TiltCard } from '@web/components/onboarding/TiltCard';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import { dispatchMood } from '@web/lib/character/mood';
-
-// Deferred + client-only: the WebGL scene is code-split and never blocks the hero LCP.
-const HeroBackground = dynamic(() => import('./HeroBackground'), { ssr: false });
 
 const PRIMARY_CTA_STYLE: React.CSSProperties = {
   height: 56,
@@ -62,24 +58,11 @@ export function LandingHero() {
         position: 'relative',
         overflow: 'hidden',
         padding: 'clamp(56px, 8vw, 96px) clamp(20px, 5vw, 64px) clamp(40px, 5vw, 64px)',
-        background: 'var(--bg)',
+        // Transparent so the page-level fixed WebGL backdrop shows through this
+        // fold (readability is held by the page veil in PublicPageShell).
+        background: 'transparent',
       }}
     >
-      <HeroBackground />
-
-      {/* Contrast scrim — keeps hero text ≥AA over the scene, biased to the text side. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 0,
-          pointerEvents: 'none',
-          background:
-            'radial-gradient(120% 120% at 30% 40%, var(--bg) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 45%, transparent 72%)',
-        }}
-      />
-
       {/* Character companion — greets on load, applauds on CTA reach. Hidden on
           narrow screens so it never crowds the headline. */}
       <div

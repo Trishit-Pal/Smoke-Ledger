@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { PublicPageShell } from '@web/components/layout/PublicPageShell';
+import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 import { AccountDeletedNotice } from '@web/components/marketing/AccountDeletedNotice';
 import { LandingHero } from '@web/components/marketing/LandingHero';
 import { LandingTrustStrip } from '@web/components/marketing/LandingTrustStrip';
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <PublicPageShell>
+    <PublicPageShell backdrop={<SceneBackdrop intensity="full" />}>
       <AccountDeletedNotice />
       <LandingHero />
       <LandingTrustStrip />
