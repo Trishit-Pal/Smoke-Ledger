@@ -1,17 +1,20 @@
 'use client';
 
 /*
- * HeroBackground — a deferred, tokenized WebGL ambient scene behind the landing
- * hero. Adapted from a Three.js prototype but reconciled to the brand:
+ * SceneBackground — a deferred, tokenized WebGL ambient scene pinned to the
+ * viewport. Reconciled to the brand:
  *   - three.js is loaded LAZILY (`await import('three')` inside the mount effect)
- *     so it lands in a separate async chunk and never blocks the hero text / LCP.
+ *     so it lands in a separate async chunk and never blocks first paint / LCP.
  *   - Colors read from the live CSS-var tokens (--accent, --bg), so the scene
  *     matches the theme and recolors when it flips (via next-themes).
- *   - Medium intensity: refractive glass shards + a faint wireframe knot +
- *     additive particle haze + mouse parallax. No low-poly human figures.
- *   - Renders nothing under prefers-reduced-motion or when WebGL is unavailable —
- *     the hero is already complete without it (progressive enhancement).
- *   - Pauses its RAF loop when the tab is hidden or the hero scrolls offscreen.
+ *   - Refractive glass shards + a faint wireframe knot + additive particle haze
+ *     + mouse parallax. No low-poly human figures.
+ *   - `position: fixed` so it stays put and keeps animating while the page
+ *     scrolls over it (content rides a translucent veil above it — see callers).
+ *   - `intensity` scales the scene's opacities down for a quieter presence on
+ *     product (task-focused) pages vs the marketing homepage.
+ *   - Renders nothing under prefers-reduced-motion or when WebGL is unavailable
+ *     (progressive enhancement); pauses its RAF loop only when the tab is hidden.
  *
  * The canvas is aria-hidden and pointer-events:none; it is pure atmosphere.
  */
@@ -22,6 +25,13 @@ import type * as THREE_NS from 'three'; // type-only: erased at build, no runtim
 
 const GLASS_COUNT = 7;
 const PARTICLE_COUNT = 500;
+
+export type SceneIntensity = 'full' | 'quiet';
+
+export interface SceneBackgroundProps {
+  /** Scales scene opacity down for calmer product-page presence. Default 'full'. */
+  intensity?: SceneIntensity;
+}
 
 function readVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -38,7 +48,7 @@ function hasWebGL(): boolean {
   }
 }
 
-export function HeroBackground() {
+export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const { resolvedTheme } = useTheme();
   // Set by the scene once mounted so the theme effect can retarget the fog color.
@@ -50,11 +60,14 @@ export function HeroBackground() {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (reduce.matches || !hasWebGL()) return;
 
+    // Quieter presence on product pages: dim every layer's opacity.
+    const dim = intensity === 'quiet' ? 0.55 : 1;
+
     let disposed = false;
     let cleanup = () => {};
 
     // Defer the heavy lib: this import is a separate async chunk fetched after
-    // hydration, so it never sits on the hero's LCP path.
+    // hydration, so it never sits on the LCP path.
     void import('three').then((THREE) => {
       if (disposed || !canvasRef.current) return;
 
@@ -102,7 +115,7 @@ export function HeroBackground() {
           transmission: 0.85,
           thickness: 1.2,
           transparent: true,
-          opacity: 0.42,
+          opacity: 0.42 * dim,
           clearcoat: 1,
           clearcoatRoughness: 0.1,
         });
@@ -123,7 +136,7 @@ export function HeroBackground() {
 
       // Faint wireframe knot — the "journey" motif, kept very low opacity.
       const knotGeo = new THREE.TorusKnotGeometry(6, 1.3, 140, 16);
-      const knotMat = new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.06 });
+      const knotMat = new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.06 * dim });
       geos.push(knotGeo);
       mats.push(knotMat);
       const knot = new THREE.Mesh(knotGeo, knotMat);
@@ -160,7 +173,7 @@ export function HeroBackground() {
         size: 0.32,
         map: spriteTex,
         transparent: true,
-        opacity: 0.28,
+        opacity: 0.28 * dim,
         color: accent.clone().lerp(new THREE.Color('#ffffff'), 0.4),
         depthWrite: false,
         blending: THREE.AdditiveBlending,
@@ -184,7 +197,8 @@ export function HeroBackground() {
       window.addEventListener('mousemove', onMouse, { passive: true });
       window.addEventListener('resize', onResize);
 
-      // Run loop with pause gating (tab hidden / hero offscreen).
+      // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
+      // scene is a fixed backdrop that must keep living through the whole scroll.)
       let raf = 0;
       let running = true;
       let clockStart = performance.now();
@@ -240,18 +254,11 @@ export function HeroBackground() {
       const onVisibility = () => (document.hidden ? stop() : start());
       document.addEventListener('visibilitychange', onVisibility);
 
-      const io = new IntersectionObserver(
-        (entries) => (entries[0]?.isIntersecting ? start() : stop()),
-        { threshold: 0 },
-      );
-      io.observe(canvas);
-
       cleanup = () => {
         stop();
         window.removeEventListener('mousemove', onMouse);
         window.removeEventListener('resize', onResize);
         document.removeEventListener('visibilitychange', onVisibility);
-        io.disconnect();
         setBgTargetRef.current = null;
         spriteTex.dispose();
         for (const g of geos) g.dispose();
@@ -264,7 +271,7 @@ export function HeroBackground() {
       disposed = true;
       cleanup();
     };
-  }, []);
+  }, [intensity]);
 
   // Retarget the fog/background color when the theme flips (accent is theme-stable).
   React.useEffect(() => {
@@ -276,7 +283,7 @@ export function HeroBackground() {
       ref={canvasRef}
       aria-hidden
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
         width: '100%',
         height: '100%',
@@ -287,4 +294,4 @@ export function HeroBackground() {
   );
 }
 
-export default HeroBackground;
+export default SceneBackground;

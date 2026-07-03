@@ -8,7 +8,7 @@ export function LandingTrustStrip() {
         padding: 'clamp(40px, 5vw, 64px) clamp(20px, 5vw, 64px)',
         borderTop: '1px solid var(--rule)',
         borderBottom: '1px solid var(--rule)',
-        background: 'var(--bg)',
+        background: 'transparent',
       }}
     >
       <div

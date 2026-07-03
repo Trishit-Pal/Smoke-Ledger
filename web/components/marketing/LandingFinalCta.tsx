@@ -26,7 +26,7 @@ export function LandingFinalCta() {
       aria-labelledby="landing-final-cta-heading"
       style={{
         padding: 'clamp(72px, 10vw, 120px) clamp(20px, 5vw, 64px)',
-        background: 'var(--bg)',
+        background: 'transparent',
         borderTop: '1px solid var(--rule)',
         position: 'relative',
         overflow: 'hidden',
