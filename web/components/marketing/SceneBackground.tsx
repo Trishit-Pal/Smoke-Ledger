@@ -5,8 +5,11 @@
  * viewport. Reconciled to the brand:
  *   - three.js (+ its bundled addons) is loaded LAZILY inside the mount effect
  *     so it lands in a separate async chunk and never blocks first paint / LCP.
- *   - Colors read from the live CSS-var tokens (--accent, --bg); recolors on
- *     theme flip (next-themes).
+ *   - Colors read from the live CSS-var tokens (--accent, --bg) at construction.
+ *     Only --bg/fog resyncs live on theme flip (next-themes) today — --accent
+ *     is currently identical in both themes, so accent-derived materials
+ *     (glass/knot/particles/rim light) don't need to; wire a resync for those
+ *     too if --accent ever becomes theme-dependent.
  *   - Refractive glass shards (now with a real environment map for genuine
  *     reflection/refraction) + a faint wireframe knot + additive particle haze
  *     + mouse parallax + a very slow camera orbit. No low-poly human figures.
@@ -91,15 +94,25 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
+      // UnrealBloomPass requires tone mapping — without it, any pixel the
+      // additive bloom composite pushes past 1.0 hard-clips to pure white
+      // instead of compressing softly, reading harsher than the restrained
+      // brand intends and eating into text contrast headroom.
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
       camera.position.set(0, 0, 22);
 
       // Real environment map → the glass actually reflects/refracts. Computed
-      // once (PMREM), cheap thereafter.
+      // once (PMREM), cheap thereafter. The RoomEnvironment scene itself is
+      // only a one-shot bake source — dispose it right after so its ~10 box
+      // geometries/materials don't linger.
       const pmrem = new THREE.PMREMGenerator(renderer);
-      const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      const roomEnv = new RoomEnvironment();
+      const envRT = pmrem.fromScene(roomEnv, 0.04);
+      roomEnv.dispose();
       scene.environment = envRT.texture;
 
       const currentBg = bg.clone();
