@@ -8,7 +8,8 @@ export type FactCategory =
   | 'finance'
   | 'recovery'
   | 'environment'
-  | 'youth';
+  | 'youth'
+  | 'cravings';
 
 export interface SmokingFact {
   id: string;
@@ -164,6 +165,30 @@ export const SMOKING_FACTS: readonly SmokingFact[] = [
     headline: 'A plan plus support roughly doubles your odds of quitting',
     body: 'Combining intent with a method — a quitline, behavioural support, or nicotine-replacement therapy — consistently outperforms going it alone. Wanting to stop is the start; a method carries it.',
     source: 'NHS UK / Cochrane reviews', sourceUrl: 'https://www.nhs.uk/live-well/quit-smoking/', weight: 1,
+  },
+  {
+    id: 'fact_craving_duration', category: 'cravings',
+    headline: 'A craving typically peaks and passes in 3–5 minutes',
+    body: 'Urges feel permanent but are not. Riding out the wave — walking, breathing, drinking water — is usually enough. Each one you outlast weakens the next.',
+    source: 'NHS UK / Allen Carr Foundation', weight: 3,
+  },
+  {
+    id: 'fact_nicotine_speed', category: 'cravings',
+    headline: 'Nicotine reaches the brain in 10 seconds',
+    body: 'That speed is why the loop is so hard to break — relief is nearly instant. Understanding the mechanism takes some of its power away.',
+    source: 'NIDA (National Institute on Drug Abuse)', weight: 2,
+  },
+  {
+    id: 'fact_brain_reset', category: 'cravings',
+    headline: 'The brain\'s dopamine system takes 4–12 weeks to rebalance after quitting',
+    body: 'Cravings are strongest in the first two weeks, then fade as receptors down-regulate. The hardest stretch is also the shortest before the curve turns.',
+    source: 'Neuropsychopharmacology, 2014', weight: 2,
+  },
+  {
+    id: 'fact_stress_trigger', category: 'cravings',
+    headline: 'Stress is the most common trigger for relapse',
+    body: 'Nicotine temporarily suppresses cortisol — so lighting up \'works\' in the short term. Quitters who build a substitute stress outlet halve their relapse risk.',
+    source: 'Journal of Abnormal Psychology, 2012', weight: 2,
   },
 ] as const;
 

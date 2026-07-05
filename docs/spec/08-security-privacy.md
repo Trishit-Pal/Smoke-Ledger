@@ -3,9 +3,12 @@ section: security-privacy
 sources:
   - supabase/migrations/**
   - supabase/functions/**
-  - web/lib/server/auth.ts
+  - web/middleware.ts
+  - web/lib/supabase/server.ts
+  - web/lib/supabase/admin.ts
+  - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: 2fdf20b
+last_verified_commit: 6ba0597
 status: current
 ---
 
@@ -169,10 +172,12 @@ The `rls-integration` CI job is configured as a required branch protection check
 
 ## Open gaps
 
-**AUDIT_PEPPER not surfaced as a GUC in all paths.** The pepper reaches the DB function `erase_account_data` via `current_setting('app.audit_pepper', true)`. If the GUC is not set (e.g., on a freshly linked CI project where only the Edge Function secret was configured), `erase_account_data` silently uses an empty string as the pepper, producing a hash that is valid but trivially reversible. There is no runtime check or migration guard that asserts the GUC is non-empty before the erase proceeds.
-
 **Leaked-password protection is a dashboard toggle, not enforced by code.** The Supabase advisor flags `auth_leaked_password_protection` as a WARN because the toggle must be enabled manually in the dashboard (Authentication → Security → Password Strength). It cannot be set via migration. The ops checklist tracks it (`docs/deployment/production-ops-checklist.md:§2`), but there is no automated gate that fails the build if it is off.
 
-**No server-side web auth module found at `web/lib/server/auth.ts`.** The manifest lists this path as a source for this section; the file does not exist in the current working tree. Either the file was deleted and the manifest has not been updated, or the web app's server-side auth logic lives elsewhere (likely in Next.js route handlers under `web/app/`).
+## Resolved gaps
+
+**AUDIT_PEPPER guard added** (`supabase/migrations/20260629000000_erase_pepper_guard.sql`). `erase_account_data` now raises `P0001` immediately if `current_setting('app.audit_pepper', true)` returns an empty string, preventing a trivially reversible audit hash on freshly linked CI/staging projects where only the Edge Function secret is configured.
+
+**Stale spec manifest resolved.** `web/lib/server/auth.ts` did not exist — the web app's server-side auth logic lives in `web/middleware.ts` (session gate, consent funnel, CSP), `web/lib/supabase/server.ts` (server Supabase client), `web/lib/supabase/admin.ts` (service-role client), and `web/app/auth/callback/route.ts` (OAuth/magic link callback). The `sources:` frontmatter has been updated to reflect the real files.
 
 **The `compliance.delete` CHECK constraint discrepancy is resolved.** The June 2026 sovereignty audit marked `error_events_compliance_delete_null_user_check` as absent (MEDIUM finding). It is present in the live DB as of 2026-06-19. The audit was a point-in-time snapshot and reflected a lag between the migration being written and being probed. The finding is closed.
