@@ -14,7 +14,7 @@ skill before each launch.
 | RLS coverage (public tables) | ✅ All 13 tables `RLS ENABLED` |
 | Anon default-deny (live probe) | ✅ 0 tenant rows readable by anon; data-rights RPCs + delete-account reject anon |
 | `SECURITY DEFINER` search_path hygiene | ✅ All 15 functions pin an explicit (non-caller) search_path |
-| `error_events` audit immutability | ⚠️ Layers 1+2 present; **layer-3 CHECK constraint absent** (MEDIUM, defense-in-depth) |
+| `error_events` audit immutability | ✅ All 3 layers present (layer-3 CHECK restored via `20260619000000_error_events_compliance_check`, verified live 2026-07-05) |
 | RPC grant model | ✅ Matches the by-design signed-in API surface |
 | Security advisors | ✅ Only known-accepted WARN/INFO (leaked-password toggle + by-design + rate_limit_counters) |
 | Performance advisors | ✅ Only 4 unused-index INFO on `cigarette_logs` (no data pre-launch) |
@@ -61,7 +61,14 @@ hijack:
 
 No function inherits the caller's search_path. No action required.
 
-## 4. `error_events` audit immutability — MEDIUM finding
+## 4. `error_events` audit immutability — MEDIUM finding — **RESOLVED 2026-07-05**
+
+> **Status update (2026-07-05):** migration
+> `20260619000000_error_events_compliance_check.sql` (live ledger row
+> `20260619075741`) added the layer-3 constraint. Verified in `pg_constraint`:
+> `error_events_compliance_delete_null_user_check`
+> `CHECK (category <> 'compliance.delete' OR user_id IS NULL)`. All three
+> layers are now live. Original finding kept below for the record.
 
 Genuine compliance-delete audit rows are written by the edge function
 (service-role) with `user_id = NULL`. Intended enforcement is three layers; the
