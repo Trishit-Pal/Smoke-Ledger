@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { revalidateAppViews } from '../_actions/revalidate';
+import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { createGoal, updateGoal, setGoalStatus, deleteGoal } from '@/db/repositories/goals';
 import { toSafeErrorMessage } from '@/lib/errors';
 import {

@@ -26,7 +26,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
-import { revalidateAppViews } from '../../_actions/revalidate';
+import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { resolveLogUnitPrice } from '@/domain/calc';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
@@ -221,16 +221,22 @@ export function LogNewClient({ brands }: LogNewClientProps) {
         inferredUnitInr: inferred,
       });
 
-      // Backdated timestamps are capped at 24h back, never in the future.
-      // The UI also caps; this is the in-form guard so a stale state or a
-      // browser bug never lets an out-of-range ts through.
+      // Resolve the timestamp against a FRESH clock. "Now" logs at the current
+      // instant. A custom backdate is re-clamped into the valid [now-24h, now]
+      // window (with a small buffer off the 24h floor to absorb client/server
+      // clock skew) rather than rejected: the picker validated against a clock
+      // frozen at mount, so a form left open a while could otherwise trip the
+      // cap on a pick that was in-window when chosen. Clamping — not throwing —
+      // means a legitimate within-window entry never surfaces a false error.
       const now = new Date();
-      const requestedTs = backdate ?? now;
-      if (requestedTs.getTime() > now.getTime()) {
-        throw new Error("A log can't be dated in the future.");
-      }
-      if (requestedTs.getTime() < maxBackdateMs(now)) {
-        throw new Error('Logs can only be backdated up to 24 hours.');
+      let requestedTs: Date;
+      if (backdate == null) {
+        requestedTs = now;
+      } else {
+        const SKEW_BUFFER_MS = 60_000;
+        const minMs = maxBackdateMs(now) + SKEW_BUFFER_MS;
+        const maxMs = now.getTime();
+        requestedTs = new Date(Math.max(minMs, Math.min(maxMs, backdate.getTime())));
       }
 
       await createLog({

@@ -4,7 +4,7 @@ import * as React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { revalidateAppViews } from '@web/app/(app)/_actions/revalidate';
+import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { updateLog } from '@/db/repositories/logs';
 import { round2 } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';

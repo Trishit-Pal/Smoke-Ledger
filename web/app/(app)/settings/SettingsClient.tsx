@@ -38,7 +38,10 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { revalidateAppViews, revalidateBrands } from '../_actions/revalidate';
+import {
+  safeRevalidateAppViews as revalidateAppViews,
+  safeRevalidateBrands as revalidateBrands,
+} from '@web/lib/safeRevalidate';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSupabase } from '@web/lib/supabase/client';

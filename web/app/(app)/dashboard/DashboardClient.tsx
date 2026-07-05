@@ -17,7 +17,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { revalidateAppViews } from '../_actions/revalidate';
+import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { avgCravingInWindow, dailyStats, dayShift, lastLog } from '@/domain/calc';
 import {
   type DailySummaryRow,

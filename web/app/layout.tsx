@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@web/components/providers/AuthProvider';
 import { UserThemeSync } from '@web/components/providers/UserThemeSync';
 import { ThemeToggle } from '@web/components/layout/ThemeToggle';
+import { ChunkReloadGuard } from '@web/components/system/ChunkReloadGuard';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${fraunces.variable}`}>
       <body>
+        <ChunkReloadGuard />
         <ThemeProvider
           nonce={nonce}
           attribute="class"
