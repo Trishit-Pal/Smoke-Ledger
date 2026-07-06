@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: f1bd2bb
+last_verified_commit: a979537
 status: current
 ---
 
@@ -144,7 +144,7 @@ These must never break.
 
 **`mobile_changed_at` is read-only from the client.** The `rowToProfile` function in the repository reads `mobile_changed_at` from the DB row (`src/db/repositories/profile.ts:54`), and `updateProfile` never includes it in the outbound `row` object (`src/db/repositories/profile.ts:92`–`108`). A client that tried to send it would see the field silently dropped, not a DB error.
 
-**Zod trims and strips null bytes before the DB.** `ProfileSchema` applies a `.transform()` to string fields that strips ` ` characters and trims whitespace (`src/lib/validation.ts:51`–`55`). An empty-after-trim name is rejected (`min(1)` on the `BoundedString` pipe). This means `updateProfile({ fullName: '   ' })` is caught by the schema and never reaches the DB.
+**Zod trims and strips null bytes before the DB.** `ProfileSchema` applies a `.transform()` to string fields that strips `\u0000` characters and trims whitespace (`src/lib/validation.ts:51`–`55`). An empty-after-trim name is rejected (`min(1)` on the `BoundedString` pipe). This means `updateProfile({ fullName: '   ' })` is caught by the schema and never reaches the DB.
 
 ## Tests
 

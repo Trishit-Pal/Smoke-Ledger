@@ -12,7 +12,7 @@ sources:
   - web/app/onboarding/done/**
   - web/app/(auth)/login/page.tsx
   - web/components/marketing/AccountDeletedNotice.tsx
-last_verified_commit: 2fdf20b
+last_verified_commit: a979537
 status: current
 ---
 
@@ -88,6 +88,17 @@ The birthday effect runs after the profile loads (`index.tsx:426–439`). A `bir
 The streak effect stores the previous streak value in `prevStreakRef`. It calls `milestoneForStreak` and dispatches a milestone when `streak > prev` — so the milestone never fires on first load. When the streak drops to `0` from a previous value of `3` or more, it instead dispatches a `concern` mood (the streak-break nudge) plus a `warn()` haptic on mobile; smaller drops and non-zero values are ignored. On first render, `prevStreakRef` is set to the current value and the effect returns early.
 
 **Web (`web/app/(app)/dashboard/DashboardClient.tsx`).** The same effects exist with identical logic and copy, including the streak-break branch (`concern` mood, no haptic on web). The web version uses `React.useRef` and `React.useEffect` rather than bare `useRef`/`useEffect`, and the birthday event shape is the same object (`type: 'birthday'`, `days: 0`, same title, same body).
+
+On both platforms the streak that drives these effects now comes from `streakFromRows(summary, today)` — the canonical daily summary, up to 365 days — rather than the raw 90-day log window, so a long streak no longer truncates at the log-fetch horizon.
+
+### Goal moments — `GoalMoment`
+
+Two quieter moments got their own overlay (`src/components/character/GoalMoment.tsx` native, `web/components/character/GoalMoment.tsx` web), modelled on `LogoutFarewell` but self-dismissing on a ~2.6 s timer (and on tap/click) because the goals page doesn't navigate afterwards:
+
+- **Completion** — the figure applauds with "Well kept." Congratulation, never confetti.
+- **Deletion of an unaccomplished goal** — the figure breathes with "No judgment." Sentiment for a goal let go, never guilt.
+
+The mood bus carries them as `character:goal-completion` / `character:goal-deletion` events with a `{ title, body }` detail (`dispatchGoalCompletion` / `dispatchGoalDeletion` in `src/lib/character/mood.ts` and `web/lib/character/mood.ts`). The component is mounted once — in the web `(app)` layout and in `app/_layout.tsx` on mobile — and renders nothing until an event fires.
 
 ### The modal — `src/components/character/MilestoneCelebration.tsx`
 
