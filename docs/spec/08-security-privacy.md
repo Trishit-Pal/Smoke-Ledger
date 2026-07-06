@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: 6ba0597
+last_verified_commit: a979537
 status: current
 ---
 
@@ -36,7 +36,7 @@ The policy shape for most user-owned tables is a single FOR ALL policy that gate
 
 `rate_limit_counters` is the exception. It has RLS enabled but carries no policy at all, making it default-deny to every non-service-role caller. Only the `consume_rate_limit` SECURITY DEFINER function can touch it, and that function is granted only to `service_role`. An anon `SELECT` returns `42501`. This table is intentionally invisible to both `anon` and `authenticated` roles — nothing about its contents should ever be client-readable.
 
-**Realtime is gated by the same RLS.** `cigarette_logs`, `goals`, and `user_profiles` are in the `supabase_realtime` publication (`supabase/migrations/20260620130000_realtime_enable.sql`). Supabase applies each table's RLS SELECT policy before delivering any `postgres_changes` event to a subscriber, so realtime cannot leak another user's rows — a subscriber only receives changes to rows it could already SELECT (`user_id = auth.uid()` / `id = auth.uid()`). The client-side `filter` is defense-in-depth, not the primary guard. `REPLICA IDENTITY FULL` on the two `user_id`-filtered tables affects only the internal WAL stream (so DELETE events carry `user_id`); it exposes nothing extra to clients.
+**Realtime is gated by the same RLS.** `cigarette_logs`, `goals`, `user_profiles`, `brands`, and `brand_variants` are in the `supabase_realtime` publication (`supabase/migrations/20260620130000_realtime_enable.sql`, brands added in `20260622000000_realtime_brands.sql`). Supabase applies each table's RLS SELECT policy before delivering any `postgres_changes` event to a subscriber, so realtime cannot leak another user's rows — a subscriber only receives changes to rows it could already SELECT (`user_id = auth.uid()` / `id = auth.uid()`). The client-side `filter` is defense-in-depth, not the primary guard. `REPLICA IDENTITY FULL` on the `user_id`-filtered tables affects only the internal WAL stream (so DELETE events carry `user_id`); it exposes nothing extra to clients.
 
 `audit_events` and `error_events` have split policies. `audit_events` allows SELECT (own rows only) but has no INSERT policy for `authenticated` — clients cannot write directly to it; they call Edge Functions which use the service-role client. `error_events` allows SELECT and INSERT for own rows, but has no UPDATE or DELETE policy for `authenticated`, so users cannot modify rows once written. The INSERT policy explicitly blocks `category = 'compliance.delete'` for authenticated users (`supabase/migrations/20260520000000_security_correctness.sql:254–255`).
 
@@ -147,6 +147,8 @@ These rules must not break:
 
 **The error_events INSERT policy was tightened twice.** The initial policy in `20260519100000_hardening_and_compliance.sql:68` allowed `user_id IS NULL OR user_id = auth.uid()` (permissive). It was replaced in `20260520000000_security_correctness.sql:254–255` to require `user_id = auth.uid() AND category <> 'compliance.delete'` (restrictive). The CHECK constraint was added in the same migration. Any audit of the policy history should be read in migration order.
 
+**The log rate limit counts on `created_at`, not `ts_utc`.** Backdated logs (up to 24h) made `ts_utc` user-controlled, so counting the 50-per-hour window on it let a user evade the cap by backdating every insert. `supabase/migrations/20260626120000_rate_limit_window_created_at.sql` moved the window to the server-set `created_at`. Own-account abuse only, but it protects free-tier write volume.
+
 **The `v_daily_summary_user` view had an RLS bypass until migration `20260602000000`.** Before that migration added `security_invoker = true`, the view ran with owner privileges and bypassed RLS — a signed-in user could read any other user's daily aggregates by querying the view directly with a `user_id` filter. The fix is in place. The `get_daily_summary` RPC path was never affected (it filters by `auth.uid()` explicitly), but direct PostgREST access to the view was the hole.
 
 ## Tests
@@ -171,6 +173,8 @@ The `rls-integration` CI job is configured as a required branch protection check
 **Live sovereignty probe.** `scripts/verify-sovereignty.mjs` (invoked as `npm run verify:sovereignty`) tests 17 invariants against the live project using only the public anon key: zero rows readable across all tenant tables, anon rejection of all data-rights RPCs, and `POST /functions/v1/delete-account` returning 401 without a JWT. Results are documented in `docs/security/sovereignty-audit-2026-06.md`.
 
 ## Open gaps
+
+**`app.audit_pepper` was found unset on the live DB (2026-07-05).** The pepper guard (below) is live, so every `erase_account_data` call currently fails with `P0001` until the operator runs `ALTER DATABASE postgres SET app.audit_pepper = '<AUDIT_PEPPER value>'` in the SQL editor. This is fail-closed working as designed — erasure is blocked rather than writing a reversible hash — but it means the DPDP erase right is unavailable until the GUC is set. Tracked as an open operator action.
 
 **Leaked-password protection is a dashboard toggle, not enforced by code.** The Supabase advisor flags `auth_leaked_password_protection` as a WARN because the toggle must be enabled manually in the dashboard (Authentication → Security → Password Strength). It cannot be set via migration. The ops checklist tracks it (`docs/deployment/production-ops-checklist.md:§2`), but there is no automated gate that fails the build if it is off.
 

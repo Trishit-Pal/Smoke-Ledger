@@ -7,7 +7,7 @@ sources:
   - src/domain/health.ts
   - src/domain/savings.ts
   - src/db/repositories/goals.ts
-last_verified_commit: fcabb85
+last_verified_commit: a979537
 status: current
 ---
 
@@ -105,15 +105,27 @@ returns a `GoalProgress` object. The six cases:
   total days. `atRisk` is set if the user is not trending down *and* the quit
   date is within 7 days.
 
-**Only the first active goal is shown on the home screen.** `goals[0]` from the
-session store is taken directly (`app/(tabs)/index.tsx:411`,
-`DashboardClient.tsx:117`). Multiple goals can exist in the database — they are
-listed by `listAllGoals` — but the home card surfaces just one. There is
-currently no dedicated goals management screen.
+**Only the first active goal is shown on the home screen.** The dashboards pick
+`goals.find(g => g.status === 'active')` and surface just that one card; the
+dedicated goals screens (web `/goals` with `GoalsClient`/`GoalCard`, mobile
+goals tab plus the `goals/new` modal) list and manage all of them.
 
-**Session hydration.** On boot, `useSession.boot` fetches only `status =
-'active'` goals via `listActiveGoals` (`src/store/session.ts:64`). A
-`refreshGoals` action re-fetches on demand.
+**One active-or-paused goal per type.** `createGoal`
+(`src/db/repositories/goals.ts`) rejects a new goal with `AppError('conflict')`
+if a goal of the same type is already active or paused. The form guards this
+for UX (`blockingSameTypeGoal` in `src/domain/goalForm.ts`); the repository
+check catches direct/API/race paths. A same-type goal can be created again once
+the prior one is completed or abandoned.
+
+**Editing.** `updateGoal(id, patch)` validates through `GoalPatchSchema` and
+updates only `target_value`, `current_baseline`, `end_date`, and `meta_json`
+(type and start date are fixed at creation). An empty patch is a no-op that
+returns the current row.
+
+**Session hydration.** On boot, `useSession.boot` fetches all goals regardless
+of status via `listAllGoals` (`listActiveGoals` no longer exists), and the
+store wraps the CRUD paths (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`).
+A `refreshGoals` action re-fetches on demand.
 
 ### Insights
 

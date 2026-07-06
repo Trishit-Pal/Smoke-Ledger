@@ -4,6 +4,17 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-07-06 — a979537 (catch-up sync: dashboard timeframe hub, goal moments, hardening audit closure)
+- architecture: session store gained the canonical daily-summary slice (`summary`/`summarySinceYmd`), goal CRUD wrappers, and `listAllGoals` boot; RealtimeRefresher now also subscribes to `brands`/`brand_variants` with deliberate native/web parity; web `getDashboardData` fetches the daily summary as the timeframe source of truth
+- data-model: `v_daily_summary_user` is `SUM(quantity)` not `COUNT(*)`; realtime publication now includes `brands`/`brand_variants` (REPLICA IDENTITY FULL); log rate-limit window counts on server-set `created_at`; `smoking_facts` is 28 facts with the new `cravings` category; `erase_account_data` is fail-closed on an unset `app.audit_pepper` GUC
+- auth: verification bump only — auth pages gained the WebGL `SceneBackdrop` and aria-labels; no behavioral change
+- identity-profile: verification bump — mobile paste-tolerance and error copy were already documented; replaced a literal NUL byte in prose with the `\u0000` escape so text tooling stops treating the file as binary
+- logging: documented the 24h backdate cap (`MAX_BACKDATE_MS` schema refinement + `BackdateTimeField`), the `created_at` rate-limit window fix it necessitated, and `resolveLogUnitPrice` (typed per-stick price is authoritative)
+- goals-insights: `listActiveGoals` removed in favor of `listAllGoals`; one active-or-paused goal per type enforced in `createGoal` (`AppError('conflict')`); `updateGoal` + `GoalPatchSchema` added; dashboards pick the first active goal, dedicated goals screens manage the rest
+- celebrations: added the `GoalMoment` overlay (completion "Well kept." / deletion "No judgment.", self-dismissing, no confetti) and its mood-bus events; streak now derives from `streakFromRows(summary)` so it no longer truncates at the 90-day log window
+- security-privacy: realtime brands tables noted; `created_at` rate-limit gotcha; **open gap: `app.audit_pepper` found unset on live (2026-07-05) — erase fails P0001 until the operator sets the GUC**
+- infra-ops: new "migration ledger lies" section pointing at `docs/deployment/migration-ledger-map.md` (2026-07-05 audit: all repo migrations verified live; drift is cosmetic re-stamping)
+
 ## 2026-06-20 — f1bd2bb (web bug-fix follow-up: truthful errors, contact-number save, post-signup data sync)
 - identity-profile: mobile field is now paste-tolerant (`toLocalMobileDigits`) with as-you-type validation gating, Save disabled until valid, and a precise inline message; failures render through `describeError` (specific per-code copy, no raw-Postgres leak) instead of the `toSafeErrorMessage` catch-all; rate-limit copy shows the exact next-change date; live DB schema confirmed via MCP (closed the prior "no MCP verification" gap)
 
