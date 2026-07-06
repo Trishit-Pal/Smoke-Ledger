@@ -34,6 +34,7 @@ in order. Stop and report at the first hard failure; do not "mostly pass."
 | 9 | Sovereignty verify | `npm run verify:sovereignty` | anon default-deny holds on every tenant table; data-rights RPCs + delete-account reject anon |
 | 10 | Launch preflight (**staging**) | `npm run preflight:launch` | all blocker checks pass — point at STAGING, it creates+deletes a throwaway user |
 | 11 | Live security advisors | Supabase MCP `get_advisors(security)` + `get_advisors(performance)` | no NEW advisor beyond the known-accepted set (see below) |
+| 12 | Erase pepper GUC set | Supabase MCP `execute_sql`: `SELECT coalesce(current_setting('app.audit_pepper', true), '') <> '' AS ok` | `ok = true` — `erase_account_data` is fail-closed and raises `P0001` on every DPDP erase request while the GUC is empty (found unset 2026-07-05; a silently broken erase right is a HIGH) |
 
 Gates 8–11 need Supabase env: `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL` /
 `E2E_SUPABASE_URL`) and the matching anon key. Gate 10 additionally accepts
