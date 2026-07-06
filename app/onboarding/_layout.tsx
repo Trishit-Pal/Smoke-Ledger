@@ -13,16 +13,16 @@ export default function OnboardingLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { booted, boot, profile } = useSession();
-  const [checked, setChecked] = useState(false);
+  // "checked" = a boot attempt has finished. Derived from `booted` so the
+  // already-booted path needs no synchronous setState inside the effect.
+  const [bootAttempted, setBootAttempted] = useState(false);
+  const checked = booted || bootAttempted;
 
   useEffect(() => {
-    if (!booted) {
-      boot()
-        .catch(() => {})
-        .finally(() => setChecked(true));
-      return;
-    }
-    setChecked(true);
+    if (booted) return;
+    boot()
+      .catch(() => {})
+      .finally(() => setBootAttempted(true));
   }, [booted, boot]);
 
   useEffect(() => {

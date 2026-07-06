@@ -24,7 +24,9 @@ export function Donut({ slices, size = 140, thickness = 16, centerLabel, centerV
   const total = slices.reduce((a, s) => a + s.value, 0) || 1;
   const radius = size / 2 - thickness / 2;
   const circumference = 2 * Math.PI * radius;
-  let offset = 0;
+  const lens = slices.map((s) => (s.value / total) * circumference);
+  // ponytail: O(n²) prefix sums — a donut has a handful of slices.
+  const offsets = lens.map((_, i) => lens.slice(0, i).reduce((a, b) => a + b, 0));
   return (
     <View style={{ alignItems: 'center', gap: spacing.sm }}>
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -39,9 +41,9 @@ export function Donut({ slices, size = 140, thickness = 16, centerLabel, centerV
               fill="transparent"
             />
             {slices.map((s, i) => {
-              const len = (s.value / total) * circumference;
+              const len = lens[i]!;
               const c = s.color ?? theme.chart[i % theme.chart.length]!;
-              const el = (
+              return (
                 <Circle
                   key={i}
                   cx={size / 2}
@@ -51,12 +53,10 @@ export function Donut({ slices, size = 140, thickness = 16, centerLabel, centerV
                   strokeWidth={thickness}
                   fill="transparent"
                   strokeDasharray={`${len} ${circumference - len}`}
-                  strokeDashoffset={-offset}
+                  strokeDashoffset={-offsets[i]!}
                   strokeLinecap="butt"
                 />
               );
-              offset += len;
-              return el;
             })}
           </G>
         </Svg>

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated SharedValue is a mutable box; writing `.value` in press handlers is its documented API */
 import React, { memo, useEffect } from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
