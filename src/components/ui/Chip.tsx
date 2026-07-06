@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability -- Reanimated SharedValue is a mutable box; writing `.value` in press handlers is its documented API */
 import React from 'react';
 import { Pressable, StyleProp, ViewStyle } from 'react-native';
 import Animated, {

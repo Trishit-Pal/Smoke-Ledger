@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: 4b286c1
+last_verified_commit: a979537
 status: current
 ---
 
@@ -79,6 +79,16 @@ Four scripts live in `scripts/` and are part of the standard ops workflow:
 `scripts/preflight-launch.mjs` (`npm run preflight:launch`) audits the Supabase Auth dashboard config via the Management API (custom SMTP, email confirmation, site URL, redirect allowlist, captcha, HaveIBeenPwned check) and runs a real signup→confirm→login→reset→cleanup loop. It should be run against staging, not production. Full detail in the release-preflight skill (`.claude/skills/release-preflight/SKILL.md`).
 
 `scripts/verify-delete-resignup.mjs` proves the deletion contract end-to-end: a deleted account is inaccessible, the `auth.users` row is hard-deleted, and the same email can re-register as a fresh account with a new UUID and zero data. It requires the service-role key and should be run against staging.
+
+### The migration ledger lies (by re-stamping)
+
+Migrations applied via the Supabase MCP or dashboard get recorded under the
+apply-time version, not the repo file's version, so `supabase migration list`
+shows false "local-only" rows. The canonical repo-file ↔ live-ledger mapping
+lives in `docs/deployment/migration-ledger-map.md` (audited 2026-07-05: every
+repo migration's effects are live; all drift is cosmetic). When in doubt, trust
+object-level checks (`pg_proc`, `pg_constraint`, `pg_publication_tables`), not
+the ledger.
 
 ### Spec drift detection
 

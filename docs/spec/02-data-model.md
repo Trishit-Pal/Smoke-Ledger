@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: 2fdf20b
+last_verified_commit: a979537
 status: current
 ---
 
@@ -344,12 +344,12 @@ No RLS. Protected by `REVOKE ALL … FROM PUBLIC` at the schema level.
 
 #### `smoke_seed.smoking_facts`
 
-20 health/finance/recovery facts surfaced in the app. Served exclusively through the `get_random_facts()` RPC; clients never query this table directly.
+28 sourced facts surfaced in the app (verified live 2026-07-05: 6 health, 10 recovery, 4 cravings, 3 finance, 2 india, 2 environment, 1 youth). Served exclusively through the `get_random_facts()` RPC; clients never query this table directly. The bundled fallback in `src/constants/facts.ts` mirrors the same 28. Four recovery facts were added in `20260628120000_facts_cravings.sql`; the `cravings` category and its four craving-mechanism facts landed in `20260629000001_facts_cravings_category.sql`.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | text PK | — |
-| `category` | text | CHECK: `health`, `india`, `finance`, `recovery`, `environment`, `youth` |
+| `category` | text | CHECK: `health`, `india`, `finance`, `recovery`, `environment`, `youth`, `cravings` |
 | `headline` | text | — |
 | `body` | text | — |
 | `source` | text | Attribution |
@@ -372,12 +372,17 @@ A lightweight pre-aggregation of `cigarette_logs` by `(user_id, local_date)`. It
 
 ```sql
 SELECT user_id, local_date,
-  COUNT(*)::int AS sticks,
+  COALESCE(SUM(quantity), 0)::int AS sticks,
   COALESCE(SUM(total_price_inr), 0)::numeric AS total_spend_inr,
   AVG(unit_price_inr) FILTER (WHERE unit_price_inr IS NOT NULL) AS avg_unit_price_inr
 FROM public.cigarette_logs
 GROUP BY user_id, local_date
 ```
+
+`sticks` is `SUM(quantity)`, not `COUNT(*)` — a single log row can record several
+cigarettes (a pack entry), and counting rows undercounted them. Fixed in
+`supabase/migrations/20260621000000_daily_summary_sum_quantity.sql` after the
+dashboard and Trends disagreed with History totals.
 
 This view uses `security_invoker = true`, which means RLS on the underlying `cigarette_logs` table applies at query time. A user who queries the view directly only sees their own rows (`supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:57`). An earlier version of this view lacked `security_invoker` and was a real bug — any authenticated user could read every user's daily aggregates. That was fixed in the `20260602000000` migration.
 
@@ -411,7 +416,7 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 
 #### User-callable (granted to `authenticated`)
 
-**`create_log_with_rate_limit(...)`** — the only way to insert a log. It enforces a 50-inserts-per-rolling-hour limit, handles `client_op_id` idempotency (returns the existing row on a collision), inserts the log, and atomically updates `brand_variants.price_sum_inr` / `price_count` / `avg_price_inr` / `last_price_inr` in the same call. Source: `supabase/migrations/20260520000000_security_correctness.sql:851`.
+**`create_log_with_rate_limit(...)`** — the only way to insert a log. It enforces a 50-inserts-per-rolling-hour limit, handles `client_op_id` idempotency (returns the existing row on a collision), inserts the log, and atomically updates `brand_variants.price_sum_inr` / `price_count` / `avg_price_inr` / `last_price_inr` in the same call. Source: `supabase/migrations/20260520000000_security_correctness.sql:851`. The rate-limit window counts off `created_at` (server-set), **not** `ts_utc`: since backdated logs made `ts_utc` user-controlled (up to 24h in the past), counting on it would let a user evade the hourly cap by backdating every insert. Fixed in `supabase/migrations/20260626120000_rate_limit_window_created_at.sql`.
 
 **`list_logs_page(p_user_id, p_from_date, p_to_date, p_brand_id, p_trigger_tag, p_cursor_ts, p_cursor_id, p_limit)`** — keyset-paginated log listing. The cursor is a `(ts_utc, id)` tuple (both DESC), which is stable under concurrent inserts and avoids the offset-drift problem. The function validates that `p_user_id = auth.uid()` so a user cannot request another user's page. Returns `{ logs, nextCursorTs, nextCursorId, hasMore }`. The TypeScript caller is `listLogsPage()` in `src/db/repositories/logs.ts:167`. `local_date` comparisons cast to `::date` to avoid the text-vs-date type mismatch that caused a crash before `20260523171527_fix_list_logs_page_date_cast.sql`.
 
@@ -425,7 +430,7 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 
 **`export_account_data(p_from, p_to, p_cursor_ts, p_cursor_id, p_limit)`** — produces a `version: 2` JSON export of the user's data. On the first page it includes profile, brands+variants, goals, settings, reminders, price entries, usage events, audit events, and facts seen, plus a paginated slice of logs. Subsequent pages return only the next log slice. Uses `(ts_utc, id) DESC` keyset pagination so the cursor is stable. Caps `p_limit` at 5000 and floors it at 100. Writes an `account_data_exported` audit event on the first page only.
 
-**`erase_account_data()`** — the DPDP right-to-erasure path. Sequence: (1) re-keys all the user's audit and error event rows by replacing the content with a SHA-256 HMAC of `uid || AUDIT_PEPPER` and setting `user_id = NULL` so the rows survive ON DELETE CASCADE; (2) deletes all user-owned data tables; (3) resets `user_profiles` to defaults and sets `deleted_at = now()`; (4) re-seeds default brands so the account is functional if the user logs back in; (5) writes a `account_data_erased` compliance audit event.
+**`erase_account_data()`** — the DPDP right-to-erasure path. It is fail-closed on its secret: if the `app.audit_pepper` GUC is empty or unset it raises `P0001` and aborts, rather than writing a reversible (unpeppered) hash (`supabase/migrations/20260629000000_erase_pepper_guard.sql`). The pepper must be set at the database level (`ALTER DATABASE postgres SET app.audit_pepper = …`, same value as the edge functions' `AUDIT_PEPPER` secret) or every erase call fails. Sequence: (1) re-keys all the user's audit and error event rows by replacing the content with a SHA-256 hash of `uid || pepper` and setting `user_id = NULL` so the rows survive ON DELETE CASCADE; (2) deletes all user-owned data tables; (3) resets `user_profiles` to defaults and sets `deleted_at = now()`; (4) re-seeds default brands so the account is functional if the user logs back in; (5) writes a `account_data_erased` compliance audit event.
 
 **`sync_default_brand_catalog()`** — adds any catalog brands/variants the user does not yet have. Safe to call repeatedly; skips already-present entries by name (case-insensitive). Used after a catalog expansion migration to push new brands to existing users without re-running a full seed.
 
@@ -518,7 +523,7 @@ These rules must never break:
 
 **`smoke_seed` tables have no RLS**. The advisor warning is real but not a security bug in practice: the tables have no data that could harm a user if read (they are public health facts and generic brand info), and the `REVOKE ALL … FROM PUBLIC` on the schema prevents direct client access via PostgREST. However, enabling RLS with appropriate policies (or keeping them as internal-only tables with no PostgREST exposure) is the cleaner long-term posture.
 
-**Realtime is active**. `cigarette_logs`, `goals`, and `user_profiles` are in the `supabase_realtime` publication — applied and verified live via `20260620130000_realtime_enable.sql` (the earlier `20260606000000_realtime_publications.sql` was authored but never applied, which is why the publication was empty). `cigarette_logs` and `goals` are `REPLICA IDENTITY FULL` so DELETE events carry `user_id` for the client filter. Both clients subscribe via `RealtimeRefresher` (web `router.refresh()`, mobile `useSession.refresh*`).
+**Realtime is active**. `cigarette_logs`, `goals`, `user_profiles`, `brands`, and `brand_variants` are in the `supabase_realtime` publication — the first three via `20260620130000_realtime_enable.sql`, the brand tables via `20260622000000_realtime_brands.sql` (so a brand added on mobile appears in the web quick-log strip without a reload). `cigarette_logs`, `goals`, `brands`, and `brand_variants` are `REPLICA IDENTITY FULL` so DELETE events carry `user_id` for the client filter. Both clients subscribe via `RealtimeRefresher` (web `router.refresh()`, mobile `useSession.refresh*`).
 
 **`onboarding_step` was widened post-launch**. The original constraint in `20260520000000` omitted `'usage'`. The app's first onboarding step writes that value, so every new signup rejected with `23514` until `20260523081444_align_onboarding_step_constraint.sql` widened the CHECK. The TS source of truth is `OnboardingStep` in `src/types/index.ts:95`.
 

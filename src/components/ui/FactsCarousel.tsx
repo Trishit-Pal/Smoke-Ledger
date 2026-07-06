@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   FlatList,
@@ -47,14 +47,16 @@ export function FactsCarousel({ count = 5 }: FactsCarouselProps) {
     return () => { mounted = false; };
   }, [count]);
 
-  const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  // Stable identity (FlatList forbids changing onViewableItemsChanged between
+  // renders) without reading a ref during render.
+  const onViewable = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const first = viewableItems[0];
     if (first?.index != null) {
       setActiveIdx(first.index);
       const f = first.item as SmokingFact;
       if (f?.id) markFactSeen(f.id).catch(() => {});
     }
-  }).current;
+  }, []);
 
   if (facts.length === 0) return null;
 

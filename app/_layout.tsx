@@ -32,7 +32,13 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Missing-env is knowable at first render, so seed it here instead of a
+  // synchronous setState inside the boot effect.
+  const [error, setError] = useState<string | null>(() =>
+    isSupabaseConfigured()
+      ? null
+      : 'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env (see .env.example) and restart Expo.',
+  );
   // Editorial fonts (Fraunces display + DM Sans body). Render is gated until
   // these resolve so the first paint already uses the brand type.
   const [fontsLoaded, fontError] = useFonts({
@@ -52,9 +58,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      setError(
-        'Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env (see .env.example) and restart Expo.',
-      );
+      // `error` is already seeded by the useState initializer above.
       setAuthInitialized(true);
       return;
     }

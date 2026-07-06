@@ -2,6 +2,7 @@ import {
   revalidateAppViews,
   revalidateBrands,
 } from '@web/app/(app)/_actions/revalidate';
+import { logClientError } from '@/lib/logger';
 
 /*
  * Best-effort Router-Cache revalidation after a mutation.
@@ -19,11 +20,15 @@ import {
  * covers any transient action failure.
  */
 
+// Failures are telemetered through logClientError (a direct Supabase insert —
+// still deliverable on skew, since only server-action ids go stale), so the
+// signal that skew is hitting real users reaches error_events instead of
+// dying in the browser console. logClientError never throws.
 export async function safeRevalidateAppViews(): Promise<void> {
   try {
     await revalidateAppViews();
   } catch (err) {
-    console.warn('[revalidate] app views — non-fatal (likely deployment skew):', err);
+    await logClientError(err, { category: 'client.revalidate', route: 'app-views' });
   }
 }
 
@@ -31,6 +36,6 @@ export async function safeRevalidateBrands(): Promise<void> {
   try {
     await revalidateBrands();
   } catch (err) {
-    console.warn('[revalidate] brands — non-fatal (likely deployment skew):', err);
+    await logClientError(err, { category: 'client.revalidate', route: 'brands' });
   }
 }
