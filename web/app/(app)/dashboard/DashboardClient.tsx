@@ -176,6 +176,12 @@ export function DashboardClient({
   // Month-to-date spend projection — same engine as mobile's "Month forecast".
   // The raw-log window (~60d) always covers the current month.
   const forecast = React.useMemo(() => forecastMonthlySpend(logs, today), [logs, today]);
+  // Transparency caption factors: the EFFECTIVE per-stick rate (total ÷ sticks)
+  // so the arithmetic the caption invites reproduces the displayed total exactly
+  // — savedOverRange prices each day at that day's rate, so quoting the fallback
+  // unit price here would not multiply out.
+  const savedSticks = Math.round(allTimeSaved.sticksAvoided);
+  const savedRate = savedSticks > 0 ? allTimeSaved.totalInr / savedSticks : null;
 
   // Today's count (independent of the selected window) — used for the quick-log mood.
   const todaySticks = React.useMemo(() => totalsForWindow(summary, 1, today).sticks, [summary, today]);
@@ -535,7 +541,9 @@ export function DashboardClient({
               subtitle={
                 hidden
                   ? '•••'
-                  : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started — ${allTimeSaved.sticksAvoided} sticks below baseline × ${formatInr(fallbackUnit)} avg per stick`
+                  : allTimeSaved.totalInr > 0 && savedRate != null
+                    ? `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started — ${savedSticks} sticks below baseline × ${formatInr(savedRate)} per stick`
+                    : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started`
               }
               value={hidden ? '•••' : formatInr(periodSaved.totalInr, { compact: true })}
               tone={periodSaved.totalInr > 0 ? 'accent' : 'neutral'}
