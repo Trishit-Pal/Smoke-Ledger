@@ -10,7 +10,10 @@ import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
 import { Figure } from '@web/components/character/Figure';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
-import { revalidateAppViews, revalidateBrands } from '@web/app/(app)/_actions/revalidate';
+import {
+  safeRevalidateAppViews as revalidateAppViews,
+  safeRevalidateBrands as revalidateBrands,
+} from '@web/lib/safeRevalidate';
 import type { GoalType } from '@/types';
 
 const PRICE_PER_STICK = 18;

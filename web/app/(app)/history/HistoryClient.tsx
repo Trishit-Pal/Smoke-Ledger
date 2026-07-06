@@ -40,7 +40,7 @@ import dayjs from 'dayjs';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import type { LogCursor } from '@web/lib/server/data';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
-import { revalidateAppViews } from '../_actions/revalidate';
+import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { LogEditModal } from '@web/components/modals/LogEditModal';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';

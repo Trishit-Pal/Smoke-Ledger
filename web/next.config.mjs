@@ -32,6 +32,13 @@ const callbackSecurityHeaders = [
 const config = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Vercel Skew Protection: stamp client asset / RSC / server-action requests
+  // with the build's deployment id so a browser running an older build routes
+  // to the deployment its code came from — eliminating the server-action /
+  // chunk version-mismatch that made post-write revalidation throw (surfacing
+  // a false "log not saved" error and leaving the router cache stale).
+  // Enable "Skew Protection" in the Vercel project settings to complete this.
+  deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '..'),
   },
