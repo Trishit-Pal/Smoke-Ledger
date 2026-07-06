@@ -88,9 +88,9 @@ A `compliance.delete` row in `error_events` is the surviving proof that a deleti
 
 **Layer 2 — No UPDATE or DELETE policy.** `authenticated` has no policy for UPDATE or DELETE on `error_events`, so RLS default-deny applies. A user cannot modify or delete any `error_events` row, including rows they wrote themselves.
 
-**Layer 3 — CHECK constraint.** `error_events_compliance_delete_null_user_check` (`supabase/migrations/20260520000000_security_correctness.sql:271–277`) enforces `category <> 'compliance.delete' OR user_id IS NULL` at the DB level. This closes the gap where future code might accidentally insert a user-owned `compliance.delete` row that would then be readable by that user. Confirmed present in the live DB on 2026-06-19 via `pg_constraint`.
+**Layer 3 — CHECK constraint.** `error_events_compliance_delete_null_user_check` enforces `category <> 'compliance.delete' OR user_id IS NULL` at the DB level. This closes the gap where future code might accidentally insert a user-owned `compliance.delete` row that would then be readable by that user.
 
-Note: the June 2026 sovereignty audit (`docs/security/sovereignty-audit-2026-06.md:§4`) described this constraint as absent, but that was a point-in-time snapshot taken against an earlier DB state. Migration `20260520000000_security_correctness.sql` includes the constraint, and the live query confirms it is present.
+Its history is the repo's canonical migrations-can-lie example: the constraint was declared in `20260520000000_security_correctness.sql:271–277`, but that block was edited after the migration had already been applied, so it never reached the live DB. The June 2026 sovereignty audit (`docs/security/sovereignty-audit-2026-06.md:§4`) correctly found it absent; `20260619000000_error_events_compliance_check.sql` (live ledger row `20260619075741`) restored it idempotently. Last verified live via `pg_constraint` on 2026-07-06.
 
 ### Service-role-only surfaces
 
@@ -184,4 +184,4 @@ The `rls-integration` CI job is configured as a required branch protection check
 
 **Stale spec manifest resolved.** `web/lib/server/auth.ts` did not exist — the web app's server-side auth logic lives in `web/middleware.ts` (session gate, consent funnel, CSP), `web/lib/supabase/server.ts` (server Supabase client), `web/lib/supabase/admin.ts` (service-role client), and `web/app/auth/callback/route.ts` (OAuth/magic link callback). The `sources:` frontmatter has been updated to reflect the real files.
 
-**The `compliance.delete` CHECK constraint discrepancy is resolved.** The June 2026 sovereignty audit marked `error_events_compliance_delete_null_user_check` as absent (MEDIUM finding). It is present in the live DB as of 2026-06-19. The audit was a point-in-time snapshot and reflected a lag between the migration being written and being probed. The finding is closed.
+**The `compliance.delete` CHECK constraint discrepancy is resolved.** The June 2026 sovereignty audit marked `error_events_compliance_delete_null_user_check` as absent (MEDIUM finding) — correctly: the `20260520000000` constraint block was edited post-apply and never reached live. `20260619000000_error_events_compliance_check.sql` restored it; re-verified live via `pg_constraint` on 2026-07-06. The finding is closed.
