@@ -418,7 +418,13 @@ export default function Home() {
     if (!baseline) return null;
     const unit = weightedAvgUnitPrice(summary) ?? 0;
     const r = savedAllTime(summary, baseline, unit, summarySinceYmd, today);
-    return { totalInr: r.totalInr, sticksAvoided: r.sticksAvoided, avgUnitPriceUsed: unit };
+    // Caption factors: rounded sticks × the EFFECTIVE rate (total ÷ sticks), so
+    // the arithmetic the caption invites reproduces the displayed total exactly
+    // — savedOverRange prices each day at that day's rate, so quoting the
+    // fallback unit price would not multiply out.
+    const sticks = Math.round(r.sticksAvoided);
+    const ratePerStick = sticks > 0 ? r.totalInr / sticks : null;
+    return { totalInr: r.totalInr, sticksAvoided: sticks, ratePerStick };
   }, [summary, profile, summarySinceYmd, today]);
 
   const activeGoal = goals.find((g) => g.status === 'active') ?? null;
@@ -913,9 +919,11 @@ export default function Home() {
                     ]}
                   />
                 )}
-                <Text variant="small" muted>
-                  {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × avg unit price {maskInr(savings.avgUnitPriceUsed, hidden, (n) => formatInr(n))}
-                </Text>
+                {savings.ratePerStick != null ? (
+                  <Text variant="small" muted>
+                    {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × {maskInr(savings.ratePerStick, hidden, (n) => formatInr(n))} per stick
+                  </Text>
+                ) : null}
               </View>
 
               <Divider />
