@@ -191,11 +191,11 @@ export default function Trends() {
   const [yearError, setYearError] = useState<string | null>(null);
 
   // Fetch year summary when window === 365
+  // Loading/error are primed by the period-selector press handler; a `today`
+  // rollover mid-session refetches silently (loading stays false).
   useEffect(() => {
     if (windowDays !== 365) return;
     let cancelled = false;
-    setYearLoading(true);
-    setYearError(null);
     const from365 = daysAgoIst(364);
     getDailySummary(from365, today)
       .then((rows) => {
@@ -340,7 +340,15 @@ export default function Trends() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
             >
               <Pressable
-                onPress={() => setWindowDays(period.days)}
+                onPress={() => {
+                  // Prime the year-fetch UI here (event handler) rather than
+                  // synchronously inside the fetch effect.
+                  if (period.days === 365 && windowDays !== 365) {
+                    setYearLoading(true);
+                    setYearError(null);
+                  }
+                  setWindowDays(period.days);
+                }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
                 accessibilityLabel={`${period.label} period`}

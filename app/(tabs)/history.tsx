@@ -170,7 +170,12 @@ export default function History() {
 
   // Accumulated logs = store window + any cursor-fetched pages.
   const [extraLogs, setExtraLogs] = useState<CigaretteLog[]>([]);
-  const [cursor, setCursor] = useState<LogCursor | null | undefined>(undefined); // undefined = not yet known
+  // undefined = not yet known. Seeded null (no pagination) when the store has
+  // no logs at mount — logs hydrate before this screen mounts, same snapshot
+  // the probe effect below reads.
+  const [cursor, setCursor] = useState<LogCursor | null | undefined>(() =>
+    useSession.getState().logs.length === 0 ? null : undefined,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const mountedRef = useRef(true);
@@ -203,11 +208,8 @@ export default function History() {
     // the empty initial list (logs are hydrated before this screen mounts).
     const snapshot = useSession.getState().logs;
     const oldest = [...snapshot].sort((a, b) => a.tsUtc.localeCompare(b.tsUtc))[0];
-    if (!oldest) {
-      // No logs at all — no pagination needed.
-      setCursor(null);
-      return;
-    }
+    // No logs at all — cursor was seeded null by the useState initializer.
+    if (!oldest) return;
     const probeCursor: LogCursor = { ts: oldest.tsUtc, id: oldest.id };
     let cancelled = false;
     listLogsPage({ cursor: probeCursor, limit: 1 })

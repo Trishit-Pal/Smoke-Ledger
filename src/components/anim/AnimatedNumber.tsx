@@ -32,7 +32,6 @@ export function AnimatedNumber({ value, format, duration = 600, style, ...rest }
   useEffect(() => {
     if (reduce) {
       sv.value = value;
-      setDisplay(value);
     } else {
       sv.value = withTiming(value, { duration, easing: Easing.out(Easing.cubic) });
     }
@@ -46,5 +45,8 @@ export function AnimatedNumber({ value, format, duration = 600, style, ...rest }
     [],
   );
 
-  return <RNText {...rest} style={style}>{format ? format(display) : Math.round(display).toString()}</RNText>;
+  // Under reduce-motion the value is shown directly (no tween), so `display`
+  // never needs a synchronous setState in the effect above.
+  const shown = reduce ? value : display;
+  return <RNText {...rest} style={style}>{format ? format(shown) : Math.round(shown).toString()}</RNText>;
 }
