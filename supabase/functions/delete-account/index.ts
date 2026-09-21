@@ -182,13 +182,15 @@ serve(async (req) => {
     // bypass auth.uid() and the function would fail.
     const { error: eraseErr } = await supabaseUser.rpc('erase_account_data');
     if (eraseErr) {
+      const pepperMissing = eraseErr.code === 'P0001';
       log.error('erase_failed_pre_delete', {
         request_id: requestId,
         error: String(eraseErr.message).slice(0, 200),
+        code: eraseErr.code,
       });
       return json(
-        { error: 'erase_failed', request_id: requestId },
-        500,
+        { error: pepperMissing ? 'server_misconfigured' : 'erase_failed', request_id: requestId },
+        pepperMissing ? 503 : 500,
         origin,
       );
     }

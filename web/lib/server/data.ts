@@ -435,18 +435,13 @@ export async function getLogPageData() {
 }
 
 /**
- * CONCERN: History pagination is partially implemented.
- * The initial SSR render is capped at 200 rows over a 60-day rolling window via
- * `getServerLogsPage`. The `nextCursor` is passed to `HistoryClient` so it can
- * be threaded into a future "load more" / infinite-scroll flow, but that client-
- * side wiring is not in C1's scope. Full unbounded history requires a follow-up
- * task to add a paginated fetch action and load-more UI in HistoryClient.
+ * History: newest page of this user's lifetime logs (no fromDate).
+ * `nextCursor` drives Load older via fetchMoreHistoryLogs — same unbounded window.
  */
 export async function getHistoryPageData() {
-  const fromDate = daysAgoIst(60);
   const [profile, { logs, nextCursor }] = await Promise.all([
     getServerProfile(),
-    getServerLogsPage({ fromDate, limit: SERVER_LOGS_PAGE_SIZE }),
+    getServerLogsPage({ limit: SERVER_LOGS_PAGE_SIZE }),
   ]);
   return { profile, logs, nextCursor };
 }

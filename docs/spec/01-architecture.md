@@ -127,7 +127,7 @@ Every table uses `user_id = auth.uid()` RLS policies so no query from a client c
 
 **The `listLogs` helper is capped at 200 rows.** `listLogs` in `logs.ts` is a legacy flat-array helper. It internally delegates to `listLogsPage`, which uses a keyset-paginated RPC. If the result is capped and there is a next cursor, it fires `logClientError` as a migration hint (`src/db/repositories/logs.ts:333–338`). New code that needs deep history should use `listLogsPage` directly and loop over pages.
 
-**`boot()` fetches a 90-day window, not the full history.** The session store loads only the last 90 days of logs on startup to keep the payload small (`src/store/session.ts:15`). The history screen defines its own constant `HISTORY_LOG_LOOKBACK_DAYS = 365` and fetches independently. Computations that need full history (e.g. a streak from the account's first log) must either use the full fetch or anchor themselves to the earliest log in the 90-day slice, which can produce a conservative under-count.
+**`boot()` fetches a 90-day window, not the full history.** The session store loads only the last 90 days of logs on startup to keep the payload small (`src/store/session.ts`). History does not use `HISTORY_LOG_LOOKBACK_DAYS`. Web History calls `list_logs_page` with no `fromDate` (200-row keyset + Load older). Native History merges the 90-day boot slice with Load older; if the store is empty it fetches the first unbounded page so logs older than 90 days still appear.
 
 **Web `unstable_cache` and the service-role key.** `getServerBrandsWithVariants` uses `unstable_cache` (Next.js Data Cache) for cross-request caching, but only when a service-role key is available. Inside `unstable_cache` callbacks, cookies are forbidden — so the RLS client cannot be used. The admin client bypasses RLS, but every query inside the cached callback is explicitly scoped to `userId` (`web/lib/server/data.ts:304–361`). If the service-role key is absent, the function falls back to the per-request RLS client, uncached.
 
@@ -145,7 +145,7 @@ Run all unit tests: `npm test` from the repo root (uses `ts-jest`, environment: 
 
 ## Open gaps
 
-- **History pagination on web is partial.** `getHistoryPageData` returns a `nextCursor` alongside the initial 200-row page, and passes it to `HistoryClient`, but the client-side "load more" wiring does not exist yet (`web/lib/server/data.ts:400–412`). Users with more than 200 log entries in a 60-day window will see a truncated history view on web.
+- **History is lifetime keyset pagination.** Web `getHistoryPageData` / `fetchMoreHistoryLogs` omit `fromDate` so `list_logs_page` returns this user's logs since the first entry, 200 at a time. Native History probes `listLogsPage` without a date cap (including when the 90-day store is empty). Dashboard / Trends / Goals still use their 60–90 day raw-log windows.
 - **`price_entries` table is unused.** It was designed for crowd-sourced brand pricing but has 0 rows and no corresponding repository code or UI.
 - **`reminders` table has no rows.** The schema exists and the `ReminderKindSchema` is defined in `src/lib/validation.ts:81`, but the notification scheduling feature is not implemented.
 - **`src/store/session.ts` has no persistence.** The store is purely in-memory and always re-fetches from Supabase on `boot()`. There is no offline queue; writes made without a network connection will simply fail.
