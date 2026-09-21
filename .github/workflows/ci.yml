@@ -1,6 +1,9 @@
 name: CI
 
-on:
+permissions:
+  contents: read
+
+"on":
   push:
     branches: [main, master]
   pull_request:
@@ -61,12 +64,16 @@ jobs:
         working-directory: web
 
       - name: Web E2E authenticated (optional)
-        if: ${{ secrets.E2E_LOGIN_EMAIL != '' && secrets.E2E_LOGIN_PASSWORD != '' }}
-        run: npm run test:e2e
         working-directory: web
         env:
           E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
           E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+        run: |
+          if [ -z "$E2E_LOGIN_EMAIL" ] || [ -z "$E2E_LOGIN_PASSWORD" ]; then
+            echo "Skipping authenticated E2E — E2E_LOGIN_EMAIL / E2E_LOGIN_PASSWORD not set."
+            exit 0
+          fi
+          npm run test:e2e
 
   db-smoke:
     runs-on: ubuntu-latest
