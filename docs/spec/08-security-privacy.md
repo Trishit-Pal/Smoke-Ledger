@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: a979537
+last_verified_commit: bf62af4
 status: current
 ---
 

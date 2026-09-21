@@ -46,7 +46,7 @@
         "web/app/(auth)/**",
         "web/lib/auth/authEmailExists.ts"
       ],
-      "last_verified_commit": "a979537",
+      "last_verified_commit": "bf62af4",
       "status": "current"
     },
     {
@@ -117,7 +117,7 @@
         "web/lib/server/auth.ts",
         "docs/security/**"
       ],
-      "last_verified_commit": "a979537",
+      "last_verified_commit": "bf62af4",
       "status": "current"
     },
     {
