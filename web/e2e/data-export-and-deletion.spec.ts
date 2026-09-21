@@ -27,7 +27,7 @@ test.describe('data export & deletion (DPDP)', () => {
     test.skip(!loginEmail || !loginPassword, 'Set E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD to run.');
     await page.goto('/login');
     await page.getByLabel('Email').fill(loginEmail!);
-    await page.getByLabel('Password').fill(loginPassword!);
+    await page.getByRole('textbox', { name: 'Password', exact: true }).fill(loginPassword!);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForLoadState('networkidle');
     // If the test user is fresh and still in onboarding, bounce to settings —

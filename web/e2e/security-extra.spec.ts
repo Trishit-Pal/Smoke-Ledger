@@ -16,7 +16,7 @@ test.describe('web hardening — protected routes & auth errors', () => {
   test('wrong password keeps the user on /login and creates no session', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill('nobody-e2e@smoke-ledger-e2e.test');
-    await page.getByLabel('Password').fill('definitely-wrong-password');
+    await page.getByRole('textbox', { name: 'Password', exact: true }).fill('definitely-wrong-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await expect(page).toHaveURL(/\/login/);

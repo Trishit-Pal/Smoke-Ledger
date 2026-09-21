@@ -41,7 +41,7 @@ test('CSP nonce in response header matches nonce stamped on script tags', async 
 
 test('signup page shows age acknowledgment', async ({ page }) => {
   await page.goto('/signup');
-  await expect(page.getByText(/18 or older/i)).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /18 or older/i })).toBeVisible();
 });
 
 test('login page shows keep me signed in option', async ({ page }) => {
@@ -67,7 +67,7 @@ test('login with protocol-relative next= lands on /dashboard after auth', async 
   // /dashboard before the credentials form is even submitted.
   await page.goto(`/login?next=${encodeURIComponent('//evil.com')}`);
   await page.getByLabel('Email').fill(loginEmail!);
-  await page.getByLabel('Password').fill(loginPassword!);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(loginPassword!);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/);
 
@@ -86,7 +86,7 @@ test('login with chained redirect via onboarding next= lands on /dashboard', asy
   const maliciousNext = '/onboarding/privacy?next=https://evil.com';
   await page.goto(`/login?next=${encodeURIComponent(maliciousNext)}`);
   await page.getByLabel('Email').fill(loginEmail!);
-  await page.getByLabel('Password').fill(loginPassword!);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(loginPassword!);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/);
 
@@ -104,7 +104,7 @@ test('password login without remember-me sets session-only auth cookies', async 
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(loginEmail!);
-  await page.getByLabel('Password').fill(loginPassword!);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(loginPassword!);
   await page.getByRole('checkbox', { name: /keep me signed in/i }).uncheck();
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/);
