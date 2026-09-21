@@ -20,6 +20,9 @@ sources:
   - web/app/(auth)/login/page.tsx
   - web/app/(auth)/login/actions.ts
   - web/app/(auth)/login/_actions/phoneOtp.ts
+  - web/lib/auth/authEmailExists.ts
+  - web/__tests__/authEmailExists.test.ts
+  - supabase/migrations/20260921160000_auth_email_exists.sql
   - web/app/(auth)/signup/page.tsx
   - web/app/(auth)/reset/page.tsx
   - web/app/(auth)/reset-password/page.tsx
@@ -31,7 +34,7 @@ sources:
   - DB: public.handle_new_user (trigger)
   - DB: public.enforce_profile_identity_rules (trigger)
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
-last_verified_commit: a979537
+last_verified_commit: bf62af4
 status: current
 ---
 
@@ -45,7 +48,7 @@ Authentication lets users create an account, prove who they are, and recover acc
 
 **Signing up.** On mobile, the user fills in their name, date of birth, gender, email, and a password (8–128 characters), confirms it, and taps "Create account". On web, there is an additional acknowledgement checkbox — "I am 18 or older and understand the next step will ask me to review and accept the Terms, Privacy Policy, and medical disclaimer." Either way, if email confirmation is enabled, the form flips to a "check your email" state with a resend button. There is no immediate app access until the link is clicked. Alternatively, on web, the user can tap "Sign up with email link instead" to skip setting a password and receive a one-click link that creates and confirms the account in one step.
 
-**Signing in.** Both platforms offer two modes, selectable from a toggle: **Password** (email + password) and **Email link** (magic link). The web login page also shows a **Phone OTP** mode when `NEXT_PUBLIC_PHONE_OTP_ENABLED` is set. The email-link mode sends a one-click sign-in link to an existing account; it does not create new accounts (`shouldCreateUser: false`). The info message after sending is always neutral — "If that email is registered, a sign-in link is on its way" — to avoid revealing whether an email is registered.
+**Signing in.** Both platforms offer two modes, selectable from a toggle: **Password** (email + password) and **Email link** (magic link). The web login page also shows a **Phone OTP** mode when `NEXT_PUBLIC_PHONE_OTP_ENABLED` is set. The email-link mode sends a one-click sign-in link to an existing account; it does not create new accounts (`shouldCreateUser: false`). On **web**, a failed password sign-in distinguishes “No ledger for this email.” from “That password doesn't match this email.” Email-link submit (web and native) shows “No ledger for this email.” when GoTrue refuses an unknown address, and “We sent a sign-in link.” when the send succeeds. **Native password** still uses the combined “Email or password is incorrect.” copy (no privileged lookup on device). **Password reset** and **phone OTP** stay generic so those surfaces do not confirm whether an address or number exists.
 
 **Password reset.** A "Forgot password?" link on the login screen opens a separate page. The user enters their email and taps send. The success message is neutral regardless of whether the address exists ("If an account exists for that email, a reset link is on its way"). Clicking the link lands the user on a "choose a new password" form. After updating, the app shows a brief confetti/celebration moment, then signs the user out automatically and redirects them to sign in with the new password.
 
@@ -67,17 +70,17 @@ A second trigger, `enforce_profile_identity_rules`, fires on updates to `user_pr
 
 ### Login (password)
 
-**Mobile** (`app/(auth)/login.tsx`). Calls `supabase.auth.signInWithPassword`. On success, if the user has neither `email_confirmed_at` nor `phone_confirmed_at`, the app signs them out immediately and shows "Please confirm your email before signing in." On failure, `toAuthErrorMessage` (`src/lib/auth-errors.ts:19`) maps Supabase error codes and message fragments to human-readable copy.
+**Mobile** (`app/(auth)/login.tsx`). Calls `supabase.auth.signInWithPassword`. On success, if the user has neither `email_confirmed_at` nor `phone_confirmed_at`, the app signs them out immediately and shows "Please confirm your email before signing in." On failure, `toAuthErrorMessage` (`src/lib/auth-errors.ts`) maps Supabase error codes and message fragments to human-readable copy.
 
-**Web** (`web/app/(auth)/login/actions.ts`). The password form posts to a Next.js server action (`signInWithPasswordAction`). The action validates input with Zod, runs two DB-backed rate-limit checks (10 attempts/10 min per IP, 5 attempts/15 min per email), calls `supabase.auth.signInWithPassword` inside a `withTimeout` wrapper (10–20 second deadline), and then calls Next.js `redirect()` outside the try/catch so the redirect signal is never swallowed. If `email_not_confirmed` comes back, the login page shows a "Resend confirmation email" button that calls the same `precheckResendAction` + `supabase.auth.resend` flow as signup.
+**Web** (`web/app/(auth)/login/actions.ts`). The password form posts to a Next.js server action (`signInWithPasswordAction`). The action validates input with Zod, runs two DB-backed rate-limit checks (10 attempts/10 min per IP, 5 attempts/15 min per email), calls `supabase.auth.signInWithPassword` inside a `withTimeout` wrapper (10–20 second deadline), and then calls Next.js `redirect()` outside the try/catch so the redirect signal is never swallowed. GoTrue returns the same `invalid_credentials` error for an unknown email and a wrong password. After that failure the action calls `lookupAuthEmail` (`web/lib/auth/authEmailExists.ts`) which runs the service-role RPC `auth_email_exists` (GoTrue's admin user list cannot filter by email). `classifyInvalidCredentials` maps absent → `email_not_registered`, present → `password_mismatch`, and anything else (missing service role, RPC error, timeout, throw) → generic `invalid_credentials`. `lookupAuthEmail` is a total function: it never throws. If `email_not_confirmed` comes back, the login page shows a "Resend confirmation email" button that calls the same `precheckResendAction` + `supabase.auth.resend` flow as signup.
 
 The web login also supports **Phone OTP** when the env flag is set: a two-step form (send OTP → verify code) backed by `sendPhoneOtpAction` and `verifyPhoneOtpAction` in `web/app/(auth)/login/_actions/phoneOtp.ts`.
 
 ### Login (magic link)
 
-**Mobile** (`app/(auth)/login.tsx:70`). Calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false`. The redirect URL uses `Linking.createURL` so the link deep-links back into the app via `smokeledger://auth/callback?next=/`. The info message is always neutral.
+**Mobile** (`app/(auth)/login.tsx:70`). Calls `supabase.auth.signInWithOtp` with `shouldCreateUser: false`. The redirect URL uses `Linking.createURL` so the link deep-links back into the app via `smokeledger://auth/callback?next=/`. Unknown-address failures map through shared `toAuthErrorMessage` to “No ledger for this email.” Success shows “We sent a sign-in link.”
 
-**Web** (`web/app/(auth)/login/page.tsx:363`). The same `signInWithOtp` call, with `shouldCreateUser: false`. The `emailRedirectTo` is constructed client-side as `${window.location.origin}/auth/callback?next=…`. On error the UI still shows the neutral "If this email is registered, we sent a sign-in link" message — the magic-link flow must not reveal whether an address exists.
+**Web** (`web/app/(auth)/login/page.tsx`). The same `signInWithOtp` call, with `shouldCreateUser: false`. The `emailRedirectTo` is constructed client-side as `${window.location.origin}/auth/callback?next=…`. Unknown-address failures (`user_not_found`, “Signups not allowed for otp”) map to “No ledger for this email.” Success shows “We sent a sign-in link.” Other errors go through `toAuthErrorMessage`. The page does not call the admin lookup on this path — GoTrue already distinguishes.
 
 ### The three link shapes and `createSessionFromUrl`
 
@@ -120,11 +123,11 @@ The `next` parameter is sanitized by `sanitizeCallbackNextPath` before any redir
 
 ### Error handling and rate limiting
 
-`src/lib/auth-errors.ts` normalises Supabase error shapes into app-friendly messages. It checks `.code` first, then falls back to scanning `.message` for known fragments (`invalid login credentials`, `email not confirmed`, `rate limit`, `captcha`). The mapped codes are `invalid_credentials`, `email_not_confirmed`, `too_many_requests`, and `captcha_required`. Unknown errors go through `toSafeErrorMessage` which returns a generic copy — raw internal error text never reaches the user.
+`src/lib/auth-errors.ts` normalises Supabase error shapes into app-friendly messages. It checks known codes first (`email_not_registered`, `password_mismatch`, `user_not_found`), then message fragments (`signups not allowed for otp`, `invalid login credentials`, `email not confirmed`, `rate limit`, `captcha`). Unknown errors go through `toSafeErrorMessage` which returns a generic copy — raw internal error text never reaches the user. Native **password** still surfaces `invalid_credentials` as “Email or password is incorrect.” because it does not run the admin lookup. Native **email-link** uses the same mapper as web and does distinguish an unknown address.
+
+Web auth timeouts are not one mapping. `signInWithPassword` in `signInWithPasswordAction` is wrapped in `withTimeout`; a deadline throws `TimeoutError`, which `safeAuthCatchState` maps to `dependency_failure`. `lookupAuthEmail` races the RPC against the same deadline inside its own try/catch and returns `'unknown'` → generic credentials, never `dependency_failure`. `sendEmailOtp` and `onResendConfirmation` catch a timeout as `SERVICE_UNAVAILABLE_MESSAGE` on the client. Phone OTP actions are not wrapped.
 
 All email-sending surfaces (signup, password reset, resend confirmation) are guarded by `precheckSignupAction` / `precheckResetAction` / `precheckResendAction` (`web/app/(auth)/_actions/authPrechecks.ts`), which call a DB-backed token-bucket RPC (`consume_rate_limit`). These are fail-open: if the service-role key is missing or the DB is unavailable, the check passes and Supabase's native rate limits serve as the backstop. Thresholds live in `web/lib/auth/authRateLimitKeys.ts`: signup is 5/hour per IP and 3/hour per email; reset is 10/hour per IP and 3/hour per email; resend is 3/hour per email.
-
-All auth calls on the web are wrapped in `withTimeout` with a `DEFAULT_AUTH_TIMEOUT_MS` deadline (between 10 and 20 seconds). A timed-out call throws `TimeoutError`, which is caught by `safeAuthCatchState` and mapped to `dependency_failure` — a clear spinner error rather than an indefinitely spinning button.
 
 ## Invariants
 
@@ -146,9 +149,9 @@ All auth calls on the web are wrapped in `withTimeout` with a `DEFAULT_AUTH_TIME
 
 **Existing email on signup.** Supabase returns a user with an empty `identities` array when the email already exists and is confirmed. The web signup page checks for this and shows "An account with this email already exists" with links to sign in or reset. The mobile signup form does not have this check — it relies on Supabase's error response, which may surface as a generic error on the mobile side.
 
-**Neutral copy on password reset and magic-link.** Both flows show the same success message whether or not the address exists. This is intentional (account enumeration protection). Don't "improve" the messages to say "no account found" — that would reveal which addresses are registered.
+**Neutral copy on password reset (and phone OTP).** Web password reset still shows the same success message whether or not the address exists. Phone OTP send always returns the same sent copy. Web login password + email-link, and native email-link, **do** distinguish an unknown address; that is a deliberate product choice, not an accident. Native password does not.
 
-**captcha_required on mobile.** The mobile login form does not implement Turnstile. If Supabase-side captcha is enabled and the Supabase anon key sends captcha tokens for web clients but not mobile clients, mobile password login will fail with `captcha_required`. The error is handled (`src/lib/auth-errors.ts:25`) and surfaced as "Security check failed or is not configured on this device."
+**captcha_required on mobile.** The mobile login form does not implement Turnstile. If Supabase-side captcha is enabled and the Supabase anon key sends captcha tokens for web clients but not mobile clients, mobile password login will fail with `captcha_required`. The error is handled (`src/lib/auth-errors.ts`) and surfaced as "Security check failed or is not configured on this device."
 
 **The `?welcome=1` flag is URL-carried, not device-local.** On web, the welcome signal travels in the redirect URL, not in localStorage or a cookie. If a user opens the confirmation link, lands on `/onboarding/privacy?welcome=1`, and then navigates away and comes back, the flag is gone. The celebration fires at most once per link click, which is the intended behaviour.
 
@@ -160,9 +163,11 @@ All auth calls on the web are wrapped in `withTimeout` with a `DEFAULT_AUTH_TIME
 
 **`src/tests/authCallback.test.ts`** — covers all three link shapes through `createSessionFromUrl`. Verifies that `token_hash`+`type` calls `verifyOtp` and returns `'recovery'`, `'signed_up'`, or `'signed_in'`; that `code` calls `exchangeCodeForSession`; that hash-fragment tokens call `setSession`; that API failures return `'none'`; and that a bare or malformed URL returns `'none'`. Tests use a mock Supabase client — no network required.
 
-**`src/tests/auth-errors.test.ts`** — tests the message-fragment → error code mapping in `getAuthErrorCode` and the code → user-visible string mapping in `toAuthErrorMessage`. Verifies the fallback to "Something went wrong" for unknown errors.
+**`src/tests/auth-errors.test.ts`** — tests the message-fragment → error code mapping in `getAuthErrorCode` and the code → user-visible string mapping in `toAuthErrorMessage`. Covers `email_not_registered` / `password_mismatch`, the GoTrue `otp_disabled` + “Signups not allowed for otp” pair, and the fallback to "Something went wrong" for unknown errors.
 
 **`web/__tests__/authErrors.test.ts`** — parallel Vitest suite covering the same `auth-errors.ts` exports from the web test runner, confirming the module is importable in both environments.
+
+**`web/__tests__/authEmailExists.test.ts`** — `presenceFromRpc` (`true` present, `false` absent, errors unknown); `classifyInvalidCredentials` three-way copy; `lookupAuthEmail` resolves `'unknown'` when the RPC rejects and does not throw.
 
 **`src/tests/web-auth-redirect.test.ts`** — covers `sanitizeNextPath` and `isAllowedNextPath` from `web/lib/auth/redirect.ts`. Verifies that allowed paths pass through unchanged (including query strings and hashes), and that absolute URLs, protocol-relative URLs, path traversal, wrong-case paths, and embedded newlines are all rejected in favour of the fallback (`/dashboard`).
 
@@ -185,3 +190,5 @@ All auth calls on the web are wrapped in `withTimeout` with a `DEFAULT_AUTH_TIME
 **No automated test for the full mobile deep-link flow end-to-end.** The `createSessionFromUrl` logic is unit-tested, and the web E2E suite covers the web callback. But there is no Detox or Maestro test that opens an actual deep link and verifies the mobile callback screen navigates correctly. This is a manual-only test at present.
 
 **Captcha on mobile.** Mobile password sign-in does not send a captcha token. If Supabase-side captcha is enforced globally (not scoped to web), mobile sign-in will fail. The error is handled gracefully but the feature is effectively blocked. As of the last manual check, captcha is not enforced on mobile in the Supabase dashboard, but this is not asserted in any automated test.
+
+**`auth_email_exists` is in-repo, not necessarily live.** Web password split stays generic until the operator applies `supabase/migrations/20260921160000_auth_email_exists.sql` (`npm run db:push`). Email-link enumeration does not need the RPC.

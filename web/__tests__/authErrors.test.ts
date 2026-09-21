@@ -26,6 +26,20 @@ describe('getAuthErrorCode', () => {
     expect(getAuthErrorCode(null)).toBe('');
     expect(getAuthErrorCode('string error')).toBe('');
   });
+
+  it('maps user_not_found and OTP signup-disabled to email_not_registered', () => {
+    expect(getAuthErrorCode({ code: 'user_not_found' })).toBe('email_not_registered');
+    expect(getAuthErrorCode({ message: 'Signups not allowed for otp' })).toBe(
+      'email_not_registered',
+    );
+  });
+
+  it('maps otp_disabled by Signups-not-allowed sentence, not by code alone', () => {
+    expect(
+      getAuthErrorCode({ code: 'otp_disabled', message: 'Signups not allowed for otp' }),
+    ).toBe('email_not_registered');
+    expect(getAuthErrorCode({ code: 'otp_disabled' })).toBe('otp_disabled');
+  });
 });
 
 describe('toAuthErrorMessage', () => {
@@ -53,5 +67,17 @@ describe('toAuthErrorMessage', () => {
     const msg = toAuthErrorMessage({ message: 'some unexpected error' });
     expect(typeof msg).toBe('string');
     expect(msg.length).toBeGreaterThan(0);
+  });
+
+  it('returns no-ledger copy for email_not_registered', () => {
+    expect(toAuthErrorMessage({ code: 'email_not_registered' })).toBe(
+      'No ledger for this email.',
+    );
+  });
+
+  it('returns mismatch copy for password_mismatch', () => {
+    expect(toAuthErrorMessage({ code: 'password_mismatch' })).toBe(
+      "That password doesn't match this email.",
+    );
   });
 });

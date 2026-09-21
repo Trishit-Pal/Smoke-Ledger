@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: a979537
+last_verified_commit: bf62af4
 status: current
 ---
 
@@ -42,16 +42,16 @@ The policy shape for most user-owned tables is a single FOR ALL policy that gate
 
 ### SECURITY DEFINER + search_path hygiene
 
-All 15 `SECURITY DEFINER` functions in `public` pin an explicit `search_path`. Thirteen pin `search_path = ''` (the empty string), which means every object reference inside the function body must be schema-qualified or the function errors. Two pin a non-empty path appropriate to their job:
+All 16 `SECURITY DEFINER` functions in `public` pin an explicit `search_path`. Fourteen pin `search_path = ''` (the empty string), which means every object reference inside the function body must be schema-qualified or the function errors. Two pin a non-empty path appropriate to their job:
 
 - `refresh_seed_prices_from_catalog` pins `smoke_seed, public` because it needs to read the seed catalog schema.
 - `rls_auto_enable` pins `pg_catalog` because it is a DDL helper that works in system catalogs.
 
-No function inherits the caller's search_path. This matters because a SECURITY DEFINER function runs with the privileges of the function owner (typically the Supabase table owner), not the calling role. If it inherited the caller's search_path, a sufficiently creative caller could shadow `public.some_table` with a same-named table in a schema they control and redirect the function's queries. Pinning to `''` closes that vector entirely. Confirmed live via `pg_proc.proconfig` on 2026-06-19.
+No function inherits the caller's search_path. This matters because a SECURITY DEFINER function runs with the privileges of the function owner (typically the Supabase table owner), not the calling role. If it inherited the caller's search_path, a sufficiently creative caller could shadow `public.some_table` with a same-named table in a schema they control and redirect the function's queries. Pinning to `''` closes that vector entirely. The previous 15 functions were confirmed live via `pg_proc.proconfig` on 2026-06-19. `auth_email_exists` is in-repo and not yet asserted live.
 
 The user-facing RPCs that `authenticated` may call are: `create_log_with_rate_limit`, `erase_account_data`, `export_account_data`, `get_daily_summary`, `get_health_milestones`, `get_random_facts`, `list_logs_page`, `mark_fact_seen`, `refresh_seed_prices_from_catalog`, `seed_default_brands_if_empty`, `sync_default_brand_catalog`.
 
-The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable` — have had `EXECUTE` revoked from both `anon` and `authenticated` via `supabase/migrations/20260531075255_lockdown_secdef_execute.sql:27–39`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected.
+The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `auth_email_exists` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. `auth_email_exists` is granted in `supabase/migrations/20260921160000_auth_email_exists.sql` (REVOKE PUBLIC/anon/authenticated, GRANT `service_role` only) and is called only from `lookupAuthEmail` after GoTrue `invalid_credentials`.
 
 ### The DPDP export and erase RPCs
 
@@ -97,6 +97,7 @@ Its history is the repo's canonical migrations-can-lie example: the constraint w
 The following are reachable only with the service-role key and are never handed to browser clients:
 
 - `consume_rate_limit` RPC — backs the Edge Function rate limiter; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260523092236_add_rate_limit_counters.sql:62–63`).
+- `auth_email_exists` RPC — boolean existence check on `auth.users` for web password login after `invalid_credentials`; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260921160000_auth_email_exists.sql`). Never cached. Until this migration is applied, lookup fail-closes to generic credentials.
 - `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers.
 - `record_audit_event` RPC — `EXECUTE` revoked from `authenticated` in `supabase/migrations/20260521000000_audit_export_ops.sql:295–297`; re-granted only to `service_role`. The `audit-record` Edge Function verifies the caller's JWT with the anon client first, then writes through the service-role client.
 - `auth.admin.deleteUser` — called only by `delete-account/index.ts:198`; requires `SUPABASE_SERVICE_ROLE_KEY`, which is an Edge Function secret and a server-side Vercel env var, never a `NEXT_PUBLIC_*` value.

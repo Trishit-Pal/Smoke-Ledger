@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-09-21 — bf62af4 (web login unknown-email vs wrong-password)
+- auth: web password sign-in calls service-role RPC `auth_email_exists` after `invalid_credentials` and shows “No ledger for this email.” vs “That password doesn't match this email.” Lookup is a total function (`lookupAuthEmail` never throws): timeout/throw/missing RPC fail-close to the combined copy. Email-link (web and native) maps GoTrue unknown-user errors the same way and tells the truth on send success. Password reset, phone OTP, and native password stay generic. Web `sendEmailOtp` uses the same `withTimeout` catch as resend.
+- security-privacy: 16th public `SECURITY DEFINER` function `auth_email_exists` (`search_path ''`, EXECUTE only `service_role`, reads `auth.users`). Operator must `npm run db:push` the migration before the password split is live.
+
 ## 2026-07-06 — a979537 (catch-up sync: dashboard timeframe hub, goal moments, hardening audit closure)
 - architecture: session store gained the canonical daily-summary slice (`summary`/`summarySinceYmd`), goal CRUD wrappers, and `listAllGoals` boot; RealtimeRefresher now also subscribes to `brands`/`brand_variants` with deliberate native/web parity; web `getDashboardData` fetches the daily summary as the timeframe source of truth
 - data-model: `v_daily_summary_user` is `SUM(quantity)` not `COUNT(*)`; realtime publication now includes `brands`/`brand_variants` (REPLICA IDENTITY FULL); log rate-limit window counts on server-set `created_at`; `smoking_facts` is 28 facts with the new `cravings` category; `erase_account_data` is fail-closed on an unset `app.audit_pepper` GUC

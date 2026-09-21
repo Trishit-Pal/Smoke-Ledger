@@ -11,6 +11,7 @@ import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
 import { isNextRedirectError, safeAuthCatchState } from '@web/lib/auth/authCatch';
 import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
+import { classifyInvalidCredentials, lookupAuthEmail } from '@web/lib/auth/authEmailExists';
 import {
   REMEMBER_ME_COOKIE,
   applyAuthCookiePolicy,
@@ -124,10 +125,12 @@ export async function signInWithPasswordAction(
     );
 
     if (error) {
-      return {
-        code: getAuthErrorCode(error) || 'authentication_error',
-        message: toAuthErrorMessage(error),
-      };
+      const code = getAuthErrorCode(error) || 'authentication_error';
+      if (code === 'invalid_credentials') {
+        const split = classifyInvalidCredentials(await lookupAuthEmail(email.trim()));
+        return { code: split, message: toAuthErrorMessage({ code: split }) };
+      }
+      return { code, message: toAuthErrorMessage(error) };
     }
   } catch (err) {
     if (isNextRedirectError(err)) throw err;
