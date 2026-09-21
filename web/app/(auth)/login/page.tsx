@@ -362,20 +362,26 @@ function LoginPageInner() {
     setOtpLoading(true);
     try {
       setRememberMePreference(rememberMe);
-      const { error } = await getSupabase().auth.signInWithOtp({
-        email: parsed.data,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: callbackRedirectTo,
-          ...(captchaToken ? { captchaToken } : {}),
-        },
-      });
+      const { error } = await withTimeout(
+        getSupabase().auth.signInWithOtp({
+          email: parsed.data,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: callbackRedirectTo,
+            ...(captchaToken ? { captchaToken } : {}),
+          },
+        }),
+        DEFAULT_AUTH_TIMEOUT_MS,
+      );
       if (error) {
-        setOtpInfo('If this email is registered, we sent a sign-in link.');
+        setOtpError(toAuthErrorMessage(error));
         setCaptchaToken(null);
         return;
       }
-      setOtpInfo('If this email is registered, we sent a sign-in link.');
+      setOtpInfo('We sent a sign-in link.');
+    } catch {
+      setOtpError(SERVICE_UNAVAILABLE_MESSAGE);
+      setCaptchaToken(null);
     } finally {
       setOtpLoading(false);
     }
@@ -476,7 +482,7 @@ function LoginPageInner() {
           {reason === 'reauth' && !passwordError ? (
             <InlineInfo message="Confirm it's you to finish deleting your account." />
           ) : null}
-          {passwordError ? <InlineError message={passwordError} /> : null}
+          {passwordError ? <InlineError key={passwordError} message={passwordError} /> : null}
           {resendInfo ? <InlineInfo message={resendInfo} /> : null}
 
           {showEmailNotConfirmedActions ? (
@@ -682,7 +688,7 @@ function LoginPageInner() {
       ) : null}
 
       {otpInfo ? <InlineInfo message={otpInfo} /> : null}
-      {otpError ? <InlineError message={otpError} /> : null}
+      {otpError ? <InlineError key={otpError} message={otpError} /> : null}
 
       <div
         style={{
@@ -737,17 +743,10 @@ function LoginPageInner() {
 
 function InlineError({ message }: { message: string }) {
   return (
-    <p
-      role="alert"
-      style={{
-        fontSize: 13,
-        color: 'var(--warn-earth)',
-        margin: '12px 0 0 0',
-        lineHeight: 1.5,
-      }}
-    >
-      {message}
-    </p>
+    <div className="login-correction" role="alert">
+      <span className="login-correction-rule rule-draw" aria-hidden />
+      <p className="login-correction-copy">{message}</p>
+    </div>
   );
 }
 

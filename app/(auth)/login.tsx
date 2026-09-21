@@ -92,8 +92,7 @@ export default function LoginScreen() {
         setErr(toAuthErrorMessage(error));
         return;
       }
-      // Neutral copy — don't reveal whether the email exists (per launch posture).
-      setInfo('If that email is registered, a sign-in link is on its way. Open it on any device to finish signing in.');
+      setInfo('We sent a sign-in link.');
     } finally {
       setLoading(false);
     }

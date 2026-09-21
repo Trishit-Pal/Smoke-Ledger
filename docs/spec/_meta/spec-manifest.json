@@ -43,7 +43,8 @@
         "app/auth/**",
         "app/(auth)/**",
         "web/app/auth/**",
-        "web/app/(auth)/**"
+        "web/app/(auth)/**",
+        "web/lib/auth/authEmailExists.ts"
       ],
       "last_verified_commit": "a979537",
       "status": "current"
