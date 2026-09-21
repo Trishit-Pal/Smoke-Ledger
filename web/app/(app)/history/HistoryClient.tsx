@@ -97,7 +97,7 @@ export interface HistoryClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
   /**
    * Initial pagination cursor from the SSR fetch. Non-null means there are
-   * older logs beyond the initial 200-row / 60-day window. The "Load older"
+   * older logs beyond the first 200-row lifetime page. The "Load older"
    * button uses this to drive the `fetchMoreHistoryLogs` server action; once
    * the action returns `null` for `nextCursor`, the button hides itself.
    */
@@ -145,9 +145,8 @@ export function HistoryClient({
   }
 
   // Client-side filter over the loaded ledger. ponytail: searches only the
-  // logs already in state (the initial 60-day window + any "Load older"
-  // pages) — a brand last used outside that window won't match until more
-  // pages load. Server-side search is the upgrade path if that proves narrow.
+  // logs already in state (first page + any "Load older" pages) — a brand
+  // on an unloaded older page won't match until more pages load.
   const [query, setQuery] = React.useState('');
   const normalizedQuery = query.trim().toLowerCase();
 

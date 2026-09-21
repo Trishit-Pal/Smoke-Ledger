@@ -5,8 +5,8 @@
  * tabular numerals for day totals, date-group headers with Today/Yesterday
  * relative labels, load-older cursor pagination via listLogsPage.
  *
- * Data: initial window from useSession (≤90 days); deeper pages fetched on
- * demand via listLogsPage and merged/deduped by log id.
+ * Data: initial window from useSession (≤90 days); if that slice is empty,
+ * first paint loads listLogsPage with no fromDate. Deeper pages on demand.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -168,14 +168,12 @@ export default function History() {
   const removeLog = useSession((s) => s.removeLog);
   const discreet = isDiscreetMode(profile);
 
-  // Accumulated logs = store window + any cursor-fetched pages.
+  // Accumulated logs = store window + any cursor-fetched pages (including the
+  // empty-store first page, which is unbounded).
   const [extraLogs, setExtraLogs] = useState<CigaretteLog[]>([]);
-  // undefined = not yet known. Seeded null (no pagination) when the store has
-  // no logs at mount — logs hydrate before this screen mounts, same snapshot
-  // the probe effect below reads.
-  const [cursor, setCursor] = useState<LogCursor | null | undefined>(() =>
-    useSession.getState().logs.length === 0 ? null : undefined,
-  );
+  // undefined = probe in flight. Do not seed null on empty store — logs older
+  // than the 90-day boot window still exist and must be fetched.
+  const [cursor, setCursor] = useState<LogCursor | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const mountedRef = useRef(true);
@@ -196,33 +194,40 @@ export default function History() {
     };
   }, []);
 
-  // On first render, probe whether there are older logs beyond the store window
-  // by calling listLogsPage with a cursor derived from the oldest store log.
-  // probedRef ensures this fires exactly once — no duplicate/concurrent probes
-  // even if storeLogs gets a new array reference before the async resolves.
+  // Probe once: empty store → first unbounded page; otherwise check for rows
+  // older than the 90-day boot window.
   useEffect(() => {
     if (probedRef.current) return;
     probedRef.current = true;
 
-    // Read the current store snapshot directly to avoid a stale-closure on
-    // the empty initial list (logs are hydrated before this screen mounts).
     const snapshot = useSession.getState().logs;
     const oldest = [...snapshot].sort((a, b) => a.tsUtc.localeCompare(b.tsUtc))[0];
-    // No logs at all — cursor was seeded null by the useState initializer.
-    if (!oldest) return;
-    const probeCursor: LogCursor = { ts: oldest.tsUtc, id: oldest.id };
     let cancelled = false;
+
+    if (!oldest) {
+      listLogsPage({ limit: 50 })
+        .then((page) => {
+          if (cancelled || !mountedRef.current) return;
+          setExtraLogs((prev) => mergeUniq(prev, page.logs));
+          setCursor(page.nextCursor);
+        })
+        .catch(() => {
+          if (cancelled || !mountedRef.current) return;
+          setCursor(null);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const probeCursor: LogCursor = { ts: oldest.tsUtc, id: oldest.id };
     listLogsPage({ cursor: probeCursor, limit: 1 })
       .then((page) => {
         if (cancelled || !mountedRef.current) return;
-        // If hasMore, the returned nextCursor points to even older entries.
-        // For simplicity: just store the probeCursor as the starting cursor so
-        // the first "Load older" click fetches from that boundary.
         setCursor(page.nextCursor !== null ? probeCursor : null);
       })
       .catch(() => {
         if (cancelled || !mountedRef.current) return;
-        // If probe fails, don't show pagination — graceful degradation.
         setCursor(null);
       });
     return () => {
@@ -338,6 +343,7 @@ export default function History() {
 
       {/* ─── Content ─── */}
       {groups.length === 0 ? (
+        cursor === undefined ? null : (
         <FadeSlideIn index={2}>
           <EmptyState
             title="No logs match"
@@ -348,6 +354,7 @@ export default function History() {
             }
           />
         </FadeSlideIn>
+        )
       ) : (
         <>
           {groups.map((group, gi) => {
