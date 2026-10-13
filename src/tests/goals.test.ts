@@ -1,5 +1,6 @@
 import type { Goal } from '@/types';
 import { evaluateGoal } from '@/domain/goals';
+import { formatMoney } from '@/lib/format';
 
 const baseGoal = (overrides: Partial<Goal>): Goal => ({
   id: 'g1',
@@ -162,5 +163,13 @@ describe('evaluateGoal', () => {
     expect(p.valueTarget).toBeGreaterThan(0);
     expect(p.unit).toBe('days');
     expect(p.label).toContain('2025-04-30');
+  });
+
+  it('labels a spend cap in the profile currency', () => {
+    const goal = baseGoal({ type: 'spend_cap_daily', targetValue: 13.5 });
+    const eur = evaluateGoal(goal, [], '2025-04-18', { currency: 'EUR', locale: 'fr-FR' });
+    expect(eur.label).toBe(`Daily spend cap: ${formatMoney(13.5, 'EUR', { locale: 'fr-FR' })}`);
+    expect(eur.explanation).not.toContain('₹');
+    expect(evaluateGoal(goal, [], '2025-04-18').label).toContain('₹');
   });
 });

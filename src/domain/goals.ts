@@ -3,6 +3,13 @@
 import type { CigaretteLog, Goal } from '@/types';
 import { rollingAvgSticks, sticksOn, spendOn, dayShift } from './calc';
 import { startOfWeekIst, todayIst, daysBetween } from '@/lib/date';
+import { formatMoney } from '@/lib/format';
+import type { CurrencyCode } from '@/lib/regions';
+
+export interface EvaluateGoalMoney {
+  currency?: CurrencyCode;
+  locale?: string;
+}
 
 export interface GoalProgress {
   goalId: string;
@@ -32,7 +39,12 @@ function clampPercent(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
 }
 
-export function evaluateGoal(goal: Goal, logs: CigaretteLog[], today = todayIst()): GoalProgress {
+export function evaluateGoal(
+  goal: Goal,
+  logs: CigaretteLog[],
+  today = todayIst(),
+  money?: EvaluateGoalMoney,
+): GoalProgress {
   switch (goal.type) {
     case 'daily_cap': {
       const used = sticksOn(logs, today);
@@ -56,9 +68,12 @@ export function evaluateGoal(goal: Goal, logs: CigaretteLog[], today = todayIst(
       const used = spendOn(logs, today);
       const target = goal.targetValue;
       const percent = target > 0 ? clampPercent((used / target) * 100) : 0;
+      const currency = money?.currency ?? 'INR';
+      const targetLabel = formatMoney(target, currency, { locale: money?.locale });
+      const usedLabel = formatMoney(used, currency, { locale: money?.locale });
       return {
         goalId: goal.id,
-        label: `Daily spend cap: ₹${target}`,
+        label: `Daily spend cap: ${targetLabel}`,
         valueCurrent: used,
         valueTarget: target,
         unit: 'inr',
@@ -66,7 +81,7 @@ export function evaluateGoal(goal: Goal, logs: CigaretteLog[], today = todayIst(
         isOnTrack: used <= target,
         atRisk: used >= target * 0.8 && used < target,
         remaining: Math.max(0, target - used),
-        explanation: `You have spent ₹${used.toFixed(0)} of ₹${target} today.`,
+        explanation: `You have spent ${usedLabel} of ${targetLabel} today.`,
       };
     }
 

@@ -28,7 +28,7 @@ import { useRouter } from 'next/navigation';
 
 import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
-import { timezoneForCountry } from '@/lib/regions';
+import { currencyFor, localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { resolveLogUnitPrice } from '@/domain/calc';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
 import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
@@ -197,8 +197,8 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
   // Live per-stick preview: the typed value IS the per-stick price; show the
   // resulting total so there's no ambiguity before saving.
   const pricePreview = React.useMemo(
-    () => buildPricePreview(priceText, quantity),
-    [priceText, quantity],
+    () => buildPricePreview(priceText, quantity, currencyFor(country), localeForCountry(country)),
+    [priceText, quantity, country],
   );
 
   const handleSave = async () => {
@@ -389,7 +389,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
             />
           </FieldRow>
           <FieldRow
-            label="Price per stick (INR)"
+            label={`Price per stick (${currencyFor(country)})`}
             htmlFor="price-input"
             sublabel={
               <>
@@ -409,7 +409,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
               placeholder="0"
               value={priceText}
               onChange={(e) => setPriceText(e.target.value)}
-              aria-label="Price per stick in rupees"
+              aria-label={`Price per stick in ${currencyFor(country)}`}
             />
           </FieldRow>
         </section>

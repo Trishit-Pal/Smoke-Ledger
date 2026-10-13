@@ -4,6 +4,8 @@ import * as React from 'react';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
+import { formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
 import { ProgressRing } from '@web/components/ui/ProgressRing';
@@ -20,7 +22,10 @@ export interface GoalCardProps {
 }
 
 export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, onDelete }: GoalCardProps) {
-  const progress = evaluateGoal(goal, logs, today);
+  const progress = evaluateGoal(goal, logs, today, {
+    currency: profile.currency,
+    locale: localeForCountry(profile.country),
+  });
   // Spend goals embed ₹ values in their label/explanation — hide those under discreet mode.
   const hideMoney = goal.type === 'spend_cap_daily' && isDiscreetMode(profile);
   const pct = Math.round(Math.max(0, Math.min(100, progress.percent)));
@@ -40,7 +45,7 @@ export function GoalCard({ goal, logs, today, profile, busy, onEdit, onStatus, o
     !isCap || hideMoney || !progress.isOnTrack
       ? null
       : goal.type === 'spend_cap_daily'
-        ? `₹${Math.round(progress.remaining)} of ₹${progress.valueTarget} left today`
+        ? `${formatMoney(progress.remaining, profile.currency, { locale: localeForCountry(profile.country) })} of ${formatMoney(progress.valueTarget, profile.currency, { locale: localeForCountry(profile.country) })} left today`
         : `${progress.remaining} of ${progress.valueTarget} left ${goal.type === 'weekly_target' ? 'this week' : 'today'}`;
 
   return (

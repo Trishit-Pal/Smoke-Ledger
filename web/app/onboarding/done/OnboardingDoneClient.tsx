@@ -10,13 +10,13 @@ import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
 import { Figure } from '@web/components/character/Figure';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
+import { regionFor } from '@/lib/regions';
+import { formatMoney } from '@/lib/format';
 import {
   safeRevalidateAppViews as revalidateAppViews,
   safeRevalidateBrands as revalidateBrands,
 } from '@web/lib/safeRevalidate';
 import type { GoalType } from '@/types';
-
-const PRICE_PER_STICK = 18;
 
 interface GoalSummary {
   type: GoalType;
@@ -50,6 +50,7 @@ export interface OnboardingDoneClientProps {
   purchasePref: 'single' | 'pack' | 'mixed' | null;
   favorites: string[];
   goal: GoalSummary | null;
+  country: string | null;
 }
 
 export function OnboardingDoneClient({
@@ -58,6 +59,7 @@ export function OnboardingDoneClient({
   purchasePref,
   favorites,
   goal,
+  country,
 }: OnboardingDoneClientProps) {
   const router = useRouter();
   const reduce = useReduceMotion();
@@ -81,7 +83,10 @@ export function OnboardingDoneClient({
   }, [reduce]);
 
   const baseline = Math.max(0, Math.round(Number(baselinePerDay) || 0));
-  const yearlySpend = baseline * PRICE_PER_STICK * 365;
+  const region = regionFor(country) ?? regionFor(null)!;
+  const perStick = region.stickHint ?? 18;
+  const yearlySpend = baseline * perStick * 365;
+  const yearlyLabel = formatMoney(yearlySpend, region.currency, { locale: region.locale });
 
   const today = new Date();
   const dateLine = today.toLocaleDateString('en-IN', {
@@ -92,7 +97,17 @@ export function OnboardingDoneClient({
   });
   const filedDate = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
-  const goalDisplay = goal ? GOAL_DISPLAY[goal.type] : null;
+  const goalDisplay = goal
+    ? {
+        ...GOAL_DISPLAY[goal.type],
+        ...(goal.type === 'spend_cap_daily'
+          ? {
+              unit: region.currency === 'EUR' ? 'EUR / day' : 'INR / day',
+              prefix: region.currency === 'EUR' ? '€' : '₹',
+            }
+          : {}),
+      }
+    : null;
 
   return (
     <div
@@ -284,7 +299,7 @@ export function OnboardingDoneClient({
                     alignItems: 'baseline',
                   }}
                 >
-                  ₹<DigitRoll value={yearlySpend.toLocaleString('en-IN')} delay={1100} />
+                  <DigitRoll value={yearlyLabel} delay={1100} />
                 </span>
               }
               sub="Annual spend on cigarettes at current baseline."

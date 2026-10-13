@@ -234,8 +234,11 @@ export function DashboardClient({
 
   const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = React.useMemo(
-    () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
-    [activeGoal, logs, today],
+    () => (activeGoal ? evaluateGoal(activeGoal, logs, today, {
+      currency: profile.currency,
+      locale: localeForCountry(profile.country),
+    }) : null),
+    [activeGoal, logs, today, profile.currency, profile.country],
   );
   const goalToneColor = goalProgress
     ? goalProgress.atRisk

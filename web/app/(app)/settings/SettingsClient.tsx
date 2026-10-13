@@ -45,7 +45,8 @@ import {
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { updateProfile, setRegion, resetLedgerForRegion } from '@/db/repositories/profile';
 import { CountryField } from '@web/components/settings/CountryField';
-import { isRegionPickerEnabled } from '@/lib/regions';
+import { isRegionPickerEnabled, localeForCountry } from '@/lib/regions';
+import { formatMoney } from '@/lib/format';
 import { getSupabase } from '@web/lib/supabase/client';
 import { dispatchFarewell } from '@web/lib/character/mood';
 import { track } from '@/services/analytics';
@@ -475,9 +476,14 @@ export function SettingsClient({
     }
   };
 
+  const packCurrency = profile.currency;
+  const packLocale = localeForCountry(profile.country);
+  const roundPackPrice = (n: number) =>
+    packCurrency === 'EUR' ? Math.round(n * 100) / 100 : Math.round(n);
+
   const beginEditPrice = (variant: BrandVariant) => {
     setEditingVariantId(variant.id);
-    setPriceDraft(variant.avgPriceInr != null ? String(Math.round(variant.avgPriceInr)) : '');
+    setPriceDraft(variant.avgPriceInr != null ? String(roundPackPrice(variant.avgPriceInr)) : '');
     setError(null);
   };
 
@@ -492,9 +498,8 @@ export function SettingsClient({
       setError(`Price must be a number between ${MIN_PRICE_INR} and ${MAX_PRICE_INR}.`);
       return;
     }
-    // Pack MRPs are whole rupees; round so the stored value matches what the
-    // editor displays (the list shows Math.round(price)).
-    const price = Math.round(parsed);
+    // India pack MRPs are whole rupees. Euro prices keep cents.
+    const price = roundPackPrice(parsed);
     setBusy('save-price');
     setError(null);
     try {
@@ -1113,7 +1118,7 @@ export function SettingsClient({
                   />
                 </label>
                 <label className="flex flex-col gap-xs">
-                  <span className="editorial-caption">Price per stick (INR)</span>
+                  <span className="editorial-caption">Price per stick ({packCurrency})</span>
                   <input
                     type="number"
                     min={0}
@@ -1122,7 +1127,7 @@ export function SettingsClient({
                     value={newAvgPrice}
                     onChange={(event) => setNewAvgPrice(event.target.value)}
                     placeholder="per stick, optional"
-                    aria-label="Price per stick in rupees"
+                    aria-label={`Price per stick in ${packCurrency}`}
                     className="w-full bg-transparent border-0 border-b nums-tabular text-body text-text focus:outline-none focus-visible:border-[var(--text)] py-xs"
                     style={{ borderBottomColor: 'var(--rule-strong)' }}
                   />
@@ -1202,12 +1207,12 @@ export function SettingsClient({
                           </div>
                           {editingVariantId === v.id ? (
                             <div className="flex items-center gap-sm">
-                              <span className="text-text-muted">₹</span>
+                              <span className="text-text-muted">{packCurrency === 'EUR' ? '€' : '₹'}</span>
                               <input
                                 type="number"
                                 min={0}
                                 max={2000}
-                                step="1"
+                                step={packCurrency === 'EUR' ? '0.01' : '1'}
                                 inputMode="decimal"
                                 value={priceDraft}
                                 onChange={(event) => setPriceDraft(event.target.value)}
@@ -1231,7 +1236,9 @@ export function SettingsClient({
                           ) : (
                             <div className="flex items-center gap-md">
                               <span className="nums-tabular text-body text-text">
-                                {v.avgPriceInr != null ? `₹${Math.round(v.avgPriceInr)}` : '—'}
+                                {v.avgPriceInr != null
+                                  ? formatMoney(v.avgPriceInr, packCurrency, { locale: packLocale })
+                                  : '—'}
                               </span>
                               <TextLink
                                 onClick={() => beginEditPrice(v)}

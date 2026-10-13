@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { buildPricePreview } from '@/lib/pricePreview';
-import { formatInr, formatPerStick } from '@/lib/format';
+import { formatInr, formatMoney, formatPerStick } from '@/lib/format';
 
 describe('buildPricePreview', () => {
   it('returns null when nothing is typed', () => {
@@ -33,5 +33,12 @@ describe('buildPricePreview', () => {
     expect(buildPricePreview('50', '0')).toContain(formatInr(50));
     expect(buildPricePreview('50', '')).toContain(formatInr(50));
     expect(buildPricePreview('50', 'xyz')).toContain(formatInr(50));
+  });
+
+  it('formats the preview in the given currency', () => {
+    const r = buildPricePreview('13.5', 2, 'EUR', 'fr-FR');
+    expect(r).toContain(formatMoney(27, 'EUR', { locale: 'fr-FR' }));
+    expect(r).toContain(formatPerStick(13.5, { currency: 'EUR', locale: 'fr-FR' }));
+    expect(r).not.toContain('₹');
   });
 });
