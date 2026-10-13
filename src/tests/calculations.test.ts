@@ -9,6 +9,7 @@ import {
   smokeFreeStreak,
   forecastMonthlySpend,
   avgCravingInWindow,
+  round2,
 } from '@/domain/calc';
 import { potentialSavings, actualSavings, deriveBaselinePerDay } from '@/domain/savings';
 import type { CigaretteLog } from '@/types';
@@ -297,5 +298,13 @@ describe('avgCravingInWindow', () => {
       mkLog({ localDate: '2025-03-04', craving: 1 }), // after window
     ];
     expect(avgCravingInWindow(logs, '2025-03-01', '2025-03-03')).toBe(9);
+  });
+});
+
+describe('round2', () => {
+  it('keeps a 0.45 euro stick exact to the cent', () => {
+    expect(round2(0.45)).toBe(0.45);
+    expect(round2(0.45) + round2(0.45)).toBe(0.9);
+    expect(round2(12.345)).toBe(12.35);
   });
 });

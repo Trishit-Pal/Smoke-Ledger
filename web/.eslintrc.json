@@ -1,4 +1,19 @@
 {
   "root": true,
-  "extends": ["next/core-web-vitals"]
+  "extends": ["next/core-web-vitals"],
+  "overrides": [
+    {
+      "files": ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+      "excludedFiles": ["**/marketing/**", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "CallExpression[callee.name='formatInr']",
+            "message": "Use formatMoney(amount, currency, { locale }). formatInr prints rupees only."
+          }
+        ]
+      }
+    }
+  ]
 }

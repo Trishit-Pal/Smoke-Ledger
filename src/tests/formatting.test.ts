@@ -1,4 +1,4 @@
-import { formatInr, formatDelta, formatCompactInt, pluralize } from '@/lib/format';
+import { formatInr, formatMoney, formatDelta, formatCompactInt, pluralize } from '@/lib/format';
 import {
   dayOfWeekShort,
   formatIndianDate,
@@ -37,6 +37,40 @@ describe('formatInr', () => {
   it('handles negatives', () => {
     expect(formatInr(-250)).toBe('-₹250');
     expect(formatInr(-2500, { compact: true })).toBe('-₹2.5k');
+  });
+});
+
+describe('formatMoney', () => {
+  it('keeps Indian grouping and lakh compact for INR', () => {
+    expect(formatMoney(100000, 'INR')).toBe('₹1,00,000');
+    expect(formatMoney(250000, 'INR', { compact: true })).toBe('₹2.5L');
+    expect(formatMoney(0.45, 'INR')).toBe('₹0.45');
+  });
+
+  it('formats EUR with the country locale, and those four locales are not the same string', () => {
+    const opts = { style: 'currency', currency: 'EUR' } as const;
+    const fr = formatMoney(1234.5, 'EUR', { locale: 'fr-FR' });
+    const de = formatMoney(1234.5, 'EUR', { locale: 'de-DE' });
+    const ie = formatMoney(1234.5, 'EUR', { locale: 'en-IE' });
+    const nl = formatMoney(1234.5, 'EUR', { locale: 'nl-NL' });
+    expect(fr).toBe(new Intl.NumberFormat('fr-FR', opts).format(1234.5));
+    expect(de).toBe(new Intl.NumberFormat('de-DE', opts).format(1234.5));
+    expect(ie).toBe(new Intl.NumberFormat('en-IE', opts).format(1234.5));
+    expect(nl).toBe(new Intl.NumberFormat('nl-NL', opts).format(1234.5));
+    expect(new Set([fr, de, ie, nl]).size).toBe(4);
+    for (const locale of ['fr-FR', 'de-DE', 'en-IE', 'nl-NL'] as const) {
+      const parts = new Intl.NumberFormat(locale, opts).formatToParts(1234.5);
+      expect(parts.some((p) => p.type === 'currency')).toBe(true);
+      expect(formatMoney(1234.5, 'EUR', { locale })).toContain(
+        parts.find((p) => p.type === 'decimal')?.value,
+      );
+    }
+  });
+
+  it('compacts EUR with k and M, never lakh or crore', () => {
+    expect(formatMoney(2500, 'EUR', { compact: true, locale: 'fr-FR' })).toBe('€2.5k');
+    expect(formatMoney(1_500_000, 'EUR', { compact: true })).toBe('€1.5M');
+    expect(formatMoney(250000, 'EUR', { compact: true })).not.toMatch(/L|Cr/);
   });
 });
 

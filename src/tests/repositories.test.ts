@@ -80,6 +80,14 @@ describe('mapDbError', () => {
     const err = mapDbError({ code: '23505', message: 'duplicate' });
     expect((err as AppError).code).toBe('conflict');
   });
+
+  it('maps a currency-changing region move to region_change_requires_reset', () => {
+    const err = mapDbError({
+      code: 'P0001',
+      message: 'region_change_requires_reset',
+    });
+    expect((err as AppError).code).toBe('region_change_requires_reset');
+  });
 });
 
 // ---------------------------------------------------------------------------

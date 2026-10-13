@@ -305,7 +305,8 @@ export const ImportProfileSchema = z
   .object({
     baselinePerDay: z.number().min(0).max(200).nullable(),
     baselineWindowDays: z.number().int().min(1).max(365),
-    currency: z.literal('INR'),
+    currency: z.enum(['INR', 'EUR']),
+    country: z.string().length(2).nullable().optional(),
     discreetMode: z.boolean(),
     appLockEnabled: z.boolean(),
     hideTotalsOnHome: z.boolean(),

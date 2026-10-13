@@ -135,6 +135,8 @@ export type LogDraft = Omit<
    * to be safe against duplicate inserts on flaky networks.
    */
   clientOpId?: string;
+  /** IANA zone for local_date / local_hour. Defaults to IST. */
+  timeZone?: string;
 };
 
 export const MAX_LIST_LOGS = 5_000;
@@ -209,8 +211,9 @@ export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
     throw new AppError('validation_error', 'A cigarette brand is required to log.');
   }
   const id = makeId('log');
-  const localDate = draft.localDate ?? toLocalDate(draft.tsUtc);
-  const localHour = draft.localHour ?? toLocalHour(draft.tsUtc);
+  const zone = draft.timeZone;
+  const localDate = draft.localDate ?? toLocalDate(draft.tsUtc, zone);
+  const localHour = draft.localHour ?? toLocalHour(draft.tsUtc, zone);
   // CigaretteLogSchema applies the 24h backdate cap as a refinement — see
   // MAX_BACKDATE_MS in src/lib/validation.ts. This parse runs in the client
   // Supabase context, so the cap is a client-side guard (RLS scopes any forged

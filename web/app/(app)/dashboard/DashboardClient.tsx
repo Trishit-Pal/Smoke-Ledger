@@ -30,9 +30,10 @@ import {
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
-import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
+import { todayInZone, daysAgoInZone, dayOfWeekShort, formatIndianDate } from '@/lib/date';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isBirthdayToday } from '@/domain/age';
-import { formatInr, formatDelta, formatPerStick } from '@/lib/format';
+import { formatMoney, formatDelta, formatPerStick } from '@/lib/format';
 import { isHomeTotalsHidden, isDiscreetMode } from '@/lib/discreet';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { AnalyticsEvents } from '@/constants/events';
@@ -146,7 +147,10 @@ export function DashboardClient({
   const [windowDays, setWindowDays] = React.useState<WindowDays>(1);
   const [lastLogParams, setLastLogParams] = React.useState<{ brandId: string | null; brandName: string | null; variantName: string | null; quantity: number } | null>(null);
 
-  const today = todayIst();
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
+  const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
+    formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
   const hidden = isHomeTotalsHidden(profile);
 
   // ── Canonical timeframe metrics (single source of truth = the daily summary) ──
@@ -189,12 +193,12 @@ export function DashboardClient({
   // Week strip stays a fixed 7-day view; raw logs (60-day) cover it and sum quantity
   // identically to the summary.
   const weekBars = React.useMemo(() => {
-    const stats = dailyStats(logs, daysAgoIst(6), today);
+    const stats = dailyStats(logs, daysAgoInZone(6, zone), today);
     return stats.map((s) => ({
       label: dayOfWeekShort(s.date).slice(0, 1).toUpperCase(),
       value: s.sticks,
     }));
-  }, [logs, today]);
+  }, [logs, today, zone]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
   const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
 
@@ -204,8 +208,8 @@ export function DashboardClient({
   // the week strip. Requires >=3 tagged logs so a sparse tag doesn't read as
   // a headline stat.
   const avgCraving = React.useMemo(
-    () => avgCravingInWindow(logs, daysAgoIst(6), today),
-    [logs, today],
+    () => avgCravingInWindow(logs, daysAgoInZone(6, zone), today),
+    [logs, today, zone],
   );
 
   // Recent activity — last 5 logs, most-recent first regardless of the
@@ -305,6 +309,7 @@ export function DashboardClient({
         const total = unit != null ? unit * opts.quantity : null;
         await createLog({
           tsUtc: new Date().toISOString(),
+          timeZone: zone,
           brandId: opts.brandId,
           brandNameSnap: opts.brandName,
           variantSnap: opts.variantName,
@@ -336,7 +341,7 @@ export function DashboardClient({
 
         setToast(
           `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${
-            total != null ? ` · ${formatInr(total, { compact: true })}` : ''
+            total != null ? ` · ${money(total, { compact: true })}` : ''
           }`,
         );
         setQuickLogError(null);
@@ -351,7 +356,7 @@ export function DashboardClient({
         setQuickLogPending(false);
       }
     },
-    [router, todaySticks, baseline],
+    [router, todaySticks, baseline, zone, profile.currency, profile.country, money],
   );
 
   const deck = headlineDeck({ sticks, windowDays, deltaPct: period.stickDeltaPct, streak, hidden });
@@ -431,13 +436,13 @@ export function DashboardClient({
               <span className="editorial-caption mb-sm">Spend</span>
               <div
                 className="editorial-numeral--small nums-tabular"
-                aria-label={hidden ? 'Spend hidden' : `Spent ${formatInr(spend)}`}
+                aria-label={hidden ? 'Spend hidden' : `Spent ${money(spend)}`}
               >
-                {hidden ? '•••' : formatInr(spend, { compact: true })}
+                {hidden ? '•••' : money(spend, { compact: true })}
               </div>
               {!hidden && sticks > 0 && spend > 0 ? (
                 <span className="text-caption text-text-faint nums-tabular mt-xs">
-                  {formatPerStick(spend / sticks, { compact: true })}
+                  {formatPerStick(spend / sticks, { compact: true, currency: profile.currency, locale: localeForCountry(profile.country) })}
                 </span>
               ) : null}
             </div>
@@ -492,7 +497,7 @@ export function DashboardClient({
           />
           <KpiCard
             label="Spend, last 7 days"
-            value={hidden ? '•••' : formatInr(totalsForWindow(summary, 7, today).spendInr, { compact: true })}
+            value={hidden ? '•••' : money(totalsForWindow(summary, 7, today).spendInr, { compact: true })}
           />
           {avgCraving !== null ? (
             <KpiCard
@@ -542,15 +547,15 @@ export function DashboardClient({
                 hidden
                   ? '•••'
                   : allTimeSaved.totalInr > 0 && savedRate != null
-                    ? `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started — ${savedSticks} sticks below baseline × ${formatInr(savedRate)} per stick`
-                    : `${formatInr(allTimeSaved.totalInr, { compact: true })} since you started`
+                    ? `${money(allTimeSaved.totalInr, { compact: true })} since you started — ${savedSticks} sticks below baseline × ${money(savedRate)} per stick`
+                    : `${money(allTimeSaved.totalInr, { compact: true })} since you started`
               }
-              value={hidden ? '•••' : formatInr(periodSaved.totalInr, { compact: true })}
+              value={hidden ? '•••' : money(periodSaved.totalInr, { compact: true })}
               tone={periodSaved.totalInr > 0 ? 'accent' : 'neutral'}
               ariaLabel={
                 hidden
                   ? 'Saved hidden'
-                  : `Saved ${periodNoun(windowDays)}: ${formatInr(periodSaved.totalInr)}`
+                  : `Saved ${periodNoun(windowDays)}: ${money(periodSaved.totalInr)}`
               }
             />
 
@@ -561,13 +566,13 @@ export function DashboardClient({
                 subtitle={
                   hidden
                     ? '•••'
-                    : `${formatInr(forecast.elapsedSpend, { compact: true })} so far · ${forecast.daysElapsed}/${forecast.daysInMonth} days elapsed`
+                    : `${money(forecast.elapsedSpend, { compact: true })} so far · ${forecast.daysElapsed}/${forecast.daysInMonth} days elapsed`
                 }
-                value={hidden ? '•••' : formatInr(forecast.forecast, { compact: true })}
+                value={hidden ? '•••' : money(forecast.forecast, { compact: true })}
                 ariaLabel={
                   hidden
                     ? 'Month forecast hidden'
-                    : `At this pace, about ${formatInr(forecast.forecast)} this month`
+                    : `At this pace, about ${money(forecast.forecast)} this month`
                 }
               />
             ) : null}
@@ -637,7 +642,7 @@ export function DashboardClient({
                 <SectionLabel id="week-heading" tone="inverse" spacing="none">
                   The last 7 days
                 </SectionLabel>
-                <span className="text-small ink-muted nums-tabular">{dayOfWeekShort(daysAgoIst(6))} — {dayOfWeekShort(today)}</span>
+                <span className="text-small ink-muted nums-tabular">{dayOfWeekShort(daysAgoInZone(6, zone))} — {dayOfWeekShort(today)}</span>
               </div>
               <WeekStrip data={weekBars} inverted hidden={hidden} />
             </div>

@@ -43,7 +43,9 @@ import {
   safeRevalidateBrands as revalidateBrands,
 } from '@web/lib/safeRevalidate';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
-import { updateProfile } from '@/db/repositories/profile';
+import { updateProfile, setRegion, resetLedgerForRegion } from '@/db/repositories/profile';
+import { CountryField } from '@web/components/settings/CountryField';
+import { isRegionPickerEnabled } from '@/lib/regions';
 import { getSupabase } from '@web/lib/supabase/client';
 import { dispatchFarewell } from '@web/lib/character/mood';
 import { track } from '@/services/analytics';
@@ -73,6 +75,7 @@ type BusyAction =
   | 'save-profile'
   | 'save-mobile'
   | 'save-place'
+  | 'save-country'
   | 'signout'
   | 'return-home'
   | 'export-json'
@@ -254,6 +257,9 @@ export function SettingsClient({
   const [mobileDraft, setMobileDraft] = React.useState(localMobileDigits(profile.mobileE164));
   const [editingPlace, setEditingPlace] = React.useState(false);
   const [placeDraft, setPlaceDraft] = React.useState(profile.place ?? '');
+  const [country, setCountry] = React.useState(profile.country ?? 'IN');
+  const [countryError, setCountryError] = React.useState<string | null>(null);
+  const [confirmRegionReset, setConfirmRegionReset] = React.useState(false);
 
   const [analyticsOptIn, setAnalyticsOptIn] = React.useState(initialAnalyticsOptIn);
   // Reconcile with the server prop after router.refresh() (e.g. consent changed
@@ -612,6 +618,29 @@ export function SettingsClient({
     }
   };
 
+  const onSaveCountry = async (reset: boolean) => {
+    setBusy('save-country');
+    setError(null);
+    setCountryError(null);
+    try {
+      if (reset) await resetLedgerForRegion(country);
+      else await setRegion(country);
+      setConfirmRegionReset(false);
+      flashToast(reset ? 'Ledger reset for the new country.' : 'Country saved.');
+      await revalidateAppViews();
+      router.refresh();
+    } catch (e) {
+      if (isAppError(e) && e.code === 'region_change_requires_reset') {
+        setConfirmRegionReset(true);
+        setCountryError(describeError(e));
+      } else {
+        setCountryError(describeError(e, 'validation_error'));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onEraseAll = async () => {
     setBusy('erase-all');
     setError(null);
@@ -936,6 +965,31 @@ export function SettingsClient({
                 )
               }
             />
+            {isRegionPickerEnabled() ? (
+              <div className="flex flex-col gap-sm py-md" style={{ borderTop: '1px solid var(--rule)' }}>
+                <CountryField value={country} onChange={setCountry} />
+                <div className="flex items-center gap-md">
+                  <TextLink
+                    onClick={() => void onSaveCountry(false)}
+                    disabled={busy != null}
+                    busy={busy === 'save-country'}
+                    ariaLabel="Save country"
+                  >
+                    {busy === 'save-country' ? 'Saving…' : 'Save country'}
+                  </TextLink>
+                  {confirmRegionReset ? (
+                    <TextLink
+                      onClick={() => void onSaveCountry(true)}
+                      disabled={busy != null}
+                      ariaLabel="Reset the ledger and switch country"
+                    >
+                      Reset the ledger and switch
+                    </TextLink>
+                  ) : null}
+                </div>
+                {countryError ? <p className="text-small text-text-muted">{countryError}</p> : null}
+              </div>
+            ) : null}
           </dl>
         </section>
 

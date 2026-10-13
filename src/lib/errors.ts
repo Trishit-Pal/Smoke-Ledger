@@ -5,6 +5,7 @@ export type AppErrorCode =
   | 'not_found'
   | 'conflict'
   | 'rate_limited'
+  | 'region_change_requires_reset'
   | 'dependency_failure'
   | 'timeout'
   | 'internal_error';
@@ -16,6 +17,8 @@ const SAFE_MESSAGES: Record<AppErrorCode, string> = {
   not_found: 'The requested item could not be found.',
   conflict: 'This action conflicts with current data. Refresh and retry.',
   rate_limited: 'Too many requests. Please wait and try again.',
+  region_change_requires_reset:
+    'Changing currency clears the ledger. Confirm the reset, or stay in the current country.',
   dependency_failure: 'A backend dependency failed. Please retry shortly.',
   timeout: 'The request timed out. Please try again.',
   internal_error: 'Something went wrong. Please try again.',
@@ -82,6 +85,8 @@ const SPECIFIC_MESSAGES: Record<AppErrorCode, string> = {
   not_found: 'We could not find what you were looking for.',
   conflict: 'That conflicts with existing data. Refresh and try again.',
   rate_limited: 'Too many attempts. Please wait a moment and try again.',
+  region_change_requires_reset:
+    'That country uses a different currency. Reset the ledger to switch, or keep the current one.',
   dependency_failure: 'Could not reach the server. Check your connection and try again.',
   timeout: 'The request timed out. Check your connection and try again.',
   internal_error: 'Something went wrong. Please try again.',

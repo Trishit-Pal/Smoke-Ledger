@@ -1,4 +1,4 @@
-import { formatInr, formatPerStick } from '@/lib/format';
+import { formatMoney, formatPerStick } from '@/lib/format';
 
 /**
  * Live price hint for a log entry form. The typed value is always the per-stick
@@ -14,5 +14,5 @@ export function buildPricePreview(
   const perStick = Number(priceText);
   if (!Number.isFinite(perStick) || perStick < 0) return 'Enter a valid price per stick.';
   const qty = Math.max(1, Number(quantity) || 1);
-  return `= ${formatInr(perStick * qty)} total · ${formatPerStick(perStick)}`;
+  return `= ${formatMoney(perStick * qty, 'INR')} total · ${formatPerStick(perStick)}`;
 }

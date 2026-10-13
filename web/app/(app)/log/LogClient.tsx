@@ -17,8 +17,9 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { todayIst, formatTime } from '@/lib/date';
-import { formatInr, formatPerStick } from '@/lib/format';
+import { todayInZone, formatTime } from '@/lib/date';
+import { formatMoney, formatPerStick } from '@/lib/format';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { triggerLabel } from '@/constants/triggers';
 import type { CigaretteLog, UserProfile } from '@/types';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
@@ -36,7 +37,9 @@ function formatIndianDateShort(ymd: string): string {
 
 export function LogClient({ profile, logs }: LogClientProps) {
   const router = useRouter();
-  const today = todayIst();
+  const today = todayInZone(timezoneForCountry(profile.country));
+  const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
+    formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
   const discreet = isDiscreetMode(profile);
 
   const todaysLogs = React.useMemo(
@@ -100,7 +103,7 @@ export function LogClient({ profile, logs }: LogClientProps) {
                 {todaysLogs.length === 0
                   ? 'Nothing logged today.'
                   : maskInr(todayTotalSpend, discreet, (n) =>
-                      formatInr(n, { compact: true }),
+                      money(n, { compact: true }),
                     )}
               </p>
             </div>
@@ -155,14 +158,14 @@ export function LogClient({ profile, logs }: LogClientProps) {
                     <p className="text-small text-text-muted nums-tabular">
                       {log.totalPriceInr != null
                         ? maskInr(log.totalPriceInr, discreet, (n) =>
-                            formatInr(n, { compact: true }),
+                            money(n, { compact: true }),
                           )
                         : '—'}
                     </p>
                     {log.unitPriceInr != null ? (
                       <p className="text-caption text-text-faint nums-tabular">
                         {maskInr(log.unitPriceInr, discreet, (n) =>
-                          formatPerStick(n, { compact: true }),
+                          formatPerStick(n, { compact: true, currency: profile.currency, locale: localeForCountry(profile.country) }),
                         )}
                       </p>
                     ) : null}
@@ -213,14 +216,14 @@ export function LogClient({ profile, logs }: LogClientProps) {
                     <span>
                       {log.totalPriceInr != null
                         ? maskInr(log.totalPriceInr, discreet, (n) =>
-                            formatInr(n, { compact: true }),
+                            money(n, { compact: true }),
                           )
                         : '—'}
                     </span>
                     {log.unitPriceInr != null ? (
                       <span className="text-caption text-text-faint">
                         {maskInr(log.unitPriceInr, discreet, (n) =>
-                          formatPerStick(n, { compact: true }),
+                          formatPerStick(n, { compact: true, currency: profile.currency, locale: localeForCountry(profile.country) }),
                         )}
                       </span>
                     ) : null}

@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { setSetting } from '@/db/repositories/settings';
-import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
+import { updateProfile, setOnboardingStep, setRegion } from '@/db/repositories/profile';
+import { CountryField } from '@web/components/settings/CountryField';
+import { isRegionPickerEnabled, regionFor } from '@/lib/regions';
+import { formatMoney } from '@/lib/format';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
 
@@ -47,6 +50,9 @@ export default function OnboardingUsagePage() {
   const windowDays = draftWindow ?? 30;
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [country, setCountry] = React.useState('IN');
+  const pickerOn = isRegionPickerEnabled();
+  const region = regionFor(country);
 
   const n = Math.max(0, Math.min(MAX_TICKS, Number(perDay) || 0));
   const setPerDay = (value: string) =>
@@ -72,6 +78,7 @@ export default function OnboardingUsagePage() {
           baselineWindowDays: windowDays,
         }),
       ]);
+      if (pickerOn) await setRegion(country);
       await setOnboardingStep('goal');
       router.push('/onboarding/goal');
     } catch (e) {
@@ -106,6 +113,8 @@ export default function OnboardingUsagePage() {
           One number is plenty. We&rsquo;ll use it for trends and savings — never to judge you.
         </p>
       </header>
+
+      <CountryField value={country} onChange={setCountry} />
 
       <div
         style={{
@@ -146,7 +155,17 @@ export default function OnboardingUsagePage() {
             }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
-              ₹<DigitRoll value={dailySpend.toLocaleString('en-IN')} />
+              {pickerOn ? (
+                region?.stickHint == null ? (
+                  '—'
+                ) : (
+                  formatMoney(n * region.stickHint, region.currency, { locale: region.locale })
+                )
+              ) : (
+                <>
+                  ₹<DigitRoll value={dailySpend.toLocaleString('en-IN')} />
+                </>
+              )}
             </span>
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/ day</span>
           </div>
@@ -155,9 +174,21 @@ export default function OnboardingUsagePage() {
             style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 4, flexWrap: 'wrap' }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'baseline' }}>
-              ≈ ₹<DigitRoll value={yearlySpend.toLocaleString('en-IN')} /> a year
+              {pickerOn ? (
+                region?.stickHint == null ? (
+                  'A stick price appears once you log one.'
+                ) : (
+                  `≈ ${formatMoney(n * region.stickHint * 365, region.currency, { locale: region.locale })} a year`
+                )
+              ) : (
+                <>
+                  ≈ ₹<DigitRoll value={yearlySpend.toLocaleString('en-IN')} /> a year
+                </>
+              )}
             </span>
-            <span style={{ color: 'var(--text-faint)' }}>· at ₹{PRICE_PER_STICK}/stick</span>
+            {pickerOn ? null : (
+              <span style={{ color: 'var(--text-faint)' }}>· at ₹{PRICE_PER_STICK}/stick</span>
+            )}
           </div>
         </div>
       </div>
