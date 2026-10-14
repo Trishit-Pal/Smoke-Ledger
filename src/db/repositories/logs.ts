@@ -210,22 +210,23 @@ export async function createLog(draft: LogDraft): Promise<CigaretteLog> {
   if (!draft.brandId) {
     throw new AppError('validation_error', 'A cigarette brand is required to log.');
   }
+  const { timeZone, clientOpId: suppliedOpId, ...fields } = draft;
   const id = makeId('log');
-  const zone = draft.timeZone;
-  const localDate = draft.localDate ?? toLocalDate(draft.tsUtc, zone);
-  const localHour = draft.localHour ?? toLocalHour(draft.tsUtc, zone);
+  const localDate = fields.localDate ?? toLocalDate(fields.tsUtc, timeZone);
+  const localHour = fields.localHour ?? toLocalHour(fields.tsUtc, timeZone);
   // CigaretteLogSchema applies the 24h backdate cap as a refinement — see
   // MAX_BACKDATE_MS in src/lib/validation.ts. This parse runs in the client
   // Supabase context, so the cap is a client-side guard (RLS scopes any forged
   // ts_utc to the caller's own rows), not a DB-enforced constraint. The
   // rate-limit RPC counts its window off server-set created_at, not the
   // now-backdatable ts_utc, so backdating can't evade it.
+  // timeZone and clientOpId are transport fields. The strict schema rejects them.
   const validated = parseOrThrow(
     CigaretteLogSchema,
-    { ...draft, localDate, localHour },
+    { ...fields, localDate, localHour },
     'cigarette_log',
   );
-  const clientOpId = draft.clientOpId ?? makeId('op');
+  const clientOpId = suppliedOpId ?? makeId('op');
 
   const { data, error } = await supabase.rpc('create_log_with_rate_limit', {
     p_id: id,
