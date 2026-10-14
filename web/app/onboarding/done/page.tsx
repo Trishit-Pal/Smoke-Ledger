@@ -55,6 +55,7 @@ export default async function OnboardingDonePage() {
           ? { type: activeGoal.type, targetValue: activeGoal.targetValue }
           : null
       }
+      country={profile?.country ?? null}
     />
   );
 }

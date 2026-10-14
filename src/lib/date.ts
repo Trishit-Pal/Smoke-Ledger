@@ -16,12 +16,16 @@ export function nowUtcIso(): string {
   return dayjs().utc().toISOString();
 }
 
-export function toLocalDate(tsUtc: string): string {
-  return dayjs.utc(tsUtc).tz(IST).format('YYYY-MM-DD');
+export function toLocalDate(tsUtc: string, zone: string = IST): string {
+  return dayjs.utc(tsUtc).tz(zone).format('YYYY-MM-DD');
 }
 
-export function toLocalHour(tsUtc: string): number {
-  return dayjs.utc(tsUtc).tz(IST).hour();
+export function toLocalHour(tsUtc: string, zone: string = IST): number {
+  return dayjs.utc(tsUtc).tz(zone).hour();
+}
+
+export function todayInZone(zone: string = IST): string {
+  return dayjs().tz(zone).format('YYYY-MM-DD');
 }
 
 export function formatIndianDate(date: string | Date): string {
@@ -68,11 +72,15 @@ export function parseDatetimeLocalIst(value: string): Date | null {
 }
 
 export function todayIst(): string {
-  return dayjs().tz(IST).format('YYYY-MM-DD');
+  return todayInZone(IST);
+}
+
+export function daysAgoInZone(days: number, zone: string = IST): string {
+  return dayjs().tz(zone).subtract(days, 'day').format('YYYY-MM-DD');
 }
 
 export function daysAgoIst(days: number): string {
-  return dayjs().tz(IST).subtract(days, 'day').format('YYYY-MM-DD');
+  return daysAgoInZone(days, IST);
 }
 
 /** Returns list of YYYY-MM-DD strings from start to end inclusive. */

@@ -33,8 +33,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MoreVertical, Search } from 'lucide-react';
-import { formatInr, formatPerStick } from '@/lib/format';
-import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import { formatMoney, formatPerStick } from '@/lib/format';
+import { formatIndianDate, formatTime, todayInZone, daysAgoInZone } from '@/lib/date';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { deleteLog } from '@/db/repositories/logs';
 import dayjs from 'dayjs';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
@@ -161,8 +162,11 @@ export function HistoryClient({
 
   const groups = React.useMemo(() => groupLogs(filteredLogs), [filteredLogs]);
 
-  const today = React.useMemo(() => todayIst(), []);
-  const yesterday = React.useMemo(() => daysAgoIst(1), []);
+  const zone = timezoneForCountry(profile.country);
+  const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
+    formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
+  const today = React.useMemo(() => todayInZone(zone), [zone]);
+  const yesterday = React.useMemo(() => daysAgoInZone(1, zone), [zone]);
   // Span reflects the full loaded window, not the filtered view, so the
   // masthead identity stays stable while the user searches.
   const spanLabel = React.useMemo(() => {
@@ -349,7 +353,7 @@ export function HistoryClient({
                         {formatIndianDate(group.date)}
                       </h2>
                       <span className="text-small text-text-muted nums-tabular">
-                        {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
+                        {maskInr(group.totalSpend, discreet, (n) => money(n))}
                         <span className="text-text-faint"> spent</span>
                       </span>
                     </div>
@@ -400,10 +404,10 @@ export function HistoryClient({
                             </dd>
                           </div>
                           <dd className="text-body text-text nums-tabular text-right flex flex-col items-end">
-                            <span>{maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}</span>
+                            <span>{maskInr(log.totalPriceInr, discreet, (n) => money(n))}</span>
                             {log.unitPriceInr != null ? (
                               <span className="text-caption text-text-faint">
-                                {maskInr(log.unitPriceInr, discreet, (n) => formatPerStick(n))}
+                                {maskInr(log.unitPriceInr, discreet, (n) => formatPerStick(n, { currency: profile.currency, locale: localeForCountry(profile.country) }))}
                               </span>
                             ) : null}
                           </dd>

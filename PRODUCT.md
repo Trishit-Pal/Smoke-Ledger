@@ -14,7 +14,7 @@ much money, when and why — so they can cut down or quit. They often open the a
 private, even furtive moment: right after a cigarette, or reflecting late at night. Many
 are sensitive about the habit itself, which is why the app ships discreet mode, app-lock,
 and "hide totals on home" — a glance over the shoulder is a real part of the threat model.
-Currency is always INR; the only timezone is IST. The job on any given screen is small and
+Currency is INR in India and EUR when the reader chooses an EU country. The calendar follows that country. An account with no country stays on INR and India time. The job on any given screen is small and
 concrete: log one stick honestly, or read back what the ledger already knows.
 
 ## Product Purpose
@@ -62,4 +62,4 @@ Target WCAG 2.1 AA. Body text ≥4.5:1, large text ≥3:1, verified in both ligh
 **default dark** theme. `prefers-reduced-motion` is honored throughout (reveals degrade to
 crossfade/instant). Native controls are theme-tied via `color-scheme` so date and select
 popups stay legible in dark mode. Touch targets ≥44px. Discreet/masking modes must never
-drop contrast below AA. Content is IST/INR-localized for the India audience.
+drop contrast below AA. Content follows the reader's country: rupees and India time, or euros and that country's time.

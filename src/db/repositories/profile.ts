@@ -1,7 +1,9 @@
 import type { OnboardingStep, UserProfile } from '@/types';
+import { regionFor } from '@/lib/regions';
 import { parseOrThrow, ProfilePatchSchema } from '@/lib/validation';
 import { getSupabase } from '@/lib/supabase';
 import { mapDbError, requireUserId } from '@/db/repositories/_supabase';
+import { AppError } from '@/lib/errors';
 
 export type { OnboardingStep };
 
@@ -28,6 +30,7 @@ type Row = {
   mobile_e164?: string | null;
   mobile_changed_at?: string | null;
   place?: string | null;
+  country?: string | null;
 };
 
 function rowToProfile(r: Row): UserProfile {
@@ -53,6 +56,7 @@ function rowToProfile(r: Row): UserProfile {
     mobileE164: r.mobile_e164 ?? null,
     mobileChangedAt: r.mobile_changed_at ?? null,
     place: r.place ?? null,
+    country: r.country ?? null,
   };
 }
 
@@ -107,6 +111,28 @@ export async function updateProfile(patch: Partial<UserProfile>): Promise<UserPr
     const { error } = await supabase.from('user_profiles').update(row).eq('id', userId);
     if (error) throw mapDbError(error);
   }
+  return getProfile();
+}
+
+export async function setRegion(country: string): Promise<UserProfile> {
+  if (!regionFor(country) || country.length !== 2) {
+    throw new AppError('validation_error', 'Choose a country from the list.');
+  }
+  const supabase = getSupabase();
+  await requireUserId();
+  const { error } = await supabase.rpc('set_region', { p_country: country });
+  if (error) throw mapDbError(error);
+  return getProfile();
+}
+
+export async function resetLedgerForRegion(country: string): Promise<UserProfile> {
+  if (!regionFor(country) || country.length !== 2) {
+    throw new AppError('validation_error', 'Choose a country from the list.');
+  }
+  const supabase = getSupabase();
+  await requireUserId();
+  const { error } = await supabase.rpc('reset_ledger_for_region', { p_country: country });
+  if (error) throw mapDbError(error);
   return getProfile();
 }
 

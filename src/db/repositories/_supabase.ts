@@ -44,6 +44,11 @@ export function mapDbError(err: unknown, fallback: AppErrorCode = 'dependency_fa
       return new AppError('authorization_error', msg, err);
     case '54000': // raised by create_log_with_rate_limit
       return new AppError('rate_limited', msg, err);
+    case 'P0001':
+      if (/region_change_requires_reset/i.test(msg)) {
+        return new AppError('region_change_requires_reset', msg, err);
+      }
+      return new AppError('validation_error', msg, err);
     default:
       break;
   }

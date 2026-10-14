@@ -99,7 +99,9 @@ export type Gender = 'male' | 'female' | 'other' | 'undisclosed';
 export interface UserProfile {
   baselinePerDay: number | null;
   baselineWindowDays: number; // 7|30|custom
-  currency: 'INR';
+  currency: 'INR' | 'EUR';
+  /** ISO 3166-1 alpha-2. Null means the existing India ledger. */
+  country?: string | null;
   discreetMode: boolean;
   appLockEnabled: boolean;
   hideTotalsOnHome: boolean;

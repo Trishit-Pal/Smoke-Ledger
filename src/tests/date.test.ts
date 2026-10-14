@@ -1,3 +1,6 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import {
   startOfWeekIst,
   startOfMonthIst,
@@ -6,7 +9,11 @@ import {
   parseDatetimeLocalIst,
   toLocalDate,
   toLocalHour,
+  IST,
 } from '@/lib/date';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 describe('IST date helpers', () => {
   const originalTz = process.env.TZ;
@@ -40,6 +47,30 @@ describe('IST date helpers', () => {
  * instant by interpreting it as IST, so a backdated log is correct even when
  * the user's device timezone isn't IST. IST is UTC+5:30, no DST.
  */
+describe('country-local calendar', () => {
+  it('stores 21:00 Europe/Paris on that calendar day, which is already the next day in IST', () => {
+    const ts = dayjs.tz('2026-07-15 21:00', 'YYYY-MM-DD HH:mm', 'Europe/Paris').toISOString();
+    expect(toLocalDate(ts, 'Europe/Paris')).toBe('2026-07-15');
+    expect(toLocalHour(ts, 'Europe/Paris')).toBe(21);
+    expect(toLocalDate(ts, IST)).toBe('2026-07-16');
+  });
+
+  it('keeps the Paris wall clock across the spring-forward boundary', () => {
+    const before = dayjs.tz('2026-03-29 01:30', 'YYYY-MM-DD HH:mm', 'Europe/Paris').toISOString();
+    const after = dayjs.tz('2026-03-29 03:30', 'YYYY-MM-DD HH:mm', 'Europe/Paris').toISOString();
+    expect(toLocalDate(before, 'Europe/Paris')).toBe('2026-03-29');
+    expect(toLocalHour(before, 'Europe/Paris')).toBe(1);
+    expect(toLocalDate(after, 'Europe/Paris')).toBe('2026-03-29');
+    expect(toLocalHour(after, 'Europe/Paris')).toBe(3);
+  });
+
+  it('still defaults to IST when no zone is passed', () => {
+    const ts = '2026-07-15T18:30:00.000Z';
+    expect(toLocalDate(ts)).toBe('2026-07-16');
+    expect(toLocalHour(ts)).toBe(0);
+  });
+});
+
 describe('IST datetime-local picker helpers', () => {
   const originalTz = process.env.TZ;
 

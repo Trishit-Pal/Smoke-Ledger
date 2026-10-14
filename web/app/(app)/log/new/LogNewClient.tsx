@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 
 import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
+import { currencyFor, localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { resolveLogUnitPrice } from '@/domain/calc';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
 import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
@@ -59,6 +60,7 @@ const QUANTITY_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40];
 
 export interface LogNewClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
+  country?: string | null;
 }
 
 // ── Inline editorial primitives ───────────────────────────────────────────────
@@ -146,7 +148,7 @@ const EditorialInput = React.forwardRef<
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function LogNewClient({ brands }: LogNewClientProps) {
+export function LogNewClient({ brands, country }: LogNewClientProps) {
   const router = useRouter();
 
   const [brandId, setBrandId] = React.useState<string | null>(null);
@@ -195,8 +197,8 @@ export function LogNewClient({ brands }: LogNewClientProps) {
   // Live per-stick preview: the typed value IS the per-stick price; show the
   // resulting total so there's no ambiguity before saving.
   const pricePreview = React.useMemo(
-    () => buildPricePreview(priceText, quantity),
-    [priceText, quantity],
+    () => buildPricePreview(priceText, quantity, currencyFor(country), localeForCountry(country)),
+    [priceText, quantity, country],
   );
 
   const handleSave = async () => {
@@ -241,6 +243,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
 
       await createLog({
         tsUtc: requestedTs.toISOString(),
+        timeZone: timezoneForCountry(country),
         brandId,
         brandNameSnap: selectedBrand?.name ?? null,
         variantSnap: variantName,
@@ -386,7 +389,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
             />
           </FieldRow>
           <FieldRow
-            label="Price per stick (INR)"
+            label={`Price per stick (${currencyFor(country)})`}
             htmlFor="price-input"
             sublabel={
               <>
@@ -406,7 +409,7 @@ export function LogNewClient({ brands }: LogNewClientProps) {
               placeholder="0"
               value={priceText}
               onChange={(e) => setPriceText(e.target.value)}
-              aria-label="Price per stick in rupees"
+              aria-label={`Price per stick in ${currencyFor(country)}`}
             />
           </FieldRow>
         </section>

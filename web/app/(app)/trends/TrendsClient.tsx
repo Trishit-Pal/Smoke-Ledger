@@ -49,8 +49,9 @@ import {
   dowDistribution,
   brandSpendMix,
 } from '@/domain/calc';
-import { todayIst, daysAgoIst, dateRange } from '@/lib/date';
-import { formatDelta, formatInr } from '@/lib/format';
+import { todayInZone, daysAgoInZone, dateRange } from '@/lib/date';
+import { formatDelta, formatMoney } from '@/lib/format';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
@@ -155,8 +156,11 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
   const discreet = isDiscreetMode(profile);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(30);
 
-  const today = todayIst();
-  const startYmd = daysAgoIst(windowDays - 1);
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
+  const startYmd = daysAgoInZone(windowDays - 1, zone);
+  const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
+    formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
 
   const dependencyKey = `${windowDays}-${logs.length}-${dailySummary.length}`;
 
@@ -381,10 +385,10 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                     aria-label={
                       discreet
                         ? 'Period spend hidden'
-                        : `Spent ${formatInr(summary.spend)} across the period`
+                        : `Spent ${money(summary.spend)} across the period`
                     }
                   >
-                    {maskInr(summary.spend, discreet, (n) => formatInr(n, { compact: true }))}
+                    {maskInr(summary.spend, discreet, (n) => money(n, { compact: true }))}
                   </div>
                   <span
                     className="text-small nums-tabular mt-xs"
@@ -448,20 +452,20 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   Daily spend
                 </SectionLabel>
                 <span className="text-caption text-text-faint nums-tabular">
-                  {maskInr(summary.spend, discreet, (n) => formatInr(n, { compact: true }))} total
+                  {maskInr(summary.spend, discreet, (n) => money(n, { compact: true }))} total
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
                 <AnimatedBarChart
                   data={spendBars}
                   height={180}
-                  formatY={(v) => formatInr(v, { compact: true })}
+                  formatY={(v) => money(v, { compact: true })}
                 />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 {summary.spend === 0
                   ? 'Nothing spent in this window.'
-                  : `Average ${maskInr(summary.avgSpendPerDay, discreet, (n) => formatInr(n, { compact: true }))} a day. The bars are the texture.`}
+                  : `Average ${maskInr(summary.avgSpendPerDay, discreet, (n) => money(n, { compact: true }))} a day. The bars are the texture.`}
               </p>
             </section>
 
@@ -578,7 +582,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                     className="text-caption nums-tabular"
                     style={{ color: 'var(--ink-surface-muted)' }}
                   >
-                    {maskInr(totalSpend, discreet, (n) => formatInr(n, { compact: true }))}
+                    {maskInr(totalSpend, discreet, (n) => money(n, { compact: true }))}
                   </span>
                 </div>
 
@@ -594,7 +598,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                         size={160}
                         centerLabel="TOTAL"
                         centerValue={maskInr(totalSpend, discreet, (n) =>
-                          formatInr(n, { compact: true }),
+                          money(n, { compact: true }),
                         )}
                       />
                       <ul className="flex-1 w-full flex flex-col">
@@ -632,7 +636,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                               style={{ color: 'var(--ink-surface-muted)' }}
                             >
                               {maskInr(b.spendInr, discreet, (n) =>
-                                formatInr(n, { compact: true }),
+                                money(n, { compact: true }),
                               )}
                               <span style={{ color: 'var(--ink-surface-muted)' }}> · </span>
                               {Math.round(b.share * 100)}%

@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { formatInr } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
 import { maskBrandName, maskInr } from '@/lib/discreet';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import { Button } from '@web/components/ui/Button';
@@ -48,7 +49,7 @@ export function QuickLogSheet({
 
   const lastPrice =
     lastLog?.unitPriceInr != null
-      ? maskInr(lastLog.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      ? maskInr(lastLog.unitPriceInr, discreet, (n) => formatMoney(n, profile.currency, { compact: true, locale: localeForCountry(profile.country) }))
       : 'Price estimated';
 
   return (

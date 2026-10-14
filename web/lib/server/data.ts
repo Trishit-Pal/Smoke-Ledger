@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@web/lib/supabase/server';
 import { createAdminClient } from '@web/lib/supabase/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { daysAgoIst } from '@/lib/date';
+import { daysAgoInZone, todayInZone } from '@/lib/date';
+import { timezoneForCountry } from '@/lib/regions';
 import type { DailySummaryRow } from '@/domain/periodSummary';
 import type {
   Brand,
@@ -37,6 +38,7 @@ type ProfileRow = {
   mobile_e164: string | null;
   mobile_changed_at: string | null;
   place: string | null;
+  country?: string | null;
 };
 
 type GoalRow = {
@@ -94,6 +96,7 @@ function mapProfile(row: ProfileRow): UserProfile {
     mobileE164: row.mobile_e164,
     mobileChangedAt: row.mobile_changed_at,
     place: row.place,
+    country: row.country ?? null,
   };
 }
 
@@ -399,16 +402,17 @@ export function toDailySummaryRow(d: DailySummary): DailySummaryRow {
 }
 
 export async function getDashboardData() {
-  const today = daysAgoIst(0);
   const profile = await getServerProfile();
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
   // The daily summary is the single source of truth for the dashboard's
   // timeframe totals. Floor the range at onboarding so "saved" never counts
   // pre-onboarding days as fully avoided (and at the RPC's 366-day cap).
-  const yearAgo = daysAgoIst(365);
+  const yearAgo = daysAgoInZone(365, zone);
   const onboardYmd = profile.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
   const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
   // Raw logs (60-day) still power quick-log inference, insights, and the week strip.
-  const fromDate = daysAgoIst(60);
+  const fromDate = daysAgoInZone(60, zone);
   const [logs, goals, brands, summary] = await Promise.all([
     getServerLogs({ fromDate }),
     getServerGoals(),
@@ -426,11 +430,9 @@ export async function getDashboardData() {
 }
 
 export async function getLogPageData() {
-  const today = daysAgoIst(0);
-  const [profile, logs] = await Promise.all([
-    getServerProfile(),
-    getServerLogs({ fromDate: today }),
-  ]);
+  const profile = await getServerProfile();
+  const today = todayInZone(timezoneForCountry(profile.country));
+  const logs = await getServerLogs({ fromDate: today });
   return { profile, logs };
 }
 
@@ -495,11 +497,12 @@ export const getServerDailySummary = cache(
  * 90-day raw logs — tracked as F1 follow-on: full-Year breakdowns.
  */
 export async function getTrendsPageData() {
-  const fromDate90 = daysAgoIst(90);
-  const fromDate365 = daysAgoIst(365);
-  const today = daysAgoIst(0);
-  const [profile, logs, dailySummary] = await Promise.all([
-    getServerProfile(),
+  const profile = await getServerProfile();
+  const zone = timezoneForCountry(profile.country);
+  const fromDate90 = daysAgoInZone(90, zone);
+  const fromDate365 = daysAgoInZone(365, zone);
+  const today = todayInZone(zone);
+  const [logs, dailySummary] = await Promise.all([
     getServerLogs({ fromDate: fromDate90 }),    // raw logs, 90-day capped at 200 — for hour/dow/brand/mood charts
     getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
   ]);
@@ -507,16 +510,20 @@ export async function getTrendsPageData() {
 }
 
 export async function getNewLogPageData() {
-  const brands = await getServerBrandsWithVariants();
-  return { brands };
+  const [profile, brands] = await Promise.all([
+    getServerProfile(),
+    getServerBrandsWithVariants(),
+  ]);
+  return { profile, brands };
 }
 
 export async function getGoalsPageData() {
-  const today = daysAgoIst(0);
+  const profile = await getServerProfile();
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
   // 60-day raw logs power evaluateGoal's daily/weekly/rolling-average reads.
-  const fromDate = daysAgoIst(60);
-  const [profile, goals, logs] = await Promise.all([
-    getServerProfile(),
+  const fromDate = daysAgoInZone(60, zone);
+  const [goals, logs] = await Promise.all([
     getServerAllGoals(),
     getServerLogs({ fromDate }),
   ]);

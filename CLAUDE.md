@@ -15,4 +15,4 @@ Load-bearing facts (the rest is in those files):
 - **Anti-references — never drift toward:** gamified health-app (badges/confetti/streak-shaming), loud/promotional UI, clinical/medical dashboards.
 - **Motion:** slow, gravitational reveals (no spring/bounce); every animation needs a `prefers-reduced-motion` fallback.
 - **Shared editorial primitives live in `web/components/visual/`** (`SectionLabel`, `MetricRow`, `InlineRule`, `ChoiceRun`) — reuse them; don't re-implement the patterns inline.
-- **Tokens, not literals:** spacing `xs…xxxl`, semantic color CSS-vars (`--bg`/`--text`/`--accent`/`--rule`…). INR currency, IST timezone throughout.
+- **Tokens, not literals:** spacing `xs…xxxl`, semantic color CSS-vars (`--bg`/`--text`/`--accent`/`--rule`…). Money and the calendar follow the reader's country: INR and IST unless they choose an EU country.

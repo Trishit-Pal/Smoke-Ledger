@@ -22,7 +22,8 @@
  */
 
 import * as React from 'react';
-import { formatInr } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
 import { maskBrandName, maskInr } from '@/lib/discreet';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
@@ -78,12 +79,12 @@ export function QuickLogStrip({
 
   const lastPrice =
     lastLog?.unitPriceInr != null
-      ? maskInr(lastLog.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      ? maskInr(lastLog.unitPriceInr, discreet, (n) => formatMoney(n, profile.currency, { compact: true, locale: localeForCountry(profile.country) }))
       : null;
 
   const lastTotal =
     lastLog?.totalPriceInr != null && (lastLog.quantity ?? 1) > 1
-      ? maskInr(lastLog.totalPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      ? maskInr(lastLog.totalPriceInr, discreet, (n) => formatMoney(n, profile.currency, { compact: true, locale: localeForCountry(profile.country) }))
       : null;
 
   const logLast = (quantity: number) => {

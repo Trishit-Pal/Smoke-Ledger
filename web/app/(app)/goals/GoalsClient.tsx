@@ -78,6 +78,7 @@ interface GoalFormProps {
   form: GoalFormState;
   logs: CigaretteLog[];
   today: string;
+  currency: UserProfile['currency'];
   isEdit: boolean;
   busy: boolean;
   error: string | null;
@@ -90,6 +91,7 @@ function GoalForm({
   form,
   logs,
   today,
+  currency,
   isEdit,
   busy,
   error,
@@ -98,6 +100,9 @@ function GoalForm({
   onCancel,
 }: GoalFormProps) {
   const meta = GOAL_TYPE_META.find((m) => m.type === form.type)!;
+  const spendEuro = currency === 'EUR' && form.type === 'spend_cap_daily';
+  const blurb = spendEuro ? 'Keep daily spend under a euro limit.' : meta.blurb;
+  const targetUnit = spendEuro ? '€/day' : meta.targetUnit;
   const derivedBaseline = deriveReductionBaseline(logs, today);
   const baselineHint =
     derivedBaseline > 0
@@ -112,15 +117,15 @@ function GoalForm({
         <div className="flex flex-col gap-sm">
           <span className="text-caption uppercase text-text-muted">Type</span>
           <TypePicker value={form.type} onChange={(t) => onFormChange({ type: t, target: '', baseline: '', quitDate: '' })} disabled={busy} />
-          <p className="text-small text-text-muted">{meta.blurb}</p>
+          <p className="text-small text-text-muted">{blurb}</p>
         </div>
       ) : (
-        <p className="text-small text-text-muted">{meta.label} · {meta.blurb}</p>
+        <p className="text-small text-text-muted">{meta.label} · {blurb}</p>
       )}
 
       {(form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') && (
         <Input
-          label={`Target (${meta.targetUnit})`}
+          label={`Target (${targetUnit})`}
           type="number"
           min="0.01"
           step="any"
@@ -134,7 +139,7 @@ function GoalForm({
       {form.type === 'reduction_target' && (
         <>
           <Input
-            label={`Target (${meta.targetUnit})`}
+            label={`Target (${targetUnit})`}
             type="number"
             min="0.01"
             step="any"
@@ -364,6 +369,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
             form={formState}
             logs={logs}
             today={today}
+            currency={profile.currency}
             isEdit={editing !== null}
             busy={busy === 'submit'}
             error={formError}
