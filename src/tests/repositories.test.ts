@@ -13,7 +13,7 @@ jest.mock('@/lib/logger', () => ({
 
 import { mapDbError } from '@/db/repositories/_supabase';
 import { deleteBrand, setVariantPriceOverride } from '@/db/repositories/brands';
-import { listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
+import { createLog, listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
 import { getProfile } from '@/db/repositories/profile';
 import { AppError } from '@/lib/errors';
 import { getSupabase } from '@/lib/supabase';
@@ -591,5 +591,62 @@ describe('setVariantPriceOverride — direct price set (not running mean)', () =
   it('maps a DB error to AppError', async () => {
     stubVariantUpdate({ error: { code: '42501', message: 'permission denied' } });
     await expect(setVariantPriceOverride('var_x', 100)).rejects.toBeInstanceOf(AppError);
+  });
+});
+
+describe('createLog', () => {
+  it('calls create_log_with_rate_limit when the draft includes a timezone', async () => {
+    const ts = new Date().toISOString();
+    const rpc = makeRpcMock({
+      id: 'log_test',
+      user_id: 'user-123',
+      ts_utc: ts,
+      local_date: '2026-10-14',
+      local_hour: 18,
+      brand_id: 'brd_acc2d5c2e5c842a590e3ccd876f27bce',
+      brand_name_snap: 'Mild Seven',
+      variant_snap: 'Super Lights',
+      quantity: 1,
+      purchase_mode: 'single',
+      pack_size: null,
+      total_price_inr: 20.8,
+      unit_price_inr: 20.8,
+      price_source: 'exact',
+      trigger_tag: null,
+      mood_before: null,
+      mood_after: null,
+      craving: null,
+      context_tag: null,
+      notes: null,
+      created_at: ts,
+      updated_at: ts,
+    });
+    stubSupabase(rpc);
+
+    await createLog({
+      tsUtc: ts,
+      timeZone: 'Europe/Paris',
+      clientOpId: 'op_fixed',
+      brandId: 'brd_acc2d5c2e5c842a590e3ccd876f27bce',
+      brandNameSnap: 'Mild Seven',
+      variantSnap: 'Super Lights',
+      quantity: 1,
+      purchaseMode: 'single',
+      packSize: null,
+      totalPriceInr: 20.8,
+      unitPriceInr: 20.8,
+      priceSource: 'exact',
+      triggerTag: null,
+      moodBefore: null,
+      moodAfter: null,
+      craving: null,
+      contextTag: null,
+      notes: null,
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'create_log_with_rate_limit',
+      expect.objectContaining({ p_client_op_id: 'op_fixed', p_unit_price_inr: 20.8 }),
+    );
   });
 });
