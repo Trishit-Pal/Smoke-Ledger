@@ -24,6 +24,10 @@ describe('web: opening a link never signs a browser in', () => {
     expect(route).toContain('postAuthDestination(');
   });
 
+  it('the callback takes the link type from readAuthLink only (one source of truth)', () => {
+    expect(route).not.toContain('parseEmailOtpType');
+  });
+
   it('only the confirm page server action redeems, on POST', () => {
     const action = read('web', 'app', 'auth', 'confirm', 'actions.ts');
     expect(action.startsWith("'use server';")).toBe(true);

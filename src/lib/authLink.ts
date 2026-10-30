@@ -12,16 +12,17 @@ import { parseEmailOtpType, type AllowedEmailOtpType } from '@/lib/emailOtpType'
  *   flow), which are never accepted from a link.
  */
 export type AuthLink =
-  | { kind: 'exchange'; code: string }
+  | { kind: 'exchange'; code: string; type: AllowedEmailOtpType | null }
   | { kind: 'confirm'; tokenHash: string; type: AllowedEmailOtpType }
   | { kind: 'invalid' };
 
 export function readAuthLink(params: URLSearchParams): AuthLink {
+  const type = parseEmailOtpType(params.get('type'));
+
   const code = params.get('code');
-  if (code) return { kind: 'exchange', code };
+  if (code) return { kind: 'exchange', code, type };
 
   const tokenHash = params.get('token_hash');
-  const type = parseEmailOtpType(params.get('type'));
   if (tokenHash && type) return { kind: 'confirm', tokenHash, type };
 
   return { kind: 'invalid' };

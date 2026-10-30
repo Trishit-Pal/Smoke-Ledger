@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
 import { confirmLinkPath, readAuthLink } from '@/lib/authLink';
-import { parseEmailOtpType } from '@/lib/emailOtpType';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   applyAuthCookiePolicy,
@@ -40,7 +39,6 @@ function redirectWithCookies(source: NextResponse, target: URL): NextResponse {
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const link = readAuthLink(requestUrl.searchParams);
-  const type = parseEmailOtpType(requestUrl.searchParams.get('type'));
   const nextPath = sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
 
   const supabaseUrl = readSupabaseUrl();
@@ -108,6 +106,9 @@ export async function GET(request: NextRequest) {
 
   return redirectWithCookies(
     response,
-    new URL(postAuthDestination(profile, type, nextPath), requestUrl.origin),
+    new URL(
+      postAuthDestination(profile, link.kind === 'exchange' ? link.type : null, nextPath),
+      requestUrl.origin,
+    ),
   );
 }
