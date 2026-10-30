@@ -6,6 +6,7 @@
 // service-role admin client. No new dependency: this is the exact mechanism
 // that already guards OTP send/verify.
 
+import { createHmac } from 'node:crypto';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@web/lib/supabase/admin';
 
@@ -28,6 +29,19 @@ export function getClientIp(): string {
 }
 
 /**
+ * Emails, phone numbers and IPs are personal data, so the counters table stores
+ * a keyed hash of them, never the raw value. The key is the service-role secret:
+ * it is already required for the admin client to exist, never leaves the server,
+ * and a leaked table alone cannot be reversed by dictionary.
+ */
+function hashBucketKey(identity: string): string {
+  // ponytail: rotating SUPABASE_SERVICE_ROLE_KEY resets live buckets, harmless (windows are minutes).
+  return createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '')
+    .update(`rate-limit:${identity}`)
+    .digest('hex');
+}
+
+/**
  * Consume one token from each bucket. Returns false if ANY bucket is exhausted.
  *
  * `failOpen` controls behaviour when the service-role client is unavailable
@@ -47,7 +61,7 @@ export async function checkRateLimits(
   for (const k of keys) {
     const { data, error } = await admin.rpc('consume_rate_limit', {
       p_kind: k.kind,
-      p_key: k.key,
+      p_key: hashBucketKey(k.key),
       p_max: k.max,
       p_window_sec: k.windowSec,
     });

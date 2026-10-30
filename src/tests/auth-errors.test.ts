@@ -1,6 +1,7 @@
 import {
   toAuthErrorMessage,
   getAuthErrorCode,
+  isUnknownEmailError,
 } from '@/lib/auth-errors';
 
 describe('auth-errors', () => {
@@ -20,26 +21,26 @@ describe('auth-errors', () => {
     );
   });
 
-  it('maps unknown-email OTP failures to no-ledger copy', () => {
-    expect(toAuthErrorMessage({ message: 'Signups not allowed for otp' })).toBe(
-      'No ledger for this email.',
-    );
-    expect(toAuthErrorMessage({ code: 'user_not_found' })).toBe('No ledger for this email.');
+  it('never reveals whether an email has an account', () => {
+    for (const error of [
+      { message: 'Signups not allowed for otp' },
+      { code: 'user_not_found' },
+      { code: 'email_not_registered' },
+      { code: 'password_mismatch' },
+    ]) {
+      expect(toAuthErrorMessage(error)).not.toMatch(/no ledger|doesn't match this email/i);
+    }
   });
 
-  it('maps password_mismatch separately from invalid_credentials', () => {
-    expect(toAuthErrorMessage({ code: 'password_mismatch' })).toBe(
-      "That password doesn't match this email.",
-    );
-    expect(toAuthErrorMessage({ code: 'invalid_credentials' })).toBe(
-      'Email or password is incorrect.',
-    );
+  it('flags unknown-email failures so a link sender can treat them like a successful send', () => {
+    expect(isUnknownEmailError({ message: 'Signups not allowed for otp' })).toBe(true);
+    expect(isUnknownEmailError({ code: 'user_not_found' })).toBe(true);
+    expect(isUnknownEmailError({ code: 'invalid_credentials' })).toBe(false);
+    expect(isUnknownEmailError({ code: 'otp_disabled' })).toBe(false);
+    expect(isUnknownEmailError(null)).toBe(false);
   });
 
-  it('maps otp_disabled by Signups-not-allowed sentence, not by code alone', () => {
-    expect(
-      getAuthErrorCode({ code: 'otp_disabled', message: 'Signups not allowed for otp' }),
-    ).toBe('email_not_registered');
+  it('keeps otp_disabled distinct from the Signups-not-allowed sentence', () => {
     expect(getAuthErrorCode({ code: 'otp_disabled' })).toBe('otp_disabled');
   });
 });

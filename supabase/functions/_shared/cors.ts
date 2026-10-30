@@ -8,14 +8,17 @@
 //      that should always work even if the env var is unset. Prevents the
 //      single-point-of-failure where a forgotten env var (or a freshly-cloned
 //      function with no env wired) silently 403s the prod site.
-//   3. *.vercel.app — Vercel preview deployments. Each PR ships under a unique
-//      subdomain (e.g. smoke-ledger-git-feature-x.vercel.app); the auth header
-//      is the real isolation, the origin allowlist is just a CORS courtesy.
+//   3. This project's Vercel preview deployments (see originPatterns.ts). Each PR
+//      ships under a unique subdomain; the auth header is the real isolation, the
+//      origin allowlist is just a CORS courtesy, but it must not admit every
+//      *.vercel.app site.
 //
 // Disallowed-origin handling: omit the `Access-Control-Allow-Origin` header
 // entirely. The previous helper emitted the literal string `'null'`, which
 // browsers display as a confusing `'null' is not equal to the supplied origin`
 // error and pollutes log triage. Omission is the canonical CORS denial.
+
+import { PREVIEW_ORIGIN_REGEX } from './originPatterns.ts';
 
 const ENV = (Deno.env.get('ENVIRONMENT') ?? Deno.env.get('ENV') ?? 'production').toLowerCase();
 const IS_PROD = ENV === 'production';
@@ -25,8 +28,6 @@ export const DEFAULT_PROD_ORIGINS: readonly string[] = [
   'https://smoke-ledger-beige.vercel.app', // canonical Vercel production alias
   'https://smokeledger.app',
 ];
-
-const VERCEL_PREVIEW_REGEX = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
 
 function readEnvAllowedOrigins(): string[] {
   return (Deno.env.get('ALLOWED_ORIGINS') ?? '')
@@ -44,7 +45,7 @@ export function originAllowed(origin: string | null): boolean {
   if (envOrigins.includes('*') && !IS_PROD) return true;
   if (envOrigins.includes(origin)) return true;
   if (DEFAULT_PROD_ORIGINS.includes(origin)) return true;
-  if (VERCEL_PREVIEW_REGEX.test(origin)) return true;
+  if (PREVIEW_ORIGIN_REGEX.test(origin)) return true;
   return false;
 }
 

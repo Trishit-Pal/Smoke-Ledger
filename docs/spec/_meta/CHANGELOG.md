@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-10-30 — uncommitted on cc9f3a5 (security hardening phase 1; partial update, sections not re-stamped)
+- auth: no sign-in surface enumerates accounts any more (password copy is generic, email-link treats an unknown address as sent); `auth_email_exists` lookup removed; login rate limits are per IP, per email+IP and 30/h per email; email-link `type` allowlist via `parseEmailOtpType`; erase is the one bypass of identity immutability.
+- security-privacy: anon default-deny (grants + default privileges + PUBLIC EXECUTE); rate-limit identities stored as keyed hashes, one-time purge of pre-hashing rows, pg_cron daily purge; edge functions fail closed without `AUDIT_PEPPER`; erase hash is now `uid:pepper` and clears identity fields with a `prior_identity_erased` audit flag.
+
 ## 2026-09-21 — bf62af4 (web login unknown-email vs wrong-password)
 - auth: web password sign-in calls service-role RPC `auth_email_exists` after `invalid_credentials` and shows “No ledger for this email.” vs “That password doesn't match this email.” Lookup is a total function (`lookupAuthEmail` never throws): timeout/throw/missing RPC fail-close to the combined copy. Email-link (web and native) maps GoTrue unknown-user errors the same way and tells the truth on send success. Password reset, phone OTP, and native password stay generic. Web `sendEmailOtp` uses the same `withTimeout` catch as resend.
 - security-privacy: 16th public `SECURITY DEFINER` function `auth_email_exists` (`search_path ''`, EXECUTE only `service_role`, reads `auth.users`). Operator must `npm run db:push` the migration before the password split is live.

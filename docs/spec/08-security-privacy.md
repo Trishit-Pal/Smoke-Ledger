@@ -47,11 +47,13 @@ All 16 `SECURITY DEFINER` functions in `public` pin an explicit `search_path`. F
 - `refresh_seed_prices_from_catalog` pins `smoke_seed, public` because it needs to read the seed catalog schema.
 - `rls_auto_enable` pins `pg_catalog` because it is a DDL helper that works in system catalogs.
 
-No function inherits the caller's search_path. This matters because a SECURITY DEFINER function runs with the privileges of the function owner (typically the Supabase table owner), not the calling role. If it inherited the caller's search_path, a sufficiently creative caller could shadow `public.some_table` with a same-named table in a schema they control and redirect the function's queries. Pinning to `''` closes that vector entirely. The previous 15 functions were confirmed live via `pg_proc.proconfig` on 2026-06-19. `auth_email_exists` is in-repo and not yet asserted live.
+No function inherits the caller's search_path. This matters because a SECURITY DEFINER function runs with the privileges of the function owner (typically the Supabase table owner), not the calling role. If it inherited the caller's search_path, a sufficiently creative caller could shadow `public.some_table` with a same-named table in a schema they control and redirect the function's queries. Pinning to `''` closes that vector entirely. The previous 15 functions were confirmed live via `pg_proc.proconfig` on 2026-06-19.
+
+**anon default-deny.** `20261030000000_security_hardening.sql` revokes every `anon` grant on public tables, sequences and functions, removes the default grants to `anon` for future objects, and drops the built-in PUBLIC `EXECUTE` default for functions the migration role creates. `anon` also inherits `EXECUTE` through PUBLIC on functions that already exist, so every `SECURITY DEFINER` function is revoked `FROM PUBLIC, anon` explicitly (enforced by `src/tests/security-migrations.test.ts`). `scripts/sql/smoke.sql` fails CI if `anon` can execute any public `SECURITY DEFINER` function or holds any public table privilege.
 
 The user-facing RPCs that `authenticated` may call are: `create_log_with_rate_limit`, `erase_account_data`, `export_account_data`, `get_daily_summary`, `get_health_milestones`, `get_random_facts`, `list_logs_page`, `mark_fact_seen`, `refresh_seed_prices_from_catalog`, `seed_default_brands_if_empty`, `sync_default_brand_catalog`.
 
-The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `auth_email_exists` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. `auth_email_exists` is granted in `supabase/migrations/20260921160000_auth_email_exists.sql` (REVOKE PUBLIC/anon/authenticated, GRANT `service_role` only) and is called only from `lookupAuthEmail` after GoTrue `invalid_credentials`.
+The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `purge_rate_limit_counters` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. The former `auth_email_exists` email-existence oracle is dropped by the hardening migration.
 
 ### The DPDP export and erase RPCs
 
@@ -59,13 +61,13 @@ The service-role-only / internal functions — `consume_rate_limit`, `handle_new
 
 `erase_account_data` (`supabase/migrations/20260521000000_audit_export_ops.sql:303–369`) runs as the calling user (it reads `auth.uid()` internally — the Edge Function intentionally calls it with the user's bearer token, not the service-role client, so `auth.uid()` resolves correctly). It:
 
-1. Computes `user_hash = sha256(uid || pepper)` using `extensions.digest` and the `app.audit_pepper` GUC.
+1. Computes `user_hash = sha256(uid || ':' || pepper)` using `extensions.digest` and the `app.audit_pepper` GUC (or the Vault secret `audit_pepper`).
 2. Rewrites all `audit_events` rows for this user: nulls out `user_id`, replaces `props_json` with `{"hashed_user_id": "<hash>"}`.
 3. Patches all `error_events` rows for this user: adds `hashed_user_id` to `details_json`, nulls out `user_id`.
 4. Deletes all product data (logs, brands, variants, goals, reminders, settings, price entries, usage events, facts seen).
-5. Resets the profile row and sets `deleted_at = now()`.
+5. Resets the profile row, including the otherwise-immutable `full_name`, `date_of_birth`, `gender`, plus `mobile_e164` and `place` (it sets the transaction-local `app.erasing` flag, which `enforce_profile_identity_rules` honours), and sets `deleted_at = now()`.
 6. Re-seeds default brands via `smoke_seed.apply_default_brands(uid)`.
-7. Inserts a final `account_data_erased` audit event (still attributed to the live user, since auth deletion comes later).
+7. Inserts a final `account_data_erased` audit event with `prior_identity_erased: true` (still attributed to the live user, since auth deletion comes later). That row is the record that the user's earlier name / DOB / gender existed before they re-entered new ones.
 
 After `erase_account_data` returns, the `delete-account` Edge Function calls `auth.admin.deleteUser(userId)`, which cascades through foreign keys and removes anything the erase step missed (defense-in-depth against future schema drift). If `erase_account_data` fails for any reason, the function aborts without calling `deleteUser` — the user's auth row stays intact and they can retry (`supabase/functions/delete-account/index.ts:183–194`).
 
@@ -73,12 +75,12 @@ After `erase_account_data` returns, the `delete-account` Edge Function calls `au
 
 The pepper is a 32-byte random secret stored as the `AUDIT_PEPPER` Edge Function environment variable and surfaced inside the DB as the `app.audit_pepper` GUC. Two functions use it:
 
-- `delete-account/index.ts:156` — `sha256Hex(`${userId}:${AUDIT_PEPPER}`)` is written into the compliance delete row in `error_events` before the user is erased.
+- `delete-account/index.ts` — `hashWithPepper(user.id, AUDIT_PEPPER)` is written into the compliance delete row in `error_events` before the user is erased, and the IP is hashed the same way for the audit row and rate-limit key. The function returns `server_misconfigured` (500) if `AUDIT_PEPPER` is unset rather than storing a reversible hash; `send-sms-otp` does the same, since it keys the phone rate-limit bucket on the peppered hash.
 - `audit-record/index.ts:81` — the same hash appears in log output when a user hits the audit-record rate limit.
 
 The hash is computed in `supabase/functions/_shared/hash.ts` using `crypto.subtle.digest('SHA-256', ...)`. The pepper is what makes the retained audit rows non-reversible: once `auth.users` is purged, the hashed id has no public counterpart to correlate against. Rotation of the pepper (procedure in `docs/runbooks/audit-pepper-rotation.md`) severs forensic continuity across the rotation boundary — existing hashes in `error_events` remain inert.
 
-Inside the DB the same logic is expressed using `extensions.digest` (pgcrypto): `encode(extensions.digest(uid::text || pepper, 'sha256'), 'hex')` (`supabase/migrations/20260521000000_audit_export_ops.sql:318`).
+Inside the DB the same `<id>:<pepper>` form is expressed using `extensions.digest` (pgcrypto): `encode(extensions.digest(uid::text || ':' || pepper, 'sha256'), 'hex')` (`20261030000000_security_hardening.sql`). Rows anonymized before that migration used `uid || pepper` with no colon; to correlate one, hash the candidate id both ways.
 
 ### Compliance delete row tamper-resistance
 
@@ -97,8 +99,7 @@ Its history is the repo's canonical migrations-can-lie example: the constraint w
 The following are reachable only with the service-role key and are never handed to browser clients:
 
 - `consume_rate_limit` RPC — backs the Edge Function rate limiter; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260523092236_add_rate_limit_counters.sql:62–63`).
-- `auth_email_exists` RPC — boolean existence check on `auth.users` for web password login after `invalid_credentials`; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260921160000_auth_email_exists.sql`). Never cached. Until this migration is applied, lookup fail-closes to generic credentials.
-- `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers.
+- `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers. Emails, phone numbers and IPs are stored only as keyed hashes: edge functions use `hashWithPepper(value, AUDIT_PEPPER)` (`_shared/hash.ts`), the web limiter an HMAC keyed on the service-role key. Per-user buckets in `audit-record` and `delete-account` still key on the raw user UUID (`user:<id>`). The hardening migration deletes every pre-hashing row once, enables `pg_cron` (guarded) and schedules `purge_rate_limit_counters()` daily at 03:17 to drop rows older than 2 days. The migration only warns if pg_cron cannot be enabled; `scripts/sql/smoke.sql` fails if pg_cron is installed but the job is missing. Verify production after deploy with `select * from cron.job`.
 - `record_audit_event` RPC — `EXECUTE` revoked from `authenticated` in `supabase/migrations/20260521000000_audit_export_ops.sql:295–297`; re-granted only to `service_role`. The `audit-record` Edge Function verifies the caller's JWT with the anon client first, then writes through the service-role client.
 - `auth.admin.deleteUser` — called only by `delete-account/index.ts:198`; requires `SUPABASE_SERVICE_ROLE_KEY`, which is an Edge Function secret and a server-side Vercel env var, never a `NEXT_PUBLIC_*` value.
 

@@ -55,6 +55,8 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.enforce_profile_region() FROM PUBLIC, anon;
+
 CREATE OR REPLACE FUNCTION public.set_region(p_country text)
 RETURNS void
 LANGUAGE plpgsql
@@ -133,7 +135,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_region(text) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.swap_seeds_after_region_change()
@@ -161,7 +163,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.swap_seeds_after_region_change() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.swap_seeds_after_region_change() FROM PUBLIC, anon;
 
 DROP TRIGGER IF EXISTS trg_user_profiles_seed_swap ON public.user_profiles;
 CREATE TRIGGER trg_user_profiles_seed_swap

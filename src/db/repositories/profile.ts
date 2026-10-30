@@ -132,7 +132,13 @@ export async function resetLedgerForRegion(country: string): Promise<UserProfile
   const supabase = getSupabase();
   await requireUserId();
   const { error } = await supabase.rpc('reset_ledger_for_region', { p_country: country });
-  if (error) throw mapDbError(error);
+  if (error) {
+    const mapped = mapDbError(error);
+    // Same currency (e.g. a double-tapped confirm after the first reset landed):
+    // nothing to wipe, so just save the country.
+    if (mapped.code === 'region_reset_not_needed') return setRegion(country);
+    throw mapped;
+  }
   return getProfile();
 }
 

@@ -8,10 +8,10 @@ import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
 import { emailZodStrict } from '@web/lib/auth/email';
 import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
+import { loginRateLimitKeys } from '@web/lib/auth/authRateLimitKeys';
 import { isNextRedirectError, safeAuthCatchState } from '@web/lib/auth/authCatch';
 import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
-import { classifyInvalidCredentials, lookupAuthEmail } from '@web/lib/auth/authEmailExists';
 import {
   REMEMBER_ME_COOKIE,
   applyAuthCookiePolicy,
@@ -66,13 +66,9 @@ export async function signInWithPasswordAction(
     // DB-backed token bucket (same `consume_rate_limit` RPC as OTP). Fail-open
     // so a missing service-role key can't lock everyone out of sign-in —
     // Supabase's native auth limits remain as a backstop. See SCALING_PLAN.md §2a.
-    const rateOk = await checkRateLimits(
-      [
-        { kind: 'pw_login_ip', key: getClientIp(), max: 10, windowSec: 600 },
-        { kind: 'pw_login_email', key: email.trim().toLowerCase(), max: 5, windowSec: 900 },
-      ],
-      { failOpen: true },
-    );
+    const rateOk = await checkRateLimits(loginRateLimitKeys(getClientIp(), email), {
+      failOpen: true,
+    });
     if (!rateOk) {
       return {
         code: 'rate_limited',
@@ -125,11 +121,9 @@ export async function signInWithPasswordAction(
     );
 
     if (error) {
+      // One message for "no such email" and "wrong password": see
+      // web-auth-no-enumeration.test.ts.
       const code = getAuthErrorCode(error) || 'authentication_error';
-      if (code === 'invalid_credentials') {
-        const split = classifyInvalidCredentials(await lookupAuthEmail(email.trim()));
-        return { code: split, message: toAuthErrorMessage({ code: split }) };
-      }
       return { code, message: toAuthErrorMessage(error) };
     }
   } catch (err) {

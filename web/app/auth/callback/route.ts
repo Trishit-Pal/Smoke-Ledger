@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
-import type { EmailOtpType } from '@supabase/supabase-js';
+import { parseEmailOtpType } from '@/lib/emailOtpType';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   applyAuthCookiePolicy,
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   const tokenHash = requestUrl.searchParams.get('token_hash');
-  const type = requestUrl.searchParams.get('type') as EmailOtpType | null;
+  const type = parseEmailOtpType(requestUrl.searchParams.get('type'));
   let nextPath = sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
 
   const supabaseUrl = readSupabaseUrl();

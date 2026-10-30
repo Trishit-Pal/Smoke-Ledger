@@ -6,6 +6,7 @@ export type AppErrorCode =
   | 'conflict'
   | 'rate_limited'
   | 'region_change_requires_reset'
+  | 'region_reset_not_needed'
   | 'dependency_failure'
   | 'timeout'
   | 'internal_error';
@@ -19,6 +20,7 @@ const SAFE_MESSAGES: Record<AppErrorCode, string> = {
   rate_limited: 'Too many requests. Please wait and try again.',
   region_change_requires_reset:
     'Changing currency clears the ledger. Confirm the reset, or stay in the current country.',
+  region_reset_not_needed: 'That country uses your current currency, so nothing needs resetting.',
   dependency_failure: 'A backend dependency failed. Please retry shortly.',
   timeout: 'The request timed out. Please try again.',
   internal_error: 'Something went wrong. Please try again.',
@@ -87,6 +89,7 @@ const SPECIFIC_MESSAGES: Record<AppErrorCode, string> = {
   rate_limited: 'Too many attempts. Please wait a moment and try again.',
   region_change_requires_reset:
     'That country uses a different currency. Reset the ledger to switch, or keep the current one.',
+  region_reset_not_needed: 'That country uses your current currency, so nothing needs resetting.',
   dependency_failure: 'Could not reach the server. Check your connection and try again.',
   timeout: 'The request timed out. Check your connection and try again.',
   internal_error: 'Something went wrong. Please try again.',

@@ -5,9 +5,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import {
   AUDIT_EVENT_CATEGORIES,
   AUDIT_EVENT_TYPES,
+  markClientReported,
   redactAuditProps,
 } from '../_shared/auditAllowlist.ts';
-import { sha256Hex } from '../_shared/hash.ts';
+import { hashWithPepper } from '../_shared/hash.ts';
 import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { corsHeaders, originAllowed } from '../_shared/cors.ts';
@@ -78,7 +79,7 @@ serve(async (req) => {
       windowSec: RATE_LIMIT_WINDOW_SEC,
     });
     if (!allowed) {
-      const userIdHash = await sha256Hex(`${user.id}:${Deno.env.get('AUDIT_PEPPER') ?? ''}`);
+      const userIdHash = await hashWithPepper(user.id, Deno.env.get('AUDIT_PEPPER') ?? '');
       log.warn('rate_limit_exceeded', {
         user_id_hash: userIdHash,
         request_id: requestId,
@@ -113,7 +114,7 @@ serve(async (req) => {
       return json({ error: 'invalid_event_category', request_id: requestId }, 400, origin);
     }
 
-    const safeProps = redactAuditProps(props);
+    const safeProps = markClientReported(redactAuditProps(props));
 
     const supabaseAdmin = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },

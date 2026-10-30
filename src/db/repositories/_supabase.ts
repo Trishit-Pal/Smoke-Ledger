@@ -32,8 +32,12 @@ export function mapDbError(err: unknown, fallback: AppErrorCode = 'dependency_fa
   switch (code) {
     case '23505':
       return new AppError('conflict', msg, err);
-    case '23503':
     case '23514':
+      if (/region_reset_not_needed/i.test(msg)) {
+        return new AppError('region_reset_not_needed', msg, err);
+      }
+      return new AppError('validation_error', msg, err);
+    case '23503':
     case '22P02':
     case '22023':
       return new AppError('validation_error', msg, err);

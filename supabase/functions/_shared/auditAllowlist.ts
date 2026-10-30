@@ -71,6 +71,16 @@ function isPrimitive(value: unknown): value is string | number | boolean | null 
   );
 }
 
+/**
+ * Rows written through audit-record are claims the signed-in user made about
+ * their own account, not facts the server observed. Stamp them so a reviewer can
+ * tell them from server-written compliance rows (erase / delete). The stamp is
+ * applied last, so a client-supplied `source` cannot pose as a server row.
+ */
+export function markClientReported(props: Record<string, unknown>): Record<string, unknown> {
+  return { ...props, source: 'client_reported' };
+}
+
 export function redactAuditProps(
   props: Record<string, unknown> | undefined | null,
 ): Record<string, unknown> {

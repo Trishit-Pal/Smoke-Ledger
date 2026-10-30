@@ -44,7 +44,9 @@
         "app/(auth)/**",
         "web/app/auth/**",
         "web/app/(auth)/**",
-        "web/lib/auth/authEmailExists.ts"
+        "web/lib/auth/**",
+        "src/lib/auth-errors.ts",
+        "src/lib/emailOtpType.ts"
       ],
       "last_verified_commit": "bf62af4",
       "status": "current"
