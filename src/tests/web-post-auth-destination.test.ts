@@ -3,7 +3,7 @@
  * route; it is now shared by the callback (PKCE code) and the confirm page's
  * server action (token_hash), so the two paths cannot drift.
  */
-import { postAuthDestination } from '../../web/lib/auth/postAuthDestination';
+import { nextPathForLink, postAuthDestination } from '../../web/lib/auth/postAuthDestination';
 
 const CONSENTED = {
   age_confirmed_at: 't',
@@ -15,9 +15,15 @@ const CONSENTED = {
 const ONBOARDED = { ...CONSENTED, onboarded_at: 't' };
 
 describe('postAuthDestination', () => {
-  it('sends a recovery link to set a new password, even before consents', () => {
-    expect(postAuthDestination(null, 'recovery', null)).toBe('/reset-password');
+  it('sends an explicit /reset-password next there, even before consents', () => {
     expect(postAuthDestination(null, null, '/reset-password?hint=x')).toBe('/reset-password?hint=x');
+  });
+
+  // Review fix (M3): the old callback only defaulted a recovery link to
+  // /reset-password on the token_hash path. A bare `type=recovery` on a PKCE code
+  // link, or on its own, must not force a signed-in user there.
+  it('does not invent a reset destination from type alone', () => {
+    expect(postAuthDestination(null, 'recovery', null)).toBe('/onboarding/privacy');
   });
 
   it('sends a user without the required consents to the privacy step', () => {
@@ -39,5 +45,21 @@ describe('postAuthDestination', () => {
   it('honours next for an onboarded user, else the dashboard', () => {
     expect(postAuthDestination(ONBOARDED, 'magiclink', '/log?ref=widget')).toBe('/log?ref=widget');
     expect(postAuthDestination(ONBOARDED, 'magiclink', null)).toBe('/dashboard');
+  });
+});
+
+describe('nextPathForLink (token_hash links only)', () => {
+  it('defaults a recovery link to /reset-password', () => {
+    expect(nextPathForLink('recovery', null)).toBe('/reset-password');
+  });
+
+  it('keeps an explicit next', () => {
+    expect(nextPathForLink('recovery', '/reset-password?hint=x')).toBe('/reset-password?hint=x');
+    expect(nextPathForLink('magiclink', '/log')).toBe('/log');
+  });
+
+  it('adds nothing for other link types', () => {
+    expect(nextPathForLink('magiclink', null)).toBeNull();
+    expect(nextPathForLink('signup', null)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { spacing } from '@/constants/theme';
 import { createSessionFromUrl } from '@/lib/authCallback';
-import { maskEmail, readAuthLink } from '@/lib/authLink';
+import { maskAccount, readAuthLink } from '@/lib/authLink';
 import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/store/auth';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -25,10 +25,26 @@ export default function AuthCallbackScreen() {
   const [redeeming, setRedeeming] = useState(false);
   const [done, setDone] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
 
   const redeem = async (url: string) => {
+    // A double tap must not redeem twice: the second verifyOtp would fail and
+    // could show "invalid or expired" over a sign-in that worked.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setRedeeming(true);
     const result = await createSessionFromUrl(url);
+    inFlight.current = false;
+    // Left the screen meanwhile: no state, and no stray welcome celebration.
+    if (!mounted.current) return;
     setRedeeming(false);
     if (result === 'none') {
       setError('This link is invalid or expired.');
@@ -42,18 +58,18 @@ export default function AuthCallbackScreen() {
   };
 
   useEffect(() => {
-    let cancelled = false;
     // The cold-start URL (getInitialURL) and the warm-start listener can both
-    // deliver the same link; process it at most once.
-    let handled = false;
+    // deliver the same link: skip a repeat, but let a newer link replace one
+    // still waiting for confirmation (e.g. a fresh link after an expired one).
+    let lastUrl: string | null = null;
 
     const receive = async (url: string | null) => {
       if (!url) {
-        if (!cancelled && !handled) setError('Missing authentication link.');
+        if (mounted.current && lastUrl === null) setError('Missing authentication link.');
         return;
       }
-      if (handled) return;
-      handled = true;
+      if (url === lastUrl) return;
+      lastUrl = url;
 
       let link: ReturnType<typeof readAuthLink>;
       try {
@@ -62,20 +78,28 @@ export default function AuthCallbackScreen() {
         link = { kind: 'invalid' };
       }
       if (link.kind === 'invalid') {
-        setError('This link is invalid or expired.');
+        if (mounted.current) setError('This link is invalid or expired.');
         return;
       }
 
       // A token_hash link is not bound to this device: anyone could send one for
       // their own account. Ask before redeeming it (security scan F3).
       if (link.kind === 'confirm') {
-        const { data } = await getSupabase().auth.getSession();
-        if (!cancelled) setPending({ url, signedInAs: maskEmail(data.session?.user.email) });
+        let signedInAs: string | null = null;
+        try {
+          const { data } = await getSupabase().auth.getSession();
+          signedInAs = maskAccount(data.session?.user);
+        } catch {
+          // The current session could not be read: still ask, without naming it.
+        }
+        if (!mounted.current || url !== lastUrl) return;
+        setError(null);
+        setPending({ url, signedInAs });
         return;
       }
 
       // A PKCE code only works with this device's verifier: redeem it now.
-      if (!cancelled) await redeem(url);
+      if (mounted.current) await redeem(url);
     };
 
     void Linking.getInitialURL().then((url) => receive(url));
@@ -83,10 +107,7 @@ export default function AuthCallbackScreen() {
       void receive(url);
     });
 
-    return () => {
-      cancelled = true;
-      sub.remove();
-    };
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -134,8 +155,7 @@ export default function AuthCallbackScreen() {
         </Text>
         {pending.signedInAs ? (
           <Text variant="small" color={theme.warnEarth}>
-            You&apos;re signed in as {pending.signedInAs}. Continuing switches to the account in this
-            link.
+            You&apos;re signed in as {pending.signedInAs}. If this link is for a different account, continuing switches to it.
           </Text>
         ) : null}
         <Button title="Continue" onPress={() => void redeem(pending.url)} loading={redeeming} />

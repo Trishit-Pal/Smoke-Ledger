@@ -37,6 +37,19 @@ export function confirmLinkPath(
   return `/auth/confirm?${query.toString()}`;
 }
 
+/**
+ * How to name the account already signed in on this device, or null when
+ * nobody is. Any session counts, phone-only included: the account-switch
+ * warning must not depend on the session having an email.
+ */
+export function maskAccount(
+  user: { email?: string | null; phone?: string | null } | null | undefined,
+): string | null {
+  if (!user) return null;
+  const digits = (user.phone ?? '').replace(/\D/g, '');
+  return maskEmail(user.email) ?? (digits.length >= 4 ? `•••${digits.slice(-4)}` : 'another account');
+}
+
 /** `jane.doe@example.com` -> `j•••@example.com`, enough to recognise an account. */
 export function maskEmail(email: string | null | undefined): string | null {
   const trimmed = email?.trim() ?? '';

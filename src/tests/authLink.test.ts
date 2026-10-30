@@ -6,7 +6,7 @@
  * device-bound and may be exchanged at once; a `token_hash` must be confirmed
  * by the person on the device before it is redeemed.
  */
-import { confirmLinkPath, maskEmail, readAuthLink } from '@/lib/authLink';
+import { confirmLinkPath, maskAccount, maskEmail, readAuthLink } from '@/lib/authLink';
 
 const params = (s: string) => new URLSearchParams(s);
 
@@ -69,5 +69,28 @@ describe('maskEmail', () => {
 
   it.each([null, undefined, '', 'not-an-email', '@example.com'])('returns null for %j', (email) => {
     expect(maskEmail(email)).toBeNull();
+  });
+});
+
+// Review fix: the account-switch warning keyed on an email, so a phone-only
+// session (Phone OTP sign-in) got no warning at all.
+describe('maskAccount', () => {
+  it('prefers a masked email', () => {
+    expect(maskAccount({ email: 'jane@example.com', phone: '+919876543210' })).toBe('j•••@example.com');
+  });
+
+  it('masks a phone-only account to its last four digits', () => {
+    expect(maskAccount({ email: null, phone: '+919876543210' })).toBe('•••3210');
+    expect(maskAccount({ email: '', phone: '919876543210' })).toBe('•••3210');
+  });
+
+  it('still reports a signed-in account with neither', () => {
+    expect(maskAccount({ email: null, phone: null })).toBe('another account');
+    expect(maskAccount({})).toBe('another account');
+  });
+
+  it('is null only when nobody is signed in', () => {
+    expect(maskAccount(null)).toBeNull();
+    expect(maskAccount(undefined)).toBeNull();
   });
 });

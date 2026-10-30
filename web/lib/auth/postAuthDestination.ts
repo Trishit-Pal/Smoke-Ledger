@@ -15,6 +15,15 @@ export interface PostAuthProfile {
 }
 
 /**
+ * The `next` for a redeemed token_hash link: a recovery link with no explicit
+ * next goes to set a new password. Only the token_hash path applies this, as
+ * the callback always did; a bare `type=recovery` elsewhere changes nothing.
+ */
+export function nextPathForLink(type: AllowedEmailOtpType, nextPath: string | null): string | null {
+  return type === 'recovery' && !nextPath ? '/reset-password' : nextPath;
+}
+
+/**
  * Where a freshly signed-in browser goes. Shared by the callback route (PKCE
  * code) and the confirm page's server action (token_hash) so the two cannot
  * drift. `nextPath` must already be sanitized by sanitizeCallbackNextPath.
@@ -24,12 +33,11 @@ export function postAuthDestination(
   type: AllowedEmailOtpType | null,
   nextPath: string | null,
 ): string {
-  const next = type === 'recovery' && !nextPath ? '/reset-password' : nextPath;
   // Route on the pathname alone so a query string cannot change the decision.
-  const nextPathname = next ? new URL(next, 'https://x').pathname : null;
+  const nextPathname = nextPath ? new URL(nextPath, 'https://x').pathname : null;
 
   // Recovery always wins so the user can finish setting a new password.
-  if (nextPathname === '/reset-password') return next!;
+  if (nextPathname === '/reset-password') return nextPath!;
 
   const hasRequiredConsents = Boolean(
     profile?.age_confirmed_at &&
@@ -45,8 +53,8 @@ export function postAuthDestination(
   }
 
   if (!profile?.onboarded_at) {
-    return nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname) ? next! : '/onboarding/privacy';
+    return nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname) ? nextPath! : '/onboarding/privacy';
   }
 
-  return next ?? '/dashboard';
+  return nextPath ?? '/dashboard';
 }

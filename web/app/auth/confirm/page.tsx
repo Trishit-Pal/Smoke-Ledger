@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { maskEmail, readAuthLink } from '@/lib/authLink';
+import { maskAccount, readAuthLink } from '@/lib/authLink';
 import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
@@ -37,7 +37,8 @@ export default async function ConfirmEmailLinkPage({ searchParams }: { searchPar
   const {
     data: { user },
   } = await createClient().auth.getUser();
-  const signedInAs = maskEmail(user?.email);
+  // Any existing session counts (phone-only included), so the warning cannot be skipped.
+  const signedInAs = maskAccount(user);
 
   return (
     <EditorialPageShell maxWidth={520} backdrop={<SceneBackdrop intensity="full" />}>
@@ -52,8 +53,8 @@ export default async function ConfirmEmailLinkPage({ searchParams }: { searchPar
       />
 
       {signedInAs ? (
-        <p role="status" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: '12px 0 0 0' }}>
-          You&apos;re signed in as {signedInAs}. Continuing switches to the account in this link.
+        <p role="status" className="mt-md" style={{ fontSize: 13, color: 'var(--warn-earth)' }}>
+          You&apos;re signed in as {signedInAs}. If this link is for a different account, continuing switches to it.
         </p>
       ) : null}
 
@@ -61,20 +62,20 @@ export default async function ConfirmEmailLinkPage({ searchParams }: { searchPar
         <input type="hidden" name="token_hash" value={link.tokenHash} />
         <input type="hidden" name="type" value={link.type} />
         {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
-        <button type="submit" className="focus-ring" style={{ ...PRIMARY_CTA_STYLE, marginTop: 16 }}>
+        <button type="submit" className="focus-ring mt-lg" style={PRIMARY_CTA_STYLE}>
           Continue →
         </button>
       </form>
 
       <Link
         href={signedInAs ? '/dashboard' : '/login'}
+        className="mt-md"
         style={{
           fontFamily: 'var(--font-display)',
           fontStyle: 'italic',
           fontSize: 13,
           color: 'var(--text-muted)',
           textDecoration: 'none',
-          marginTop: 12,
         }}
       >
         Not now

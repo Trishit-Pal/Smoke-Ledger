@@ -32,6 +32,11 @@ const callbackSecurityHeaders = [
   { key: 'Referrer-Policy', value: 'no-referrer' },
 ];
 
+// The confirm page carries a token in its URL but also POSTs a server action.
+// no-referrer would make a pre-hydration form POST send `Origin: null`, which
+// Next 14.2 answers with a 500; same-origin still hides the URL from other sites.
+const confirmSecurityHeaders = [{ key: 'Referrer-Policy', value: 'same-origin' }];
+
 /** @type {import('next').NextConfig} */
 const config = {
   poweredByHeader: false,
@@ -53,7 +58,7 @@ const config = {
     return [
       { source: '/(.*)', headers: baseSecurityHeaders },
       { source: '/auth/callback', headers: callbackSecurityHeaders },
-      { source: '/auth/confirm', headers: callbackSecurityHeaders },
+      { source: '/auth/confirm', headers: confirmSecurityHeaders },
       { source: '/reset-password', headers: callbackSecurityHeaders },
     ];
   },
