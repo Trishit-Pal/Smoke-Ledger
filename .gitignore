@@ -25,3 +25,9 @@ graphify-out/
 !.claude/workflows/
 !.claude/README.md
 supabase/.temp/
+supabase/.branches/
+
+# Local tooling and credentials that must never be committed
+.cursor/
+.superpowers/
+play-service-account.json
