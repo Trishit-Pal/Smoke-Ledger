@@ -19,3 +19,13 @@ export async function sha256Hex(input: string): Promise<string> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/**
+ * The one way identifiers are hashed before they reach a long-lived row or a
+ * rate-limit key: `sha256("<value>:<AUDIT_PEPPER>")`, the form documented in
+ * docs/runbooks/audit-pepper-rotation.md. An unpeppered hash of an IPv4 address
+ * or phone number is reversible by enumeration, so never call sha256Hex on those.
+ */
+export function hashWithPepper(value: string, pepper: string): Promise<string> {
+  return sha256Hex(`${value}:${pepper}`);
+}

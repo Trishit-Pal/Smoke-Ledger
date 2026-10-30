@@ -20,6 +20,22 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * The tight email bucket is per (email, IP) pair: keyed on the email alone, anyone
+ * who knew a victim's address could burn its 5 attempts and lock the owner out.
+ * The looser per-email bucket caps distributed guessing against one account: the
+ * sign-in runs server-side, so GoTrue's per-IP limits only ever see Vercel's IPs.
+ * Its price is that a determined stranger can lock an address out for up to an hour.
+ */
+export function loginRateLimitKeys(ip: string, email: string): RateLimitKey[] {
+  const normalized = normalizeEmail(email);
+  return [
+    { kind: 'pw_login_ip', key: ip, max: 10, windowSec: 600 },
+    { kind: 'pw_login_email', key: `${normalized}|${ip}`, max: 5, windowSec: 900 },
+    { kind: 'pw_login_email_global', key: normalized, max: 30, windowSec: HOUR_SEC },
+  ];
+}
+
 export function signupRateLimitKeys(ip: string, email: string): RateLimitKey[] {
   return [
     { kind: 'signup_ip', key: ip, max: 5, windowSec: HOUR_SEC },

@@ -108,5 +108,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_region(text) TO authenticated;

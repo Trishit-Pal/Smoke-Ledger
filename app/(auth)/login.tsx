@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
-import { toAuthErrorMessage } from '@/lib/auth-errors';
+import { isUnknownEmailError, toAuthErrorMessage } from '@/lib/auth-errors';
 
 type Mode = 'password' | 'magic-link';
 
@@ -88,11 +88,11 @@ export default function LoginScreen() {
           emailRedirectTo: Linking.createURL('/auth/callback', { queryParams: { next: '/' } }),
         },
       });
-      if (error) {
+      if (error && !isUnknownEmailError(error)) {
         setErr(toAuthErrorMessage(error));
         return;
       }
-      setInfo('We sent a sign-in link.');
+      setInfo('If that email has a ledger, we sent a sign-in link.');
     } finally {
       setLoading(false);
     }

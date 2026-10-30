@@ -11,7 +11,7 @@ import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialModeSwitch } from '@web/components/editorial/EditorialModeSwitch';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_LINKS } from '@web/lib/legal';
-import { toAuthErrorMessage } from '@/lib/auth-errors';
+import { isUnknownEmailError, toAuthErrorMessage } from '@/lib/auth-errors';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
@@ -373,12 +373,12 @@ function LoginPageInner() {
         }),
         DEFAULT_AUTH_TIMEOUT_MS,
       );
-      if (error) {
+      if (error && !isUnknownEmailError(error)) {
         setOtpError(toAuthErrorMessage(error));
         setCaptchaToken(null);
         return;
       }
-      setOtpInfo('We sent a sign-in link.');
+      setOtpInfo('If that email has a ledger, we sent a sign-in link.');
     } catch {
       setOtpError(SERVICE_UNAVAILABLE_MESSAGE);
       setCaptchaToken(null);

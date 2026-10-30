@@ -31,7 +31,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { sha256Hex } from '../_shared/hash.ts';
+import { hashWithPepper } from '../_shared/hash.ts';
 import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { corsHeaders, originAllowed } from '../_shared/cors.ts';
@@ -85,14 +85,17 @@ serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-  if (!url || !serviceKey || !anonKey) {
+  // Without the pepper the IP and user-id hashes are reversible; fail closed like
+  // erase_account_data does.
+  const pepper = Deno.env.get('AUDIT_PEPPER');
+  if (!url || !serviceKey || !anonKey || !pepper) {
     return json({ error: 'server_misconfigured', request_id: requestId }, 500, origin);
   }
 
   const ip = clientIp(req);
   const ipRate = await checkRateLimit({
     kind: 'delete-account',
-    key: `ip:${await sha256Hex(ip)}`,
+    key: `ip:${await hashWithPepper(ip, pepper)}`,
     max: RATE_LIMIT_MAX,
     windowSec: RATE_LIMIT_WINDOW_SEC,
   });
@@ -153,13 +156,13 @@ serve(async (req) => {
     // Audit BEFORE delete. Audit row cascades along with the user, so also
     // write a tamper-evident copy into error_events (category compliance)
     // which we deliberately do not delete on user purge.
-    const hashedUserId = await sha256Hex(`${userId}:${Deno.env.get('AUDIT_PEPPER') ?? ''}`);
+    const hashedUserId = await hashWithPepper(user.id, pepper);
     try {
       await supabaseAdmin.from('audit_events').insert({
         user_id: userId,
         event_type: 'account_delete_requested',
         event_category: 'compliance',
-        props_json: { request_id: requestId, ip_hash: await sha256Hex(ip) },
+        props_json: { request_id: requestId, ip_hash: await hashWithPepper(ip, pepper) },
       });
       await supabaseAdmin.from('error_events').insert({
         user_id: null,

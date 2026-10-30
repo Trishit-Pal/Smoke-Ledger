@@ -14,7 +14,7 @@ jest.mock('@/lib/logger', () => ({
 import { mapDbError } from '@/db/repositories/_supabase';
 import { deleteBrand, setVariantPriceOverride } from '@/db/repositories/brands';
 import { createLog, listLogs, listLogsPage, PAGE_SIZE_DEFAULT } from '@/db/repositories/logs';
-import { getProfile } from '@/db/repositories/profile';
+import { getProfile, resetLedgerForRegion } from '@/db/repositories/profile';
 import { AppError } from '@/lib/errors';
 import { getSupabase } from '@/lib/supabase';
 import { logClientError } from '@/lib/logger';
@@ -87,6 +87,11 @@ describe('mapDbError', () => {
       message: 'region_change_requires_reset',
     });
     expect((err as AppError).code).toBe('region_change_requires_reset');
+  });
+
+  it('maps a same-currency reset refusal to region_reset_not_needed, not a generic validation error', () => {
+    const err = mapDbError({ code: '23514', message: 'region_reset_not_needed' });
+    expect((err as AppError).code).toBe('region_reset_not_needed');
   });
 });
 
@@ -341,6 +346,42 @@ function stubSupabaseProfile(row: Record<string, unknown> | null, error: unknown
   };
   mockGetSupabase.mockReturnValue(chain);
 }
+
+describe('resetLedgerForRegion', () => {
+  beforeEach(() => {
+    mockGetSupabase.mockReset();
+  });
+
+  it('saves the country without wiping anything when the currency already matches (e.g. a double-tapped confirm)', async () => {
+    const rpc = jest
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { code: '23514', message: 'region_reset_not_needed' } })
+      .mockResolvedValueOnce({ data: null, error: null });
+    mockGetSupabase.mockReturnValue({
+      rpc,
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: makeProfileRow(), error: null }),
+    });
+
+    const profile = await resetLedgerForRegion('DE');
+
+    expect(rpc).toHaveBeenNthCalledWith(1, 'reset_ledger_for_region', { p_country: 'DE' });
+    expect(rpc).toHaveBeenNthCalledWith(2, 'set_region', { p_country: 'DE' });
+    expect(profile).toBeDefined();
+  });
+
+  it('still surfaces other reset failures', async () => {
+    const rpc = jest
+      .fn()
+      .mockResolvedValue({ data: null, error: { code: '42501', message: 'not authenticated' } });
+    mockGetSupabase.mockReturnValue({ rpc });
+
+    await expect(resetLedgerForRegion('DE')).rejects.toMatchObject({ code: 'authorization_error' });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('getProfile — baseline_per_day numeric coercion (C4)', () => {
   beforeEach(() => {

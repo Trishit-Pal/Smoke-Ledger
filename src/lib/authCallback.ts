@@ -1,3 +1,4 @@
+import { parseEmailOtpType } from '@/lib/emailOtpType';
 import { getSupabase } from '@/lib/supabase';
 
 // 'signed_up' is a first-time signup confirmation (type=signup) — callers use it
@@ -29,13 +30,12 @@ export async function createSessionFromUrl(url: string): Promise<SessionResult> 
 
     // 1. token_hash + type → verifyOtp (cross-device safe; preferred template)
     const tokenHash = parsed.searchParams.get('token_hash');
-    if (tokenHash && type) {
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: type as 'recovery' | 'signup' | 'invite' | 'magiclink' | 'email_change' | 'email',
-      });
+    if (tokenHash) {
+      const otpType = parseEmailOtpType(type);
+      if (!otpType) return 'none';
+      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
       if (error) throw error;
-      return resultForType(type);
+      return resultForType(otpType);
     }
 
     // 2. code → exchangeCodeForSession (PKCE; same-device only)
