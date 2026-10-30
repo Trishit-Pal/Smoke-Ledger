@@ -48,6 +48,12 @@ describe('hasRecentSignIn', () => {
     expect(hasRecentSignIn(bearer({ amr: [{ method, timestamp: minAgo(1) }] }), NOW, 15)).toBe(false);
   });
 
+  it('accepts any casing of the Bearer scheme, as getUser does', () => {
+    const header = bearer({ amr: [{ method: 'password', timestamp: minAgo(1) }] });
+    expect(hasRecentSignIn(header.replace('Bearer', 'bearer'), NOW, 15)).toBe(true);
+    expect(hasRecentSignIn(header.replace('Bearer', 'BEARER'), NOW, 15)).toBe(true);
+  });
+
   it('rejects a timestamp claimed to be in the future', () => {
     expect(hasRecentSignIn(bearer({ amr: [{ method: 'password', timestamp: minAgo(-10) }] }), NOW, 15)).toBe(false);
   });

@@ -28,8 +28,9 @@ const SIGN_IN_METHODS: ReadonlySet<string> = new Set([
 const MAX_FUTURE_SKEW_SEC = 60;
 
 function decodeClaims(authHeader: string): unknown {
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
-  const payload = token?.split('.')[1];
+  // The scheme is case-insensitive, as it is for auth.getUser().
+  const match = /^bearer\s+(\S+)$/i.exec(authHeader.trim());
+  const payload = match?.[1].split('.')[1];
   if (!payload) return null;
   try {
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');

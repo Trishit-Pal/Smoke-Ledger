@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isReauthRequest } from '@/lib/reauth';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
 import {
   applyAuthCookiePolicy,
@@ -134,6 +135,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isCallbackRoute(pathname)) {
+    return response;
+  }
+
+  // Signing in again before account deletion: let the signed-in user through.
+  if (isReauthRequest(pathname, url.searchParams.get('reason'))) {
     return response;
   }
 
