@@ -53,12 +53,30 @@ describe('GitHub workflows', () => {
     expect(ci).toMatch(/gitleaks git[^\n]*--redact/);
   });
 
-  it('ci.yml cancels superseded runs to stay inside the free Actions minutes', () => {
-    expect(read('.github', 'workflows', 'ci.yml')).toMatch(/cancel-in-progress: true/);
+  it('ci.yml cancels superseded PR runs, but never a main run (its secret scan covers only that push)', () => {
+    const ci = read('.github', 'workflows', 'ci.yml');
+    expect(ci).toMatch(/cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+    expect(ci).not.toMatch(/^ {2}cancel-in-progress: true/m);
   });
+
+  it.each(workflows.map((w) => [w.name, w.text]))(
+    '%s never leaves the checkout token on disk while running a downloaded scanner',
+    (_name, text) => {
+      for (const job of text.split(/\n {2}(?=[a-z-]+:\n)/).filter((j) => j.includes('gitleaks'))) {
+        expect(job).toContain('persist-credentials: false');
+      }
+    },
+  );
 
   it('posture audit runs on a weekly schedule', () => {
     expect(read('.github', 'workflows', 'posture-audit.yml')).toMatch(/schedule:\n\s+- cron:/);
+  });
+
+  it('posture audit reports npm advisories without failing every week until the Next 15 track', () => {
+    const audit = read('.github', 'workflows', 'posture-audit.yml');
+    const npmAuditLines = audit.split('\n').filter((l) => l.includes('npm audit --'));
+    expect(npmAuditLines.length).toBeGreaterThan(0);
+    for (const line of npmAuditLines) expect(line).toMatch(/\|\| true\s*$/);
   });
 });
 

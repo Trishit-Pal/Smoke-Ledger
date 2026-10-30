@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          # The scanner is a downloaded binary: keep the token out of .git/config.
+          persist-credentials: false
 
       - name: Install gitleaks (checksum-verified)
         env:
@@ -31,6 +33,9 @@ jobs:
       - name: Full-history secret scan (redacted)
         run: ./gitleaks git --redact --no-banner --exit-code 1
 
+      # Report-only until the Next 15 track lands: Next 14 has advisories with no
+      # fix on its line, so failing here would email every Monday and be ignored.
+      # The secret scan above still fails the run.
       - name: Dependency audit (root, then web)
         if: always()
         run: |
@@ -39,5 +44,3 @@ jobs:
             echo '### root'; npm audit --omit=dev --audit-level=high || true
             echo '### web'; (cd web && npm audit --omit=dev --audit-level=high) || true
           } >> "$GITHUB_STEP_SUMMARY"
-          npm audit --omit=dev --audit-level=high
-          (cd web && npm audit --omit=dev --audit-level=high)

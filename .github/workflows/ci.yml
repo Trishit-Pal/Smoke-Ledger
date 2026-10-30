@@ -9,10 +9,12 @@ on:
 permissions:
   contents: read
 
-# Free-tier Actions minutes: a newer push to the same ref supersedes the old run.
+# Free-tier Actions minutes: a newer push to a PR supersedes its old run. Never
+# cancel on main: each main run's secret scan covers only its own push, so a
+# cancelled run would leave those commits unscanned.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -192,6 +194,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          # The scanner is a downloaded binary: keep the token out of .git/config.
+          persist-credentials: false
 
       - name: Install gitleaks (checksum-verified)
         env:
