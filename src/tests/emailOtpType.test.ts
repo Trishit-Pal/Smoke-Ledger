@@ -25,12 +25,17 @@ describe('parseEmailOtpType', () => {
 });
 
 describe('verifyOtp callers go through the allowlist', () => {
+  it('readAuthLink, the shared link classifier, parses type with parseEmailOtpType', () => {
+    expect(read('src', 'lib', 'authLink.ts')).toContain('parseEmailOtpType(');
+  });
+
+  // Every verifyOtp caller takes its type from readAuthLink, never from a cast.
   it.each([
-    ['web callback route', ['web', 'app', 'auth', 'callback', 'route.ts']],
+    ['web confirm action', ['web', 'app', 'auth', 'confirm', 'actions.ts']],
     ['native deep-link handler', ['src', 'lib', 'authCallback.ts']],
-  ])('%s parses type with parseEmailOtpType and never casts it', (_label, parts) => {
+  ])('%s classifies with readAuthLink and never casts the type', (_label, parts) => {
     const source = read(...parts);
-    expect(source).toContain('parseEmailOtpType');
+    expect(source).toContain('readAuthLink(');
     expect(source).not.toMatch(/as EmailOtpType|type as '/);
   });
 });

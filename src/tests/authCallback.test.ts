@@ -77,25 +77,16 @@ describe('createSessionFromUrl', () => {
     });
   });
 
-  describe('implicit hash path (tokens in URL fragment)', () => {
-    it('sets the session and reports recovery', async () => {
-      const result = await createSessionFromUrl(
-        `${DEEP}#access_token=AAA&refresh_token=BBB&type=recovery`,
-      );
-      expect(auth.setSession).toHaveBeenCalledWith({ access_token: 'AAA', refresh_token: 'BBB' });
-      expect(result).toBe('recovery');
-    });
-
-    it('reports signed_up when the hash link is a signup confirmation', async () => {
-      const result = await createSessionFromUrl(
-        `${DEEP}#access_token=AAA&refresh_token=BBB&type=signup`,
-      );
-      expect(result).toBe('signed_up');
-    });
-
-    it('reports signed_in for a plain token hash', async () => {
-      const result = await createSessionFromUrl(`${DEEP}#access_token=AAA&refresh_token=BBB`);
-      expect(result).toBe('signed_in');
+  // Security scan F3: anyone could send `smokeledger://auth/callback#access_token=…`
+  // minted for THEIR account and silently sign the victim's app into it.
+  describe('implicit hash path (tokens in URL fragment) is rejected', () => {
+    it.each([
+      `${DEEP}#access_token=AAA&refresh_token=BBB&type=recovery`,
+      `${DEEP}#access_token=AAA&refresh_token=BBB&type=signup`,
+      `${DEEP}#access_token=AAA&refresh_token=BBB`,
+    ])('never sets a session from %s', async (url) => {
+      expect(await createSessionFromUrl(url)).toBe('none');
+      expect(auth.setSession).not.toHaveBeenCalled();
     });
   });
 

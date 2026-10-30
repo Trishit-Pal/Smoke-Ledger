@@ -53,6 +53,7 @@ const config = {
     return [
       { source: '/(.*)', headers: baseSecurityHeaders },
       { source: '/auth/callback', headers: callbackSecurityHeaders },
+      { source: '/auth/confirm', headers: callbackSecurityHeaders },
       { source: '/reset-password', headers: callbackSecurityHeaders },
     ];
   },
