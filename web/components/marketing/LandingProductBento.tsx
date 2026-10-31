@@ -18,7 +18,7 @@ const PLATES: FigurePlate[] = [
     caption: 'II · The ledger',
     figure: '365',
     label: 'A record, not a score.',
-    hint: 'Every day, written. No streaks. No shame patterns. Just the line.',
+    hint: 'Every day, written. No shame patterns. Just the line.',
   },
   {
     caption: 'III · Trends',
@@ -66,7 +66,7 @@ export function LandingProductBento() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: 0,
             borderTop: '1px solid var(--rule-strong)',
           }}
