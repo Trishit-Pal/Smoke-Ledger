@@ -29,8 +29,10 @@ import * as React from 'react';
 import { useTheme } from 'next-themes';
 import type * as THREE_NS from 'three'; // type-only: erased at build, no runtime cost
 
-const GLASS_COUNT = 7;
-const PARTICLE_COUNT = 500;
+import { pickSceneTier, SCENE_BUDGET, type SceneEnv } from '@web/lib/sceneTier';
+
+const IDLE_PAUSE_MS = 20_000; // stop drawing after this long with no user input
+const IDLE_CHECK_MS = 2_000;
 
 export type SceneIntensity = 'full' | 'quiet';
 
@@ -48,10 +50,26 @@ function readVar(name: string, fallback: string): string {
 function hasWebGL(): boolean {
   try {
     const c = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+    const gl = (c.getContext('webgl') || c.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+    // Release the probe context right away — browsers cap live WebGL contexts.
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return !!(window.WebGLRenderingContext && gl);
   } catch {
     return false;
   }
+}
+
+function readSceneEnv(): SceneEnv {
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean };
+  };
+  return {
+    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+    hardwareConcurrency: nav.hardwareConcurrency,
+    deviceMemory: nav.deviceMemory,
+    saveData: nav.connection?.saveData,
+  };
 }
 
 export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
@@ -63,11 +81,17 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    canvas.style.visibility = ''; // undo a previous shutDown (intensity changed)
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (reduce.matches || !hasWebGL()) return;
+    const tier = pickSceneTier(readSceneEnv());
+    if (tier === 'off') return; // data-saver: static page background only
+    const budget = SCENE_BUDGET[tier];
+    const GLASS_COUNT = budget.shards;
+    const PARTICLE_COUNT = budget.particles;
 
     const dim = intensity === 'quiet' ? 0.55 : 1; // opacity tier
-    const useBloom = intensity === 'full'; // boldness reserved for brand surfaces
+    const useBloom = intensity === 'full' && budget.bloom; // boldness reserved for brand surfaces on capable devices
 
     let disposed = false;
     let cleanup = () => {};
@@ -92,7 +116,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       const bg = new THREE.Color(readVar('--bg', '#0B0F14'));
 
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, budget.dprCap));
       renderer.setSize(window.innerWidth, window.innerHeight);
       // UnrealBloomPass requires tone mapping — without it, any pixel the
       // additive bloom composite pushes past 1.0 hard-clips to pure white
@@ -263,7 +287,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         renderer.setSize(window.innerWidth, window.innerHeight);
         composer?.setSize(window.innerWidth, window.innerHeight);
       };
-      window.addEventListener('mousemove', onMouse, { passive: true });
+      if (budget.parallax) window.addEventListener('mousemove', onMouse, { passive: true });
       window.addEventListener('resize', onResize);
 
       // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
@@ -272,10 +296,16 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       let running = true;
       let clockStart = performance.now();
       let elapsed = 0;
+      let lastDraw = 0;
 
       const frame = () => {
         if (!running) return;
         const now = performance.now();
+        if (budget.frameIntervalMs && now - lastDraw < budget.frameIntervalMs) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+        lastDraw = now;
         elapsed += (now - clockStart) / 1000;
         clockStart = now;
         const t = elapsed;
@@ -324,14 +354,57 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       };
       start();
 
-      const onVisibility = () => (document.hidden ? stop() : start());
+      // Two independent reasons to stand still: tab hidden, or no input for a while.
+      // The scene is a decorative backdrop — nothing is lost by freezing it.
+      let idle = false;
+      let lastInput = performance.now();
+      const sync = () => (document.hidden || idle ? stop() : start());
+      const wake = () => {
+        lastInput = performance.now();
+        if (idle) {
+          idle = false;
+          sync();
+        }
+      };
+      const idleTimer = window.setInterval(() => {
+        if (!idle && performance.now() - lastInput > IDLE_PAUSE_MS) {
+          idle = true;
+          sync();
+        }
+      }, IDLE_CHECK_MS);
+      const WAKE_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'scroll', 'touchstart'] as const;
+      for (const ev of WAKE_EVENTS) window.addEventListener(ev, wake, { passive: true });
+      const onVisibility = () => sync();
       document.addEventListener('visibilitychange', onVisibility);
+
+      // Blank the canvas for good (reduced-motion turned on, or the GPU context was lost).
+      // ponytail: stays off until the next mount/navigation; add re-init if users toggle often.
+      const shutDown = () => {
+        cleanup();
+        cleanup = () => {};
+        canvas.style.visibility = 'hidden';
+      };
+      const onReduceChange = (e: MediaQueryListEvent) => {
+        if (e.matches) shutDown();
+      };
+      const onContextLost = (e: Event) => {
+        e.preventDefault();
+        shutDown();
+      };
+      reduce.addEventListener('change', onReduceChange);
+      canvas.addEventListener('webglcontextlost', onContextLost);
+      // The preference may have flipped while three.js was still loading.
+      if (reduce.matches) queueMicrotask(shutDown); // after `cleanup` is assigned below
 
       cleanup = () => {
         stop();
-        window.removeEventListener('mousemove', onMouse);
+        if (budget.parallax) window.removeEventListener('mousemove', onMouse);
         window.removeEventListener('resize', onResize);
         document.removeEventListener('visibilitychange', onVisibility);
+        window.clearInterval(idleTimer);
+        for (const ev of WAKE_EVENTS) window.removeEventListener(ev, wake);
+        reduce.removeEventListener('change', onReduceChange);
+        canvas.removeEventListener('webglcontextlost', onContextLost);
         setBgTargetRef.current = null;
         composer?.dispose();
         bloomPass?.dispose?.();
