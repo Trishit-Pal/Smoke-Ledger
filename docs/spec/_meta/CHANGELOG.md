@@ -2,7 +2,10 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-10-31 — 1a40fb0
+<!-- Format: ## 2026-10-31 — f1ab5c4
+- infra-ops: re-stamped after the dependency restore (root package.json, lockfiles, dependabot.yml); no infrastructure behaviour changed.
+
+## 2026-10-31 — 1a40fb0
 - all stale stamps: re-pointed at a commit that exists after the stack was rebased (earlier entries cite pre-rebase hashes); no spec prose changed.
 
 ## 2026-10-31 — 94fa89d
