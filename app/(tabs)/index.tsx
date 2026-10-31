@@ -13,7 +13,7 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
 import { spacing, typography, fonts, radius } from '@/constants/theme';
-import { useSession, ledgerTimeZone } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import { useTheme } from '@/hooks/useTheme';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import {
@@ -37,7 +37,7 @@ import { generateInsights } from '@/domain/insights';
 import { formatDelta } from '@/lib/format';
 import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
-import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
+import { dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -390,8 +390,8 @@ export default function Home() {
     };
   }, []);
 
-  const today = useMemo(() => todayIst(), [refreshing]);
-  const last7Start = useMemo(() => daysAgoIst(6), [refreshing]);
+  const today = ledgerToday();
+  const last7Start = ledgerDaysAgo(6);
 
   // ── computed ──
   const todaySticks = useMemo(() => sticksOn(logs, today), [logs, today]);

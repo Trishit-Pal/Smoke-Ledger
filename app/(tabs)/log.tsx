@@ -6,14 +6,14 @@ import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
-import { useSession, ledgerTimeZone } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { success } from '@/lib/haptics';
 import { ledgerMoney } from '@/lib/ledgerMoney';
-import { formatTime, todayIst } from '@/lib/date';
+import { formatTime } from '@/lib/date';
 import { sticksOn, spendOn } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
@@ -28,7 +28,7 @@ export default function LogTab() {
   const discreet = isDiscreetMode(profile);
   const [error, setError] = useState<string | null>(null);
 
-  const today = todayIst();
+  const today = ledgerToday();
   const todayLogs = logs.filter((l) => l.localDate === today).slice(0, 12);
 
   const quickAdd = async (quantity: number) => {

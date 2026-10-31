@@ -14,19 +14,18 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Divider } from '@/components/ui/Divider';
 import { spacing, fonts, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerToday } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { dispatchGoalCompletion, dispatchGoalDeletion } from '@/lib/character/mood';
 import { isDiscreetMode } from '@/lib/discreet';
-import { todayIst } from '@/lib/date';
 import type { Goal } from '@/types';
 
 export default function GoalsTab() {
   const router = useRouter();
   const theme = useTheme();
-  const today = todayIst();
+  const today = ledgerToday();
 
   const goals = useSession((s) => s.goals);
   const logs = useSession((s) => s.logs);

@@ -25,10 +25,10 @@ import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
 import { fonts, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession, ledgerTimeZone } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 import { ledgerMoney } from '@/lib/ledgerMoney';
-import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import { formatIndianDate, formatTime } from '@/lib/date';
 import { triggerLabel } from '@/constants/triggers';
 import { contextLabel } from '@/constants/contexts';
 import { moodLabel } from '@/constants/moods';
@@ -183,8 +183,8 @@ export default function History() {
   const [filter, setFilter] = useState<FilterKind>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const today = useMemo(() => todayIst(), []);
-  const yesterday = useMemo(() => daysAgoIst(1), []);
+  const today = ledgerToday();
+  const yesterday = ledgerDaysAgo(1);
 
   // Cleanup on unmount — guards against setState after unmount in async fetch.
   useEffect(() => {

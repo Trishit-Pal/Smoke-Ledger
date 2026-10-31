@@ -12,7 +12,7 @@ import * as profileRepo from '@/db/repositories/profile';
 import * as summaryRepo from '@/db/repositories/summary';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import type { DailySummaryRow as PeriodRow } from '@/domain/periodSummary';
-import { daysAgoIst, todayIst } from '@/lib/date';
+import { daysAgoInZone, daysAgoIst, todayInZone, todayIst } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 
 /** Earliest day "saved" should count from: onboarding, floored at the RPC's 366-day cap. */
@@ -222,4 +222,13 @@ export const useSession = create<SessionState>((set, get) => ({
  */
 export function ledgerTimeZone(): string {
   return timezoneForCountry(useSession.getState().profile?.country);
+}
+
+/** Today in the ledger zone — the date new logs are stamped with. */
+export function ledgerToday(): string {
+  return todayInZone(ledgerTimeZone());
+}
+
+export function ledgerDaysAgo(days: number): string {
+  return daysAgoInZone(days, ledgerTimeZone());
 }

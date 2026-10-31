@@ -40,7 +40,7 @@ import { MoodTriggerMatrixView } from '@/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@/components/anim/Reveal';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing, radius } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import {
   brandSpendMix,
   dailyStats,
@@ -48,7 +48,6 @@ import {
   dowDistribution,
   hourDistribution,
 } from '@/domain/calc';
-import { daysAgoIst, todayIst } from '@/lib/date';
 import { formatDelta } from '@/lib/format';
 import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
@@ -183,8 +182,8 @@ export default function Trends() {
   );
 
   const [windowDays, setWindowDays] = useState<WindowDays>(30);
-  const today = todayIst();
-  const startYmd = useMemo(() => daysAgoIst(windowDays - 1), [windowDays]);
+  const today = ledgerToday();
+  const startYmd = ledgerDaysAgo(windowDays - 1);
 
   // Year RPC state
   const [yearRows, setYearRows] = useState<DailySummaryRow[]>([]);
@@ -197,7 +196,7 @@ export default function Trends() {
   useEffect(() => {
     if (windowDays !== 365) return;
     let cancelled = false;
-    const from365 = daysAgoIst(364);
+    const from365 = ledgerDaysAgo(364);
     getDailySummary(from365, today)
       .then((rows) => {
         if (!cancelled) {
