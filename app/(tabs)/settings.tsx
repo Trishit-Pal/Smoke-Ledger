@@ -20,6 +20,7 @@ import { spacing, typography, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { ledgerCurrency, ledgerMoney } from '@/lib/ledgerMoney';
+import { parseDecimal } from '@/lib/format';
 import { useSession } from '@/store/session';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSetting, setSetting } from '@/db/repositories/settings';
@@ -672,7 +673,7 @@ export default function Settings() {
     const brandName = newBrandName.trim();
     const variantName = newVariantName.trim() || 'Regular';
     const packSize = Number(newPackSize);
-    const avgPrice = newAvgPrice.trim() === '' ? null : Number(newAvgPrice);
+    const avgPrice = newAvgPrice.trim() === '' ? null : parseDecimal(newAvgPrice);
     if (!brandName) {
       setError('Brand name is required.');
       return;
@@ -721,7 +722,7 @@ export default function Settings() {
   };
 
   const saveVariantPrice = async (variantId: string) => {
-    const parsed = Number(priceDraft);
+    const parsed = parseDecimal(priceDraft);
     if (!Number.isFinite(parsed) || parsed < MIN_PRICE_INR || parsed > MAX_PRICE_INR) {
       setError(`Price must be a number between ${MIN_PRICE_INR} and ${MAX_PRICE_INR}.`);
       return;

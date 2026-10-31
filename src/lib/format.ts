@@ -21,6 +21,11 @@ export function formatMoney(
   }).format(n);
 }
 
+/** Parses a typed amount; euro-locale keypads type the decimal as a comma. */
+export function parseDecimal(value: string): number {
+  return Number(value.trim().replace(',', '.'));
+}
+
 export function formatInr(value: number | null | undefined, opts?: { compact?: boolean }): string {
   if (value == null || !Number.isFinite(value)) return '—';
   const n = Math.round(value * 100) / 100;
