@@ -19,10 +19,10 @@ export function Chip({ label, selected = false, onPress, disabled = false, class
       disabled={disabled}
       aria-pressed={selected}
       className={cn(
-        'rounded-pill px-md py-xs text-caption font-medium border transition-all',
+        'inline-flex items-center min-h-11 rounded-pill px-md text-caption font-medium border transition-all',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         selected
-          ? 'bg-accent-soft border-accent text-accent'
+          ? 'bg-accent-soft border-accent text-accent-ink'
           : 'bg-bg-elevated border-border text-text-muted hover:border-accent/50',
         disabled && 'opacity-50 cursor-not-allowed',
         className,

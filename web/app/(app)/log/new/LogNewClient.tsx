@@ -116,7 +116,7 @@ function EditorialPillRow({ items, ariaLabel }: EditorialPillRowProps<unknown>) 
           aria-pressed={it.selected}
           onClick={it.onPress}
           className={
-            'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+            'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
             (it.selected
               ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
               : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')
@@ -318,7 +318,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
             {sortedBrands.length === 0 ? (
               <a
                 href="/settings"
-                className="inline-flex items-center min-h-[36px] text-small text-accent underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+                className="inline-flex items-center min-h-11 text-small text-accent-ink underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
               >
                 Add a brand in Settings →
               </a>

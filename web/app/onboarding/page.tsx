@@ -85,7 +85,7 @@ export default function OnboardingWelcomePage() {
         <br />
         Spend less.
         <br />
-        <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Quit on your terms.</span>
+        <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>Quit on your terms.</span>
       </h1>
 
       <div
@@ -134,8 +134,8 @@ export default function OnboardingWelcomePage() {
             padding: '0 28px',
             border: 'none',
             cursor: 'pointer',
-            background: 'var(--accent)',
-            color: '#ffffff',
+            background: 'var(--accent-ink)',
+            color: 'var(--on-accent)',
             borderRadius: 10,
             fontFamily: 'var(--font-sans)',
             fontWeight: 600,
@@ -208,7 +208,7 @@ export default function OnboardingWelcomePage() {
               style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 32,
-                color: 'var(--accent)',
+                color: 'var(--accent-ink)',
                 lineHeight: 1,
                 fontStyle: 'italic',
                 fontWeight: 500,

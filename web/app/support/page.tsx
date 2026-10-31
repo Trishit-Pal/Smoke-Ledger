@@ -60,7 +60,7 @@ export default function SupportPage() {
         caption="Legal · Support"
         title={
           <>
-            How can we <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>help</span>?
+            How can we <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>help</span>?
           </>
         }
         subtitle="Account access, privacy, export, deletion, and technical support."
@@ -74,7 +74,7 @@ export default function SupportPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 22,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -110,7 +110,7 @@ export default function SupportPage() {
             style={{
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: 'var(--accent)',
+              color: 'var(--accent-ink)',
               textDecoration: 'underline',
               textUnderlineOffset: 3,
             }}
@@ -123,7 +123,7 @@ export default function SupportPage() {
             style={{
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: 'var(--accent)',
+              color: 'var(--accent-ink)',
               textDecoration: 'underline',
               textUnderlineOffset: 3,
             }}

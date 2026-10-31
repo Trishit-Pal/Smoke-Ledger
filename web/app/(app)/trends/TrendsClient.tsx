@@ -56,6 +56,7 @@ import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
+import { CHART_SERIES } from '@web/components/charts/chartTheme';
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@web/components/anim/dynamic';
@@ -327,8 +328,8 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                       textDecorationColor: 'var(--rule-strong)',
                       textUnderlineOffset: '4px',
                       textDecorationThickness: '1px',
-                      padding: '6px 4px',
-                      minHeight: '32px',
+                      padding: '6px 8px',
+                      minHeight: '44px',
                     }}
                   >
                     {period.label}
@@ -352,6 +353,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               aria-labelledby="period-heading"
               className="flex flex-col gap-lg"
             >
+              <h1 className="sr-only">Trends</h1>
               <h2 id="period-heading" className="sr-only">
                 {periodLabel} totals
               </h2>
@@ -361,6 +363,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   <span className="editorial-caption mb-sm">Sticks · {periodLabel.toLowerCase()}</span>
                   <div
                     className="editorial-numeral editorial-headline-rise nums-tabular"
+                    role="img"
                     aria-label={
                       discreet
                         ? 'Period sticks total hidden'
@@ -615,13 +618,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                                 aria-hidden
                                 className="w-2 h-2 rounded-full shrink-0"
                                 style={{
-                                  backgroundColor: [
-                                    '#2FA39B',
-                                    '#4C7CD9',
-                                    '#D99A2B',
-                                    '#C85A54',
-                                    '#8A6FC2',
-                                  ][i % 5],
+                                  backgroundColor: CHART_SERIES[i % CHART_SERIES.length],
                                 }}
                               />
                               <span

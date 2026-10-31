@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
           caption="Account · Updated"
           title={
             <>
-              <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Filed</span>.
+              <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>Filed</span>.
             </>
           }
           subtitle="Your password has been reset. Sign in with your new password."
@@ -88,7 +88,7 @@ export default function ResetPasswordPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
         caption="Account · New password"
         title={
           <>
-            Set a <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>new</span> line.
+            Set a <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>new</span> line.
           </>
         }
         subtitle="Enter a new password for your account."

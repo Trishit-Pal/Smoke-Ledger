@@ -1394,7 +1394,7 @@ export function SettingsClient({
             aria-live="polite"
           >
             {toast ? (
-              <p className="text-small italic" style={{ color: 'var(--accent)' }}>
+              <p className="text-small italic" style={{ color: 'var(--accent-ink)' }}>
                 {toast}
               </p>
             ) : null}

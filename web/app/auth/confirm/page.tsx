@@ -46,7 +46,7 @@ export default async function ConfirmEmailLinkPage({ searchParams }: { searchPar
         caption="Account · Sign-in link"
         title={
           <>
-            Continue to <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>your</span> ledger.
+            Continue to <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>your</span> ledger.
           </>
         }
         subtitle="This link signs you in on this device. Continue only if you asked for it."

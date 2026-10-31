@@ -28,7 +28,7 @@ export function ActivityLog({ events }: ActivityLogProps) {
         <div key={i} className="elevated flex items-start gap-sm rounded-md p-sm">
           <div
             className="mt-xs flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
-            style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}
           >
             <Cigarette className="h-4 w-4" aria-hidden />
           </div>

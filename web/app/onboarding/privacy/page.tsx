@@ -34,7 +34,7 @@ const REQUIRED_ROWS: ConsentRow[] = [
         I agree to the{' '}
         <Link
           href={LEGAL_LINKS.terms}
-          style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+          style={{ color: 'var(--accent-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}
         >
           Terms of Service
         </Link>
@@ -49,7 +49,7 @@ const REQUIRED_ROWS: ConsentRow[] = [
         I acknowledge the{' '}
         <Link
           href={LEGAL_LINKS.privacy}
-          style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+          style={{ color: 'var(--accent-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}
         >
           Privacy Policy
         </Link>
@@ -363,8 +363,8 @@ export default function OnboardingPrivacyPage() {
               padding: '0 20px',
               border: 'none',
               borderRadius: 10,
-              background: 'var(--accent)',
-              color: '#ffffff',
+              background: 'var(--accent-ink)',
+              color: 'var(--on-accent)',
               fontFamily: 'var(--font-sans)',
               fontWeight: 600,
               fontSize: 14,

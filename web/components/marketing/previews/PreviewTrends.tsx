@@ -17,7 +17,7 @@ export function PreviewTrends() {
             key={label}
             className={`rounded-pill px-md py-xs text-caption font-medium border ${
               i === 2
-                ? 'bg-accent-soft border-accent text-accent'
+                ? 'bg-accent-soft border-accent text-accent-ink'
                 : 'bg-bg-elevated border-border text-text-muted'
             }`}
           >

@@ -69,7 +69,7 @@ export function OnboardingRail() {
                 lineHeight: 1.05,
               }}
             >
-              Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent)' }}> Ledger</span>
+              Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent-ink)' }}> Ledger</span>
             </span>
             <span className="editorial-caption">Vol. I · Onboarding</span>
           </div>
@@ -123,7 +123,7 @@ export function OnboardingRail() {
                     fontFamily: 'var(--font-display)',
                     fontStyle: 'italic',
                     fontSize: 12,
-                    color: 'var(--accent)',
+                    color: 'var(--accent-ink)',
                   }}
                 >
                   ·

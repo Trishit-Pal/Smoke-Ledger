@@ -113,7 +113,7 @@ function SignupEmailSuccess({ email }: { email: string }) {
         caption="Account · Pending"
         title={
           <>
-            Check your <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>inbox</span>.
+            Check your <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>inbox</span>.
           </>
         }
         subtitle={
@@ -156,7 +156,7 @@ function SignupEmailSuccess({ email }: { email: string }) {
           role="status"
           style={{
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             margin: 0,
@@ -181,7 +181,7 @@ function SignupEmailSuccess({ email }: { email: string }) {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -415,7 +415,7 @@ export default function SignupPage() {
         caption="Account · Begin"
         title={
           <>
-            Open the <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>book</span>.
+            Open the <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>book</span>.
           </>
         }
         subtitle="A few details. Ninety seconds."
@@ -524,11 +524,11 @@ export default function SignupPage() {
           />
           <span>
             I am 18 or older and understand the next step will ask me to review and accept the{' '}
-            <Link href={LEGAL_LINKS.terms} style={{ color: 'var(--accent)' }}>
+            <Link href={LEGAL_LINKS.terms} style={{ color: 'var(--accent-ink)' }}>
               Terms
             </Link>
             ,{' '}
-            <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent)' }}>
+            <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent-ink)' }}>
               Privacy Policy
             </Link>
             , and medical disclaimer.
@@ -567,14 +567,14 @@ export default function SignupPage() {
               >
                 <Link
                   href={`/login?prefill=${encodeURIComponent(existingEmail)}`}
-                  style={{ color: 'var(--accent)' }}
+                  style={{ color: 'var(--accent-ink)' }}
                 >
                   Sign in
                 </Link>
                 {' · '}
                 <Link
                   href={`/reset?prefill=${encodeURIComponent(existingEmail)}`}
-                  style={{ color: 'var(--accent)' }}
+                  style={{ color: 'var(--accent-ink)' }}
                 >
                   Reset password
                 </Link>
@@ -631,7 +631,7 @@ export default function SignupPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}

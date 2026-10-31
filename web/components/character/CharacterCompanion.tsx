@@ -116,7 +116,7 @@ export function CharacterCompanion({
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 12,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textAlign: 'center',
             maxWidth: size * 2,
             lineHeight: 1.4,

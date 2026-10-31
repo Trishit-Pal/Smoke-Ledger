@@ -21,9 +21,15 @@ import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-dvh bg-bg text-text">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-lg focus:top-lg focus:z-[60] focus:rounded-md focus:bg-card focus:px-lg focus:py-md focus:text-small focus:text-text focus:ring-2 focus:ring-accent"
+      >
+        Skip to content
+      </a>
       <SceneBackdrop intensity="quiet" />
       <Sidebar />
-      <main className="flex-1 min-h-dvh pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
             WCAG-AA contrast over the moving scene. */}
         <div
