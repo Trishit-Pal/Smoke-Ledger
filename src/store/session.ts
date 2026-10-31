@@ -13,6 +13,7 @@ import * as summaryRepo from '@/db/repositories/summary';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import type { DailySummaryRow as PeriodRow } from '@/domain/periodSummary';
 import { daysAgoIst, todayIst } from '@/lib/date';
+import { timezoneForCountry } from '@/lib/regions';
 
 /** Earliest day "saved" should count from: onboarding, floored at the RPC's 366-day cap. */
 function summarySinceFor(profile: UserProfile | null): string {
@@ -175,7 +176,9 @@ export const useSession = create<SessionState>((set, get) => ({
     set((s) => ({ achievementDismissCount: s.achievementDismissCount + 1 })),
 
   addLog: async (draft) => {
-    const created = await logsRepo.createLog(draft);
+    // Every native log comes through here: stamp local_date / local_hour in the
+    // ledger's zone (the profile country; IST when there is none).
+    const created = await logsRepo.createLog({ ...draft, timeZone: draft.timeZone ?? ledgerTimeZone() });
     set((s) => ({ logs: [created, ...s.logs] }));
     // The dashboard/trends totals read `summary`; keep it in step after a write.
     await get().refreshSummary();
@@ -211,3 +214,12 @@ export const useSession = create<SessionState>((set, get) => ({
     set((s) => ({ goals: s.goals.filter((g) => g.id !== id) }));
   },
 }));
+
+/**
+ * The zone a new log's local_date / local_hour are stamped in: the profile's
+ * country, IST when there is none. Native screens that call createLog directly
+ * pass this as `timeZone`; without it createLog falls back to IST.
+ */
+export function ledgerTimeZone(): string {
+  return timezoneForCountry(useSession.getState().profile?.country);
+}

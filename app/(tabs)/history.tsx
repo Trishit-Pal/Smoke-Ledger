@@ -25,7 +25,7 @@ import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
 import { fonts, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone } from '@/store/session';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
 import { formatInr } from '@/lib/format';
 import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
@@ -439,7 +439,7 @@ export default function History() {
                           <Pressable
                             onPress={hasExpandable ? () => toggleExpand(log.id) : undefined}
                             onLongPress={() => confirmDelete(log)}
-                            accessibilityLabel={`${log.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(log.tsUtc)}${hasExpandable ? ', tap to expand' : ''}`}
+                            accessibilityLabel={`${log.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(log.tsUtc, ledgerTimeZone())}${hasExpandable ? ', tap to expand' : ''}`}
                           >
                             {/* Main ledger row — brand left, price right */}
                             <View
@@ -468,7 +468,7 @@ export default function History() {
                                     muted
                                     style={{ fontVariant: ['tabular-nums'] }}
                                   >
-                                    {formatTime(log.tsUtc)}
+                                    {formatTime(log.tsUtc, ledgerTimeZone())}
                                   </Text>
                                   {' · '}
                                   {discreet

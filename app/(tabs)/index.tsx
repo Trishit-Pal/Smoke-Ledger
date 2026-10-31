@@ -13,7 +13,7 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
 import { spacing, typography, fonts, radius } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone } from '@/store/session';
 import { useTheme } from '@/hooks/useTheme';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import {
@@ -518,6 +518,7 @@ export default function Home() {
       const unit = lastL?.unitPriceInr ?? null;
       const total = unit != null ? unit * opts.quantity : null;
       await createLog({
+        timeZone: ledgerTimeZone(),
         tsUtc: new Date().toISOString(),
         brandId: opts.brandId,
         brandNameSnap: opts.brandName,

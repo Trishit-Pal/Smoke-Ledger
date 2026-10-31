@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
@@ -38,6 +38,7 @@ export default function LogTab() {
     const now = new Date().toISOString();
     const unit = last?.unitPriceInr ?? null;
     await createLog({
+        timeZone: ledgerTimeZone(),
       tsUtc: now,
       brandId: last?.brandId ?? null,
       brandNameSnap: last?.brandNameSnap ?? null,
@@ -73,6 +74,7 @@ export default function LogTab() {
     }
     const now = new Date().toISOString();
     await createLog({
+        timeZone: ledgerTimeZone(),
       tsUtc: now,
       brandId: last.brandId,
       brandNameSnap: last.brandNameSnap,
@@ -159,7 +161,7 @@ export default function LogTab() {
                     {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
                   </Text>
                   <Text variant="small" muted>
-                    {formatTime(l.tsUtc)}
+                    {formatTime(l.tsUtc, ledgerTimeZone())}
                   </Text>
                 </View>
               </View>
