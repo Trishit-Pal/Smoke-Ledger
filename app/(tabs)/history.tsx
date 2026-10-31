@@ -25,10 +25,10 @@ import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
 import { fonts, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
-import { formatInr } from '@/lib/format';
-import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
+import { ledgerMoney } from '@/lib/ledgerMoney';
+import { formatIndianDate, formatTime } from '@/lib/date';
 import { triggerLabel } from '@/constants/triggers';
 import { contextLabel } from '@/constants/contexts';
 import { moodLabel } from '@/constants/moods';
@@ -183,8 +183,8 @@ export default function History() {
   const [filter, setFilter] = useState<FilterKind>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const today = useMemo(() => todayIst(), []);
-  const yesterday = useMemo(() => daysAgoIst(1), []);
+  const today = ledgerToday();
+  const yesterday = ledgerDaysAgo(1);
 
   // Cleanup on unmount — guards against setState after unmount in async fetch.
   useEffect(() => {
@@ -396,7 +396,7 @@ export default function History() {
                         {formatIndianDate(group.date)}
                       </Text>
                       <Text variant="caption" faint>
-                        {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
+                        {maskInr(group.totalSpend, discreet, (n) => ledgerMoney(n))}
                         {' '}spent
                       </Text>
                     </View>
@@ -439,7 +439,7 @@ export default function History() {
                           <Pressable
                             onPress={hasExpandable ? () => toggleExpand(log.id) : undefined}
                             onLongPress={() => confirmDelete(log)}
-                            accessibilityLabel={`${log.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(log.tsUtc)}${hasExpandable ? ', tap to expand' : ''}`}
+                            accessibilityLabel={`${log.brandNameSnap ?? 'Unlogged brand'}, ${formatTime(log.tsUtc, ledgerTimeZone())}${hasExpandable ? ', tap to expand' : ''}`}
                           >
                             {/* Main ledger row — brand left, price right */}
                             <View
@@ -468,7 +468,7 @@ export default function History() {
                                     muted
                                     style={{ fontVariant: ['tabular-nums'] }}
                                   >
-                                    {formatTime(log.tsUtc)}
+                                    {formatTime(log.tsUtc, ledgerTimeZone())}
                                   </Text>
                                   {' · '}
                                   {discreet
@@ -494,7 +494,7 @@ export default function History() {
                                 variant="body"
                                 style={{ fontVariant: ['tabular-nums'] }}
                               >
-                                {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
+                                {maskInr(log.totalPriceInr, discreet, (n) => ledgerMoney(n))}
                               </Text>
                             </View>
                           </Pressable>

@@ -83,9 +83,15 @@ describe('regions', () => {
   it('puts India first in the picker, then the rest by name', () => {
     const options = regionOptions();
     expect(options[0]).toEqual({ value: 'IN', label: 'India' });
-    expect(options).toHaveLength(28);
+    expect(options).toHaveLength(22);
     const names = options.slice(1).map((o) => o.label);
     expect([...names].sort((a, b) => a.localeCompare(b))).toEqual(names);
+  });
+
+  // These six do not use the euro, but the ledger only supports INR and EUR, so a
+  // local price (19 zł) would be stored as €19. Hidden until their currencies exist.
+  it.each(['CZ', 'DK', 'HU', 'PL', 'RO', 'SE'])('keeps non-euro %s out of the picker', (country) => {
+    expect(regionOptions().map((o) => o.value)).not.toContain(country);
   });
 
   it('resolves a canonical zone for Paris and keeps an unknown code off the ledger', () => {

@@ -40,7 +40,7 @@ import { MoodTriggerMatrixView } from '@/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@/components/anim/Reveal';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing, radius } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import {
   brandSpendMix,
   dailyStats,
@@ -48,8 +48,8 @@ import {
   dowDistribution,
   hourDistribution,
 } from '@/domain/calc';
-import { daysAgoIst, todayIst } from '@/lib/date';
-import { formatDelta, formatInr } from '@/lib/format';
+import { formatDelta } from '@/lib/format';
+import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
 import type { DailyStat } from '@/types';
 import { getDailySummary, type DailySummaryRow } from '@/db/repositories/summary';
@@ -177,13 +177,13 @@ export default function Trends() {
 
   const fmtSpend = useCallback(
     (n: number, compact = false) =>
-      maskInr(n, discreet, (v) => formatInr(v, compact ? { compact: true } : undefined)),
+      maskInr(n, discreet, (v) => ledgerMoney(v, compact ? { compact: true } : undefined)),
     [discreet],
   );
 
   const [windowDays, setWindowDays] = useState<WindowDays>(30);
-  const today = todayIst();
-  const startYmd = useMemo(() => daysAgoIst(windowDays - 1), [windowDays]);
+  const today = ledgerToday();
+  const startYmd = ledgerDaysAgo(windowDays - 1);
 
   // Year RPC state
   const [yearRows, setYearRows] = useState<DailySummaryRow[]>([]);
@@ -196,7 +196,7 @@ export default function Trends() {
   useEffect(() => {
     if (windowDays !== 365) return;
     let cancelled = false;
-    const from365 = daysAgoIst(364);
+    const from365 = ledgerDaysAgo(364);
     getDailySummary(from365, today)
       .then((rows) => {
         if (!cancelled) {
@@ -453,7 +453,7 @@ export default function Trends() {
                   variant="h1"
                   style={{ color: theme.text }}
                   accessibilityLabel={
-                    discreet ? 'Period spend hidden' : `Spent ${formatInr(summary.spend)}`
+                    discreet ? 'Period spend hidden' : `Spent ${ledgerMoney(summary.spend)}`
                   }
                 >
                   {fmtSpend(summary.spend, true)}
@@ -517,7 +517,7 @@ export default function Trends() {
               <AnimatedBarChart
                 data={spendBars}
                 height={180}
-                formatY={(v) => formatInr(v, { compact: true })}
+                formatY={(v) => ledgerMoney(v, { compact: true })}
                 showLabels={false}
               />
             </Reveal>
@@ -568,7 +568,7 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Mood × trigger" right="Where it tends to start" />
             <Reveal dependencyKey={dependencyKey}>
-              <MoodTriggerMatrixView logs={logs} />
+              <MoodTriggerMatrixView logs={logs} money={(n) => ledgerMoney(n)} />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               A grid of feelings against situations. The dense cells are the pattern.

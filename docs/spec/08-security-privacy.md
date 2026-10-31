@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: bf62af4
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -189,3 +189,11 @@ The `rls-integration` CI job is configured as a required branch protection check
 **Stale spec manifest resolved.** `web/lib/server/auth.ts` did not exist — the web app's server-side auth logic lives in `web/middleware.ts` (session gate, consent funnel, CSP), `web/lib/supabase/server.ts` (server Supabase client), `web/lib/supabase/admin.ts` (service-role client), and `web/app/auth/callback/route.ts` (OAuth/magic link callback). The `sources:` frontmatter has been updated to reflect the real files.
 
 **The `compliance.delete` CHECK constraint discrepancy is resolved.** The June 2026 sovereignty audit marked `error_events_compliance_delete_null_user_check` as absent (MEDIUM finding) — correctly: the `20260520000000` constraint block was edited post-apply and never reached live. `20260619000000_error_events_compliance_check.sql` restored it; re-verified live via `pg_constraint` on 2026-07-06. The finding is closed.
+
+### Hardening, 2026-10 (security scan and review follow-ups)
+
+- **Logs are written only through the rate-limited RPC.** `cigarette_logs` has SELECT / UPDATE / DELETE policies and no INSERT path for `authenticated` (`20261031000000_logs_insert_via_rpc.sql`), so `create_log_with_rate_limit`'s cap cannot be bypassed through PostgREST. UPDATE is granted only on the logged fields, so back-dating `created_at` (the cap's window) is denied too. Proven by `smoke.sql` (table and column privileges) and by RLS integration tests: a direct insert and a `created_at` rewrite both get `42501`, while an ordinary edit succeeds.
+- **anon default-deny** on every public table, sequence and function, now and for new objects (`20261030000000_security_hardening.sql`).
+- **Legal pages render per request.** `/privacy`, `/terms` and `/support` were `force-static`, so their inline Next scripts carried no CSP nonce and were blocked; they are `force-dynamic` now. The e2e smoke suite fails on any CSP violation on a public route.
+- **Headers.** `img-src` is `'self' data: blob:` (no `https:` wildcard); `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` are `same-origin`; `/auth/confirm` sends `Referrer-Policy: same-origin`.
+- **Phone sign-in is opt-in** (`NEXT_PUBLIC_PHONE_OTP_ENABLED` must be exactly `true`), because `send-sms-otp` is not deployed.

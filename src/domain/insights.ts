@@ -9,7 +9,14 @@ import { makeId } from '@/lib/id';
 
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function generateInsights(logs: CigaretteLog[], today = todayIst()): Insight[] {
+/** Whole-unit money for evidence lines. Callers pass the ledger's currency formatter. */
+const formatRupeesWhole = (amount: number): string => `₹${amount.toFixed(0)}`;
+
+export function generateInsights(
+  logs: CigaretteLog[],
+  today = todayIst(),
+  money: (amount: number) => string = formatRupeesWhole,
+): Insight[] {
   const out: Insight[] = [];
   const start30 = dayShift(today, -29);
 
@@ -106,7 +113,7 @@ export function generateInsights(logs: CigaretteLog[], today = todayIst()): Insi
       id: makeId('ins'),
       title: `${mix[0]!.brand} is ${Math.round(mix[0]!.share * 100)}% of your monthly spend`,
       explanation: 'One brand dominates your recent spending. Useful for budgeting decisions.',
-      evidence: `₹${mix[0]!.spendInr.toFixed(0)} on ${mix[0]!.brand} in last 30 days.`,
+      evidence: `${money(Math.round(mix[0]!.spendInr))} on ${mix[0]!.brand} in last 30 days.`,
       confidence: 'high',
       severity: 'info',
       generatedAt: new Date().toISOString(),

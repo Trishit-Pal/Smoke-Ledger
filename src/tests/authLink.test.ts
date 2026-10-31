@@ -20,7 +20,16 @@ describe('readAuthLink', () => {
   });
 
   it('a PKCE code link is device-bound and can be exchanged directly', () => {
-    expect(readAuthLink(params('code=xyz'))).toEqual({ kind: 'exchange', code: 'xyz' });
+    expect(readAuthLink(params('code=xyz'))).toEqual({ kind: 'exchange', code: 'xyz', type: null });
+  });
+
+  it('carries an allowlisted type on a code link, so callers never parse it again', () => {
+    expect(readAuthLink(params('code=xyz&type=signup'))).toEqual({
+      kind: 'exchange',
+      code: 'xyz',
+      type: 'signup',
+    });
+    expect(readAuthLink(params('code=xyz&type=invite'))).toEqual({ kind: 'exchange', code: 'xyz', type: null });
   });
 
   it('prefers the code when both are present, as the callback always has', () => {

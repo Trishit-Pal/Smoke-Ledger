@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: a979537
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -45,7 +45,8 @@ One row per authenticated user, created automatically by the `on_auth_user_creat
 | `id` | uuid | NOT NULL | — | PK; FK → `auth.users.id` ON DELETE CASCADE |
 | `baseline_per_day` | float8 (double precision) | NULL | — | CHECK: NULL or 0–200 |
 | `baseline_window_days` | int4 | NOT NULL | 30 | CHECK: 1–365 |
-| `currency` | text | NOT NULL | `'INR'` | — |
+| `currency` | text | NOT NULL | `'INR'` | CHECK `INR`/`EUR`; set from `country` by the `enforce_profile_region` trigger, never by the client |
+| `country` | text | NULL | — | FK → `smoke_seed.region.country`; NULL is the India / INR ledger |
 | `discreet_mode` | bool | NOT NULL | false | — |
 | `app_lock_enabled` | bool | NOT NULL | false | — |
 | `hide_totals_on_home` | bool | NOT NULL | false | — |
@@ -155,7 +156,7 @@ The central fact table. Every recorded smoking event is one row here.
 
 `trigger_tag`, `mood_before`, `mood_after`, and `context_tag` are not CHECK-constrained at the DB layer. The valid values are enforced in the TypeScript Zod schemas (`src/lib/validation.ts`) and in the domain types (`src/types/index.ts:6`). This was a deliberate trade-off: adding a DB CHECK would require a migration every time a new mood or trigger is introduced.
 
-**RLS**: single `logs_all` policy FOR ALL using `user_id = (SELECT auth.uid())`.
+**RLS**: `logs_select`, `logs_update` and `logs_delete`, each `user_id = (SELECT auth.uid())`. There is deliberately no INSERT policy and `authenticated` has no INSERT privilege (`20261031000000_logs_insert_via_rpc.sql`): logs are written only through `create_log_with_rate_limit`, so its 50-per-hour cap and `client_op_id` idempotency cannot be bypassed. UPDATE is a column grant on the logged fields only: `created_at` (which the cap counts), `id`, `user_id` and `client_op_id` are not updatable by `authenticated`.
 
 **Realtime**: `cigarette_logs` is in the `supabase_realtime` publication and set to `REPLICA IDENTITY FULL` (migration `20260620130000_realtime_enable.sql`). FULL is required because subscribers filter on `user_id=eq.<uid>`, which is not the PK — without it, DELETE events would omit `user_id` and never reach the client.
 
@@ -540,3 +541,11 @@ These rules must never break:
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
 - **`goals.start_date` and `end_date` are text**. Like `local_date` on logs, these are `YYYY-MM-DD` strings. They have no CHECK constraint ensuring they are valid dates or that `end_date >= start_date`. The validation lives only in TypeScript.
 - **No automated drift detection for this section**. The manifest globs (`supabase/migrations/**`, `src/types/index.ts`) cover the main sources, but the live DB schema may diverge from the migration files if any out-of-band SQL is run. The integration tests are the only live-schema verification.
+
+## Region, currency and hardening (2026-10)
+
+**`smoke_seed.region`** (`20261013120000_region_currency.sql`) maps each supported country to its `currency` (`INR` or `EUR`), seed `market`, `locale`, IANA `timezone` and a per-stick price hint. `user_profiles.country` references it. The BEFORE trigger `enforce_profile_region` recomputes `currency` from `country` on every insert and update and raises `region_change_requires_reset` (P0001) when the currency would change while the user has logs, priced variants or an active spend cap. The AFTER trigger `swap_seeds_after_region_change` swaps the seed brands when the currency changes. `amount *_inr` columns hold major units of the profile's currency; the names are historical.
+
+**Region RPCs.** `set_region(p_country)` changes the country (blocked by the trigger above when needed). `reset_ledger_for_region(p_country)` wipes logs, prices and spend caps and switches; it refuses with `region_reset_not_needed` (23514) when the currency would not change. Both, and `refresh_seed_prices_from_catalog`, are SECURITY DEFINER with `search_path = ''`, check `auth.uid()`, and are revoked from `PUBLIC` and `anon`.
+
+**anon default-deny** (`20261030000000_security_hardening.sql`). `anon` holds no privilege on any public table, sequence or function, and default privileges keep it that way for new objects (including revoking the built-in `PUBLIC` EXECUTE on new functions). That migration also: makes `erase_account_data` clear `full_name`, `date_of_birth`, `gender`, `mobile_e164` and `place` (through a transaction-local `app.erasing` flag the identity trigger honours) and hash the user id as `id:pepper`; adds a 4 KB cap on `usage_events.props_json`; adds `purge_rate_limit_counters()` (service role only, scheduled daily when pg_cron is present); and drops the `auth_email_exists` RPC.

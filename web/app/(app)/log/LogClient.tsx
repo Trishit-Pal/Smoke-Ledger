@@ -37,7 +37,8 @@ function formatIndianDateShort(ymd: string): string {
 
 export function LogClient({ profile, logs }: LogClientProps) {
   const router = useRouter();
-  const today = todayInZone(timezoneForCountry(profile.country));
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
   const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
     formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
   const discreet = isDiscreetMode(profile);
@@ -147,7 +148,7 @@ export function LogClient({ profile, logs }: LogClientProps) {
                       ) : null}
                     </p>
                     <p className="text-small text-text-muted nums-tabular">
-                      {formatTime(log.tsUtc)}
+                      {formatTime(log.tsUtc, zone)}
                       {' · '}
                       {discreet
                         ? '•••'

@@ -8,11 +8,12 @@ import type { CigaretteLog } from '@/types';
 
 export interface MoodTriggerMatrixProps {
   logs: CigaretteLog[];
+  money: (amount: number) => string;
 }
 
 const PRETTY = (s: string) => s.replace(/_/g, ' ');
 
-export function MoodTriggerMatrixView({ logs }: MoodTriggerMatrixProps) {
+export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
   const theme = useTheme();
   const m = moodTriggerMatrix(logs, 5);
 
@@ -41,7 +42,7 @@ export function MoodTriggerMatrixView({ logs }: MoodTriggerMatrixProps) {
               {PRETTY(p.mood)} → {PRETTY(p.trigger)}
             </Text>
             <Text variant="small" muted>
-              {p.count}× {p.avgUnitPriceInr != null ? `· ₹${p.avgUnitPriceInr}` : ''}
+              {p.count}× {p.avgUnitPriceInr != null ? `· ${money(p.avgUnitPriceInr)}` : ''}
             </Text>
           </View>
         ))}

@@ -12,6 +12,26 @@ const REQUIRED_ENV = [
 const hasEnv = REQUIRED_ENV.every((key) => !!process.env[key]);
 const describeIfEnv = hasEnv ? describe : describe.skip;
 
+
+// Logs are written only through the rate-limited RPC (20261031000000); a direct
+// table INSERT is denied to signed-in clients. Returns { data: { id }, error }.
+async function insertLogViaRpc(
+  client: SupabaseClient,
+  id: string,
+  tsUtc: string,
+  localDate: string,
+  localHour: number,
+): Promise<{ data: { id: string } | null; error: unknown }> {
+  const { data, error } = await client.rpc('create_log_with_rate_limit', {
+    p_id: id, p_ts_utc: tsUtc, p_local_date: localDate, p_local_hour: localHour,
+    p_brand_id: null, p_brand_name_snap: 'RLS probe', p_variant_snap: null, p_quantity: 1,
+    p_purchase_mode: 'single', p_pack_size: null, p_total_price_inr: null, p_unit_price_inr: null,
+    p_price_source: 'unknown', p_trigger_tag: null, p_mood_before: null, p_mood_after: null,
+    p_craving: null, p_context_tag: null, p_notes: null, p_client_op_id: `op_${id}`,
+  });
+  return { data: data ? { id: (data as { id: string }).id } : null, error };
+}
+
 describeIfEnv('RLS cross-user isolation (integration)', () => {
   let clientA: SupabaseClient;
   let clientB: SupabaseClient;
@@ -82,22 +102,7 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     const localDate = nowIso.slice(0, 10);
     const localHour = now.getUTCHours();
 
-    const insert = await clientA
-      .from('cigarette_logs')
-      .insert({
-        id,
-        user_id: userAId,
-        ts_utc: nowIso,
-        local_date: localDate,
-        local_hour: localHour,
-        quantity: 1,
-        purchase_mode: 'single',
-        price_source: 'unknown',
-        created_at: nowIso,
-        updated_at: nowIso,
-      })
-      .select('id')
-      .single();
+    const insert = await insertLogViaRpc(clientA, id, nowIso, localDate, localHour);
 
     expect(insert.error).toBeNull();
     expect(insert.data?.id).toBe(id);
@@ -117,6 +122,41 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     const stillExists = await clientA.from('cigarette_logs').select('id').eq('id', id).maybeSingle();
     expect(stillExists.error).toBeNull();
     expect(stillExists.data?.id).toBe(id);
+
+    const cleanup = await clientA.from('cigarette_logs').delete().eq('id', id);
+    expect(cleanup.error).toBeNull();
+  });
+
+  it('denies a direct INSERT into cigarette_logs (only the rate-limited RPC writes logs)', async () => {
+    const nowIso = new Date().toISOString();
+    const { error } = await clientA.from('cigarette_logs').insert({
+      id: `log_rls_direct_${Date.now()}`,
+      user_id: userAId,
+      ts_utc: nowIso,
+      local_date: nowIso.slice(0, 10),
+      local_hour: new Date().getUTCHours(),
+      quantity: 1,
+      purchase_mode: 'single',
+      price_source: 'unknown',
+    });
+    expect(error?.code).toBe('42501');
+  });
+
+  it('lets a user edit a log but not rewrite created_at (the rate-limit window)', async () => {
+    const id = `log_rls_window_${Date.now()}`;
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const insert = await insertLogViaRpc(clientA, id, nowIso, nowIso.slice(0, 10), now.getUTCHours());
+    expect(insert.error).toBeNull();
+
+    const edit = await clientA.from('cigarette_logs').update({ notes: 'edited' }).eq('id', id);
+    expect(edit.error).toBeNull();
+
+    const rewind = await clientA
+      .from('cigarette_logs')
+      .update({ created_at: '2000-01-01T00:00:00Z' })
+      .eq('id', id);
+    expect(rewind.error?.code).toBe('42501');
 
     const cleanup = await clientA.from('cigarette_logs').delete().eq('id', id);
     expect(cleanup.error).toBeNull();
@@ -271,22 +311,7 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
     const nowIso = new Date().toISOString();
     const localHour = new Date().getUTCHours();
 
-    const insertA = await clientA
-      .from('cigarette_logs')
-      .insert({
-        id: probeId,
-        user_id: userAId,
-        ts_utc: nowIso,
-        local_date: today,
-        local_hour: localHour,
-        quantity: 1,
-        purchase_mode: 'single',
-        price_source: 'unknown',
-        created_at: nowIso,
-        updated_at: nowIso,
-      })
-      .select('id')
-      .single();
+    const insertA = await insertLogViaRpc(clientA, probeId, nowIso, today, localHour);
     expect(insertA.error).toBeNull();
 
     try {

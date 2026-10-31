@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: a979537
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -59,7 +59,7 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
 
 **Repository (`src/db/repositories/`).** One file per database table. Each function calls `requireUserId()` to confirm the caller is authenticated before touching data (`src/db/repositories/_supabase.ts:4–12`). Writes always run through `parseOrThrow(SomeSchema, input, 'label')` before the Supabase call. DB errors are mapped to typed `AppError` codes (`authentication_error`, `rate_limited`, `conflict`, etc.) so callers never see raw Postgres error strings (`src/db/repositories/_supabase.ts:27–68`). The native app talks to the same repository functions as the server; the difference is which Supabase client they receive.
 
-**Store (`src/store/`).** Four Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, all goals (any status), the profile, and the canonical per-day daily summary (`summary`, up to 365 days, floored at onboarding via `summarySinceYmd` so "saved" never counts pre-onboarding days), plus a per-session `achievementDismissCount` (drives celebration suppression — see Celebrations). It populates itself on `boot()` with five parallel Supabase calls, exposes per-slice `refresh*` actions plus a `refreshAll()`, wraps goal CRUD (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`), and is reset to empty on sign-out. `refreshSummary()` deliberately keeps the previous rows on a transient failure so a refresh after a log write never blanks the dashboard totals. `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). `useOnboardingDraft` (`src/store/onboardingDraft.ts`) holds the multi-step onboarding wizard's in-progress field values so back/forward navigation doesn't lose them; it is in-memory only and cleared on onboarding completion and on logout (via `useSession.reset()`). The stores are deliberately narrow: domain computation is never done inside them.
+**Store (`src/store/`).** Four Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, all goals (any status), the profile, and the canonical per-day daily summary (`summary`, up to 365 days, floored at onboarding via `summarySinceYmd` so "saved" never counts pre-onboarding days), plus a per-session `achievementDismissCount` (drives celebration suppression — see Celebrations). It populates itself on `boot()` with five parallel Supabase calls, exposes per-slice `refresh*` actions plus a `refreshAll()`, wraps goal CRUD (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`), and is reset to empty on sign-out. `refreshSummary()` deliberately keeps the previous rows on a transient failure so a refresh after a log write never blanks the dashboard totals. Beside it, `ledgerTimeZone()`, `ledgerToday()` and `ledgerDaysAgo()` give native screens the profile country's zone (IST when none) for stamping logs and reading "today". `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). `useOnboardingDraft` (`src/store/onboardingDraft.ts`) holds the multi-step onboarding wizard's in-progress field values so back/forward navigation doesn't lose them; it is in-memory only and cleared on onboarding completion and on logout (via `useSession.reset()`). The stores are deliberately narrow: domain computation is never done inside them.
 
 **Server layer (`web/lib/server/data.ts`).** Next.js Server Components cannot use the Zustand stores — they run on the server, not in the browser. The server layer replicates the same data-fetching logic using React's `cache()` for per-request deduplication and Next.js `unstable_cache` for cross-request caching of slow or rarely-changing data like brands (`web/lib/server/data.ts:345–361`). Profile, logs, goals, and brands are fetched with the SSR Supabase client which reads its session from cookies set by `@supabase/ssr`. The page-level helpers (`getDashboardData`, `getTrendsPageData`, etc.) compose these cached fetchers and run everything in parallel with `Promise.all`.
 
@@ -100,14 +100,14 @@ The Supabase project `tvcwrsglceahkjnfuzkn` (region: us-east-2) holds these publ
 | `user_profiles` | One row per user. Baseline, consent timestamps, identity fields, onboarding state. FK → `auth.users`. |
 | `brands` | User's cigarette brand catalog (seeded from defaults + user-added). |
 | `brand_variants` | Variants per brand with rolling price statistics (`price_sum_inr`, `price_count`). |
-| `cigarette_logs` | Every logged cigarette. Dual timestamp: `ts_utc` (absolute) + `local_date`/`local_hour` (IST-derived for chart bucketing). `client_op_id` enables safe retries. |
+| `cigarette_logs` | Every logged cigarette. Dual timestamp: `ts_utc` (absolute) + `local_date`/`local_hour` (derived in the ledger's zone, the profile country's, IST when there is none, for chart bucketing). `client_op_id` enables safe retries. |
 | `goals` | Reduction/quit goals. `meta_json` holds type-specific configuration. |
 | `settings_kv` | Arbitrary per-user key/value store (e.g. `consent.analyticsOptIn`). |
 | `reminders` | Push notification schedules (schema exists; no rows yet). |
 | `usage_events` | Analytics events written from the client (opt-in). |
 | `audit_events` | Server-side record of account-level actions (delete, export, etc.). |
 | `error_events` | Client-reported errors from `logClientError`. |
-| `rate_limit_counters` | Sliding-window counters used by Postgres RPCs to enforce per-user rate limits. |
+| `rate_limit_counters` | Sliding-window counters used by Postgres RPCs to enforce per-user rate limits. Identities are stored as keyed hashes, and rows older than two days are purged daily (`purge_rate_limit_counters`, scheduled by pg_cron). |
 | `price_entries` | Intended for crowd-sourced pricing data (0 rows; not yet in use). |
 | `user_facts_seen` | Tracks which motivational facts a user has seen. |
 

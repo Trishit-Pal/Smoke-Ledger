@@ -7,7 +7,7 @@ sources:
   - src/domain/health.ts
   - src/domain/savings.ts
   - src/db/repositories/goals.ts
-last_verified_commit: a979537
+last_verified_commit: c3ec7a1
 status: current
 ---
 
@@ -87,7 +87,7 @@ returns a `GoalProgress` object. The six cases:
 - `daily_cap` — counts sticks on `today` via `sticksOn`, compares to
   `targetValue`. `atRisk` is true when utilisation is 80–100%. Remaining is
   `max(0, target - used)`.
-- `spend_cap_daily` — same logic but uses `spendOn` and reports in INR.
+- `spend_cap_daily` — same logic but uses `spendOn` and reports in the ledger's currency (INR, or EUR for an EU country).
 - `no_smoke_window` — reads `startHour` / `endHour` from `goal.meta`, handles
   overnight windows (e.g. 22:00–06:00) by wrapping midnight. `percent` is 100
   if no sticks fell inside the window, 0 otherwise. `atRisk` is always false
@@ -152,8 +152,9 @@ Five rules run in sequence; any that fire append to the output array:
    ("your average is down"); ≥ +15% fires an `act` insight ("your average is
    up"). Both include the exact per-day numbers as evidence.
 5. **Brand concentration** — uses `brandSpendMix` over the last 30 days. If the
-   top brand is ≥40% of spend, an insight names the brand and shows the INR
-   figure.
+   top brand is ≥40% of spend, an insight names the brand and shows the spend.
+   `generateInsights(logs, today, money)` takes the screen's money formatter, so
+   a euro ledger reads euros; the default stays whole rupees for native and demo data.
 
 A sixth rule (day-of-week dominance) runs via `dowDistribution`; it fires when
 a single day holds ≥22% of sticks over 30 days (minimum 7 total sticks).

@@ -398,7 +398,7 @@ export function HistoryClient({
                               ) : null}
                             </dt>
                             <dd className="text-small text-text-muted nums-tabular">
-                              <span className="nums-tabular">{formatTime(log.tsUtc)}</span>
+                              <span className="nums-tabular">{formatTime(log.tsUtc, zone)}</span>
                               <span className="text-text-faint"> · </span>
                               <span>{qtyText}</span>
                             </dd>
@@ -482,6 +482,7 @@ export function HistoryClient({
         open={editingLog !== null}
         log={editingLog}
         brands={brands}
+        money={(amount) => money(amount)}
         onOpenChange={(open) => {
           if (!open) setEditingLog(null);
         }}

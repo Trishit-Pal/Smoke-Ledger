@@ -690,4 +690,36 @@ describe('createLog', () => {
       expect.objectContaining({ p_client_op_id: 'op_fixed', p_unit_price_inr: 20.8 }),
     );
   });
+
+  // EU ledger: 20:00 UTC on 29 Oct is 21:00 on the 29th in Paris but 01:30 on the
+  // 30th in IST. If createLog ever falls back to IST this test goes red.
+  it('stores the local date and hour of the ledger zone, not IST', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-29T20:30:00.000Z') });
+    try {
+      const ts = '2026-10-29T20:00:00.000Z';
+      const rpc = makeRpcMock({
+        id: 'log_paris', user_id: 'user-123', ts_utc: ts, local_date: '2026-10-29', local_hour: 21,
+        brand_id: null, brand_name_snap: null, variant_snap: null, quantity: 1, purchase_mode: 'single',
+        pack_size: null, total_price_inr: null, unit_price_inr: null, price_source: 'unknown',
+        trigger_tag: null, mood_before: null, mood_after: null, craving: null, context_tag: null,
+        notes: null, created_at: ts, updated_at: ts,
+      });
+      stubSupabase(rpc);
+
+      await createLog({
+        tsUtc: ts, timeZone: 'Europe/Paris', brandId: 'brd_acc2d5c2e5c842a590e3ccd876f27bce',
+        brandNameSnap: 'Mild Seven', variantSnap: 'Super Lights',
+        quantity: 1, purchaseMode: 'single', packSize: null, totalPriceInr: null, unitPriceInr: null,
+        priceSource: 'unknown', triggerTag: null, moodBefore: null, moodAfter: null, craving: null,
+        contextTag: null, notes: null,
+      });
+
+      expect(rpc).toHaveBeenCalledWith(
+        'create_log_with_rate_limit',
+        expect.objectContaining({ p_local_date: '2026-10-29', p_local_hour: 21 }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

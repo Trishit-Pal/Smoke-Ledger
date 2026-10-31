@@ -35,6 +35,8 @@ interface LogEditModalProps {
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   onDelete?: (log: CigaretteLog) => void;
+  /** Formats an amount in the ledger's currency (for validation copy). */
+  money: (amount: number) => string;
 }
 
 // ── Reusable form row component ─────────────────────────────────────────────
@@ -77,6 +79,7 @@ export function LogEditModal({
   onOpenChange,
   onSaved,
   onDelete,
+  money,
 }: LogEditModalProps) {
   const router = useRouter();
   const [saving, setSaving] = React.useState(false);
@@ -143,7 +146,7 @@ export function LogEditModal({
     }
     const unit = price ? round2(Number(price)) : null;
     if (unit != null && (Number.isNaN(unit) || unit < 0 || unit > MAX_PRICE_INR)) {
-      setError(`Price per stick must be between ₹0 and ₹${MAX_PRICE_INR.toLocaleString('en-IN')}.`);
+      setError(`Price per stick must be between ${money(0)} and ${money(MAX_PRICE_INR)}.`);
       return;
     }
 

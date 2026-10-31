@@ -169,3 +169,22 @@ describe('reset_ledger_for_region', () => {
     expect(beforeDelete).toMatch(/IS NOT DISTINCT FROM/);
   });
 });
+
+// Phase 4: direct INSERT on cigarette_logs let a signed-in client skip the
+// 50-per-hour cap in create_log_with_rate_limit. Logs are written only by the RPC.
+describe('20261031000000_logs_insert_via_rpc.sql', () => {
+  const sql = readMigration('20261031000000_logs_insert_via_rpc.sql');
+
+  it('replaces the catch-all policy with read, update and delete policies only', () => {
+    expect(sql).toMatch(/DROP POLICY IF EXISTS logs_all ON public\.cigarette_logs;/);
+    for (const cmd of ['SELECT', 'UPDATE', 'DELETE']) {
+      expect(sql).toContain(`ON public.cigarette_logs
+  FOR ${cmd} TO authenticated`);
+    }
+    expect(sql).not.toMatch(/FOR (INSERT|ALL)/);
+  });
+
+  it('revokes the table INSERT privilege from signed-in clients', () => {
+    expect(sql).toMatch(/REVOKE INSERT ON public\.cigarette_logs FROM authenticated;/);
+  });
+});

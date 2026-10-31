@@ -38,7 +38,7 @@ export async function createSessionFromUrl(url: string): Promise<SessionResult> 
     if (link.kind === 'exchange') {
       const { error } = await supabase.auth.exchangeCodeForSession(link.code);
       if (error) throw error;
-      return resultForType(parsed.searchParams.get('type'));
+      return resultForType(link.type);
     }
   } catch {
     return 'none';
