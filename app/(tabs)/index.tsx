@@ -34,7 +34,8 @@ import { isBirthdayToday } from '@/domain/age';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
-import { formatInr, formatDelta } from '@/lib/format';
+import { formatDelta } from '@/lib/format';
+import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
@@ -247,7 +248,7 @@ function QuickLogRow({
 
   const lastPrice =
     lastEntry?.unitPriceInr != null
-      ? maskInr(lastEntry.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      ? maskInr(lastEntry.unitPriceInr, discreet, (n) => ledgerMoney(n, { compact: true }))
       : null;
 
   return (
@@ -547,7 +548,7 @@ export default function Home() {
       dispatchMood(isAbove ? 'concern' : 'regret', {
         caption: isAbove ? 'Above your usual today.' : 'Noted. No judgment.',
       });
-      const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${formatInr(total, { compact: true })}` : ''}`;
+      const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${ledgerMoney(total, { compact: true })}` : ''}`;
       setToast(label);
       if (toastTimerRef.current !== null) {
         clearTimeout(toastTimerRef.current);
@@ -676,12 +677,12 @@ export default function Home() {
               ) : (
                 <AnimatedNumber
                   value={todaySpend}
-                  format={(n) => formatInr(n, { compact: true })}
+                  format={(n) => ledgerMoney(n, { compact: true })}
                   style={[
                     typography.h1 as TextStyle,
                     { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
                   ]}
-                  accessibilityLabel={`Spent today: ${formatInr(todaySpend)}`}
+                  accessibilityLabel={`Spent today: ${ledgerMoney(todaySpend)}`}
                 />
               )}
             </View>
@@ -913,7 +914,7 @@ export default function Home() {
                 ) : (
                   <AnimatedNumber
                     value={savings.totalInr}
-                    format={(n) => formatInr(n, { compact: true })}
+                    format={(n) => ledgerMoney(n, { compact: true })}
                     style={[
                       typography.h1 as TextStyle,
                       { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
@@ -922,7 +923,7 @@ export default function Home() {
                 )}
                 {savings.ratePerStick != null ? (
                   <Text variant="small" muted>
-                    {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × {maskInr(savings.ratePerStick, hidden, (n) => formatInr(n))} per stick
+                    {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × {maskInr(savings.ratePerStick, hidden, (n) => ledgerMoney(n))} per stick
                   </Text>
                 ) : null}
               </View>
@@ -944,7 +945,7 @@ export default function Home() {
                 ) : (
                   <AnimatedNumber
                     value={forecast.forecast}
-                    format={(n) => formatInr(n, { compact: true })}
+                    format={(n) => ledgerMoney(n, { compact: true })}
                     style={[
                       typography.h1 as TextStyle,
                       { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },

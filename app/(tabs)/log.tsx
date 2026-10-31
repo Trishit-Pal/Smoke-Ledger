@@ -12,7 +12,7 @@ import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { success } from '@/lib/haptics';
-import { formatInr } from '@/lib/format';
+import { ledgerMoney } from '@/lib/ledgerMoney';
 import { formatTime, todayIst } from '@/lib/date';
 import { sticksOn, spendOn } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -131,7 +131,7 @@ export default function LogTab() {
           <Text variant="h3">Today</Text>
           <Text variant="caption" muted>
             {maskCount(sticksOn(logs, today), discreet)} sticks ·{' '}
-            {maskInr(spendOn(logs, today), discreet, (n) => formatInr(n))}
+            {maskInr(spendOn(logs, today), discreet, (n) => ledgerMoney(n))}
           </Text>
         </View>
         {error ? (
@@ -158,7 +158,7 @@ export default function LogTab() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text variant="bodyStrong">
-                    {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
+                    {maskInr(l.totalPriceInr, discreet, (n) => ledgerMoney(n))}
                   </Text>
                   <Text variant="small" muted>
                     {formatTime(l.tsUtc, ledgerTimeZone())}

@@ -27,7 +27,7 @@ import { fonts, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useSession, ledgerTimeZone } from '@/store/session';
 import { isDiscreetMode, maskBrandName, maskInr } from '@/lib/discreet';
-import { formatInr } from '@/lib/format';
+import { ledgerMoney } from '@/lib/ledgerMoney';
 import { formatIndianDate, formatTime, todayIst, daysAgoIst } from '@/lib/date';
 import { triggerLabel } from '@/constants/triggers';
 import { contextLabel } from '@/constants/contexts';
@@ -396,7 +396,7 @@ export default function History() {
                         {formatIndianDate(group.date)}
                       </Text>
                       <Text variant="caption" faint>
-                        {maskInr(group.totalSpend, discreet, (n) => formatInr(n))}
+                        {maskInr(group.totalSpend, discreet, (n) => ledgerMoney(n))}
                         {' '}spent
                       </Text>
                     </View>
@@ -494,7 +494,7 @@ export default function History() {
                                 variant="body"
                                 style={{ fontVariant: ['tabular-nums'] }}
                               >
-                                {maskInr(log.totalPriceInr, discreet, (n) => formatInr(n))}
+                                {maskInr(log.totalPriceInr, discreet, (n) => ledgerMoney(n))}
                               </Text>
                             </View>
                           </Pressable>

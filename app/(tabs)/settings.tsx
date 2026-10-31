@@ -19,6 +19,7 @@ import { Chip } from '@/components/ui/Chip';
 import { spacing, typography, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { ledgerCurrency, ledgerMoney } from '@/lib/ledgerMoney';
 import { useSession } from '@/store/session';
 import { updateProfile } from '@/db/repositories/profile';
 import { getSetting, setSetting } from '@/db/repositories/settings';
@@ -706,7 +707,11 @@ export default function Settings() {
 
   const beginEditPrice = (variant: BrandVariant) => {
     setEditingVariantId(variant.id);
-    setPriceDraft(variant.avgPriceInr != null ? String(Math.round(variant.avgPriceInr)) : '');
+    setPriceDraft(
+      variant.avgPriceInr == null
+        ? ''
+        : String(ledgerCurrency() === 'EUR' ? variant.avgPriceInr : Math.round(variant.avgPriceInr)),
+    );
     setError(null);
   };
 
@@ -721,8 +726,8 @@ export default function Settings() {
       setError(`Price must be a number between ${MIN_PRICE_INR} and ${MAX_PRICE_INR}.`);
       return;
     }
-    // Pack MRPs are whole rupees; round so the stored value matches the display.
-    const price = Math.round(parsed);
+    // Rupee MRPs are whole numbers; euro prices keep their cents (€13.50 is not 14).
+    const price = ledgerCurrency() === 'EUR' ? Math.round(parsed * 100) / 100 : Math.round(parsed);
     setBusy('save-price');
     setError(null);
     try {
@@ -1173,7 +1178,7 @@ export default function Settings() {
                     color={theme.textMuted}
                     style={{ textTransform: 'uppercase', letterSpacing: 1.6 }}
                   >
-                    Avg price (₹)
+                    Avg price ({ledgerCurrency() === 'EUR' ? '€' : '₹'})
                   </Text>
                   <TextInput
                     value={newAvgPrice}
@@ -1307,7 +1312,7 @@ export default function Settings() {
                               }}
                             >
                               <Text variant="body" color={theme.textMuted}>
-                                ₹
+                                {ledgerCurrency() === 'EUR' ? '€' : '₹'}
                               </Text>
                               <TextInput
                                 value={priceDraft}
@@ -1347,7 +1352,7 @@ export default function Settings() {
                               }}
                             >
                               <Text variant="body">
-                                {v.avgPriceInr != null ? `₹${Math.round(v.avgPriceInr)}` : '—'}
+                                {ledgerMoney(v.avgPriceInr)}
                               </Text>
                               <TextLink
                                 onPress={() => beginEditPrice(v)}
