@@ -25,7 +25,7 @@ export default function GlobalError({ error, reset }: Props): React.ReactElement
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-lg">
+    <div className="min-h-dvh bg-bg flex items-center justify-center p-lg">
       <div className="w-full max-w-sm">
         <Card>
           <div className="flex flex-col gap-md text-center">

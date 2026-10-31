@@ -38,7 +38,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="bg-card border-t border-border h-16 flex items-stretch"
+      className="bg-card border-t border-border h-16 short-landscape:h-12 flex items-stretch"
     >
       {NAV.map(({ href, label, icon: Icon, match }) => {
         const active = isNavActive(pathname, match ?? [href]);
@@ -54,7 +54,7 @@ export function BottomNav() {
             )}
           >
             <Icon className="w-5 h-5" aria-hidden />
-            <span className="text-caption font-medium">{label}</span>
+            <span className="text-caption font-medium short-landscape:sr-only">{label}</span>
           </Link>
         );
       })}

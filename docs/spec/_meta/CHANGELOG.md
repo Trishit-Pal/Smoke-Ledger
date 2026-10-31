@@ -2,13 +2,22 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-10-31 — 42c2ee6
+<!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
+
+## 2026-10-31 — e52ffac
+- architecture, auth, identity-profile, infra-ops: re-stamped after merging the scene-tiers and responsive/chart-accessibility work into main alongside the security dependency PR; no behaviour these sections describe changed.
+- CHANGELOG: entries added by earlier stamp scripts had been inserted inside the Format comment (hidden); moved out under an intact comment.
+
+## 2026-10-31 — 42c2ee6
 - auth: Next 15 async request APIs, phoneOtpState.ts split, version-specific Next 14.2 claims marked as not re-checked, two new open gaps.
 - infra-ops: audit job now blocks on critical and lists the known high-severity leftovers.
 - architecture, identity-profile: re-stamped (server helpers now awaited; settings page awaits searchParams); no described behaviour changed.
 
 ## 2026-10-31 — f1ab5c4
 - infra-ops: re-stamped after the dependency restore (root package.json, lockfiles, dependabot.yml); no infrastructure behaviour changed.
+
+## 2026-10-31 — 3a97c1f
+- auth: re-stamped — error pages use dvh instead of vh; no behaviour the section describes changed.
 
 ## 2026-10-31 — 1a40fb0
 - all stale stamps: re-pointed at a commit that exists after the stack was rebased (earlier entries cite pre-rebase hashes); no spec prose changed.
@@ -17,8 +26,6 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 - identity-profile: ThemedSelect now returns focus to its trigger and uses accent ink for the selected option.
 - auth, celebrations, infra-ops: re-stamped after the design pass (token-only colour swaps on auth pages, landing CTA no longer fires confetti on hover, framer-motion removed); no behaviour these sections describe changed.
 - architecture: re-stamped — /log now redirects to the Ledger (/history) and its loader getLogPageData is gone; the History data path described here is unchanged.
-
-## <date> — <commit> ; then a bullet per section changed. -->
 
 ## 2026-10-31 — 6268c8d
 - architecture: ledgerToday / ledgerDaysAgo beside ledgerTimeZone in the session store.
