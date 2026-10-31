@@ -972,7 +972,13 @@ export function SettingsClient({
             />
             {isRegionPickerEnabled() ? (
               <div className="flex flex-col gap-sm py-md" style={{ borderTop: '1px solid var(--rule)' }}>
-                <CountryField value={country} onChange={setCountry} />
+                <CountryField
+                  value={country}
+                  onChange={(next) => {
+                    setCountry(next);
+                    setConfirmRegionReset(false);
+                  }}
+                />
                 <div className="flex items-center gap-md">
                   <TextLink
                     onClick={() => void onSaveCountry(false)}

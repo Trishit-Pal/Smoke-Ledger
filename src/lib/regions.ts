@@ -76,6 +76,11 @@ export function regionOptions(): { value: string; label: string }[] {
   return [INDIA, ...rest].map((r) => ({ value: r.country, label: r.name }));
 }
 
+/** Whether picking `picked` changes the saved country (no country means India). */
+export function regionChangeNeeded(saved: string | null | undefined, picked: string): boolean {
+  return (saved ?? INDIA.country) !== picked;
+}
+
 /** Off unless the deploy explicitly sets the flag. Redeploy is the kill switch. */
 export function isRegionPickerEnabled(): boolean {
   return process.env.NEXT_PUBLIC_REGION_PICKER === 'true';
