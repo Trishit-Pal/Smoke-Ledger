@@ -79,6 +79,7 @@ export function toE164In(local: string): string {
   return `+91${local.trim()}`;
 }
 
+/** Opt-in: phone sign-in shows only when the flag is exactly 'true' (see web/.env.example). */
 export function isPhoneOtpEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED !== 'false';
+  return process.env.NEXT_PUBLIC_PHONE_OTP_ENABLED === 'true';
 }

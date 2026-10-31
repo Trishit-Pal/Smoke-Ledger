@@ -94,6 +94,6 @@ These compose: the strictest layer wins.
 
 If MSG91 sends spiral (cost, abuse, or a broken template):
 
-1. In Vercel, set `NEXT_PUBLIC_PHONE_OTP_ENABLED=false` and redeploy. The mode hides immediately.
+1. In Vercel, unset `NEXT_PUBLIC_PHONE_OTP_ENABLED` (or set it to anything but `true`) and redeploy. The mode hides immediately.
 2. The server actions also short-circuit with a `disabled` state if the env var is `false`, so an attacker who calls the action directly receives a friendly refusal.
 3. If you need to stop existing in-flight OTP sends, disable the hook in *Authentication → Hooks*. Supabase will stop calling the edge function but `signInWithOtp` will fail open (return an error).
