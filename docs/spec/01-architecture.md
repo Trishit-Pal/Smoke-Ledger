@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: a979537
+last_verified_commit: c3ec7a1
 status: current
 ---
 
@@ -100,14 +100,14 @@ The Supabase project `tvcwrsglceahkjnfuzkn` (region: us-east-2) holds these publ
 | `user_profiles` | One row per user. Baseline, consent timestamps, identity fields, onboarding state. FK → `auth.users`. |
 | `brands` | User's cigarette brand catalog (seeded from defaults + user-added). |
 | `brand_variants` | Variants per brand with rolling price statistics (`price_sum_inr`, `price_count`). |
-| `cigarette_logs` | Every logged cigarette. Dual timestamp: `ts_utc` (absolute) + `local_date`/`local_hour` (IST-derived for chart bucketing). `client_op_id` enables safe retries. |
+| `cigarette_logs` | Every logged cigarette. Dual timestamp: `ts_utc` (absolute) + `local_date`/`local_hour` (derived in the ledger's zone, the profile country's, IST when there is none, for chart bucketing). `client_op_id` enables safe retries. |
 | `goals` | Reduction/quit goals. `meta_json` holds type-specific configuration. |
 | `settings_kv` | Arbitrary per-user key/value store (e.g. `consent.analyticsOptIn`). |
 | `reminders` | Push notification schedules (schema exists; no rows yet). |
 | `usage_events` | Analytics events written from the client (opt-in). |
 | `audit_events` | Server-side record of account-level actions (delete, export, etc.). |
 | `error_events` | Client-reported errors from `logClientError`. |
-| `rate_limit_counters` | Sliding-window counters used by Postgres RPCs to enforce per-user rate limits. |
+| `rate_limit_counters` | Sliding-window counters used by Postgres RPCs to enforce per-user rate limits. Identities are stored as keyed hashes, and rows older than two days are purged daily (`purge_rate_limit_counters`, scheduled by pg_cron). |
 | `price_entries` | Intended for crowd-sourced pricing data (0 rows; not yet in use). |
 | `user_facts_seen` | Tracks which motivational facts a user has seen. |
 

@@ -15,7 +15,7 @@ sources:
   - supabase/migrations/20260524050357_add_daily_summary.sql
   - supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql
   - src/tests/calculations.test.ts
-last_verified_commit: a979537
+last_verified_commit: c3ec7a1
 status: current
 ---
 
@@ -140,9 +140,15 @@ characters.
 ### Local date and local hour
 
 The log stores three time values: `tsUtc` (the true wall-clock moment as ISO
-8601), `localDate` (a `YYYY-MM-DD` string in IST), and `localHour` (0–23 in
-IST). The date and hour are derived at write time via `toLocalDate` and
-`toLocalHour` in `src/lib/date.ts`, or can be supplied by the caller.
+8601), `localDate` (a `YYYY-MM-DD` string), and `localHour` (0–23), both in the
+ledger's zone: the profile country's (`timezoneForCountry`), IST when there is
+none. `createLog` derives them from the draft's `timeZone` via `toLocalDate` and
+`toLocalHour` in `src/lib/date.ts`. Web passes the zone from the new-log form;
+native screens pass `ledgerTimeZone()` (`src/store/session.ts`) at every
+`createLog` call, and `useSession.addLog` fills it when a caller does not. The
+web backdate picker reads and writes its wall clock in the same zone
+(`formatDatetimeLocal` / `parseDatetimeLocal`), and Log / History render times
+with `formatTime(ts, zone)`.
 
 Storing the local date separately is important because "how many today?" only
 makes sense in the user's wall-clock day. The domain layer (`dailyStats`,
@@ -267,8 +273,11 @@ a brand-less entry would be to call the RPC directly, which still works because
 the RPC does not enforce the brand requirement — but every normal write path
 does.
 
-**Logs are isolated per user.** The RLS policy `logs_all` on `cigarette_logs`
-uses `user_id = (select auth.uid())` (the `select` form avoids a per-row
+**Logs are isolated per user, and written only by the RPC.** The RLS policies
+`logs_select` / `logs_update` / `logs_delete` on `cigarette_logs` use
+`user_id = (select auth.uid())`; there is no INSERT policy and `authenticated`
+has no INSERT privilege, so every write goes through `create_log_with_rate_limit`
+(`20261031000000_logs_insert_via_rpc.sql`). The policies use (the `select` form avoids a per-row
 function call; added in `supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:24`).
 This applies to direct table access and to the `v_daily_summary_user` view
 (which is `security_invoker = true`). The `list_logs_page` and
