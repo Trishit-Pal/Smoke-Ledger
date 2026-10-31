@@ -34,7 +34,7 @@ sources:
   - DB: public.handle_new_user (trigger)
   - DB: public.enforce_profile_identity_rules (trigger)
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
-last_verified_commit: 42c2ee6
+last_verified_commit: e52ffac
 status: current
 ---
 

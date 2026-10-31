@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: 42c2ee6
+last_verified_commit: e52ffac
 status: current
 ---
 
