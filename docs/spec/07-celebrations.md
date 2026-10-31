@@ -12,7 +12,7 @@ sources:
   - web/app/onboarding/done/**
   - web/app/(auth)/login/page.tsx
   - web/components/marketing/AccountDeletedNotice.tsx
-last_verified_commit: 6268c8d
+last_verified_commit: 94fa89d
 status: current
 ---
 

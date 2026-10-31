@@ -2,7 +2,12 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
+<!-- Format: ## 2026-10-31 — 94fa89d
+- identity-profile: ThemedSelect now returns focus to its trigger and uses accent ink for the selected option.
+- auth, celebrations, infra-ops: re-stamped after the design pass (token-only colour swaps on auth pages, landing CTA no longer fires confetti on hover, framer-motion removed); no behaviour these sections describe changed.
+- architecture: re-stamped — /log now redirects to the Ledger (/history) and its loader getLogPageData is gone; the History data path described here is unchanged.
+
+## <date> — <commit> ; then a bullet per section changed. -->
 
 ## 2026-10-31 — 6268c8d
 - architecture: ledgerToday / ledgerDaysAgo beside ledgerTimeZone in the session store.

@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: 6268c8d
+last_verified_commit: 94fa89d
 status: current
 ---
 
@@ -22,7 +22,7 @@ The profile is where the user is a person, not just a set of logs. It holds the 
 
 ## What the user experiences
 
-During signup, the user enters their full name, date of birth, and gender. Gender is chosen from a themed dropdown (`ThemedSelect`) whose option list paints in the active theme's background with opposite-color text and the selected option highlighted in the brand accent — replacing the older chip row (mobile) and native `<select>` (web), which could not be themed consistently. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
+During signup, the user enters their full name, date of birth, and gender. Gender is chosen from a themed dropdown (`ThemedSelect`) whose option list paints in the active theme's background with opposite-color text and the selected option highlighted in the brand accent (in AA-safe accent ink). The list is keyboard-operable — arrows, Home/End, Enter — and Escape or a pick returns focus to the trigger — replacing the older chip row (mobile) and native `<select>` (web), which could not be themed consistently. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
 
 Once inside, the Settings screen shows a **Profile** section with five rows:
 
