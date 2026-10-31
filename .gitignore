@@ -31,3 +31,6 @@ supabase/.branches/
 .cursor/
 .superpowers/
 play-service-account.json
+
+# Playwright MCP scratch output
+.playwright-mcp/

@@ -29,7 +29,7 @@ const PRIMARY_CTA_STYLE: React.CSSProperties = {
 const PILLARS: { num: string; title: string; copy: string }[] = [
   { num: 'I.', title: 'Free', copy: 'No ads, no upsell, no subscription tier.' },
   { num: 'II.', title: 'Private', copy: 'Encrypted at rest. Yours to export or delete.' },
-  { num: 'III.', title: 'Honest', copy: 'No streaks. No badges. No shame patterns.' },
+  { num: 'III.', title: 'Honest', copy: 'No ads. No shame patterns. Your numbers, plainly.' },
 ];
 
 export function LandingHero() {
@@ -38,17 +38,6 @@ export function LandingHero() {
   React.useEffect(() => {
     const t = window.setTimeout(() => dispatchMood('greet', { durationMs: 1800 }), 400);
     return () => window.clearTimeout(t);
-  }, []);
-
-  // Celebrate when the visitor reaches for the primary CTA — throttled so
-  // repeated hover/focus doesn't spam. Confetti auto-skips under reduced motion
-  // inside CharacterCompanion.
-  const lastCelebrateRef = React.useRef(0);
-  const celebrate = React.useCallback(() => {
-    const now = Date.now();
-    if (now - lastCelebrateRef.current < 3000) return;
-    lastCelebrateRef.current = now;
-    dispatchMood('applaud', { celebrate: true });
   }, []);
 
   return (
@@ -150,7 +139,7 @@ export function LandingHero() {
             fontStyle: 'italic',
           }}
         >
-          A private, observational record of your smoking — not a streak game, not a guilt
+          A private, observational record of your smoking — not a game to win, not a guilt
           machine. Free, forever.
         </p>
 
@@ -162,7 +151,7 @@ export function LandingHero() {
             flexWrap: 'wrap',
           }}
         >
-          <Link href="/signup" style={PRIMARY_CTA_STYLE} onMouseEnter={celebrate} onFocus={celebrate}>
+          <Link href="/signup" style={PRIMARY_CTA_STYLE}>
             Begin the ledger
             <span aria-hidden style={{ fontSize: 18 }}>
               →
