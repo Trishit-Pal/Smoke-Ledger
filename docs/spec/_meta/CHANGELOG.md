@@ -2,7 +2,10 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-10-31 — 1a40fb0
+<!-- Format: ## 2026-10-31 — 3a97c1f
+- auth: re-stamped — error pages use dvh instead of vh; no behaviour the section describes changed.
+
+## 2026-10-31 — 1a40fb0
 - all stale stamps: re-pointed at a commit that exists after the stack was rebased (earlier entries cite pre-rebase hashes); no spec prose changed.
 
 ## 2026-10-31 — 94fa89d

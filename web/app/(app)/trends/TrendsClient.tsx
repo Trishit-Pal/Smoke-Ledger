@@ -408,6 +408,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </div>
               <Reveal dependencyKey={dependencyKey}>
                 <LineChart
+                  title="Daily sticks"
                   data={sticksLine}
                   height={180}
                   strokeColor={stickToneColor}
@@ -434,6 +435,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               </div>
               <Reveal dependencyKey={dependencyKey}>
                 <BarChart
+                  title="Daily spend"
                   data={spendBars}
                   height={180}
                   formatY={(v) => money(v, { compact: true })}
@@ -481,7 +483,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart data={hourBars} height={160} />
+                <BarChart title="Sticks by hour of day" data={hourBars} height={160} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 Mornings and evenings tend to spike. Quiet hours are the ones
@@ -567,6 +569,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   <Reveal dependencyKey={dependencyKey}>
                     <div className="flex flex-col sm:flex-row items-center gap-lg">
                       <Donut
+                        title="Spend by brand"
                         slices={donutSlices}
                         size={160}
                         centerLabel="TOTAL"

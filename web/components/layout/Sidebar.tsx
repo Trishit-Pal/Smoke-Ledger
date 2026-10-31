@@ -37,8 +37,8 @@ export function Sidebar() {
   const pathname = usePathname() ?? '';
 
   return (
-    <aside className="hidden md:flex flex-col w-60 h-dvh sticky top-0 z-10 bg-bg border-r border-border px-md py-lg">
-      <div className="px-sm mb-xl">
+    <aside className="hidden md:flex flex-col w-[calc(72px+env(safe-area-inset-left))] lg:w-60 h-dvh sticky top-0 z-10 bg-bg border-r border-border px-sm lg:px-md py-lg pl-[calc(0.5rem+env(safe-area-inset-left))]">
+      <div className="hidden lg:block px-sm mb-xl">
         <p className="text-h3 font-semibold text-text">Smoke Ledger</p>
         <p className="text-caption uppercase text-text-muted mt-1 tracking-wide">
           India · INR
@@ -47,10 +47,12 @@ export function Sidebar() {
 
       <Link
         href="/log/new"
-        className="mb-lg flex min-h-11 items-center justify-center gap-sm rounded-md bg-text px-md text-body font-medium text-bg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+        aria-label="New entry"
+        title="New entry"
+        className="mt-xs mb-lg flex min-h-11 items-center justify-center gap-sm rounded-md bg-text px-md text-body font-medium text-bg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
       >
         <Plus className="h-4 w-4" aria-hidden />
-        New entry
+        <span className="hidden lg:inline">New entry</span>
       </Link>
 
       <nav aria-label="Primary" className="flex flex-col gap-1">
@@ -61,8 +63,10 @@ export function Sidebar() {
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
+              aria-label={label}
+              title={label}
               className={cn(
-                'flex items-center gap-sm px-md py-sm rounded-md text-body transition-colors',
+                'flex min-h-11 items-center justify-center lg:justify-start gap-sm px-md py-sm rounded-md text-body transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
                 active
                   ? 'bg-accent-soft text-accent-ink'
@@ -70,7 +74,7 @@ export function Sidebar() {
               )}
             >
               <Icon className="w-5 h-5" aria-hidden />
-              <span className="font-medium">{label}</span>
+              <span className="hidden lg:inline font-medium">{label}</span>
             </Link>
           );
         })}

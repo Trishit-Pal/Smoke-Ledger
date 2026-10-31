@@ -207,6 +207,11 @@
     outline: 2px solid var(--accent-ink) !important;
     outline-offset: 2px;
   }
+  /* Scroll cue — fades the trailing edge so a clipped pill row reads as scrollable. */
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
   /* Focus ring */
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg;

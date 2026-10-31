@@ -107,7 +107,7 @@ function EditorialPillRow({ items, ariaLabel }: EditorialPillRowProps<unknown>) 
     <div
       role="group"
       aria-label={ariaLabel}
-      className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
+      className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide scroll-fade-x"
     >
       {items.map((it) => (
         <button

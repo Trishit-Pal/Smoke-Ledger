@@ -28,6 +28,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        // Phones held sideways: very little height, so chrome must shrink.
+        'short-landscape': { raw: '(max-height: 500px) and (orientation: landscape)' },
+      },
       colors: {
         // Semantic CSS-variable driven tokens (swap on dark mode)
         bg: 'var(--bg)',
