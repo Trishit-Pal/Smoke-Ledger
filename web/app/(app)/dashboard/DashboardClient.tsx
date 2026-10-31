@@ -200,7 +200,13 @@ export function DashboardClient({
     }));
   }, [logs, today, zone]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
-  const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
+  const insights = React.useMemo(
+    () =>
+      generateInsights(logs, today, (amount) =>
+        formatMoney(amount, profile.currency, { locale: localeForCountry(profile.country) }),
+      ),
+    [logs, today, profile.currency, profile.country],
+  );
 
   // Gated real substitute for "cravings resisted" (unobservable, and the
   // concept doesn't exist in the domain model): the average self-rated

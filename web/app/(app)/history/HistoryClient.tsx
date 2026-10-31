@@ -482,6 +482,7 @@ export function HistoryClient({
         open={editingLog !== null}
         log={editingLog}
         brands={brands}
+        money={(amount) => money(amount)}
         onOpenChange={(open) => {
           if (!open) setEditingLog(null);
         }}

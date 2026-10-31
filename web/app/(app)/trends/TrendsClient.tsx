@@ -551,7 +551,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <MoodTriggerMatrix logs={logs} />
+                <MoodTriggerMatrix logs={logs} money={(amount) => money(amount)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 A grid of feelings against situations. The dense cells are the

@@ -67,4 +67,18 @@ describe('generateInsights', () => {
     const ins = generateInsights(logs, '2025-04-10');
     expect(ins.some((i) => /Alpha/.test(i.title))).toBe(true);
   });
+
+  // EU ledger: the evidence line hard-coded ₹, so a euro ledger read "₹1000".
+  it('writes spend evidence with the caller money formatter, INR by default', () => {
+    const logs: CigaretteLog[] = [];
+    for (let i = 1; i <= 10; i++) {
+      const d = `2025-04-${String(i).padStart(2, '0')}`;
+      logs.push(mk(d, { brandNameSnap: 'Alpha', totalPriceInr: 100 }));
+    }
+    const brandEvidence = (ins: ReturnType<typeof generateInsights>) =>
+      ins.find((i) => /Alpha/.test(i.title))?.evidence;
+
+    expect(brandEvidence(generateInsights(logs, '2025-04-10', (n) => `€${n}`))).toMatch(/^€1000 on Alpha/);
+    expect(brandEvidence(generateInsights(logs, '2025-04-10'))).toMatch(/^₹1000 on Alpha/);
+  });
 });

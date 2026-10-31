@@ -8,14 +8,11 @@ import { cn } from '@web/components/ui/cn';
 
 export interface MoodTriggerMatrixProps {
   logs: CigaretteLog[];
+  /** Formats an amount in the ledger's currency. */
+  money: (amount: number) => string;
 }
 
-function formatRupees(v: number | null): string {
-  if (v == null) return '—';
-  return `₹${Math.round(v)}`;
-}
-
-export function MoodTriggerMatrix({ logs }: MoodTriggerMatrixProps) {
+export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
   const matrix = React.useMemo(() => moodTriggerMatrix(logs, 3), [logs]);
 
   if (matrix.total === 0 || matrix.moods.length === 0 || matrix.triggers.length === 0) {
@@ -50,7 +47,7 @@ export function MoodTriggerMatrix({ logs }: MoodTriggerMatrixProps) {
                 <span className="font-semibold">{pair.trigger}</span>
               </span>
               <span className="text-text-muted">
-                {pair.count}× · avg {formatRupees(pair.avgUnitPriceInr)}
+                {pair.count}× · avg {pair.avgUnitPriceInr == null ? '—' : money(Math.round(pair.avgUnitPriceInr))}
               </span>
             </li>
           ))}
