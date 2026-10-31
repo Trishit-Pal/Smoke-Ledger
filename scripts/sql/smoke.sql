@@ -162,3 +162,17 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+-- Phase 4: logs are written only through create_log_with_rate_limit.
+DO $$
+BEGIN
+  IF has_table_privilege('authenticated', 'public.cigarette_logs', 'INSERT') THEN
+    RAISE EXCEPTION 'authenticated can INSERT into cigarette_logs directly (bypasses the rate-limited RPC)';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'cigarette_logs' AND cmd IN ('INSERT', 'ALL')
+  ) THEN
+    RAISE EXCEPTION 'cigarette_logs still has an INSERT or ALL policy';
+  END IF;
+END $$;
