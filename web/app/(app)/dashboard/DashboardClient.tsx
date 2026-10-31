@@ -651,7 +651,7 @@ export function DashboardClient({
           <section style={idx(7)} aria-labelledby="activity-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <SectionLabel id="activity-heading" spacing="none">Recent activity</SectionLabel>
-              <Link href="/log" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
+              <Link href="/history" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                 View all →
               </Link>
             </div>
@@ -706,7 +706,7 @@ export function DashboardClient({
         <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
-            onClick={() => router.push('/log')}
+            onClick={() => router.push('/history')}
             className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >

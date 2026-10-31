@@ -11,9 +11,12 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@web/components/ui/cn';
+import { isNavActive } from '@web/lib/nav';
 
 interface NavItem {
   href: string;
+  /** Route prefixes that light this item; defaults to [href]. */
+  match?: readonly string[];
   label: string;
   icon: React.ComponentType<{
     className?: string;
@@ -23,7 +26,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/log', label: 'History', icon: ScrollText },
+  { href: '/history', label: 'Ledger', icon: ScrollText, match: ['/history', '/log'] },
   { href: '/trends', label: 'Trends', icon: TrendingUp },
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -37,8 +40,8 @@ export function BottomNav() {
       aria-label="Primary"
       className="bg-card border-t border-border h-16 flex items-stretch"
     >
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+      {NAV.map(({ href, label, icon: Icon, match }) => {
+        const active = isNavActive(pathname, match ?? [href]);
         return (
           <Link
             key={href}
