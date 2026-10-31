@@ -21,7 +21,7 @@ const INVALID_LINK = '/login?error=invalid_or_expired_link';
  * it for the victim (security scan F6).
  */
 export async function confirmEmailLinkAction(formData: FormData): Promise<void> {
-  const h = headers();
+  const h = await headers();
   const sameOrigin = isSameOriginRequest({
     secFetchSite: h.get('sec-fetch-site'),
     origin: h.get('origin'),
@@ -41,7 +41,7 @@ export async function confirmEmailLinkAction(formData: FormData): Promise<void> 
     link.type,
     sanitizeCallbackNextPath(String(formData.get('next') ?? '') || null),
   );
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: link.type });
   if (error) redirect(INVALID_LINK);

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'validation_error' }, { status: 400 });
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const [{ data: userData, error: userErr }, { data: sessionData }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.auth.getSession(),

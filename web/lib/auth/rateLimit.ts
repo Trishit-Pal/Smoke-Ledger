@@ -18,8 +18,8 @@ export interface RateLimitKey {
 }
 
 /** Best-effort client IP from the proxy headers Vercel sets in front of the app. */
-export function getClientIp(): string {
-  const h = headers();
+export async function getClientIp(): Promise<string> {
+  const h = await headers();
   const xff = h.get('x-forwarded-for');
   if (xff) {
     const first = xff.split(',')[0]?.trim();

@@ -127,7 +127,7 @@ function mapGoal(row: GoalRow): Goal {
 }
 
 async function requireServerUserId(): Promise<string> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
     error,
@@ -137,7 +137,7 @@ async function requireServerUserId(): Promise<string> {
 }
 
 export const getServerProfile = cache(async (): Promise<UserProfile> => {
-  const supabase = createClient();
+  const supabase = await createClient();
   const userId = await requireServerUserId();
   const { data, error } = await supabase
     .from('user_profiles')
@@ -231,7 +231,7 @@ export async function getServerLogsPage(opts?: {
   cursor?: LogCursor | null;
   limit?: number;
 }): Promise<LogPage> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const userId = await requireServerUserId();
   const limit = Math.max(1, Math.min(opts?.limit ?? SERVER_LOGS_PAGE_SIZE, 5000));
 
@@ -283,7 +283,7 @@ export const getServerLogs = cache(
 );
 
 export const getServerGoals = cache(async (): Promise<Goal[]> => {
-  const supabase = createClient();
+  const supabase = await createClient();
   const userId = await requireServerUserId();
   const { data, error } = await supabase
     .from('goals')
@@ -297,7 +297,7 @@ export const getServerGoals = cache(async (): Promise<Goal[]> => {
 
 /** All goals regardless of status — for the goals management page. */
 export const getServerAllGoals = cache(async (): Promise<Goal[]> => {
-  const supabase = createClient();
+  const supabase = await createClient();
   const userId = await requireServerUserId();
   const { data, error } = await supabase
     .from('goals')
@@ -365,7 +365,7 @@ export const getServerBrandsWithVariants = cache(
     const admin = createAdminClient();
     // Without a service-role key we cannot read inside unstable_cache (it forbids
     // cookies), so fall back to the request-scoped RLS client — correct, uncached.
-    if (!admin) return loadBrandsWithVariants(createClient(), userId);
+    if (!admin) return loadBrandsWithVariants(await createClient(), userId);
     // Cross-request Data Cache. Using the service-role client here is safe: every
     // query is explicitly scoped to the authenticated user's id, which is also the
     // cache key + tag, so no cross-user data can be cached or returned.
@@ -378,7 +378,7 @@ export const getServerBrandsWithVariants = cache(
 );
 
 export async function getServerSetting<T>(key: string): Promise<T | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const userId = await requireServerUserId();
   const { data, error } = await supabase
     .from('settings_kv')
@@ -463,7 +463,7 @@ export type DailySummary = {
  */
 export const getServerDailySummary = cache(
   async (opts: { from: string; to: string }): Promise<DailySummary[]> => {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.rpc('get_daily_summary', {
       p_from: opts.from,
       p_to: opts.to,
