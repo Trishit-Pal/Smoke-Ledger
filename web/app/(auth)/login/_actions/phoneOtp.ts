@@ -18,23 +18,7 @@ import {
   isSupabaseAuthCookie,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
-
-export type PhoneOtpActionState = {
-  code:
-    | 'idle'
-    | 'sent'
-    | 'invalid'
-    | 'rate_limited'
-    | 'disabled'
-    | 'unavailable'
-    | 'error';
-  message: string | null;
-};
-
-export const initialPhoneOtpActionState: PhoneOtpActionState = {
-  code: 'idle',
-  message: null,
-};
+import type { PhoneOtpActionState } from '../phoneOtpState';
 
 const sendSchema = z.object({
   countryCode: z.string().min(2).max(3),
