@@ -18,17 +18,19 @@ interface VerifyArgs {
   signature: string;
 }
 
-function decodeSecret(secret: string): Uint8Array {
+function decodeSecret(secret: string): Uint8Array<ArrayBuffer> {
   const stripped = secret.replace(/^v1,whsec_/, '').replace(/^whsec_/, '');
   const binary = atob(stripped);
-  const bytes = new Uint8Array(binary.length);
+  // Backed by a plain ArrayBuffer: crypto.subtle.importKey takes a BufferSource,
+  // which newer TypeScript lib types no longer accept as Uint8Array<ArrayBufferLike>.
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
 }
 
-async function hmacSha256Base64(keyBytes: Uint8Array, message: string): Promise<string> {
+async function hmacSha256Base64(keyBytes: Uint8Array<ArrayBuffer>, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
     keyBytes,
@@ -58,7 +60,7 @@ export async function verifyWebhookSignature(args: VerifyArgs): Promise<boolean>
   const { secret, payload, signature } = args;
   if (!secret || !signature) return false;
 
-  let keyBytes: Uint8Array;
+  let keyBytes: Uint8Array<ArrayBuffer>;
   try {
     keyBytes = decodeSecret(secret);
   } catch {
