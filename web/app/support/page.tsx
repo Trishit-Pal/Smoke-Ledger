@@ -5,10 +5,9 @@ import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_COPY, LEGAL_LINKS } from '@web/lib/legal';
 
-// Pure static support/contact content — no per-request data. Serve from the CDN
-// and revalidate daily instead of rendering per request. See SCALING_PLAN.md §2b.
-export const dynamic = 'force-static';
-export const revalidate = 86400;
+// Rendered per request: the CSP is nonce-based, and a statically pre-rendered page
+// has no nonce on its inline scripts, so the browser blocks them (hydration breaks).
+export const dynamic = 'force-dynamic';
 
 interface SupportSectionProps {
   index: string;
@@ -61,7 +60,7 @@ export default function SupportPage() {
         caption="Legal · Support"
         title={
           <>
-            How can we <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>help</span>?
+            How can we <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>help</span>?
           </>
         }
         subtitle="Account access, privacy, export, deletion, and technical support."
@@ -75,7 +74,7 @@ export default function SupportPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 22,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -111,7 +110,7 @@ export default function SupportPage() {
             style={{
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: 'var(--accent)',
+              color: 'var(--accent-ink)',
               textDecoration: 'underline',
               textUnderlineOffset: 3,
             }}
@@ -124,7 +123,7 @@ export default function SupportPage() {
             style={{
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: 'var(--accent)',
+              color: 'var(--accent-ink)',
               textDecoration: 'underline',
               textUnderlineOffset: 3,
             }}

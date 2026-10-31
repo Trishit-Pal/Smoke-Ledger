@@ -162,3 +162,29 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+-- Phase 4: logs are written only through create_log_with_rate_limit.
+DO $$
+BEGIN
+  IF has_table_privilege('authenticated', 'public.cigarette_logs', 'INSERT') THEN
+    RAISE EXCEPTION 'authenticated can INSERT into cigarette_logs directly (bypasses the rate-limited RPC)';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'cigarette_logs' AND cmd IN ('INSERT', 'ALL')
+  ) THEN
+    RAISE EXCEPTION 'cigarette_logs still has an INSERT or ALL policy';
+  END IF;
+  -- The RPC's hourly cap counts created_at; rewriting it (or the row identity)
+  -- would reopen the bypass.
+  IF has_column_privilege('authenticated', 'public.cigarette_logs', 'created_at', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.cigarette_logs', 'id', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.cigarette_logs', 'user_id', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.cigarette_logs', 'client_op_id', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated can UPDATE cigarette_logs created_at / id / user_id / client_op_id';
+  END IF;
+  IF NOT has_column_privilege('authenticated', 'public.cigarette_logs', 'notes', 'UPDATE')
+     OR NOT has_column_privilege('authenticated', 'public.cigarette_logs', 'ts_utc', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated lost UPDATE on editable cigarette_logs columns';
+  END IF;
+END $$;

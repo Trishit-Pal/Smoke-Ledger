@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
-import { parseEmailOtpType } from '@/lib/emailOtpType';
+import { confirmLinkPath, readAuthLink } from '@/lib/authLink';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   applyAuthCookiePolicy,
@@ -9,7 +9,8 @@ import {
   REMEMBER_ME_COOKIE,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
-import { sanitizeCallbackNextPath, CALLBACK_ONBOARDING_PATHS } from '@web/lib/auth/callbackNextPath';
+import { sanitizeCallbackNextPath } from '@web/lib/auth/callbackNextPath';
+import { POST_AUTH_PROFILE_COLUMNS, postAuthDestination } from '@web/lib/auth/postAuthDestination';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 type CookieOptions = AuthCookieOptions;
@@ -37,10 +38,8 @@ function redirectWithCookies(source: NextResponse, target: URL): NextResponse {
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const tokenHash = requestUrl.searchParams.get('token_hash');
-  const type = parseEmailOtpType(requestUrl.searchParams.get('type'));
-  let nextPath = sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
+  const link = readAuthLink(requestUrl.searchParams);
+  const nextPath = sanitizeCallbackNextPath(requestUrl.searchParams.get('next'));
 
   const supabaseUrl = readSupabaseUrl();
   const supabaseAnonKey = readSupabaseAnonKey();
@@ -70,27 +69,24 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+  // A token_hash link is not bound to the browser that asked for it, so opening
+  // one must not sign this browser in (security scan F6). Hand it to the confirm
+  // page, where the person on this device redeems it with a POST.
+  if (link.kind === 'confirm') {
+    return redirectWithCookies(
+      response,
+      new URL(confirmLinkPath(link, nextPath), requestUrl.origin),
+    );
+  }
+
+  // A PKCE code only works with this browser's code_verifier: exchange it now.
+  if (link.kind === 'exchange') {
+    const { error } = await supabase.auth.exchangeCodeForSession(link.code);
     if (error) {
       return redirectWithCookies(
         response,
         new URL('/login?error=invalid_or_expired_link', requestUrl.origin),
       );
-    }
-  } else if (tokenHash && type) {
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type,
-    });
-    if (error) {
-      return redirectWithCookies(
-        response,
-        new URL('/login?error=invalid_or_expired_link', requestUrl.origin),
-      );
-    }
-    if (type === 'recovery' && !nextPath) {
-      nextPath = '/reset-password';
     }
   }
 
@@ -102,56 +98,17 @@ export async function GET(request: NextRequest) {
     return redirectWithCookies(response, new URL('/login?error=session_missing', requestUrl.origin));
   }
 
-  // Honor ?next= only if it matches our allowlist AND the user has completed
-  // the gates middleware enforces. Otherwise route to the appropriate funnel
-  // step so a freshly verified user lands in onboarding, not deep in the app.
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select(
-      'onboarded_at, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at',
-    )
+    .select(POST_AUTH_PROFILE_COLUMNS)
     .eq('id', user.id)
     .maybeSingle();
 
-  const hasRequiredConsents = Boolean(
-    profile?.age_confirmed_at &&
-      profile?.terms_version &&
-      profile?.privacy_version &&
-      profile?.health_disclaimer_version &&
-      profile?.data_processing_consent_at,
+  return redirectWithCookies(
+    response,
+    new URL(
+      postAuthDestination(profile, link.kind === 'exchange' ? link.type : null, nextPath),
+      requestUrl.origin,
+    ),
   );
-  const onboarded = !!profile?.onboarded_at;
-
-  // Routing decisions use the normalised pathname to avoid issues with query
-  // strings (e.g. `/reset-password?hint=x` must still trigger the recovery
-  // flow). The actual redirect target uses `nextPath` (the original raw value)
-  // so query strings like `?ref=widget` are preserved in the final URL.
-  const nextPathname = nextPath ? new URL(nextPath, 'https://x').pathname : null;
-
-  // Recovery flow always wins so the user can finish setting a new password.
-  if (nextPathname === '/reset-password') {
-    return redirectWithCookies(response, new URL(nextPath!, requestUrl.origin));
-  }
-
-  if (!hasRequiredConsents) {
-    const target = new URL('/onboarding/privacy', requestUrl.origin);
-    // First-time signup confirmation → flag the first onboarding screen to fire
-    // the account-created celebration. Cross-device-safe (carried in the URL, not
-    // device-local storage).
-    if (type === 'signup') {
-      target.searchParams.set('welcome', '1');
-    }
-    return redirectWithCookies(response, target);
-  }
-
-  if (!onboarded) {
-    // Allow explicit onboarding hops; otherwise start at privacy.
-    if (nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname)) {
-      return redirectWithCookies(response, new URL(nextPath!, requestUrl.origin));
-    }
-    return redirectWithCookies(response, new URL('/onboarding/privacy', requestUrl.origin));
-  }
-
-  const destination = nextPath ?? '/dashboard';
-  return redirectWithCookies(response, new URL(destination, requestUrl.origin));
 }

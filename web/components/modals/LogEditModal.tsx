@@ -35,6 +35,8 @@ interface LogEditModalProps {
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   onDelete?: (log: CigaretteLog) => void;
+  /** Formats an amount in the ledger's currency (for validation copy). */
+  money: (amount: number) => string;
 }
 
 // ── Reusable form row component ─────────────────────────────────────────────
@@ -77,6 +79,7 @@ export function LogEditModal({
   onOpenChange,
   onSaved,
   onDelete,
+  money,
 }: LogEditModalProps) {
   const router = useRouter();
   const [saving, setSaving] = React.useState(false);
@@ -143,7 +146,7 @@ export function LogEditModal({
     }
     const unit = price ? round2(Number(price)) : null;
     if (unit != null && (Number.isNaN(unit) || unit < 0 || unit > MAX_PRICE_INR)) {
-      setError(`Price per stick must be between ₹0 and ₹${MAX_PRICE_INR.toLocaleString('en-IN')}.`);
+      setError(`Price per stick must be between ${money(0)} and ${money(MAX_PRICE_INR)}.`);
       return;
     }
 
@@ -236,7 +239,7 @@ export function LogEditModal({
                         setSelectedVariant(null);
                       }}
                       className={
-                        'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                        'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
                         (selectedBrand?.id === b.id
                           ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
                           : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')
@@ -259,7 +262,7 @@ export function LogEditModal({
                       type="button"
                       onClick={() => setSelectedVariant(v)}
                       className={
-                        'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                        'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
                         (selectedVariant?.id === v.id
                           ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
                           : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')

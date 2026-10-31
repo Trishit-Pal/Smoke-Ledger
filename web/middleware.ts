@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isReauthRequest } from '@/lib/reauth';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
 import {
   applyAuthCookiePolicy,
@@ -28,8 +29,10 @@ function isOnboardingRoute(pathname: string): boolean {
   return pathname.startsWith('/onboarding');
 }
 
+// Reachable signed in or out, and exempt from the onboarding gates: the confirm
+// page must be able to warn a signed-in visitor before an account switch.
 function isCallbackRoute(pathname: string): boolean {
-  return pathname === '/auth/callback';
+  return pathname === '/auth/callback' || pathname === '/auth/confirm';
 }
 
 function isRecoveryRoute(pathname: string): boolean {
@@ -134,6 +137,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isCallbackRoute(pathname)) {
+    return response;
+  }
+
+  // Signing in again before account deletion: let the signed-in user through.
+  if (isReauthRequest(pathname, url.searchParams.get('reason'))) {
     return response;
   }
 

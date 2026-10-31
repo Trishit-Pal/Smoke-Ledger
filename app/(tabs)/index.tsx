@@ -13,7 +13,7 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { AnimatedNumber } from '@/components/anim/AnimatedNumber';
 import { spacing, typography, fonts, radius } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday, ledgerDaysAgo } from '@/store/session';
 import { useTheme } from '@/hooks/useTheme';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import {
@@ -34,9 +34,11 @@ import { isBirthdayToday } from '@/domain/age';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
-import { formatInr, formatDelta } from '@/lib/format';
+import { formatDelta, formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
+import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
-import { todayIst, daysAgoIst, dayOfWeekShort, formatIndianDate } from '@/lib/date';
+import { dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -247,7 +249,7 @@ function QuickLogRow({
 
   const lastPrice =
     lastEntry?.unitPriceInr != null
-      ? maskInr(lastEntry.unitPriceInr, discreet, (n) => formatInr(n, { compact: true }))
+      ? maskInr(lastEntry.unitPriceInr, discreet, (n) => ledgerMoney(n, { compact: true }))
       : null;
 
   return (
@@ -389,8 +391,8 @@ export default function Home() {
     };
   }, []);
 
-  const today = useMemo(() => todayIst(), [refreshing]);
-  const last7Start = useMemo(() => daysAgoIst(6), [refreshing]);
+  const today = ledgerToday();
+  const last7Start = ledgerDaysAgo(6);
 
   // ── computed ──
   const todaySticks = useMemo(() => sticksOn(logs, today), [logs, today]);
@@ -406,7 +408,12 @@ export default function Home() {
   }, [logs, last7Start, today]);
 
   const forecast = useMemo(() => forecastMonthlySpend(logs, today), [logs, today]);
-  const insights = useMemo(() => generateInsights(logs, today), [logs, today]);
+  const currency = profile?.currency ?? 'INR';
+  const locale = localeForCountry(profile?.country);
+  const insights = useMemo(
+    () => generateInsights(logs, today, (amount) => formatMoney(amount, currency, { locale })),
+    [logs, today, currency, locale],
+  );
   const last = useMemo(() => lastLog(logs), [logs]);
   // Streak + savings derive from the canonical daily summary (quantity-correct,
   // up to 365 days), so the streak no longer truncates at the 90-day log window
@@ -429,8 +436,8 @@ export default function Home() {
 
   const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = useMemo(
-    () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
-    [activeGoal, logs, today],
+    () => (activeGoal ? evaluateGoal(activeGoal, logs, today, { currency, locale }) : null),
+    [activeGoal, logs, today, currency, locale],
   );
   // Spend caps embed ₹ in evaluateGoal().label/explanation — hide under discreet mode.
   const goalHideMoney = activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile);
@@ -518,6 +525,7 @@ export default function Home() {
       const unit = lastL?.unitPriceInr ?? null;
       const total = unit != null ? unit * opts.quantity : null;
       await createLog({
+        timeZone: ledgerTimeZone(),
         tsUtc: new Date().toISOString(),
         brandId: opts.brandId,
         brandNameSnap: opts.brandName,
@@ -546,7 +554,7 @@ export default function Home() {
       dispatchMood(isAbove ? 'concern' : 'regret', {
         caption: isAbove ? 'Above your usual today.' : 'Noted. No judgment.',
       });
-      const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${formatInr(total, { compact: true })}` : ''}`;
+      const label = `Logged ${opts.quantity} · ${opts.brandName ?? 'entry'}${total != null ? ` · ${ledgerMoney(total, { compact: true })}` : ''}`;
       setToast(label);
       if (toastTimerRef.current !== null) {
         clearTimeout(toastTimerRef.current);
@@ -675,12 +683,12 @@ export default function Home() {
               ) : (
                 <AnimatedNumber
                   value={todaySpend}
-                  format={(n) => formatInr(n, { compact: true })}
+                  format={(n) => ledgerMoney(n, { compact: true })}
                   style={[
                     typography.h1 as TextStyle,
                     { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },
                   ]}
-                  accessibilityLabel={`Spent today: ${formatInr(todaySpend)}`}
+                  accessibilityLabel={`Spent today: ${ledgerMoney(todaySpend)}`}
                 />
               )}
             </View>
@@ -912,7 +920,7 @@ export default function Home() {
                 ) : (
                   <AnimatedNumber
                     value={savings.totalInr}
-                    format={(n) => formatInr(n, { compact: true })}
+                    format={(n) => ledgerMoney(n, { compact: true })}
                     style={[
                       typography.h1 as TextStyle,
                       { fontFamily: fonts.display, color: theme.accent, fontVariant: ['tabular-nums'] },
@@ -921,7 +929,7 @@ export default function Home() {
                 )}
                 {savings.ratePerStick != null ? (
                   <Text variant="small" muted>
-                    {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × {maskInr(savings.ratePerStick, hidden, (n) => formatInr(n))} per stick
+                    {maskCount(savings.sticksAvoided, hidden)} sticks below baseline since you started × {maskInr(savings.ratePerStick, hidden, (n) => ledgerMoney(n))} per stick
                   </Text>
                 ) : null}
               </View>
@@ -943,7 +951,7 @@ export default function Home() {
                 ) : (
                   <AnimatedNumber
                     value={forecast.forecast}
-                    format={(n) => formatInr(n, { compact: true })}
+                    format={(n) => ledgerMoney(n, { compact: true })}
                     style={[
                       typography.h1 as TextStyle,
                       { fontFamily: fonts.display, color: theme.text, fontVariant: ['tabular-nums'] },

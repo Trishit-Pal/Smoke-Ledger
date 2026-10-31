@@ -6,14 +6,14 @@ import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { spacing } from '@/constants/theme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone, ledgerToday } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { success } from '@/lib/haptics';
-import { formatInr } from '@/lib/format';
-import { formatTime, todayIst } from '@/lib/date';
+import { ledgerMoney } from '@/lib/ledgerMoney';
+import { formatTime } from '@/lib/date';
 import { sticksOn, spendOn } from '@/domain/calc';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
@@ -28,7 +28,7 @@ export default function LogTab() {
   const discreet = isDiscreetMode(profile);
   const [error, setError] = useState<string | null>(null);
 
-  const today = todayIst();
+  const today = ledgerToday();
   const todayLogs = logs.filter((l) => l.localDate === today).slice(0, 12);
 
   const quickAdd = async (quantity: number) => {
@@ -38,6 +38,7 @@ export default function LogTab() {
     const now = new Date().toISOString();
     const unit = last?.unitPriceInr ?? null;
     await createLog({
+        timeZone: ledgerTimeZone(),
       tsUtc: now,
       brandId: last?.brandId ?? null,
       brandNameSnap: last?.brandNameSnap ?? null,
@@ -73,6 +74,7 @@ export default function LogTab() {
     }
     const now = new Date().toISOString();
     await createLog({
+        timeZone: ledgerTimeZone(),
       tsUtc: now,
       brandId: last.brandId,
       brandNameSnap: last.brandNameSnap,
@@ -129,7 +131,7 @@ export default function LogTab() {
           <Text variant="h3">Today</Text>
           <Text variant="caption" muted>
             {maskCount(sticksOn(logs, today), discreet)} sticks ·{' '}
-            {maskInr(spendOn(logs, today), discreet, (n) => formatInr(n))}
+            {maskInr(spendOn(logs, today), discreet, (n) => ledgerMoney(n))}
           </Text>
         </View>
         {error ? (
@@ -156,10 +158,10 @@ export default function LogTab() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text variant="bodyStrong">
-                    {maskInr(l.totalPriceInr, discreet, (n) => formatInr(n))}
+                    {maskInr(l.totalPriceInr, discreet, (n) => ledgerMoney(n))}
                   </Text>
                   <Text variant="small" muted>
-                    {formatTime(l.tsUtc)}
+                    {formatTime(l.tsUtc, ledgerTimeZone())}
                   </Text>
                 </View>
               </View>

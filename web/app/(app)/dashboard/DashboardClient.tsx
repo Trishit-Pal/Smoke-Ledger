@@ -49,7 +49,7 @@ import { WeekStrip } from '@web/components/dashboard/WeekStrip';
 import { ActivityLog } from '@web/components/dashboard/ActivityLog';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import { FloatingOrb } from '@web/components/visual/FloatingOrb';
-import { SectionLabel, MetricRow } from '@web/components/visual';
+import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
 import {
   dispatchMood,
   dispatchMilestone,
@@ -200,7 +200,13 @@ export function DashboardClient({
     }));
   }, [logs, today, zone]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
-  const insights = React.useMemo(() => generateInsights(logs, today), [logs, today]);
+  const insights = React.useMemo(
+    () =>
+      generateInsights(logs, today, (amount) =>
+        formatMoney(amount, profile.currency, { locale: localeForCountry(profile.country) }),
+      ),
+    [logs, today, profile.currency, profile.country],
+  );
 
   // Gated real substitute for "cravings resisted" (unobservable, and the
   // concept doesn't exist in the domain model): the average self-rated
@@ -389,35 +395,21 @@ export function DashboardClient({
         </header>
 
         {/* ─────────────── Timeframe switch ─────────────── */}
-        <div
-          style={idx(1)}
-          role="tablist"
-          aria-label="Time frame"
-          className="flex items-center gap-xs self-center rounded-full border border-[var(--rule)] p-xs"
-        >
-          {WINDOWS.map((w) => {
-            const selected = windowDays === w.days;
-            return (
-              <button
-                key={w.days}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setWindowDays(w.days)}
-                className="min-h-[40px] px-md rounded-full text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-                style={{
-                  background: selected ? 'var(--text)' : 'transparent',
-                  color: selected ? 'var(--bg)' : 'var(--text-muted)',
-                }}
-              >
-                {w.label}
-              </button>
-            );
-          })}
+        <div style={idx(1)} className="flex justify-center">
+          <ChoiceRun
+            ariaLabel="Time frame"
+            options={WINDOWS.map((w) => ({ value: w.days, label: w.label }))}
+            value={windowDays}
+            onSelect={(days) => {
+              if (days !== null) setWindowDays(days);
+            }}
+            allowClear={false}
+          />
         </div>
 
         {/* ─────────────── Headline · the period in one number ─────────────── */}
         <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col subsection-gap">
+          <h1 className="sr-only">Dashboard</h1>
           <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
@@ -426,6 +418,7 @@ export function DashboardClient({
               <span className="editorial-caption mb-sm">{periodCap}</span>
               <div
                 className="editorial-numeral editorial-headline-rise"
+                role="img"
                 aria-label={
                   hidden
                     ? 'Count hidden'
@@ -439,6 +432,7 @@ export function DashboardClient({
               <span className="editorial-caption mb-sm">Spend</span>
               <div
                 className="editorial-numeral--small nums-tabular"
+                role="img"
                 aria-label={hidden ? 'Spend hidden' : `Spent ${money(spend)}`}
               >
                 {hidden ? '•••' : money(spend, { compact: true })}
@@ -463,7 +457,7 @@ export function DashboardClient({
               onAdvanced={() => router.push('/log/new')}
             />
             {toast ? (
-              <p role="status" aria-live="polite" className="text-small text-accent mt-md">{toast}</p>
+              <p role="status" aria-live="polite" className="text-small text-accent-ink mt-md">{toast}</p>
             ) : null}
             {quickLogError ? (
               <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
@@ -475,7 +469,7 @@ export function DashboardClient({
                     type="button"
                     onClick={() => runQuickLog(lastLogParams)}
                     disabled={quickLogPending}
-                    className="shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center min-h-11 px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {quickLogPending ? 'Retrying…' : 'Retry'}
                   </button>
@@ -486,7 +480,7 @@ export function DashboardClient({
         </section>
 
         {/* ─────────────── KPI strip ─────────────── */}
-        <section style={idx(3)} aria-label="Key numbers at a glance" className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+        <section style={idx(3)} aria-label="Key numbers at a glance" className="grid grid-cols-2 gap-x-lg gap-y-xl lg:grid-cols-4">
           <KpiCard
             label="Today"
             value={hidden ? '••' : todaySticks}
@@ -600,11 +594,11 @@ export function DashboardClient({
         {goalProgress ? (
           <section style={idx(5)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
-              <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
+              <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent-ink transition-colors">
                 Your goal
               </Link>
               {hasMoreGoals ? (
-                <Link href="/goals" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+                <Link href="/goals" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                   View all goals →
                 </Link>
               ) : null}
@@ -657,7 +651,7 @@ export function DashboardClient({
           <section style={idx(7)} aria-labelledby="activity-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <SectionLabel id="activity-heading" spacing="none">Recent activity</SectionLabel>
-              <Link href="/log" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+              <Link href="/history" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                 View all →
               </Link>
             </div>
@@ -712,7 +706,7 @@ export function DashboardClient({
         <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
-            onClick={() => router.push('/log')}
+            onClick={() => router.push('/history')}
             className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >

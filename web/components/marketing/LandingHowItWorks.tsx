@@ -54,7 +54,7 @@ export function LandingHowItWorks() {
             className="editorial-headline"
             style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
           >
-            Three <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>small</span> steps.
+            Three <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>small</span> steps.
           </h2>
         </header>
 
@@ -86,7 +86,7 @@ export function LandingHowItWorks() {
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 28,
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   fontStyle: 'italic',
                   lineHeight: 1,
                   fontWeight: 500,

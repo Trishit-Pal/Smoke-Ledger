@@ -14,19 +14,19 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Divider } from '@/components/ui/Divider';
 import { spacing, fonts, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerToday } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { dispatchGoalCompletion, dispatchGoalDeletion } from '@/lib/character/mood';
 import { isDiscreetMode } from '@/lib/discreet';
-import { todayIst } from '@/lib/date';
+import { localeForCountry } from '@/lib/regions';
 import type { Goal } from '@/types';
 
 export default function GoalsTab() {
   const router = useRouter();
   const theme = useTheme();
-  const today = todayIst();
+  const today = ledgerToday();
 
   const goals = useSession((s) => s.goals);
   const logs = useSession((s) => s.logs);
@@ -90,7 +90,10 @@ export default function GoalsTab() {
   }, [removeGoal]);
 
   function GoalRow({ goal }: { goal: Goal }) {
-    const progress = evaluateGoal(goal, logs, today);
+    const progress = evaluateGoal(goal, logs, today, {
+      currency: profile?.currency ?? 'INR',
+      locale: localeForCountry(profile?.country),
+    });
     const hideMoney = goal.type === 'spend_cap_daily' && discreet;
     const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
     const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;

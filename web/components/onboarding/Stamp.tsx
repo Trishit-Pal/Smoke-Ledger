@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useReduceMotion } from './useReduceMotion';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 export interface StampProps {
   show: boolean;
@@ -54,7 +54,7 @@ export function Stamp({
         transition: reduce
           ? 'opacity 180ms'
           : show
-            ? 'opacity 240ms ease-out, transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+            ? 'opacity 240ms ease-out, transform 320ms var(--ease-editorial)'
             : 'opacity 180ms, transform 180ms',
         whiteSpace: 'nowrap',
         ...style,

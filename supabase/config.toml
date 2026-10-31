@@ -63,3 +63,15 @@ content_path = "./supabase/templates/magic_link.html"
 [auth.email.template.recovery]
 subject = "Reset your Smoke Ledger password"
 content_path = "./supabase/templates/recovery.html"
+
+# Edge Functions: pin JWT verification here so a deploy flag cannot silently
+# open a function. send-sms-otp is called by Supabase Auth with an HMAC-signed
+# webhook (verified in code), not with a user JWT.
+[functions.delete-account]
+verify_jwt = true
+
+[functions.audit-record]
+verify_jwt = true
+
+[functions.send-sms-otp]
+verify_jwt = false

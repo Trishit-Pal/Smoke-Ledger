@@ -45,6 +45,7 @@ import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeReval
 import { toSafeErrorMessage } from '@/lib/errors';
 import { LogEditModal } from '@web/components/modals/LogEditModal';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
+import { SectionLabel } from '@web/components/visual';
 import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
@@ -221,9 +222,9 @@ export function HistoryClient({
               className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
               style={idx(0)}
             />
-            <span className="editorial-caption nums-tabular">
+            <h1 className="editorial-caption nums-tabular">
               {spanLabel ? `History · ${spanLabel}` : 'History'}
-            </span>
+            </h1>
             <span
               aria-hidden
               className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
@@ -346,12 +347,13 @@ export function HistoryClient({
                           {relLabel}
                         </span>
                       ) : null}
-                      <h2
+                      <SectionLabel
                         id={`day-${group.date}`}
-                        className="editorial-caption nums-tabular"
+                        spacing="none"
+                        className="nums-tabular"
                       >
                         {formatIndianDate(group.date)}
-                      </h2>
+                      </SectionLabel>
                       <span className="text-small text-text-muted nums-tabular">
                         {maskInr(group.totalSpend, discreet, (n) => money(n))}
                         <span className="text-text-faint"> spent</span>
@@ -398,7 +400,7 @@ export function HistoryClient({
                               ) : null}
                             </dt>
                             <dd className="text-small text-text-muted nums-tabular">
-                              <span className="nums-tabular">{formatTime(log.tsUtc)}</span>
+                              <span className="nums-tabular">{formatTime(log.tsUtc, zone)}</span>
                               <span className="text-text-faint"> · </span>
                               <span>{qtyText}</span>
                             </dd>
@@ -482,6 +484,7 @@ export function HistoryClient({
         open={editingLog !== null}
         log={editingLog}
         brands={brands}
+        money={(amount) => money(amount)}
         onOpenChange={(open) => {
           if (!open) setEditingLog(null);
         }}

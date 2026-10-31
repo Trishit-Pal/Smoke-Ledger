@@ -2,7 +2,34 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
+<!-- Format: ## 2026-10-31 — 1a40fb0
+- all stale stamps: re-pointed at a commit that exists after the stack was rebased (earlier entries cite pre-rebase hashes); no spec prose changed.
+
+## 2026-10-31 — 94fa89d
+- identity-profile: ThemedSelect now returns focus to its trigger and uses accent ink for the selected option.
+- auth, celebrations, infra-ops: re-stamped after the design pass (token-only colour swaps on auth pages, landing CTA no longer fires confetti on hover, framer-motion removed); no behaviour these sections describe changed.
+- architecture: re-stamped — /log now redirects to the Ledger (/history) and its loader getLogPageData is gone; the History data path described here is unchanged.
+
+## <date> — <commit> ; then a bullet per section changed. -->
+
+## 2026-10-31 — 6268c8d
+- architecture: ledgerToday / ledgerDaysAgo beside ledgerTimeZone in the session store.
+- data-model: cigarette_logs UPDATE is a column grant; created_at, id, user_id, client_op_id fixed.
+- identity-profile: native insights, goals and mood matrix in the profile currency; comma decimals.
+- logging: native "today" in the ledger zone; edits cannot rewrite the rate-limit window.
+- celebrations: re-verified (Home today and money wiring only).
+- security-privacy: column-level UPDATE closes the created_at cap bypass.
+
+## 2026-10-31 — c3ec7a1
+- architecture: ledger zone for local_date/local_hour; hashed, purged rate-limit counters.
+- data-model: region table, country/currency trigger and RPCs, anon default-deny, erase clears identity, logs written only via the RPC.
+- auth: confirm-before-redeem email links, reauth route, phone sign-in opt-in, one link-type parse.
+- identity-profile: country picker (non-euro EU hidden), reset/onboarding region fixes, native ledger money, erase clears identity.
+- logging: local date/hour and backdate picker follow the ledger zone on web and native; INSERT only through the RPC.
+- goals-insights: spend caps and brand evidence in the ledger currency.
+- celebrations: re-verified; streak and dashboard flow unchanged by the money/zone work.
+- security-privacy: logs-RPC-only, anon default-deny, legal pages force-dynamic for the nonce CSP, tightened headers, phone opt-in.
+- infra-ops: CI repaired (was 0 jobs), pinned actions, gitleaks and advisory audit jobs, weekly posture audit, Dependabot.
 
 ## 2026-10-30 — uncommitted on cc9f3a5 (security hardening phase 1; partial update, sections not re-stamped)
 - auth: no sign-in surface enumerates accounts any more (password copy is generic, email-link treats an unknown address as sent); `auth_email_exists` lookup removed; login rate limits are per IP, per email+IP and 30/h per email; email-link `type` allowlist via `parseEmailOtpType`; erase is the one bypass of identity immutability.

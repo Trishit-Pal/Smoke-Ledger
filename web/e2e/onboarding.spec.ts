@@ -31,6 +31,6 @@ test.describe('onboarding → done summary', () => {
 
     // Dashboard renders the timeframe hub.
     await page.goto('/dashboard');
-    await expect(page.getByRole('tablist', { name: 'Time frame' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Time frame' })).toBeVisible();
   });
 });

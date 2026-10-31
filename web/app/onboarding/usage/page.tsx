@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
 import { setSetting } from '@/db/repositories/settings';
-import { updateProfile, setOnboardingStep, setRegion } from '@/db/repositories/profile';
+import { getProfile, updateProfile, setOnboardingStep, setRegion } from '@/db/repositories/profile';
 import { CountryField } from '@web/components/settings/CountryField';
-import { isRegionPickerEnabled, regionFor } from '@/lib/regions';
+import { isRegionPickerEnabled, regionChangeNeeded, regionFor } from '@/lib/regions';
 import { formatMoney } from '@/lib/format';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -37,6 +37,9 @@ const PURCHASE_OPTIONS: PurchaseOption[] = [
   { id: 'mixed', label: 'Mix of both' },
 ];
 
+// An account with no country is the India ledger.
+const INDIA_COUNTRY = 'IN';
+
 export default function OnboardingUsagePage() {
   const router = useRouter();
   // Draft-backed so values survive back/forward navigation within the session.
@@ -50,8 +53,26 @@ export default function OnboardingUsagePage() {
   const windowDays = draftWindow ?? 30;
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [country, setCountry] = React.useState('IN');
+  // Start from the saved country so going Back never silently switches it.
+  const [savedCountry, setSavedCountry] = React.useState<string | null>(null);
+  const [country, setCountry] = React.useState(INDIA_COUNTRY);
   const pickerOn = isRegionPickerEnabled();
+  React.useEffect(() => {
+    if (!pickerOn) return;
+    let cancelled = false;
+    getProfile()
+      .then((profile) => {
+        if (cancelled) return;
+        setSavedCountry(profile.country ?? null);
+        setCountry(profile.country ?? INDIA_COUNTRY);
+      })
+      .catch(() => {
+        // Keep India; Continue will still save whatever the user picks.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOn]);
   const region = regionFor(country);
 
   const n = Math.max(0, Math.min(MAX_TICKS, Number(perDay) || 0));
@@ -78,7 +99,7 @@ export default function OnboardingUsagePage() {
           baselineWindowDays: windowDays,
         }),
       ]);
-      if (pickerOn) await setRegion(country);
+      if (pickerOn && regionChangeNeeded(savedCountry, country)) await setRegion(country);
       await setOnboardingStep('goal');
       router.push('/onboarding/goal');
     } catch (e) {

@@ -70,6 +70,7 @@ import {
 } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
+import { SectionLabel } from '@web/components/visual';
 
 type BusyAction =
   | null
@@ -116,9 +117,9 @@ function SectionHead({
 }) {
   return (
     <div className="flex flex-col gap-xs">
-      <h2 id={id} className="editorial-caption">
+      <SectionLabel id={id} spacing="none">
         {caption}
-      </h2>
+      </SectionLabel>
       <p className="text-small text-text-muted max-w-[44ch]">{deck}</p>
     </div>
   );
@@ -972,7 +973,13 @@ export function SettingsClient({
             />
             {isRegionPickerEnabled() ? (
               <div className="flex flex-col gap-sm py-md" style={{ borderTop: '1px solid var(--rule)' }}>
-                <CountryField value={country} onChange={setCountry} />
+                <CountryField
+                  value={country}
+                  onChange={(next) => {
+                    setCountry(next);
+                    setConfirmRegionReset(false);
+                  }}
+                />
                 <div className="flex items-center gap-md">
                   <TextLink
                     onClick={() => void onSaveCountry(false)}
@@ -1388,7 +1395,7 @@ export function SettingsClient({
             aria-live="polite"
           >
             {toast ? (
-              <p className="text-small italic" style={{ color: 'var(--accent)' }}>
+              <p className="text-small italic" style={{ color: 'var(--accent-ink)' }}>
                 {toast}
               </p>
             ) : null}

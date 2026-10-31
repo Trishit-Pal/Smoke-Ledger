@@ -42,7 +42,7 @@ export function LandingFooter() {
             lineHeight: 1.3,
           }}
         >
-          Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent)' }}> Ledger</span>{' '}
+          Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent-ink)' }}> Ledger</span>{' '}
           · Vol. I · Est. 2026
         </p>
         <div
@@ -66,7 +66,7 @@ export function LandingFooter() {
                   fontFamily: 'var(--font-display)',
                   fontStyle: 'italic',
                   fontSize: 13,
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   textDecoration: 'none',
                 }}
               >

@@ -54,12 +54,13 @@ import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isDiscreetMode, maskInr } from '@/lib/discreet';
 
-import { LineChart, BarChart, AnimatedBarChart, Donut } from '@web/components/charts/dynamic';
+import { LineChart, BarChart, Donut } from '@web/components/charts/dynamic';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
+import { CHART_SERIES } from '@web/components/charts/chartTheme';
 import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@web/components/anim/dynamic';
-import { SectionLabel } from '@web/components/visual';
+import { SectionLabel, ChoiceRun } from '@web/components/visual';
 import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
 
@@ -306,43 +307,17 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
         </header>
 
         {/* ─────────────── Period selector — small-caps text run ─────────────── */}
-        <nav
-          style={idx(1)}
-          aria-label="Select trend period"
-          className="flex items-center justify-center"
-        >
-          <ul className="flex items-center gap-sm flex-wrap justify-center">
-            {PERIOD_OPTIONS.map((period, i) => {
-              const isActive = windowDays === period.days;
-              return (
-                <li key={period.days} className="flex items-center gap-sm">
-                  <button
-                    type="button"
-                    onClick={() => setWindowDays(period.days)}
-                    aria-pressed={isActive}
-                    className="editorial-caption focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm transition-colors"
-                    style={{
-                      color: isActive ? 'var(--text)' : 'var(--text-muted)',
-                      textDecoration: isActive ? 'underline' : 'none',
-                      textDecorationColor: 'var(--rule-strong)',
-                      textUnderlineOffset: '4px',
-                      textDecorationThickness: '1px',
-                      padding: '6px 4px',
-                      minHeight: '32px',
-                    }}
-                  >
-                    {period.label}
-                  </button>
-                  {i < PERIOD_OPTIONS.length - 1 ? (
-                    <span aria-hidden className="text-text-faint" style={{ fontSize: 11 }}>
-                      ·
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <div style={idx(1)} className="flex justify-center">
+          <ChoiceRun
+            ariaLabel="Select trend period"
+            options={PERIOD_OPTIONS.map((p) => ({ value: p.days, label: p.label }))}
+            value={windowDays}
+            onSelect={(days) => {
+              if (days !== null) setWindowDays(days);
+            }}
+            allowClear={false}
+          />
+        </div>
 
         {hasData ? (
           <>
@@ -352,6 +327,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
               aria-labelledby="period-heading"
               className="flex flex-col gap-lg"
             >
+              <h1 className="sr-only">Trends</h1>
               <h2 id="period-heading" className="sr-only">
                 {periodLabel} totals
               </h2>
@@ -361,6 +337,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   <span className="editorial-caption mb-sm">Sticks · {periodLabel.toLowerCase()}</span>
                   <div
                     className="editorial-numeral editorial-headline-rise nums-tabular"
+                    role="img"
                     aria-label={
                       discreet
                         ? 'Period sticks total hidden'
@@ -456,7 +433,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <AnimatedBarChart
+                <BarChart
                   data={spendBars}
                   height={180}
                   formatY={(v) => money(v, { compact: true })}
@@ -551,7 +528,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <MoodTriggerMatrix logs={logs} />
+                <MoodTriggerMatrix logs={logs} money={(amount) => money(amount)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 A grid of feelings against situations. The dense cells are the
@@ -571,13 +548,9 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
             <section style={idx(9)} aria-labelledby="brand-heading">
               <div className="ink-panel rounded-xl p-xl flex flex-col gap-lg">
                 <div className="flex items-baseline justify-between gap-md">
-                  <h2
-                    id="brand-heading"
-                    className="editorial-caption"
-                    style={{ color: 'var(--ink-surface-muted)' }}
-                  >
+                  <SectionLabel id="brand-heading" spacing="none" tone="inverse">
                     Brand spend · top 5
-                  </h2>
+                  </SectionLabel>
                   <span
                     className="text-caption nums-tabular"
                     style={{ color: 'var(--ink-surface-muted)' }}
@@ -615,13 +588,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                                 aria-hidden
                                 className="w-2 h-2 rounded-full shrink-0"
                                 style={{
-                                  backgroundColor: [
-                                    '#2FA39B',
-                                    '#4C7CD9',
-                                    '#D99A2B',
-                                    '#C85A54',
-                                    '#8A6FC2',
-                                  ][i % 5],
+                                  backgroundColor: CHART_SERIES[i % CHART_SERIES.length],
                                 }}
                               />
                               <span

@@ -92,3 +92,16 @@ describe('edge functions use the hardened helpers', () => {
     expect(migration).toContain("extensions.digest(uid::text || ':' || pepper, 'sha256')");
   });
 });
+
+describe('Edge Function JWT verification is pinned in config, not left to deploy flags', () => {
+  const config = read('supabase', 'config.toml').replace(/\r\n/g, '\n');
+
+  it.each([
+    ['delete-account', 'true'],
+    ['audit-record', 'true'],
+    // The Send-SMS hook is called by Supabase Auth with an HMAC signature, not a user JWT.
+    ['send-sms-otp', 'false'],
+  ])('%s has verify_jwt = %s', (fn, expected) => {
+    expect(config).toContain(`[functions.${fn}]\nverify_jwt = ${expected}\n`);
+  });
+});

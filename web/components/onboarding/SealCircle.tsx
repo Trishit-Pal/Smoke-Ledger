@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useReduceMotion } from './useReduceMotion';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 export interface SealCircleProps {
   size?: number;
@@ -36,7 +36,7 @@ export function SealCircle({
         transformOrigin: 'center',
         transition: reduce
           ? 'opacity 200ms'
-          : 'opacity 360ms ease-out, transform 520ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+          : 'opacity 360ms ease-out, transform 520ms var(--ease-editorial)',
         transitionDelay: reduce ? '0ms' : '600ms',
       }}
     >

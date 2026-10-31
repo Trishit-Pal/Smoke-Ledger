@@ -429,13 +429,6 @@ export async function getDashboardData() {
   };
 }
 
-export async function getLogPageData() {
-  const profile = await getServerProfile();
-  const today = todayInZone(timezoneForCountry(profile.country));
-  const logs = await getServerLogs({ fromDate: today });
-  return { profile, logs };
-}
-
 /**
  * History: newest page of this user's lifetime logs (no fromDate).
  * `nextCursor` drives Load older via fetchMoreHistoryLogs — same unbounded window.

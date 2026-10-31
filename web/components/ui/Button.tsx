@@ -21,16 +21,16 @@ export interface ButtonProps {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: 'bg-accent text-white hover:opacity-90',
-  secondary: 'bg-accent-soft text-accent hover:opacity-90',
+  primary: 'bg-accent-ink text-on-accent hover:opacity-90',
+  secondary: 'bg-accent-soft text-accent-ink hover:opacity-90',
   ghost: 'border border-border bg-transparent hover:bg-card text-text',
-  danger: 'bg-danger text-white hover:opacity-90',
+  danger: 'bg-danger text-on-accent hover:opacity-90',
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
-  sm: 'h-9 px-3 text-small',
+  sm: 'h-11 px-3 text-small',
   md: 'h-11 px-4 text-body-strong',
-  lg: 'h-13 px-6 text-body-strong',
+  lg: 'h-14 px-6 text-body-strong',
 };
 
 export function Button({

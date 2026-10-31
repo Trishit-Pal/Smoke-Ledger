@@ -15,8 +15,11 @@
   --border: #E1E5EB;
   --text: #0B0F14;
   --text-muted: #5A6673;
-  --text-faint: #A9B3BF;
+  --text-faint: #64707D;
   --accent: #2FA39B;
+  /* AA-safe teal for text and filled controls. --accent stays for rings, charts, rules. */
+  --accent-ink: #1C756E;
+  --on-accent: #FFFFFF;
   --accent-soft: #E4F3F1;
   --accent-glow: rgba(47, 163, 155, 0.25);
   --shadow-card: 0 8px 32px rgba(11, 15, 20, 0.06);
@@ -25,6 +28,8 @@
   --shadow-card-lift: 0 16px 40px rgba(11, 15, 20, 0.10);
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
+  /* The one house easing: slow arrival, no overshoot. */
+  --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Editorial tokens (Dashboard revamp pilot) */
   /* Hairline rule — slightly more visible than --border so it can carry layout work
@@ -35,6 +40,8 @@
      uses this when 7-day average trends up vs baseline. Saved teal/--accent for
      genuinely positive moments. */
   --warn-earth: #B86A4A;
+  /* AA-safe terracotta for text and destructive fills (replaces alarm-red). */
+  --warn-earth-ink: #9C5336;
   --warn-earth-soft: #F2E4DD;
   /* Inverted ink surface for one editorial contrast section (week-at-a-glance). */
   --ink-surface: #14191F;
@@ -74,8 +81,10 @@
   --border: #232B35;
   --text: #E6EAEF;
   --text-muted: #A9B3BF;
-  --text-faint: #5A6673;
+  --text-faint: #7D8896;
   --accent: #2FA39B;
+  --accent-ink: #33B0A8;
+  --on-accent: #0B0F14;
   --accent-soft: #163230;
   --accent-glow: rgba(47, 163, 155, 0.18);
   --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.35);
@@ -85,6 +94,7 @@
   --rule: #2A333F;
   --rule-strong: #3A4452;
   --warn-earth: #D08267;
+  --warn-earth-ink: #D08267;
   --warn-earth-soft: #2B1C16;
   /* In dark mode the inverted section flips to a barely-elevated near-paper tone
      so it still feels editorial rather than just "more dark". */
@@ -189,6 +199,13 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  /* Text fields always show a keyboard focus ring — underline-only editorial
+     inputs relied on a 1px border change, which is not a visible indicator. */
+  input:focus-visible:not([type='checkbox']):not([type='radio']),
+  textarea:focus-visible {
+    outline: 2px solid var(--accent-ink) !important;
+    outline-offset: 2px;
   }
   /* Focus ring */
   .focus-ring {
@@ -353,9 +370,12 @@
       box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: transform;
   }
-  .elevated-hover:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-card-lift);
+  /* Lift only where hover exists — on touch it would stick after a tap. */
+  @media (hover: hover) {
+    .elevated-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-lift);
+    }
   }
   /* Perspective context for BarChart3D's bar-tilt transform. */
   .scene-3d {
@@ -453,7 +473,7 @@
   /* ───────── Onboarding editorial motion (new in 0.2.0 redesign) ─────────
      pillarRise — Welcome screen TiltCards land from a rotated, depth-pushed
      start. Stagger via inline animation-delay on each card.
-     chipPopIn — Brands "selected pile" pills land with a back-spring.
+     chipPopIn — Brands "selected pile" pills settle in (no overshoot).
      driftSlow — Welcome page №.01 watermark gentle parallax loop. */
   @keyframes pillarRise {
     from {
@@ -465,13 +485,18 @@
       transform: none;
     }
   }
+  /* Reveal — chart/content fade for re-keyed regions (replaces framer-motion). */
+  @keyframes reveal-fade {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  .reveal-fade {
+    animation: reveal-fade 520ms var(--ease-editorial) both;
+  }
   @keyframes chipPopIn {
     0% {
       opacity: 0;
-      transform: scale(0.6) translateY(8px);
-    }
-    60% {
-      transform: scale(1.08);
+      transform: scale(0.92) translateY(8px);
     }
     100% {
       opacity: 1;
@@ -588,6 +613,27 @@
     }
     .animate-float-slow {
       animation: none !important;
+    }
+    /* Inline-style animations (onboarding / landing) — matched by name since
+       the keyframes are applied from JSX. pillarRise/chipPopIn start hidden,
+       so they must land fully visible when their animation is removed. */
+    [style*="pillarRise"],
+    [style*="chipPopIn"] {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    [style*="driftSlow"] {
+      animation: none !important;
+    }
+    .reveal-fade {
+      animation: none;
+    }
+    html {
+      scroll-behavior: auto;
+    }
+    .animate-pulse {
+      animation: none;
     }
   }
 }

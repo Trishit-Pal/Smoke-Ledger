@@ -3,14 +3,13 @@
 /*
  * Figure — minimal geometric stick-figure with 8 mood animations.
  *
- * Pure SVG + CSS keyframes (no Framer Motion, no Lottie). Animations live in
- * web/components/character/character-animations.css which must be imported
- * once at the app root (already imported via globals.css in this integration).
+ * Pure SVG + CSS keyframes (no Framer Motion, no Lottie). The keyframes live in
+ * app/globals.css (character section).
  *
  * Sizing: viewBox is 200×240 so the natural aspect ratio is 5:6. Pass `size`
  * in px (width); height auto-scales. Default 160px.
  *
- * Reduced motion: a global media query in character-animations.css disables
+ * Reduced motion: a global media query in globals.css disables
  * every animation under prefers-reduced-motion. The figure stays visible with
  * a neutral resting pose.
  */

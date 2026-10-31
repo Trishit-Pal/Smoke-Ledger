@@ -29,7 +29,7 @@ export default function AuthError({
               {toSafeErrorMessage(error, 'internal_error')}
             </Text>
             <Button title="Try again" variant="primary" fullWidth onPress={reset} />
-            <Link href="/login" className="text-accent text-small font-medium hover:opacity-80 mt-sm">
+            <Link href="/login" className="text-accent-ink text-small font-medium hover:opacity-80 mt-sm">
               Back to sign in
             </Link>
           </div>

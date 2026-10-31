@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession } from '@/store/session';
+import { useSession, ledgerToday } from '@/store/session';
 import {
   GOAL_TYPE_META,
   emptyGoalForm,
@@ -25,7 +25,6 @@ import {
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
-import { todayIst } from '@/lib/date';
 import type { Goal } from '@/types';
 
 /** Clamp a typed hour string into the valid 0–23 range (mirrors the web min/max). */
@@ -38,7 +37,7 @@ function clampHour(v: string): number {
 export default function GoalNewScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const today = todayIst();
+  const today = ledgerToday();
   const { goalId } = useLocalSearchParams<{ goalId?: string }>();
 
   const goals = useSession((s) => s.goals);

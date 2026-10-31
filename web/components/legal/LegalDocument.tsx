@@ -105,7 +105,7 @@ export function LegalDocument({
         Need help with account data requests?{' '}
         <Link
           href={LEGAL_LINKS.support}
-          style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+          style={{ color: 'var(--accent-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}
         >
           Contact support →
         </Link>

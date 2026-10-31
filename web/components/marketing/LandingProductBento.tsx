@@ -18,7 +18,7 @@ const PLATES: FigurePlate[] = [
     caption: 'II · The ledger',
     figure: '365',
     label: 'A record, not a score.',
-    hint: 'Every day, written. No streaks. No shame patterns. Just the line.',
+    hint: 'Every day, written. No shame patterns. Just the line.',
   },
   {
     caption: 'III · Trends',
@@ -59,14 +59,14 @@ export function LandingProductBento() {
             className="editorial-headline"
             style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
           >
-            What you get, in four <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>plates</span>.
+            What you get, in four <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>plates</span>.
           </h2>
         </header>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: 0,
             borderTop: '1px solid var(--rule-strong)',
           }}
@@ -87,7 +87,7 @@ export function LandingProductBento() {
               <span
                 className="editorial-numeral--small"
                 style={{
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   fontSize: 'clamp(48px, 6vw, 72px)',
                   lineHeight: 1,
                 }}

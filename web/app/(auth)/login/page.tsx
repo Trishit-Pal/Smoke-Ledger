@@ -158,7 +158,7 @@ function PhoneResendButton({
         fontFamily: 'var(--font-display)',
         fontStyle: 'italic',
         fontSize: 13,
-        color: 'var(--accent)',
+        color: 'var(--accent-ink)',
         textDecoration: 'underline',
         textUnderlineOffset: 4,
         padding: 0,
@@ -393,7 +393,7 @@ function LoginPageInner() {
         caption="Account · Sign in"
         title={
           <>
-            Welcome <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>back</span>.
+            Welcome <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>back</span>.
           </>
         }
         subtitle="Your ledger, where you left it."
@@ -705,7 +705,7 @@ function LoginPageInner() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -728,11 +728,11 @@ function LoginPageInner() {
 
       <EditorialClosingSignet align="left">
         By signing in you accept our{' '}
-        <Link href={LEGAL_LINKS.terms} style={{ color: 'var(--accent)' }}>
+        <Link href={LEGAL_LINKS.terms} style={{ color: 'var(--accent-ink)' }}>
           Terms
         </Link>{' '}
         and{' '}
-        <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent)' }}>
+        <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent-ink)' }}>
           Privacy Policy
         </Link>
         . Quiet entry, quiet exit.
@@ -756,7 +756,7 @@ function InlineInfo({ message }: { message: string }) {
       role="status"
       style={{
         fontSize: 13,
-        color: 'var(--accent)',
+        color: 'var(--accent-ink)',
         fontFamily: 'var(--font-display)',
         fontStyle: 'italic',
         margin: '12px 0 0 0',

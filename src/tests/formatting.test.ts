@@ -1,4 +1,4 @@
-import { formatInr, formatMoney, formatDelta, formatCompactInt, pluralize } from '@/lib/format';
+import { formatInr, formatMoney, formatDelta, formatCompactInt, pluralize, parseDecimal } from '@/lib/format';
 import {
   dayOfWeekShort,
   formatIndianDate,
@@ -124,5 +124,18 @@ describe('date helpers', () => {
   it('daysBetween is absolute', () => {
     expect(daysBetween('2025-04-01', '2025-04-10')).toBe(9);
     expect(daysBetween('2025-04-10', '2025-04-01')).toBe(9);
+  });
+});
+
+describe('parseDecimal', () => {
+  it('reads a comma decimal the way a euro locale keypad types it', () => {
+    expect(parseDecimal('13,50')).toBe(13.5);
+  });
+  it('reads a dot decimal and trims whitespace', () => {
+    expect(parseDecimal(' 13.50 ')).toBe(13.5);
+  });
+  it('is NaN for anything that is not one number', () => {
+    expect(parseDecimal('1,2,3')).toBeNaN();
+    expect(parseDecimal('abc')).toBeNaN();
   });
 });

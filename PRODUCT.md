@@ -30,13 +30,13 @@ but the heart of the product is the private daily ledger.
 
 Editorial, restrained, honest — the voice of a well-set printed journal. Fraunces headlines
 over hairline rules, small-caps captions, "the ledger" and "today's entry" as section
-language. Three words: **literary, calm, truthful.** It never congratulates with confetti
-and never alarms with red; a rising trend is rendered in terracotta, not emergency. The
+language. Three words: **literary, calm, truthful.** It acknowledges milestones with a brief,
+muted moment — never on a marketing path — and never alarms with red; a rising trend is rendered in terracotta, not emergency. The
 emotional goal: the user feels respected and a little more clear-eyed each time they open it.
 
 ## Anti-references
 
-- **Gamified health apps** — badges, streak-confetti, congratulatory gradients, the
+- **Gamified health apps** — badges, streak-shaming, congratulatory gradients, the
   "nag-and-reward" loop. Progress is acknowledged quietly, never celebrated loudly.
 - **Loud / promotional UI** — urgency banners, persuasion CTAs, marketing patterns pushed
   into the app surface. This is a private journal, not a conversion funnel.

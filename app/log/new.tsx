@@ -47,7 +47,7 @@ import { fonts, radius, spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 
-import { useSession } from '@/store/session';
+import { useSession, ledgerTimeZone } from '@/store/session';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { resolveLogUnitPrice } from '@/domain/calc';
 import { buildPricePreview } from '@/lib/pricePreview';
@@ -393,6 +393,7 @@ export default function NewLog() {
       });
 
       await createLog({
+        timeZone: ledgerTimeZone(),
         tsUtc: new Date().toISOString(),
         brandId,
         brandNameSnap: selectedBrand?.name ?? null,

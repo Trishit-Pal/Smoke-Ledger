@@ -11,8 +11,8 @@ const PRIMARY_CTA_STYLE: React.CSSProperties = {
   padding: '0 28px',
   border: 'none',
   borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
+  background: 'var(--accent-ink)',
+  color: 'var(--on-accent)',
   fontFamily: 'var(--font-sans)',
   fontWeight: 600,
   fontSize: 15,
@@ -29,7 +29,7 @@ const PRIMARY_CTA_STYLE: React.CSSProperties = {
 const PILLARS: { num: string; title: string; copy: string }[] = [
   { num: 'I.', title: 'Free', copy: 'No ads, no upsell, no subscription tier.' },
   { num: 'II.', title: 'Private', copy: 'Encrypted at rest. Yours to export or delete.' },
-  { num: 'III.', title: 'Honest', copy: 'No streaks. No badges. No shame patterns.' },
+  { num: 'III.', title: 'Honest', copy: 'No ads. No shame patterns. Your numbers, plainly.' },
 ];
 
 export function LandingHero() {
@@ -38,17 +38,6 @@ export function LandingHero() {
   React.useEffect(() => {
     const t = window.setTimeout(() => dispatchMood('greet', { durationMs: 1800 }), 400);
     return () => window.clearTimeout(t);
-  }, []);
-
-  // Celebrate when the visitor reaches for the primary CTA — throttled so
-  // repeated hover/focus doesn't spam. Confetti auto-skips under reduced motion
-  // inside CharacterCompanion.
-  const lastCelebrateRef = React.useRef(0);
-  const celebrate = React.useCallback(() => {
-    const now = Date.now();
-    if (now - lastCelebrateRef.current < 3000) return;
-    lastCelebrateRef.current = now;
-    dispatchMood('applaud', { celebrate: true });
   }, []);
 
   return (
@@ -131,7 +120,7 @@ export function LandingHero() {
           <br />
           Spend less.
           <br />
-          <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>Quit on your terms.</span>
+          <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>Quit on your terms.</span>
         </h1>
 
         <div
@@ -150,7 +139,7 @@ export function LandingHero() {
             fontStyle: 'italic',
           }}
         >
-          A private, observational record of your smoking — not a streak game, not a guilt
+          A private, observational record of your smoking — not a game to win, not a guilt
           machine. Free, forever.
         </p>
 
@@ -162,7 +151,7 @@ export function LandingHero() {
             flexWrap: 'wrap',
           }}
         >
-          <Link href="/signup" style={PRIMARY_CTA_STYLE} onMouseEnter={celebrate} onFocus={celebrate}>
+          <Link href="/signup" style={PRIMARY_CTA_STYLE}>
             Begin the ledger
             <span aria-hidden style={{ fontSize: 18 }}>
               →
@@ -178,7 +167,7 @@ export function LandingHero() {
               textDecoration: 'none',
             }}
           >
-            Already have an account? <span style={{ color: 'var(--accent)' }}>Sign in →</span>
+            Already have an account? <span style={{ color: 'var(--accent-ink)' }}>Sign in →</span>
           </Link>
         </div>
 
@@ -232,7 +221,7 @@ export function LandingHero() {
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 32,
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   lineHeight: 1,
                   fontStyle: 'italic',
                   fontWeight: 500,

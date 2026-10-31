@@ -200,7 +200,7 @@ export function QuickLogStrip({
                         aria-pressed={isLast}
                         className="
                           inline-flex items-center
-                          min-h-[36px] px-md
+                          min-h-11 px-md
                           text-small text-text-muted hover:text-text
                           underline-offset-4 hover:underline decoration-1
                           disabled:opacity-50 disabled:cursor-not-allowed

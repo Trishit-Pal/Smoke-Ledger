@@ -64,9 +64,21 @@ export function localeForCountry(country: string | null | undefined): string {
   return regionFor(country)?.locale ?? INDIA.locale;
 }
 
+// EU members that do not use the euro. The ledger only supports INR and EUR, so
+// a local price (19 zł) would be stored as €19. They stay in REGIONS (it must
+// match the SQL seed row for row) but are not offered until their currency is.
+const NON_EURO_EU: ReadonlySet<string> = new Set(['CZ', 'DK', 'HU', 'PL', 'RO', 'SE']);
+
 export function regionOptions(): { value: string; label: string }[] {
-  const rest = REGIONS.filter((r) => r.country !== 'IN').sort((a, b) => a.name.localeCompare(b.name));
+  const rest = REGIONS.filter((r) => r.country !== 'IN' && !NON_EURO_EU.has(r.country)).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   return [INDIA, ...rest].map((r) => ({ value: r.country, label: r.name }));
+}
+
+/** Whether picking `picked` changes the saved country (no country means India). */
+export function regionChangeNeeded(saved: string | null | undefined, picked: string): boolean {
+  return (saved ?? INDIA.country) !== picked;
 }
 
 /** Off unless the deploy explicitly sets the flag. Redeploy is the kill switch. */

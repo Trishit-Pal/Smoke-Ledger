@@ -35,6 +35,7 @@ import { hashWithPepper } from '../_shared/hash.ts';
 import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { corsHeaders, originAllowed } from '../_shared/cors.ts';
+import { hasRecentSignIn } from '../_shared/recentAuth.ts';
 
 const log = createLogger('delete-account');
 
@@ -137,11 +138,10 @@ serve(async (req) => {
       return json({ error: 'rate_limited', request_id: requestId }, 429, origin);
     }
 
-    // Recent re-auth gate. `last_sign_in_at` is updated on every full
-    // authentication; refresh-only sessions are filtered out.
-    const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
-    const ageMin = (Date.now() - lastSignIn) / 60_000;
-    if (!Number.isFinite(ageMin) || ageMin > REAUTH_WINDOW_MIN) {
+    // Recent re-auth gate, bound to the presenting session's own `amr` claim.
+    // The token was verified above (verify_jwt gateway + getUser), so its claims
+    // can be read here. Token refreshes never count as a sign-in.
+    if (!hasRecentSignIn(authHeader, Date.now(), REAUTH_WINDOW_MIN)) {
       return json(
         { error: 'reauth_required', request_id: requestId, window_min: REAUTH_WINDOW_MIN },
         401,

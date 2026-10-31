@@ -1,7 +1,7 @@
-import { getLogPageData } from '@web/lib/server/data';
-import { LogClient } from './LogClient';
+import { redirect } from 'next/navigation';
 
-export default async function LogPage() {
-  const { profile, logs } = await getLogPageData();
-  return <LogClient profile={profile} logs={logs} />;
+// /log merged into the Ledger (/history), which already opens on today's entries.
+// Kept as a redirect so old links and the post-auth allowlist entry still land.
+export default function LogPage() {
+  redirect('/history');
 }

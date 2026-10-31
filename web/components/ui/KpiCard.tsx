@@ -1,11 +1,10 @@
 'use client';
 
 /*
- * KpiCard — a small elevated tile for one headline number + optional
- * ProgressRing. Editorial-depth pilot: opaque token surface with a restrained
- * hover lift, not the glass/blur SaaS-card look. The corner accent wash is a
- * hover-only reveal (resting opacity 0) so teal stays off the surface at rest,
- * honoring the "accent ≤10%, positive-only" restraint.
+ * KpiCard — one headline number in a summary strip. Editorial: no raised
+ * surface, no glow — a hairline top rule, a small-caps label and a serif
+ * numeral, so it sits in the same ledger language as MetricRow. An optional
+ * ProgressRing sits to the right.
  */
 
 import * as React from 'react';
@@ -23,25 +22,19 @@ export interface KpiCardProps {
 
 export function KpiCard({ label, value, unit, progress, progressColor, children }: KpiCardProps) {
   return (
-    <article className="elevated elevated-hover group relative overflow-hidden rounded-xl p-lg">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
-        style={{ background: 'color-mix(in srgb, var(--accent) 20%, transparent)' }}
-      />
-
+    <article className="rule-hair-strong pt-md">
       <div className="flex items-start justify-between gap-md">
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <p className="editorial-caption">{label}</p>
           <div className="mt-sm flex items-end gap-xs">
-            <span className="text-h1 font-semibold tracking-tight text-text nums-tabular">{value}</span>
+            <span className="editorial-numeral--micro nums-tabular">{value}</span>
             {unit ? <span className="mb-xs text-small text-text-muted">{unit}</span> : null}
           </div>
         </div>
 
         {progress !== undefined ? (
           <div aria-hidden>
-            <ProgressRing percent={progress} size={78} color={progressColor} ringBg="var(--rule)" />
+            <ProgressRing percent={progress} size={64} color={progressColor} ringBg="var(--rule)" />
           </div>
         ) : null}
       </div>

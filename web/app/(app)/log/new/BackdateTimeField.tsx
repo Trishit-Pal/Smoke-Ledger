@@ -15,12 +15,12 @@
  * `datetime-local` picker whose min/max mirror the cap.
  *
  * Timezone: the native datetime-local picker is timezone-naive — it shows a
- * bare wall clock with no zone. We interpret that wall clock as IST (the only
- * zone this app supports) by formatting into and parsing out of the picker
- * through `formatDatetimeLocalIst` / `parseDatetimeLocalIst` in
- * `src/lib/date.ts`. This keeps the resolved tsUtc — and the `toLocalDate` /
- * `toLocalHour` derived from it on save — correct even when the user's device
- * timezone isn't IST.
+ * bare wall clock with no zone. We interpret that wall clock in the ledger's
+ * zone (the reader's country: IST in India, e.g. Europe/Paris in France) by
+ * formatting into and parsing out of the picker through `formatDatetimeLocal` /
+ * `parseDatetimeLocal` in `src/lib/date.ts`. This keeps the resolved tsUtc —
+ * and the `toLocalDate` / `toLocalHour` derived from it on save — correct
+ * whatever the device timezone is.
  */
 
 'use client';
@@ -29,9 +29,10 @@ import * as React from 'react';
 import {
   IST,
   formatTime,
-  formatDatetimeLocalIst,
-  parseDatetimeLocalIst,
+  formatDatetimeLocal,
+  parseDatetimeLocal,
   toLocalDate,
+  zoneLabel,
 } from '@/lib/date';
 import { MAX_BACKDATE_MS } from '@/lib/validation';
 import { ChoiceRun } from '@web/components/visual';
@@ -47,6 +48,8 @@ export interface BackdateTimeFieldProps {
   error?: string | null;
   /** Locale for the date label inside the picker; defaults to en-IN. */
   locale?: string;
+  /** The ledger's IANA zone (timezoneForCountry); defaults to IST. */
+  zone?: string;
 }
 
 const PRESETS: { value: BackdatePreset; label: string }[] = [
@@ -89,20 +92,26 @@ function formatAgo(minutes: number): string {
   return mins === 0 ? `${hrs} hr ago` : `${hrs} hr ${mins} min ago`;
 }
 
-function resolvePreview(d: Date | null, now: Date): string {
+function resolvePreview(d: Date | null, now: Date, zone: string): string {
   if (!d) {
-    return `Now · ${formatTime(now.toISOString())} IST`;
+    return `Now · ${formatTime(now.toISOString(), zone)} ${zoneLabel(zone)}`;
   }
   const minutesAgo = Math.max(0, Math.round((now.getTime() - d.getTime()) / 60000));
-  // The 24h cap guarantees the pick is either today or yesterday in IST, so
-  // those two labels are exhaustive — no general date formatting needed.
-  const sameDay = toLocalDate(d.toISOString()) === toLocalDate(now.toISOString());
+  // The 24h cap guarantees the pick is either today or yesterday in the ledger's
+  // zone, so those two labels are exhaustive — no general date formatting needed.
+  const sameDay = toLocalDate(d.toISOString(), zone) === toLocalDate(now.toISOString(), zone);
   const dateLabel = sameDay ? 'today' : 'yesterday';
-  const timeLabel = formatTime(d.toISOString());
+  const timeLabel = formatTime(d.toISOString(), zone);
   return `Logging as ${timeLabel} ${dateLabel} · ${formatAgo(minutesAgo)}`;
 }
 
-export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: BackdateTimeFieldProps) {
+export function BackdateTimeField({
+  value,
+  onChange,
+  error,
+  locale = 'en-IN',
+  zone = IST,
+}: BackdateTimeFieldProps) {
   // Track the preset the user is currently on so the picker can show/hide
   // when "Custom…" is selected. We intentionally don't lock `value` to the
   // preset: the parent owns the timestamp and may pass back whatever a
@@ -110,7 +119,7 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
   const initialPreset: BackdatePreset = value == null ? 'now' : 'custom';
   const [preset, setPreset] = React.useState<BackdatePreset>(initialPreset);
   const [customDraft, setCustomDraft] = React.useState<string>(
-    formatDatetimeLocalIst(value ?? new Date()),
+    formatDatetimeLocal(value ?? new Date(), zone),
   );
   // `now` is intentionally frozen at mount so the picker bounds and preview
   // render stably. Presets ("2 hr ago") are relative to this frozen `now`; on a
@@ -118,8 +127,8 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
   // re-checks against a fresh clock, so an out-of-window value is still caught.
   const now = React.useMemo(() => new Date(), []);
 
-  const minLocal = formatDatetimeLocalIst(new Date(maxBackdateMs(now)));
-  const maxLocal = formatDatetimeLocalIst(now);
+  const minLocal = formatDatetimeLocal(new Date(maxBackdateMs(now)), zone);
+  const maxLocal = formatDatetimeLocal(now, zone);
 
   const handleSelect = (next: BackdatePreset) => {
     setPreset(next);
@@ -127,7 +136,7 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
       // Seed the picker draft from the existing value, or "now − 30 min", and
       // resolve it now so value/draft/preview agree before the first edit.
       const seed = value ?? new Date(now.getTime() - 30 * 60 * 1000);
-      setCustomDraft(formatDatetimeLocalIst(seed));
+      setCustomDraft(formatDatetimeLocal(seed, zone));
       onChange(seed);
       return;
     }
@@ -137,7 +146,7 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
 
   const handleCustomChange = (raw: string) => {
     setCustomDraft(raw);
-    const parsed = parseDatetimeLocalIst(raw);
+    const parsed = parseDatetimeLocal(raw, zone);
     if (!parsed) return;
     // Clamp to the [maxBackdateMs, now] range.
     const minMs = maxBackdateMs(now);
@@ -147,12 +156,12 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
     // If the typed value fell outside the window, snap the visible input to the
     // clamped instant so the picker and the resolution preview never disagree.
     if (clamped.getTime() !== parsed.getTime()) {
-      setCustomDraft(formatDatetimeLocalIst(clamped));
+      setCustomDraft(formatDatetimeLocal(clamped, zone));
     }
     onChange(clamped);
   };
 
-  const preview = resolvePreview(value, now);
+  const preview = resolvePreview(value, now, zone);
   const isError = Boolean(error);
 
   return (
@@ -179,7 +188,7 @@ export function BackdateTimeField({ value, onChange, error, locale = 'en-IN' }: 
             className="w-full md:w-auto bg-transparent border-0 border-b border-[var(--rule)] focus:border-[var(--text)] py-sm text-body text-text outline-none transition-colors nums-tabular"
           />
           <span className="text-caption text-text-muted nums-tabular">
-            Up to 24 hours back, never in the future. Times in IST ({IST.split('/')[1]}).
+            Up to 24 hours back, never in the future. Times in {zoneLabel(zone)}.
           </span>
         </div>
       ) : null}

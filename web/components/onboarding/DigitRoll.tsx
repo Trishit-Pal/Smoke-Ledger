@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useReduceMotion } from './useReduceMotion';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 export interface DigitRollProps {
   value: number | string;

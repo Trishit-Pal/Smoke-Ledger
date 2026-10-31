@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: a979537
+last_verified_commit: 1a40fb0
 status: current
 ---
 
@@ -22,7 +22,7 @@ The profile is where the user is a person, not just a set of logs. It holds the 
 
 ## What the user experiences
 
-During signup, the user enters their full name, date of birth, and gender. Gender is chosen from a themed dropdown (`ThemedSelect`) whose option list paints in the active theme's background with opposite-color text and the selected option highlighted in the brand accent — replacing the older chip row (mobile) and native `<select>` (web), which could not be themed consistently. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
+During signup, the user enters their full name, date of birth, and gender. Gender is chosen from a themed dropdown (`ThemedSelect`) whose option list paints in the active theme's background with opposite-color text and the selected option highlighted in the brand accent (in AA-safe accent ink). The list is keyboard-operable — arrows, Home/End, Enter — and Escape or a pick returns focus to the trigger — replacing the older chip row (mobile) and native `<select>` (web), which could not be themed consistently. The date of birth is the only field the app uses to compute anything — their age, visible in Settings. If the date of birth indicates they are under 18, the account is never created: they see a rejection, not a dashboard.
 
 Once inside, the Settings screen shows a **Profile** section with five rows:
 
@@ -165,3 +165,11 @@ These must never break.
 **`mobile_changed_at` visible in the client.** The field is read back from the DB and surfaced in `UserProfile` (`src/types/index.ts:119`). In the export flow (`exportAccountData`), if this field is included in the export envelope, it reveals the exact timestamp of the user's last mobile change. The current `ImportProfileSchema` (`src/lib/validation.ts:246`) does not include `mobile_changed_at`, so it is not round-tripped on import, but it may still appear in raw export payloads — worth checking when the export schema is next reviewed.
 
 **Live schema confirmed (2026-06-20).** The `user_profiles` constraints, the `trg_user_profiles_identity_rules` trigger, the `enforce_profile_identity_rules()` and `handle_new_user()` function bodies, and the full column list were read directly from the live DB (`tvcwrsglceahkjnfuzkn`) via Supabase MCP and match the migration files. Confirmed live: the `mobile_e164` `CHECK` is the broad generic-E.164 pattern (not the India rule), and a *first* mobile save is never rejected by the cooldown (`OLD.mobile_changed_at` is null). The DB-level India tightening remains an optional future hardening step.
+
+## Country, currency and erase (2026-10)
+
+**Country.** Settings (web) has a country picker (`web/components/settings/CountryField.tsx`) behind `NEXT_PUBLIC_REGION_PICKER`. The country fixes the ledger's currency and calendar: India is INR and IST, EU countries are EUR in their own zone. Six EU members that do not use the euro (CZ, DK, HU, PL, RO, SE) are not offered (`regionOptions` in `src/lib/regions.ts`) until their currencies are supported. Changing to a country with a different currency while the ledger has data raises `region_change_requires_reset`; Settings then offers "Reset the ledger and switch", and changing the country again clears that prompt. A reset that would not change the currency is refused server-side (`region_reset_not_needed`), and the repository treats it as a plain country save, so a double tap cannot show a false error.
+
+**Onboarding** (`web/app/onboarding/usage/page.tsx`) starts from the saved country and calls `setRegion` only when the pick changes it (`regionChangeNeeded`), so going Back never silently switches the account. Native screens read the country from the session store: `ledgerTimeZone()` / `ledgerToday()` and `ledgerMoney()` / `ledgerCurrency()` (`src/lib/ledgerMoney.ts`); Home insights, spend-cap goals and the mood/trigger matrix format in the profile currency. The native price editor shows the ledger currency, keeps euro cents and accepts a comma decimal (`parseDecimal`). A country can only be chosen on web; native onboarding is the India ledger.
+
+**Erase** clears the identity fields too: `full_name`, `date_of_birth`, `gender`, `mobile_e164` and `place`. They are otherwise immutable; `erase_account_data` sets a transaction-local `app.erasing` flag that the identity trigger honours, and records `prior_identity_erased` on its audit row.

@@ -1,35 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
-import { useReduceMotion } from '@web/hooks/useReduceMotion';
 
 export interface RevealProps {
+  /** Changing this re-mounts the wrapper so the reveal plays again. */
   dependencyKey?: string | number;
-  duration?: number;
   children: React.ReactNode;
   className?: string;
 }
 
-export function Reveal({
-  dependencyKey,
-  duration = 520,
-  children,
-  className,
-}: RevealProps) {
-  const reduced = useReduceMotion();
-  if (reduced) return <div className={className}>{children}</div>;
-
+/** Fades content in with the editorial easing. Pure CSS (.reveal-fade); the
+ *  reduced-motion fallback lives in globals.css. */
+export function Reveal({ dependencyKey, children, className }: RevealProps) {
   return (
-    <motion.div
-      key={dependencyKey ?? 'reveal'}
-      className={className}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: duration / 1000, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <div key={dependencyKey ?? 'reveal'} className={`reveal-fade${className ? ` ${className}` : ''}`}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 

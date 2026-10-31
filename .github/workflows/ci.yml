@@ -6,13 +6,27 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
+# Free-tier Actions minutes: a newer push to a PR supersedes its old run. Never
+# cancel on main: each main run's secret scan covers only its own push, so a
+# cancelled run would leave those commits unscanned.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Secrets cannot be read in a step `if:` (GitHub rejects the whole workflow,
+    # which kept CI at 0 jobs for weeks). Derive a flag here and test that.
+    env:
+      HAS_E2E_LOGIN: ${{ secrets.E2E_LOGIN_EMAIL != '' && secrets.E2E_LOGIN_PASSWORD != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -35,6 +49,12 @@ jobs:
 
       - name: Root lint
         run: npm run lint
+
+      - name: Spec tooling tests
+        run: npm run spec:test
+
+      - name: Spec drift (advisory until the EU sections are re-stamped)
+        run: npm run spec:drift
 
       - name: Web typecheck
         run: npm run typecheck
@@ -61,7 +81,7 @@ jobs:
         working-directory: web
 
       - name: Web E2E authenticated (optional)
-        if: ${{ secrets.E2E_LOGIN_EMAIL != '' && secrets.E2E_LOGIN_PASSWORD != '' }}
+        if: env.HAS_E2E_LOGIN == 'true'
         run: npm run test:e2e
         working-directory: web
         env:
@@ -71,9 +91,9 @@ jobs:
   db-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -116,9 +136,9 @@ jobs:
       group: rls-integration-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -167,3 +187,50 @@ jobs:
           E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
           E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
           E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          # The scanner is a downloaded binary: keep the token out of .git/config.
+          persist-credentials: false
+
+      - name: Install gitleaks (checksum-verified)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+
+      - name: Scan new commits (redacted; never prints a secret)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          # gitleaks exits 0 with no findings when the range base is missing, so a
+          # bad base would be a silent pass. Fail loudly instead.
+          if ! git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+            echo "::error::scan base '${BASE}' does not exist; refusing a scan that would silently pass"
+            exit 1
+          fi
+          ./gitleaks git --redact --no-banner --exit-code 1 --log-opts="${BASE}..HEAD"
+
+  audit:
+    runs-on: ubuntu-latest
+    # Advisory until the Next 14 -> 15 track lands: Next 14 has advisories with no
+    # fix on its line, so a blocking audit would be permanently red and ignored.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Root production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Web production dependencies
+        if: always()
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: web
