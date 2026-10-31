@@ -221,16 +221,31 @@ jobs:
 
   audit:
     runs-on: ubuntu-latest
-    # Advisory until the Next 14 -> 15 track lands: Next 14 has advisories with no
-    # fix on its line, so a blocking audit would be permanently red and ignored.
-    continue-on-error: true
+    # Blocking at `critical`, advisory at `high`. Both trees are at 0 critical, so a
+    # new critical advisory fails CI. The known high-severity leftovers are advisory:
+    #   root: expo-router / @expo/cli / decode-uri-component / query-string (fixed only
+    #         by Expo SDK 58), image-size (metro pins ^1; no 1.x is patched), zod
+    #   web:  zod
+    # zod needs 3 -> 4 together with @hookform/resolvers 5 (the signup/reset forms).
+    # Revisit when the Expo SDK or zod migrations land, then tighten to `high`.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Root production dependencies
+      - name: Root production dependencies (critical — blocking)
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Web production dependencies (critical — blocking)
+        if: always()
+        run: npm audit --omit=dev --audit-level=critical
+        working-directory: web
+
+      - name: Root production dependencies (high — advisory)
+        if: always()
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Web production dependencies
+      - name: Web production dependencies (high — advisory)
         if: always()
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
         working-directory: web

@@ -56,7 +56,7 @@ From September to late October 2026 the workflow ran **zero jobs**: a `secrets.*
 
 **`secrets`** downloads gitleaks 8.30.1, verifies its sha256, and scans the pushed range with `--redact` (it never prints a secret). It fails loudly when the range base does not exist, because gitleaks would otherwise exit 0 with no findings. The checkout does not persist the token.
 
-**`audit`** runs `npm audit --omit=dev --audit-level=high` for root and `web/`. It is advisory (`continue-on-error`) until the Next 14 → 15 upgrade, because Next 14 has advisories with no fix on its line.
+**`audit`** runs `npm audit --omit=dev` for root and `web/`. It blocks at `--audit-level=critical` (both trees are at zero critical) and reports `--audit-level=high` as advisory. The known high-severity leftovers are the Expo-SDK-bound packages (`expo-router`, `@expo/cli`, `decode-uri-component`, `query-string`), `image-size` (pinned `^1` by metro; no 1.x release is patched) and `zod` (needs a 3 → 4 move together with `@hookform/resolvers` 5).
 
 **Weekly posture audit** (`.github/workflows/posture-audit.yml`, Mondays): a full-history redacted gitleaks scan that fails the run, plus `npm audit` reported to the job summary only. **Dependabot** (`.github/dependabot.yml`) proposes weekly updates for root npm, web npm and GitHub Actions, grouping minor and patch bumps.
 
