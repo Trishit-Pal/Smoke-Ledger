@@ -32,9 +32,13 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, Ba
     const hasError = Boolean(error);
 
     const fieldClasses = cn(
-      'w-full bg-bg-elevated border rounded-md px-md py-sm text-body text-text',
-      'placeholder:text-text-faint focus:outline-none transition-colors',
-      hasError ? 'border-danger focus:border-danger' : 'border-border focus:border-accent',
+      // Editorial underline field: hairline that strengthens on focus (the global
+      // :focus-visible outline in globals.css supplies the keyboard ring).
+      'w-full bg-transparent border-0 border-b rounded-none px-0 py-sm text-body text-text nums-tabular',
+      'placeholder:text-text-faint transition-colors',
+      hasError
+        ? 'border-danger focus:border-danger'
+        : 'border-[var(--rule)] focus:border-[var(--rule-strong)]',
       multiline && 'resize-y min-h-[88px]',
       className,
     );
@@ -44,7 +48,7 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, Ba
         {label ? (
           <label
             htmlFor={inputId}
-            className="text-caption uppercase text-text-muted mb-1"
+            className="editorial-caption mb-xs"
           >
             {label}
           </label>

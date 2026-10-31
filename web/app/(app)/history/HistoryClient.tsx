@@ -45,6 +45,7 @@ import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeReval
 import { toSafeErrorMessage } from '@/lib/errors';
 import { LogEditModal } from '@web/components/modals/LogEditModal';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
+import { SectionLabel } from '@web/components/visual';
 import { fetchMoreHistoryLogs } from './actions';
 
 type Group = {
@@ -346,12 +347,13 @@ export function HistoryClient({
                           {relLabel}
                         </span>
                       ) : null}
-                      <h2
+                      <SectionLabel
                         id={`day-${group.date}`}
-                        className="editorial-caption nums-tabular"
+                        spacing="none"
+                        className="nums-tabular"
                       >
                         {formatIndianDate(group.date)}
-                      </h2>
+                      </SectionLabel>
                       <span className="text-small text-text-muted nums-tabular">
                         {maskInr(group.totalSpend, discreet, (n) => money(n))}
                         <span className="text-text-faint"> spent</span>

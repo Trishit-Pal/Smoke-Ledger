@@ -70,6 +70,7 @@ import {
 } from '@/lib/mobileNumber';
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
+import { SectionLabel } from '@web/components/visual';
 
 type BusyAction =
   | null
@@ -116,9 +117,9 @@ function SectionHead({
 }) {
   return (
     <div className="flex flex-col gap-xs">
-      <h2 id={id} className="editorial-caption">
+      <SectionLabel id={id} spacing="none">
         {caption}
-      </h2>
+      </SectionLabel>
       <p className="text-small text-text-muted max-w-[44ch]">{deck}</p>
     </div>
   );

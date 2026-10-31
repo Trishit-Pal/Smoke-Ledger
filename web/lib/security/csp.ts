@@ -4,7 +4,7 @@ import { readSupabaseUrl } from '@web/lib/supabase/env';
  * Per-request Content-Security-Policy.
  *
  * - Strict script-src using a per-request nonce; no 'unsafe-inline' / 'unsafe-eval'.
- * - style-src keeps 'unsafe-inline' because Tailwind/Radix/framer-motion emit
+ * - style-src keeps 'unsafe-inline' because Tailwind/Radix emit
  *   inline styles. Style-only XSS yield is dramatically smaller than script
  *   XSS, and tightening this further requires per-component refactor.
  * - connect-src restricted to self + Supabase (HTTP + WebSocket).

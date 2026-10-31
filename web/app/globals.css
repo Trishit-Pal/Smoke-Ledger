@@ -485,6 +485,14 @@
       transform: none;
     }
   }
+  /* Reveal — chart/content fade for re-keyed regions (replaces framer-motion). */
+  @keyframes reveal-fade {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  .reveal-fade {
+    animation: reveal-fade 520ms var(--ease-editorial) both;
+  }
   @keyframes chipPopIn {
     0% {
       opacity: 0;
@@ -617,6 +625,9 @@
     }
     [style*="driftSlow"] {
       animation: none !important;
+    }
+    .reveal-fade {
+      animation: none;
     }
     html {
       scroll-behavior: auto;

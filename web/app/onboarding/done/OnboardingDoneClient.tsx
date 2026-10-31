@@ -6,7 +6,7 @@ import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { SealCircle } from '@web/components/onboarding/SealCircle';
 import { PaperEdge } from '@web/components/onboarding/PaperEdge';
 import { ThemeToggle } from '@web/components/layout/ThemeToggle';
-import { useReduceMotion } from '@web/components/onboarding/useReduceMotion';
+import { useReduceMotion } from '@web/hooks/useReduceMotion';
 import { Figure } from '@web/components/character/Figure';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
