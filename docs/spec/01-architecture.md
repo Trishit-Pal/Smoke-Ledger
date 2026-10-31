@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: 1a40fb0
+last_verified_commit: 42c2ee6
 status: current
 ---
 

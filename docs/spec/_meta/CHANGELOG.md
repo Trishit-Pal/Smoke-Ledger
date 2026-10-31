@@ -2,7 +2,12 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-10-31 — f1ab5c4
+<!-- Format: ## 2026-10-31 — 42c2ee6
+- auth: Next 15 async request APIs, phoneOtpState.ts split, version-specific Next 14.2 claims marked as not re-checked, two new open gaps.
+- infra-ops: audit job now blocks on critical and lists the known high-severity leftovers.
+- architecture, identity-profile: re-stamped (server helpers now awaited; settings page awaits searchParams); no described behaviour changed.
+
+## 2026-10-31 — f1ab5c4
 - infra-ops: re-stamped after the dependency restore (root package.json, lockfiles, dependabot.yml); no infrastructure behaviour changed.
 
 ## 2026-10-31 — 1a40fb0

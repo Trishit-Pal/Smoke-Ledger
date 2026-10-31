@@ -18,23 +18,7 @@ import {
   isSupabaseAuthCookie,
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
-
-export type PhoneOtpActionState = {
-  code:
-    | 'idle'
-    | 'sent'
-    | 'invalid'
-    | 'rate_limited'
-    | 'disabled'
-    | 'unavailable'
-    | 'error';
-  message: string | null;
-};
-
-export const initialPhoneOtpActionState: PhoneOtpActionState = {
-  code: 'idle',
-  message: null,
-};
+import type { PhoneOtpActionState } from '../phoneOtpState';
 
 const sendSchema = z.object({
   countryCode: z.string().min(2).max(3),
@@ -91,7 +75,7 @@ export async function sendPhoneOtpAction(
   }
 
   const e164 = toE164(country, parsed.data.localNumber);
-  const ip = getClientIp();
+  const ip = await getClientIp();
 
   const okLimit = await checkRateLimits([
     { kind: 'phone_otp_send_ip', key: ip, max: 10, windowSec: 600 },
@@ -110,7 +94,7 @@ export async function sendPhoneOtpAction(
     return { code: 'unavailable', message: 'Sign-in is temporarily unavailable.' };
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(supabaseUrl, anonKey, {
     cookies: {
       getAll() {
@@ -183,7 +167,7 @@ export async function verifyPhoneOtpAction(
 
     nextPath = sanitizeNextPath(parsed.data.next ?? null);
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createServerClient(supabaseUrl, anonKey, {
       cookies: {
         getAll() {

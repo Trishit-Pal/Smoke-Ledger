@@ -20,12 +20,12 @@ import {
 import { RATE_LIMITED_MESSAGE, type PrecheckResult } from '@web/lib/auth/precheck';
 
 export async function precheckSignupAction(email: string): Promise<PrecheckResult> {
-  const ok = await checkRateLimits(signupRateLimitKeys(getClientIp(), email), { failOpen: true });
+  const ok = await checkRateLimits(signupRateLimitKeys(await getClientIp(), email), { failOpen: true });
   return ok ? { ok: true } : { ok: false, message: RATE_LIMITED_MESSAGE };
 }
 
 export async function precheckResetAction(email: string): Promise<PrecheckResult> {
-  const ok = await checkRateLimits(resetRateLimitKeys(getClientIp(), email), { failOpen: true });
+  const ok = await checkRateLimits(resetRateLimitKeys(await getClientIp(), email), { failOpen: true });
   return ok ? { ok: true } : { ok: false, message: RATE_LIMITED_MESSAGE };
 }
 

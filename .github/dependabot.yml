@@ -29,7 +29,8 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Next 16 makes cookies()/headers() async and drops `next lint`; needs its own migration.
+      # Web is on Next 15.5.x (the async request APIs are already migrated). Next 16 drops
+      # `next lint` and defaults to Turbopack, so it needs its own migration.
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint-config-next"
