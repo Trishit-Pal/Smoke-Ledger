@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: 94fa89d
+last_verified_commit: 1a40fb0
 status: current
 ---
 

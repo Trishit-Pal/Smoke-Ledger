@@ -2,7 +2,10 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-10-31 — 94fa89d
+<!-- Format: ## 2026-10-31 — 1a40fb0
+- all stale stamps: re-pointed at a commit that exists after the stack was rebased (earlier entries cite pre-rebase hashes); no spec prose changed.
+
+## 2026-10-31 — 94fa89d
 - identity-profile: ThemedSelect now returns focus to its trigger and uses accent ink for the selected option.
 - auth, celebrations, infra-ops: re-stamped after the design pass (token-only colour swaps on auth pages, landing CTA no longer fires confetti on hover, framer-motion removed); no behaviour these sections describe changed.
 - architecture: re-stamped — /log now redirects to the Ledger (/history) and its loader getLogPageData is gone; the History data path described here is unchanged.
