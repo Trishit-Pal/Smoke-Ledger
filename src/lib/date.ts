@@ -36,39 +36,46 @@ export function formatIndianDateTime(tsUtc: string): string {
   return dayjs.utc(tsUtc).tz(IST).format('DD/MM/YYYY, HH:mm');
 }
 
-export function formatTime(tsUtc: string): string {
-  return dayjs.utc(tsUtc).tz(IST).format('HH:mm');
+/** `HH:mm` of an instant in the reader's zone (IST for an account with no country). */
+export function formatTime(tsUtc: string, zone: string = IST): string {
+  return dayjs.utc(tsUtc).tz(zone).format('HH:mm');
+}
+
+/** Short name of a zone for UI copy: `IST`, `Paris time`, `New York time`. */
+export function zoneLabel(zone: string): string {
+  if (zone === IST) return 'IST';
+  return `${(zone.split('/').pop() ?? zone).replace(/_/g, ' ')} time`;
 }
 
 /**
  * Format an absolute instant as a `datetime-local` value string
- * (`YYYY-MM-DDTHH:mm`) expressed in IST wall-clock. Used to seed the native
- * datetime-local picker plus its min/max so the widget always shows IST,
- * regardless of the device timezone. Returns '' for null/invalid input.
+ * (`YYYY-MM-DDTHH:mm`) expressed in the reader zone's wall clock. Used to seed
+ * the native datetime-local picker plus its min/max so the widget shows the
+ * ledger's zone, regardless of the device timezone. Returns '' for null/invalid.
  */
-export function formatDatetimeLocalIst(d: Date | null): string {
+export function formatDatetimeLocal(d: Date | null, zone: string = IST): string {
   if (!d || Number.isNaN(d.getTime())) return '';
   // `[T]` escapes the literal T so it isn't mistaken for a format token.
-  return dayjs(d).tz(IST).format('YYYY-MM-DD[T]HH:mm');
+  return dayjs(d).tz(zone).format('YYYY-MM-DD[T]HH:mm');
 }
 
 /**
- * Parse a `datetime-local` value string (`YYYY-MM-DDTHH:mm`) as IST wall-clock
- * and return the corresponding absolute instant. The native input is
- * timezone-naive; interpreting it as IST (not the device tz) keeps the stored
- * tsUtc and the derived local_date / local_hour correct on non-IST devices.
+ * Parse a `datetime-local` value string (`YYYY-MM-DDTHH:mm`) as wall-clock time
+ * in `zone` and return the corresponding absolute instant. The native input is
+ * timezone-naive; interpreting it in the ledger's zone (not the device tz) keeps
+ * the stored tsUtc and the derived local_date / local_hour correct.
  * Returns null for empty/invalid input.
  */
-export function parseDatetimeLocalIst(value: string): Date | null {
+export function parseDatetimeLocal(value: string, zone: string = IST): Date | null {
   if (!value) return null;
   // datetime-local emits `YYYY-MM-DDTHH:mm`; normalise the `T` to a space and
   // drop any seconds so the string matches the format dayjs parses cleanly
   // (the same shape startOfWeekIst relies on).
   const normalized = value.replace('T', ' ').slice(0, 16);
   // dayjs.tz throws on an unparseable string, so confirm the shape with a
-  // strict, tz-free parse first; only then interpret it as IST wall-clock.
+  // strict, tz-free parse first; only then interpret it as wall-clock in `zone`.
   if (!dayjs(normalized, 'YYYY-MM-DD HH:mm', true).isValid()) return null;
-  return dayjs.tz(normalized, 'YYYY-MM-DD HH:mm', IST).toDate();
+  return dayjs.tz(normalized, 'YYYY-MM-DD HH:mm', zone).toDate();
 }
 
 export function todayIst(): string {

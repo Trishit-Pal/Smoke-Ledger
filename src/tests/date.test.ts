@@ -5,8 +5,10 @@ import {
   startOfWeekIst,
   startOfMonthIst,
   formatIndianDate,
-  formatDatetimeLocalIst,
-  parseDatetimeLocalIst,
+  formatDatetimeLocal,
+  parseDatetimeLocal,
+  formatTime,
+  zoneLabel,
   toLocalDate,
   toLocalHour,
   IST,
@@ -79,17 +81,17 @@ describe('IST datetime-local picker helpers', () => {
     else process.env.TZ = originalTz;
   });
 
-  it('parseDatetimeLocalIst reads the wall clock as IST regardless of host TZ', () => {
+  it('parseDatetimeLocal reads the wall clock as IST regardless of host TZ', () => {
     process.env.TZ = 'America/New_York';
     // 14:30 IST == 09:00 UTC.
-    expect(parseDatetimeLocalIst('2026-06-24T14:30')?.toISOString()).toBe(
+    expect(parseDatetimeLocal('2026-06-24T14:30')?.toISOString()).toBe(
       '2026-06-24T09:00:00.000Z',
     );
   });
 
-  it('formatDatetimeLocalIst renders an instant in IST wall clock regardless of host TZ', () => {
+  it('formatDatetimeLocal renders an instant in IST wall clock regardless of host TZ', () => {
     process.env.TZ = 'America/New_York';
-    expect(formatDatetimeLocalIst(new Date('2026-06-24T09:00:00.000Z'))).toBe(
+    expect(formatDatetimeLocal(new Date('2026-06-24T09:00:00.000Z'))).toBe(
       '2026-06-24T14:30',
     );
   });
@@ -97,19 +99,44 @@ describe('IST datetime-local picker helpers', () => {
   it('round-trips a picked value through IST', () => {
     process.env.TZ = 'UTC';
     const original = '2026-01-15T08:05';
-    expect(formatDatetimeLocalIst(parseDatetimeLocalIst(original))).toBe(original);
+    expect(formatDatetimeLocal(parseDatetimeLocal(original))).toBe(original);
   });
 
   it('derived local_date / local_hour match the IST wall clock of a backdated pick', () => {
     process.env.TZ = 'Pacific/Auckland';
-    const iso = parseDatetimeLocalIst('2026-06-24T23:45')!.toISOString();
+    const iso = parseDatetimeLocal('2026-06-24T23:45')!.toISOString();
     expect(toLocalDate(iso)).toBe('2026-06-24');
     expect(toLocalHour(iso)).toBe(23);
   });
 
   it('returns null / empty for invalid input', () => {
-    expect(parseDatetimeLocalIst('')).toBeNull();
-    expect(parseDatetimeLocalIst('not-a-date')).toBeNull();
-    expect(formatDatetimeLocalIst(null)).toBe('');
+    expect(parseDatetimeLocal('')).toBeNull();
+    expect(parseDatetimeLocal('not-a-date')).toBeNull();
+    expect(formatDatetimeLocal(null)).toBe('');
+  });
+});
+
+// EU ledger: the backdate picker and log times were hard-wired to IST, so a Paris
+// user's "22:00" was stored as 16:30 UTC and shown back as an Indian time.
+describe('wall-clock helpers follow the reader zone', () => {
+  const PARIS = 'Europe/Paris'; // UTC+1 after the 25 Oct 2026 DST change
+
+  it('parses a picked wall-clock time in the given zone', () => {
+    expect(parseDatetimeLocal('2026-10-30T22:00', PARIS)?.toISOString()).toBe('2026-10-30T21:00:00.000Z');
+  });
+
+  it('renders an instant as that zone wall clock', () => {
+    expect(formatDatetimeLocal(new Date('2026-10-30T21:00:00.000Z'), PARIS)).toBe('2026-10-30T22:00');
+  });
+
+  it('formats a log time in the given zone, defaulting to IST', () => {
+    expect(formatTime('2026-10-30T21:00:00.000Z', PARIS)).toBe('22:00');
+    expect(formatTime('2026-10-30T21:00:00.000Z')).toBe('02:30');
+  });
+
+  it('names the zone for UI copy', () => {
+    expect(zoneLabel(IST)).toBe('IST');
+    expect(zoneLabel(PARIS)).toBe('Paris time');
+    expect(zoneLabel('America/New_York')).toBe('New York time');
   });
 });

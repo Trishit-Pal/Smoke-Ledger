@@ -420,7 +420,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
             label="When"
             sublabel="Stamp this line with a specific moment. Useful when you log a few minutes after the fact."
           >
-            <BackdateTimeField value={backdate} onChange={setBackdate} />
+            <BackdateTimeField value={backdate} onChange={setBackdate} zone={timezoneForCountry(country)} />
           </FieldRow>
         </section>
 
