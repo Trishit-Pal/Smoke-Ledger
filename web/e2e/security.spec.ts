@@ -39,6 +39,32 @@ test('CSP nonce in response header matches nonce stamped on script tags', async 
   ).toBe(scriptTags.length);
 });
 
+// The strict CSP is the main XSS defence; a route that trips it means either a
+// real injection or a legitimate asset the policy now blocks (img-src lost its
+// https: wildcard; COOP/CORP were added). Either way it must surface here.
+for (const route of ['/', '/login', '/signup', '/reset', '/privacy', '/terms', '/support']) {
+  test(`no CSP violations on ${route}`, async ({ page }) => {
+    const violations: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error' && /Content Security Policy/i.test(msg.text())) {
+        violations.push(msg.text());
+      }
+    });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        (window as unknown as { __csp: string[] }).__csp ??= [];
+        (window as unknown as { __csp: string[] }).__csp.push(`${e.violatedDirective} ${e.blockedURI}`);
+      });
+    });
+    await page.goto(route);
+    await page.waitForLoadState('networkidle');
+    const reported = await page.evaluate(
+      () => (window as unknown as { __csp?: string[] }).__csp ?? [],
+    );
+    expect([...violations, ...reported]).toEqual([]);
+  });
+}
+
 test('signup page shows age acknowledgment', async ({ page }) => {
   await page.goto('/signup');
   await expect(page.getByText(/18 or older/i)).toBeVisible();
