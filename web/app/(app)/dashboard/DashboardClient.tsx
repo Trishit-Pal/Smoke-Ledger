@@ -49,7 +49,7 @@ import { WeekStrip } from '@web/components/dashboard/WeekStrip';
 import { ActivityLog } from '@web/components/dashboard/ActivityLog';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import { FloatingOrb } from '@web/components/visual/FloatingOrb';
-import { SectionLabel, MetricRow } from '@web/components/visual';
+import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
 import {
   dispatchMood,
   dispatchMilestone,
@@ -395,31 +395,16 @@ export function DashboardClient({
         </header>
 
         {/* ─────────────── Timeframe switch ─────────────── */}
-        <div
-          style={idx(1)}
-          role="tablist"
-          aria-label="Time frame"
-          className="flex items-center gap-xs self-center rounded-full border border-[var(--rule)] p-xs"
-        >
-          {WINDOWS.map((w) => {
-            const selected = windowDays === w.days;
-            return (
-              <button
-                key={w.days}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setWindowDays(w.days)}
-                className="min-h-11 px-md rounded-full text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-                style={{
-                  background: selected ? 'var(--text)' : 'transparent',
-                  color: selected ? 'var(--bg)' : 'var(--text-muted)',
-                }}
-              >
-                {w.label}
-              </button>
-            );
-          })}
+        <div style={idx(1)} className="flex justify-center">
+          <ChoiceRun
+            ariaLabel="Time frame"
+            options={WINDOWS.map((w) => ({ value: w.days, label: w.label }))}
+            value={windowDays}
+            onSelect={(days) => {
+              if (days !== null) setWindowDays(days);
+            }}
+            allowClear={false}
+          />
         </div>
 
         {/* ─────────────── Headline · the period in one number ─────────────── */}
@@ -495,7 +480,7 @@ export function DashboardClient({
         </section>
 
         {/* ─────────────── KPI strip ─────────────── */}
-        <section style={idx(3)} aria-label="Key numbers at a glance" className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+        <section style={idx(3)} aria-label="Key numbers at a glance" className="grid grid-cols-2 gap-x-lg gap-y-xl lg:grid-cols-4">
           <KpiCard
             label="Today"
             value={hidden ? '••' : todaySticks}
@@ -666,7 +651,7 @@ export function DashboardClient({
           <section style={idx(7)} aria-labelledby="activity-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <SectionLabel id="activity-heading" spacing="none">Recent activity</SectionLabel>
-              <Link href="/log" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
+              <Link href="/history" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                 View all →
               </Link>
             </div>
@@ -721,7 +706,7 @@ export function DashboardClient({
         <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between">
           <button
             type="button"
-            onClick={() => router.push('/log')}
+            onClick={() => router.push('/history')}
             className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >

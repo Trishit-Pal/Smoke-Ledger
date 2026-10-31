@@ -20,8 +20,3 @@ export const Donut = dynamic(
   () => import('@web/components/charts/Donut').then((m) => m.Donut),
   { ssr: false, loading: () => chartFallback },
 );
-
-export const AnimatedBarChart = dynamic(
-  () => import('@web/components/charts/AnimatedBarChart').then((m) => m.AnimatedBarChart),
-  { ssr: false, loading: () => chartFallback },
-);

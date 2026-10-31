@@ -1,9 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Inbox } from 'lucide-react';
-import { Button } from '@web/components/ui/Button';
-import { Text } from '@web/components/ui/Text';
 import { cn } from '@web/components/ui/cn';
 
 export interface EmptyStateProps {
@@ -14,6 +11,8 @@ export interface EmptyStateProps {
   className?: string;
 }
 
+/** Editorial empty state: small-caps caption, an italic line, a text action —
+ *  no icon badge, no card. */
 export function EmptyState({
   title,
   description,
@@ -22,21 +21,20 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div className={cn('flex flex-col items-center text-center gap-md py-xxl', className)}>
-      <div className="w-16 h-16 rounded-full bg-bg-elevated border border-border flex items-center justify-center mb-sm">
-        <Inbox className="w-7 h-7 text-text-muted" aria-hidden />
-      </div>
-      <Text variant="h3">{title}</Text>
+    <div className={cn('flex flex-col items-center text-center gap-sm py-xxl', className)}>
+      <span className="editorial-caption">{title}</span>
       {description ? (
-        <Text variant="small" muted className="max-w-sm">
-          {description}
-        </Text>
+        <p className="max-w-[40ch] text-small italic text-text-muted">{description}</p>
       ) : null}
       {actionLabel && onAction ? (
-        <Button title={actionLabel} variant="secondary" onPress={onAction} />
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-sm min-h-11 px-lg text-small text-text underline underline-offset-4 decoration-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+        >
+          {actionLabel}
+        </button>
       ) : null}
     </div>
   );
 }
-
-export default EmptyState;

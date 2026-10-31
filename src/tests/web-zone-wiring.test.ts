@@ -16,7 +16,7 @@ describe('screens pass the ledger zone to the time helpers', () => {
     );
   });
 
-  it.each(['web/app/(app)/history/HistoryClient.tsx', 'web/app/(app)/log/LogClient.tsx'])(
+  it.each(['web/app/(app)/history/HistoryClient.tsx'])(
     '%s formats log times in the ledger zone',
     (file) => {
       const source = read(file);

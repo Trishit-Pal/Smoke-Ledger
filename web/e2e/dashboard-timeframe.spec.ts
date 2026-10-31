@@ -22,13 +22,13 @@ test.describe('dashboard timeframe hub', () => {
     // Default window = Day → today only = 3 (the quantity-3 row, proving the migration).
     await expect(page.getByLabel('3 cigarettes today', { exact: true })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Week' }).click();
+    await page.getByRole('button', { name: 'Week', exact: true }).click();
     await expect(page.getByLabel('5 cigarettes this week', { exact: true })).toBeVisible(); // 3+2
 
-    await page.getByRole('tab', { name: 'Month' }).click();
+    await page.getByRole('button', { name: 'Month', exact: true }).click();
     await expect(page.getByLabel('9 cigarettes this month', { exact: true })).toBeVisible(); // 3+2+4
 
-    await page.getByRole('tab', { name: 'Year' }).click();
+    await page.getByRole('button', { name: 'Year', exact: true }).click();
     await expect(page.getByLabel('14 cigarettes this year', { exact: true })).toBeVisible(); // 3+2+4+5
   });
 });

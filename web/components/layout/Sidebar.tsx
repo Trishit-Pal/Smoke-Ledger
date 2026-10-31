@@ -12,9 +12,12 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@web/components/ui/cn';
+import { isNavActive } from '@web/lib/nav';
 
 interface NavItem {
   href: string;
+  /** Route prefixes that light this item; defaults to [href]. */
+  match?: readonly string[];
   label: string;
   icon: React.ComponentType<{
     className?: string;
@@ -24,9 +27,8 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/log', label: 'Log', icon: Plus },
   { href: '/trends', label: 'Trends', icon: TrendingUp },
-  { href: '/history', label: 'History', icon: History },
+  { href: '/history', label: 'Ledger', icon: History, match: ['/history', '/log'] },
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -43,9 +45,17 @@ export function Sidebar() {
         </p>
       </div>
 
+      <Link
+        href="/log/new"
+        className="mb-lg flex min-h-11 items-center justify-center gap-sm rounded-md bg-text px-md text-body font-medium text-bg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      >
+        <Plus className="h-4 w-4" aria-hidden />
+        New entry
+      </Link>
+
       <nav aria-label="Primary" className="flex flex-col gap-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+        {NAV.map(({ href, label, icon: Icon, match }) => {
+          const active = isNavActive(pathname, match ?? [href]);
           return (
             <Link
               key={href}

@@ -17,8 +17,8 @@ test.describe('authenticated flows', () => {
 
     // Land on the dashboard and confirm the timeframe hub rendered.
     await page.goto('/dashboard');
-    await expect(page.getByRole('tablist', { name: 'Time frame' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Week' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Time frame' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible();
 
     // Log a multi-quantity entry — Save is disabled until a brand is chosen.
     await page.goto('/log/new');
@@ -29,7 +29,7 @@ test.describe('authenticated flows', () => {
 
     // Trends renders.
     await page.goto('/trends');
-    await expect(page.getByRole('tab', { name: 'Week' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible();
 
     // Settings export downloads a file.
     await page.goto('/settings');

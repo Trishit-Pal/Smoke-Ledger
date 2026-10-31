@@ -21,7 +21,6 @@ import { Button } from '@web/components/ui/Button';
 import { Input } from '@web/components/ui/Input';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { EmptyState } from '@web/components/ui/EmptyState';
-import { Text } from '@web/components/ui/Text';
 import { cn } from '@web/components/ui/cn';
 import { SectionLabel } from '@web/components/visual';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
@@ -111,7 +110,7 @@ function GoalForm({
 
   return (
     <div className="border border-border rounded-lg p-lg flex flex-col gap-md bg-card">
-      <Text variant="h3">{isEdit ? 'Edit goal' : 'New goal'}</Text>
+      <SectionLabel spacing="sm">{isEdit ? 'Edit goal' : 'New goal'}</SectionLabel>
 
       {!isEdit ? (
         <div className="flex flex-col gap-sm">
