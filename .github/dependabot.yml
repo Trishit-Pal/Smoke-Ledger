@@ -7,6 +7,19 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Major bumps held back until a migration is planned — each one broke
+      # `npm ci` or the build on main (see the 2026-10-31 CI recovery PR).
+      - dependency-name: "@babel/core"       # ts-jest peer needs <8
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"            # eslint-config-expo still targets 8/9
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-haptics"      # SDK 56 add-on; stay on ~56.x
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-sharing"      # SDK 56 add-on; stay on ~56.x
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@react-native-async-storage/async-storage"  # native module pinned by SDK 56
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web
@@ -15,6 +28,26 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Next 16 makes cookies()/headers() async and drops `next lint`; needs its own migration.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      # React 19 is a coordinated move (react, react-dom, @types/*) — not one package at a time.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      # tailwind-merge 3 targets Tailwind v4; web is on Tailwind 3.
+      - dependency-name: "tailwind-merge"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   # Keeps the SHA-pinned actions in .github/workflows current.
   - package-ecosystem: github-actions
