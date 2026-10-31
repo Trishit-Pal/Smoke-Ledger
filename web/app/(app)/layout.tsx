@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </a>
       <SceneBackdrop intensity="quiet" />
       <Sidebar />
-      <main id="main-content" tabIndex={-1} className="flex-1 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:short-landscape:pb-0 md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
             WCAG-AA contrast over the moving scene. */}
         <div

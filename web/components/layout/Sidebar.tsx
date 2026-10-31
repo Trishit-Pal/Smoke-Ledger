@@ -37,7 +37,7 @@ export function Sidebar() {
   const pathname = usePathname() ?? '';
 
   return (
-    <aside className="hidden md:flex flex-col w-[72px] lg:w-60 h-dvh sticky top-0 z-10 bg-bg border-r border-border px-sm lg:px-md py-lg pl-[max(0.5rem,env(safe-area-inset-left))]">
+    <aside className="hidden md:flex flex-col w-[calc(72px+env(safe-area-inset-left))] lg:w-60 h-dvh sticky top-0 z-10 bg-bg border-r border-border px-sm lg:px-md py-lg pl-[calc(0.5rem+env(safe-area-inset-left))]">
       <div className="hidden lg:block px-sm mb-xl">
         <p className="text-h3 font-semibold text-text">Smoke Ledger</p>
         <p className="text-caption uppercase text-text-muted mt-1 tracking-wide">
