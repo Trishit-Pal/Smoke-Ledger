@@ -67,7 +67,7 @@ for (const route of ['/', '/login', '/signup', '/reset', '/privacy', '/terms', '
 
 test('signup page shows age acknowledgment', async ({ page }) => {
   await page.goto('/signup');
-  await expect(page.getByText(/18 or older/i)).toBeVisible();
+  await expect(page.getByText(/I am 18 or older/i)).toBeVisible();
 });
 
 test('login page shows keep me signed in option', async ({ page }) => {
