@@ -20,6 +20,7 @@ import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { dispatchGoalCompletion, dispatchGoalDeletion } from '@/lib/character/mood';
 import { isDiscreetMode } from '@/lib/discreet';
+import { localeForCountry } from '@/lib/regions';
 import type { Goal } from '@/types';
 
 export default function GoalsTab() {
@@ -89,7 +90,10 @@ export default function GoalsTab() {
   }, [removeGoal]);
 
   function GoalRow({ goal }: { goal: Goal }) {
-    const progress = evaluateGoal(goal, logs, today);
+    const progress = evaluateGoal(goal, logs, today, {
+      currency: profile?.currency ?? 'INR',
+      locale: localeForCountry(profile?.country),
+    });
     const hideMoney = goal.type === 'spend_cap_daily' && discreet;
     const heading = hideMoney ? goalTypeLabel(goal.type) : progress.label;
     const explanation = hideMoney ? 'Spend hidden in discreet mode.' : progress.explanation;

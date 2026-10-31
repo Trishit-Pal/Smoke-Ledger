@@ -568,7 +568,7 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Mood × trigger" right="Where it tends to start" />
             <Reveal dependencyKey={dependencyKey}>
-              <MoodTriggerMatrixView logs={logs} />
+              <MoodTriggerMatrixView logs={logs} money={(n) => ledgerMoney(n)} />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               A grid of feelings against situations. The dense cells are the pattern.

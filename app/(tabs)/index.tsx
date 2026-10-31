@@ -34,7 +34,8 @@ import { isBirthdayToday } from '@/domain/age';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { generateInsights } from '@/domain/insights';
-import { formatDelta } from '@/lib/format';
+import { formatDelta, formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
 import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 import { dayOfWeekShort, formatIndianDate } from '@/lib/date';
@@ -407,7 +408,12 @@ export default function Home() {
   }, [logs, last7Start, today]);
 
   const forecast = useMemo(() => forecastMonthlySpend(logs, today), [logs, today]);
-  const insights = useMemo(() => generateInsights(logs, today), [logs, today]);
+  const currency = profile?.currency ?? 'INR';
+  const locale = localeForCountry(profile?.country);
+  const insights = useMemo(
+    () => generateInsights(logs, today, (amount) => formatMoney(amount, currency, { locale })),
+    [logs, today, currency, locale],
+  );
   const last = useMemo(() => lastLog(logs), [logs]);
   // Streak + savings derive from the canonical daily summary (quantity-correct,
   // up to 365 days), so the streak no longer truncates at the 90-day log window
@@ -430,8 +436,8 @@ export default function Home() {
 
   const activeGoal = goals.find((g) => g.status === 'active') ?? null;
   const goalProgress = useMemo(
-    () => (activeGoal ? evaluateGoal(activeGoal, logs, today) : null),
-    [activeGoal, logs, today],
+    () => (activeGoal ? evaluateGoal(activeGoal, logs, today, { currency, locale }) : null),
+    [activeGoal, logs, today, currency, locale],
   );
   // Spend caps embed ₹ in evaluateGoal().label/explanation — hide under discreet mode.
   const goalHideMoney = activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile);

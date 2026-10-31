@@ -47,7 +47,7 @@ export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
                 <span className="font-semibold">{pair.trigger}</span>
               </span>
               <span className="text-text-muted">
-                {pair.count}× · avg {pair.avgUnitPriceInr == null ? '—' : money(Math.round(pair.avgUnitPriceInr))}
+                {pair.count}× · avg {pair.avgUnitPriceInr == null ? '—' : money(pair.avgUnitPriceInr)}
               </span>
             </li>
           ))}
