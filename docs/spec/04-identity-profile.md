@@ -10,7 +10,7 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: c3ec7a1
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -170,6 +170,6 @@ These must never break.
 
 **Country.** Settings (web) has a country picker (`web/components/settings/CountryField.tsx`) behind `NEXT_PUBLIC_REGION_PICKER`. The country fixes the ledger's currency and calendar: India is INR and IST, EU countries are EUR in their own zone. Six EU members that do not use the euro (CZ, DK, HU, PL, RO, SE) are not offered (`regionOptions` in `src/lib/regions.ts`) until their currencies are supported. Changing to a country with a different currency while the ledger has data raises `region_change_requires_reset`; Settings then offers "Reset the ledger and switch", and changing the country again clears that prompt. A reset that would not change the currency is refused server-side (`region_reset_not_needed`), and the repository treats it as a plain country save, so a double tap cannot show a false error.
 
-**Onboarding** (`web/app/onboarding/usage/page.tsx`) starts from the saved country and calls `setRegion` only when the pick changes it (`regionChangeNeeded`), so going Back never silently switches the account. Native screens read the country from the session store: `ledgerTimeZone()` and `ledgerMoney()` / `ledgerCurrency()` (`src/lib/ledgerMoney.ts`). The native price editor shows the ledger currency and keeps euro cents. A country can only be chosen on web; native onboarding is the India ledger.
+**Onboarding** (`web/app/onboarding/usage/page.tsx`) starts from the saved country and calls `setRegion` only when the pick changes it (`regionChangeNeeded`), so going Back never silently switches the account. Native screens read the country from the session store: `ledgerTimeZone()` / `ledgerToday()` and `ledgerMoney()` / `ledgerCurrency()` (`src/lib/ledgerMoney.ts`); Home insights, spend-cap goals and the mood/trigger matrix format in the profile currency. The native price editor shows the ledger currency, keeps euro cents and accepts a comma decimal (`parseDecimal`). A country can only be chosen on web; native onboarding is the India ledger.
 
 **Erase** clears the identity fields too: `full_name`, `date_of_birth`, `gender`, `mobile_e164` and `place`. They are otherwise immutable; `erase_account_data` sets a transaction-local `app.erasing` flag that the identity trigger honours, and records `prior_identity_erased` on its audit row.

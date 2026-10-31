@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: c3ec7a1
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -156,7 +156,7 @@ The central fact table. Every recorded smoking event is one row here.
 
 `trigger_tag`, `mood_before`, `mood_after`, and `context_tag` are not CHECK-constrained at the DB layer. The valid values are enforced in the TypeScript Zod schemas (`src/lib/validation.ts`) and in the domain types (`src/types/index.ts:6`). This was a deliberate trade-off: adding a DB CHECK would require a migration every time a new mood or trigger is introduced.
 
-**RLS**: `logs_select`, `logs_update` and `logs_delete`, each `user_id = (SELECT auth.uid())`. There is deliberately no INSERT policy and `authenticated` has no INSERT privilege (`20261031000000_logs_insert_via_rpc.sql`): logs are written only through `create_log_with_rate_limit`, so its 50-per-hour cap and `client_op_id` idempotency cannot be bypassed.
+**RLS**: `logs_select`, `logs_update` and `logs_delete`, each `user_id = (SELECT auth.uid())`. There is deliberately no INSERT policy and `authenticated` has no INSERT privilege (`20261031000000_logs_insert_via_rpc.sql`): logs are written only through `create_log_with_rate_limit`, so its 50-per-hour cap and `client_op_id` idempotency cannot be bypassed. UPDATE is a column grant on the logged fields only: `created_at` (which the cap counts), `id`, `user_id` and `client_op_id` are not updatable by `authenticated`.
 
 **Realtime**: `cigarette_logs` is in the `supabase_realtime` publication and set to `REPLICA IDENTITY FULL` (migration `20260620130000_realtime_enable.sql`). FULL is required because subscribers filter on `user_id=eq.<uid>`, which is not the PK — without it, DELETE events would omit `user_id` and never reach the client.
 

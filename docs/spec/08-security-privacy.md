@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: c3ec7a1
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -192,7 +192,7 @@ The `rls-integration` CI job is configured as a required branch protection check
 
 ### Hardening, 2026-10 (security scan and review follow-ups)
 
-- **Logs are written only through the rate-limited RPC.** `cigarette_logs` has SELECT / UPDATE / DELETE policies and no INSERT path for `authenticated` (`20261031000000_logs_insert_via_rpc.sql`), so `create_log_with_rate_limit`'s cap cannot be bypassed through PostgREST. Proven by `smoke.sql` and by an RLS integration test that a direct insert is denied.
+- **Logs are written only through the rate-limited RPC.** `cigarette_logs` has SELECT / UPDATE / DELETE policies and no INSERT path for `authenticated` (`20261031000000_logs_insert_via_rpc.sql`), so `create_log_with_rate_limit`'s cap cannot be bypassed through PostgREST. UPDATE is granted only on the logged fields, so back-dating `created_at` (the cap's window) is denied too. Proven by `smoke.sql` (table and column privileges) and by RLS integration tests: a direct insert and a `created_at` rewrite both get `42501`, while an ordinary edit succeeds.
 - **anon default-deny** on every public table, sequence and function, now and for new objects (`20261030000000_security_hardening.sql`).
 - **Legal pages render per request.** `/privacy`, `/terms` and `/support` were `force-static`, so their inline Next scripts carried no CSP nonce and were blocked; they are `force-dynamic` now. The e2e smoke suite fails on any CSP violation on a public route.
 - **Headers.** `img-src` is `'self' data: blob:` (no `https:` wildcard); `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` are `same-origin`; `/auth/confirm` sends `Referrer-Policy: same-origin`.

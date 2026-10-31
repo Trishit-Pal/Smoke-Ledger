@@ -15,7 +15,7 @@ sources:
   - supabase/migrations/20260524050357_add_daily_summary.sql
   - supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql
   - src/tests/calculations.test.ts
-last_verified_commit: c3ec7a1
+last_verified_commit: 6268c8d
 status: current
 ---
 
@@ -145,7 +145,10 @@ ledger's zone: the profile country's (`timezoneForCountry`), IST when there is
 none. `createLog` derives them from the draft's `timeZone` via `toLocalDate` and
 `toLocalHour` in `src/lib/date.ts`. Web passes the zone from the new-log form;
 native screens pass `ledgerTimeZone()` (`src/store/session.ts`) at every
-`createLog` call, and `useSession.addLog` fills it when a caller does not. The
+`createLog` call, and `useSession.addLog` fills it when a caller does not.
+Native screens read "today" in the same zone (`ledgerToday()` /
+`ledgerDaysAgo()`), so a log made late in a European evening stays in today's
+list and count. The
 web backdate picker reads and writes its wall clock in the same zone
 (`formatDatetimeLocal` / `parseDatetimeLocal`), and Log / History render times
 with `formatTime(ts, zone)`.
@@ -277,7 +280,9 @@ does.
 `logs_select` / `logs_update` / `logs_delete` on `cigarette_logs` use
 `user_id = (select auth.uid())`; there is no INSERT policy and `authenticated`
 has no INSERT privilege, so every write goes through `create_log_with_rate_limit`
-(`20261031000000_logs_insert_via_rpc.sql`). The policies use (the `select` form avoids a per-row
+(`20261031000000_logs_insert_via_rpc.sql`). UPDATE is granted only on the
+logged fields `updateLog` writes; `created_at` (the RPC's rate-limit window),
+`id`, `user_id` and `client_op_id` cannot be rewritten. The policies use (the `select` form avoids a per-row
 function call; added in `supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:24`).
 This applies to direct table access and to the `v_daily_summary_user` view
 (which is `security_invoker = true`). The `list_logs_page` and
