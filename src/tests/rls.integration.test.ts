@@ -130,7 +130,7 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
   it('denies a direct INSERT into cigarette_logs (only the rate-limited RPC writes logs)', async () => {
     const nowIso = new Date().toISOString();
     const { error } = await clientA.from('cigarette_logs').insert({
-      id: `log_direct_${Date.now()}`,
+      id: `log_rls_direct_${Date.now()}`,
       user_id: userAId,
       ts_utc: nowIso,
       local_date: nowIso.slice(0, 10),
@@ -139,7 +139,27 @@ describeIfEnv('RLS cross-user isolation (integration)', () => {
       purchase_mode: 'single',
       price_source: 'unknown',
     });
-    expect(error).not.toBeNull();
+    expect(error?.code).toBe('42501');
+  });
+
+  it('lets a user edit a log but not rewrite created_at (the rate-limit window)', async () => {
+    const id = `log_rls_window_${Date.now()}`;
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const insert = await insertLogViaRpc(clientA, id, nowIso, nowIso.slice(0, 10), now.getUTCHours());
+    expect(insert.error).toBeNull();
+
+    const edit = await clientA.from('cigarette_logs').update({ notes: 'edited' }).eq('id', id);
+    expect(edit.error).toBeNull();
+
+    const rewind = await clientA
+      .from('cigarette_logs')
+      .update({ created_at: '2000-01-01T00:00:00Z' })
+      .eq('id', id);
+    expect(rewind.error?.code).toBe('42501');
+
+    const cleanup = await clientA.from('cigarette_logs').delete().eq('id', id);
+    expect(cleanup.error).toBeNull();
   });
 
   it('prevents user B from calling record_audit_event RPC after revoke', async () => {
