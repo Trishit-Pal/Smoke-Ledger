@@ -55,58 +55,52 @@ export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
       </div>
 
       <div className="overflow-x-auto">
-        <div
-          className="grid gap-1 min-w-fit"
-          style={{
-            gridTemplateColumns: `auto repeat(${matrix.triggers.length}, minmax(56px, 1fr))`,
-          }}
-        >
-          <span />
-          {matrix.triggers.map((t) => (
-            <span
-              key={`th-${t}`}
-              className="text-caption uppercase text-text-muted text-center px-1 py-1 truncate"
-              title={t}
-            >
-              {t}
-            </span>
-          ))}
-
-          {matrix.moods.map((mood) => (
-            <React.Fragment key={`row-${mood}`}>
-              <span
-                className="text-caption uppercase text-text-muted px-1 py-1 self-center"
-                title={mood}
-              >
-                {mood}
-              </span>
-              {matrix.triggers.map((trigger) => {
-                const count = lookup.get(`${mood}|${trigger}`) ?? 0;
-                const intensity = max > 0 ? count / max : 0;
-                const opacity = count > 0 ? 0.18 + 0.8 * intensity : 0;
-                return (
-                  <div
-                    key={`cell-${mood}-${trigger}`}
-                    className={cn(
-                      'rounded-sm border border-border h-9 flex items-center justify-center',
-                      count === 0 && 'bg-bg-elevated',
-                    )}
-                    style={
-                      count > 0
-                        ? { background: `rgba(47,163,155,${opacity})` }
-                        : undefined
-                    }
-                    title={`${mood} × ${trigger}: ${count}`}
-                  >
-                    <span className="text-caption font-medium text-text">
-                      {count > 0 ? count : ''}
-                    </span>
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </div>
+        <table className="min-w-fit border-separate border-spacing-1">
+          <caption className="sr-only">How often each mood and trigger were logged together</caption>
+          <thead>
+            <tr>
+              <td />
+              {matrix.triggers.map((t) => (
+                <th
+                  key={`th-${t}`}
+                  scope="col"
+                  className="min-w-[56px] px-1 py-1 text-center text-caption font-normal uppercase text-text-muted"
+                >
+                  {t}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.moods.map((mood) => (
+              <tr key={`row-${mood}`}>
+                <th
+                  scope="row"
+                  className="px-1 py-1 text-left text-caption font-normal uppercase text-text-muted"
+                >
+                  {mood}
+                </th>
+                {matrix.triggers.map((trigger) => {
+                  const count = lookup.get(`${mood}|${trigger}`) ?? 0;
+                  const intensity = max > 0 ? count / max : 0;
+                  const opacity = count > 0 ? 0.18 + 0.8 * intensity : 0;
+                  return (
+                    <td
+                      key={`cell-${mood}-${trigger}`}
+                      className={cn(
+                        'h-9 rounded-sm border border-border text-center text-caption font-medium text-text',
+                        count === 0 && 'bg-bg-elevated',
+                      )}
+                      style={count > 0 ? { background: `rgba(47,163,155,${opacity})` } : undefined}
+                    >
+                      {count > 0 ? count : <span className="sr-only">0</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

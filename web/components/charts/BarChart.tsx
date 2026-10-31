@@ -13,6 +13,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+import { ChartDataTable } from '@web/components/charts/ChartDataTable';
 import { CHART, CHART_SERIES, chartAxisTick, ChartTooltip } from '@web/components/charts/chartTheme';
 
 export interface BarChartProps {
@@ -21,6 +22,8 @@ export interface BarChartProps {
   formatY?: (v: number) => string;
   showLabels?: boolean;
   emphasizeLast?: boolean;
+  /** Names the chart for assistive tech (caption of its data table). */
+  title?: string;
 }
 
 export function BarChart({
@@ -29,6 +32,7 @@ export function BarChart({
   formatY,
   showLabels = true,
   emphasizeLast = true,
+  title = 'Bar chart',
 }: BarChartProps) {
   const lastIndex = data.length - 1;
   const reduced = useReduceMotion();
@@ -39,7 +43,8 @@ export function BarChart({
   const h = isDesktop ? Math.round(height * 1.25) : height;
 
   return (
-    <div style={{ width: '100%', height: h }}>
+    <>
+    <div style={{ width: '100%', height: h }} aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         <RBarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
@@ -80,6 +85,8 @@ export function BarChart({
         </RBarChart>
       </ResponsiveContainer>
     </div>
+    <ChartDataTable caption={title} rows={data} />
+    </>
   );
 }
 

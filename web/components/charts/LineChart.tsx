@@ -11,6 +11,7 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+import { ChartDataTable } from '@web/components/charts/ChartDataTable';
 import { CHART, CHART_SERIES, chartAxisTick, ChartTooltip } from '@web/components/charts/chartTheme';
 
 export interface LineChartProps {
@@ -18,9 +19,11 @@ export interface LineChartProps {
   height?: number;
   formatY?: (v: number) => string;
   strokeColor?: string;
+  /** Names the chart for assistive tech (caption of its data table). */
+  title?: string;
 }
 
-export function LineChart({ data, height = 160, formatY, strokeColor }: LineChartProps) {
+export function LineChart({ data, height = 160, formatY, strokeColor, title = 'Line chart' }: LineChartProps) {
   const stroke = strokeColor ?? CHART_SERIES[0];
   const reduced = useReduceMotion();
   // Grow taller on desktop to use the wider content column; phones/tablets keep
@@ -29,7 +32,8 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
   const h = isDesktop ? Math.round(height * 1.25) : height;
 
   return (
-    <div style={{ width: '100%', height: h }}>
+    <>
+    <div style={{ width: '100%', height: h }} aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         <RLineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
@@ -66,6 +70,8 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
         </RLineChart>
       </ResponsiveContainer>
     </div>
+    <ChartDataTable caption={title} rows={data} />
+    </>
   );
 }
 

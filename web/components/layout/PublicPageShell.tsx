@@ -15,7 +15,7 @@ export interface PublicPageShellProps {
 
 export function PublicPageShell({ children, backdrop }: PublicPageShellProps) {
   return (
-    <div className="relative min-h-screen bg-bg text-text">
+    <div className="relative min-h-dvh bg-bg text-text">
       {backdrop}
       <div
         className="relative"

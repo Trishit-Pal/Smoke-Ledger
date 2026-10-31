@@ -36,6 +36,18 @@ function buildGrid(logs: CigaretteLog[], startYmd: string, endYmd: string) {
   return { grid, max };
 }
 
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** One-sentence text alternative: where the activity peaks. */
+function heatmapSummary(grid: number[][], max: number): string {
+  if (max <= 0) return 'Smoking activity heatmap: no logs in this period.';
+  for (let r = 0; r < grid.length; r++) {
+    const c = grid[r]!.indexOf(max);
+    if (c >= 0) return `Smoking activity heatmap by weekday and hour: busiest ${DAY_NAMES[r]} at ${c}:00, ${max} logs.`;
+  }
+  return 'Smoking activity heatmap.';
+}
+
 export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = React.useState(0);
@@ -75,7 +87,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
   return (
     <div ref={containerRef} className="w-full overflow-x-auto" style={{ height }}>
       {width > 0 ? (
-        <svg width={drawWidth} height={height} role="img" aria-label="Smoking activity heatmap">
+        <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max)}>
           {DAY_LABELS.map((label, row) => (
             <text
               key={`day-${row}`}
