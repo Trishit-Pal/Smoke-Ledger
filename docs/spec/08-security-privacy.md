@@ -113,6 +113,8 @@ Edge Functions check `req.headers.get('origin')` against an allowlist in `supaba
 
 `delete-account/index.ts` calls `hasRecentSignIn` (`supabase/functions/_shared/recentAuth.ts`), which reads the presenting access token's own `amr` claim and requires a real sign-in (password, OTP, magic link, recovery, signup) within the configured window (default 15 minutes, tunable via `REAUTH_WINDOW_MIN`). `token_refresh` and `anonymous` never count, and a malformed claim fails closed. The check is bound to the session making the request: the earlier gate read the account-wide `last_sign_in_at`, so a stale stolen session passed whenever the owner had signed in on any other device (security scan F2, 2026-10-30).
 
+On `reauth_required`, web sends the user to `/login?next=/settings?action=delete&reason=reauth` and mobile to `/login?reason=reauth` while they are still signed in. `isReauthRequest` (`src/lib/reauth.ts`) lets exactly that route through web middleware and the mobile `(auth)` layout, which otherwise redirect every signed-in visitor away from `/login`; without it the fresh sign-in the gate demands could never happen and deletion was unreachable.
+
 The Edge Function also applies dual rate limiting: per-IP (hashed with SHA-256) and per-user, both capped at 5 requests per 10 minutes. Both use `consume_rate_limit` via the service-role client and fail closed — if the Postgres call fails, the function returns 429 rather than silently disabling the gate.
 
 ## Invariants

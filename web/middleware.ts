@@ -29,8 +29,10 @@ function isOnboardingRoute(pathname: string): boolean {
   return pathname.startsWith('/onboarding');
 }
 
+// Reachable signed in or out, and exempt from the onboarding gates: the confirm
+// page must be able to warn a signed-in visitor before an account switch.
 function isCallbackRoute(pathname: string): boolean {
-  return pathname === '/auth/callback';
+  return pathname === '/auth/callback' || pathname === '/auth/confirm';
 }
 
 function isRecoveryRoute(pathname: string): boolean {

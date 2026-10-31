@@ -1,4 +1,4 @@
-import { parseEmailOtpType } from '@/lib/emailOtpType';
+import { readAuthLink } from '@/lib/authLink';
 import { getSupabase } from '@/lib/supabase';
 
 // 'signed_up' is a first-time signup confirmation (type=signup) — callers use it
@@ -13,53 +13,32 @@ function resultForType(type: string | null | undefined): SessionResult {
 }
 
 /**
- * Parse a Supabase auth deep link and establish a session. Supports all three
- * link shapes so a link works regardless of which device opened it:
- *   - `token_hash` + `type` → verifyOtp (cross-device safe; preferred template)
- *   - PKCE `code` → exchangeCodeForSession (same-device fallback)
- *   - implicit `#access_token`/`#refresh_token` → setSession (legacy)
- * Returns the flow type so callers can route recovery links to the reset screen
- * and celebrate first-time signups.
+ * Redeem a Supabase auth deep link and establish a session.
+ *   - `token_hash` + `type` → verifyOtp. Not bound to this device, so the
+ *     callback screen asks the person to confirm BEFORE calling this.
+ *   - PKCE `code` → exchangeCodeForSession (same-device only).
+ * Raw `#access_token`/`#refresh_token` fragments (the old implicit flow) are
+ * never accepted: anyone could hand the app a link that signs it into their
+ * own account (security scan F3). Returns the flow type so callers can route
+ * recovery links to the reset screen and celebrate first-time signups.
  */
 export async function createSessionFromUrl(url: string): Promise<SessionResult> {
   const supabase = getSupabase();
 
   try {
     const parsed = new URL(url);
-    const type = parsed.searchParams.get('type');
+    const link = readAuthLink(parsed.searchParams);
 
-    // 1. token_hash + type → verifyOtp (cross-device safe; preferred template)
-    const tokenHash = parsed.searchParams.get('token_hash');
-    if (tokenHash) {
-      const otpType = parseEmailOtpType(type);
-      if (!otpType) return 'none';
-      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
+    if (link.kind === 'confirm') {
+      const { error } = await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: link.type });
       if (error) throw error;
-      return resultForType(otpType);
+      return resultForType(link.type);
     }
 
-    // 2. code → exchangeCodeForSession (PKCE; same-device only)
-    const code = parsed.searchParams.get('code');
-    if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (link.kind === 'exchange') {
+      const { error } = await supabase.auth.exchangeCodeForSession(link.code);
       if (error) throw error;
-      return resultForType(type);
-    }
-
-    // 3. #access_token/#refresh_token → setSession (legacy implicit flow)
-    const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
-    const hashParams = new URLSearchParams(hash);
-    const accessToken = hashParams.get('access_token');
-    const refreshToken = hashParams.get('refresh_token');
-    const hashType = hashParams.get('type');
-
-    if (accessToken && refreshToken) {
-      const { error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-      if (error) throw error;
-      return resultForType(hashType);
+      return resultForType(parsed.searchParams.get('type'));
     }
   } catch {
     return 'none';
