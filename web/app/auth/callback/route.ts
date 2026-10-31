@@ -122,10 +122,10 @@ export async function GET(request: NextRequest) {
   );
   const onboarded = !!profile?.onboarded_at;
 
-  // Routing decisions use the normalised pathname to avoid issues with query
-  // strings (e.g. `/reset-password?hint=x` must still trigger the recovery
-  // flow). The actual redirect target uses `nextPath` (the original raw value)
-  // so query strings like `?ref=widget` are preserved in the final URL.
+  // Routing decisions use the pathname alone so query strings don't interfere
+  // (e.g. `/reset-password?hint=x` must still trigger the recovery flow). The
+  // redirect target is `nextPath`, which the sanitizer rebuilt from the parsed
+  // URL (same origin, query and hash kept), so `?ref=widget` survives.
   const nextPathname = nextPath ? new URL(nextPath, 'https://x').pathname : null;
 
   // Recovery flow always wins so the user can finish setting a new password.

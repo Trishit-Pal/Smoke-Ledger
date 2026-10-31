@@ -1,4 +1,4 @@
-import { ALLOWED_NEXT_PATHS } from '@web/lib/auth/redirect';
+import { ALLOWED_NEXT_PATHS, parseSameOriginPath, toRelativePath } from '@web/lib/auth/redirect';
 
 const CALLBACK_ONLY_PATHS: ReadonlySet<string> = new Set(['/reset-password']);
 
@@ -15,29 +15,19 @@ const ONBOARDING_PATHS: ReadonlySet<string> = new Set([
 /** Explicit onboarding paths allowed as post-callback ?next= targets. */
 export const CALLBACK_ONBOARDING_PATHS = ONBOARDING_PATHS;
 
-function extractAllowedCallbackPathname(raw: string | null): string | null {
-  if (!raw) return null;
-  if (!raw.startsWith('/')) return null;
-  if (raw.startsWith('//')) return null;
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f\x7f]/.test(raw)) return null;
-  let pathname: string;
-  try {
-    pathname = new URL(raw, 'https://x').pathname;
-  } catch {
-    return null;
-  }
-  if (ALLOWED_NEXT_PATHS.has(pathname)) return pathname;
-  if (CALLBACK_ONLY_PATHS.has(pathname)) return pathname;
-  if (ONBOARDING_PATHS.has(pathname)) return pathname;
-  return null;
+function isAllowedCallbackPathname(pathname: string): boolean {
+  return (
+    ALLOWED_NEXT_PATHS.has(pathname) ||
+    CALLBACK_ONLY_PATHS.has(pathname) ||
+    ONBOARDING_PATHS.has(pathname)
+  );
 }
 
 /** Preserves query string and hash when the path is on the callback allowlist. */
 export function sanitizeCallbackNextPath(raw: string | null): string | null {
-  const pathname = extractAllowedCallbackPathname(raw);
-  if (pathname === null) return null;
-  return raw!;
+  const parsed = parseSameOriginPath(raw);
+  if (parsed === null || !isAllowedCallbackPathname(parsed.pathname)) return null;
+  return toRelativePath(parsed);
 }
 
 /** @deprecated Use sanitizeCallbackNextPath — kept for existing tests. */

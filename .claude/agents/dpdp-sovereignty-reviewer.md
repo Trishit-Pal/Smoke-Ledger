@@ -27,7 +27,8 @@ consent, purpose limitation, data minimization, the **right to erasure**, the
 - **Delete account** (`delete-account` edge function): a two-step flow —
   `erase_account_data()` then `auth.admin.deleteUser()` — that **removes the
   auth user**, cascades product data, and **retains the compliance.delete
-  audit event**. Gated by a 15-minute reauth window on `last_sign_in_at`.
+  audit event**. Gated by a 15-minute reauth window on the presenting token's
+  `amr` claim (`hasRecentSignIn`; token refreshes never count).
 
 **Audit-retention immutability (the H1 invariant — never weaken it).** Rows in
 `error_events` with `category = 'compliance.delete'` (written by service-role

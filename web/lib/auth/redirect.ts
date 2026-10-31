@@ -29,51 +29,50 @@ export const ALLOWED_NEXT_PATHS: ReadonlySet<string> = new Set([
   '/settings',
 ]);
 
+const PARSE_BASE = 'https://x';
+
 /**
- * Validates `raw` against the shared allowlist and returns the normalised
- * pathname if allowed, or null if not.
+ * Parses a `?next=` value as a path on our own origin, or returns null.
  *
- * This is the single source of truth for the allowlist check. Both
- * `sanitizeNextPath` and `isAllowedNextPath` delegate to this function so
- * the two are guaranteed to stay in sync without an empty-string sentinel.
- *
- * @internal Not part of the public module API — use the exported helpers.
+ * This is the one place both post-auth sanitizers (this file and
+ * callbackNextPath.ts) decide "same origin". Callers must redirect to the
+ * value built from the parsed URL (`toRelativePath`), never to `raw`: WHATWG
+ * parsing treats `\` as `/`, so `/\evil.com/dashboard` has an allowlisted
+ * pathname but host evil.com, and resolving the raw string redirects off-site.
  */
-function extractAllowedPathname(raw: string | null): string | null {
+export function parseSameOriginPath(raw: string | null): URL | null {
   if (!raw) return null;
 
-  // Reject anything that doesn't open with a single slash.
-  if (!raw.startsWith('/')) return null;
+  // Only a single leading slash: no absolute URLs, no protocol-relative //host.
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
 
-  // Reject protocol-relative URLs (//evil.com).
-  if (raw.startsWith('//')) return null;
-
-  // Reject values containing ASCII control characters (CR, LF, NUL, etc.).
-  // These can be used for HTTP response splitting when the path is placed in
-  // a Location header.
+  // ASCII control characters (CR, LF, NUL…) enable header splitting in Location.
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(raw)) return null;
 
-  // Normalise path traversal sequences by parsing as a relative URL.
-  // We use a dummy origin so the URL constructor accepts relative paths.
-  let normalizedPathname: string;
+  // A backslash, raw or percent-encoded, can smuggle a host (see above).
+  if (/\\|%5c/i.test(raw)) return null;
+
+  let parsed: URL;
   try {
-    const parsed = new URL(raw, 'https://x');
-    normalizedPathname = parsed.pathname;
+    parsed = new URL(raw, PARSE_BASE);
   } catch {
     return null;
   }
+  return parsed.origin === PARSE_BASE ? parsed : null;
+}
 
-  if (!ALLOWED_NEXT_PATHS.has(normalizedPathname)) return null;
-
-  return normalizedPathname;
+/** The redirect target for a parsed path: path, query and hash, no host. */
+export function toRelativePath(url: URL): string {
+  return url.pathname + url.search + url.hash;
 }
 
 /**
  * Returns true when `raw` resolves to an allowed post-auth path.
  */
 export function isAllowedNextPath(raw: string | null): boolean {
-  return extractAllowedPathname(raw) !== null;
+  const parsed = parseSameOriginPath(raw);
+  return parsed !== null && ALLOWED_NEXT_PATHS.has(parsed.pathname);
 }
 
 /**
@@ -98,9 +97,8 @@ export function sanitizeNextPath(
   raw: string | null,
   fallback: string = '/dashboard',
 ): string {
-  const pathname = extractAllowedPathname(raw);
-  if (pathname === null) return fallback;
-  // The path is safe — return the original value so query/hash are preserved.
-  // Type assertion is safe: extractAllowedPathname only returns non-null when raw is non-null.
-  return raw!;
+  const parsed = parseSameOriginPath(raw);
+  if (parsed === null || !ALLOWED_NEXT_PATHS.has(parsed.pathname)) return fallback;
+  // Rebuilt from the parsed URL (query and hash kept), never the raw input.
+  return toRelativePath(parsed);
 }
