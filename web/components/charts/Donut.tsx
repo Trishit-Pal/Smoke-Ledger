@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { useReduceMotion } from '@web/hooks/useReduceMotion';
+import { ChartDataTable } from '@web/components/charts/ChartDataTable';
 import { CHART_SERIES, chartTooltipStyle } from '@web/components/charts/chartTheme';
 
 export interface DonutSlice {
@@ -16,9 +17,11 @@ export interface DonutProps {
   size?: number;
   centerLabel?: string;
   centerValue?: string;
+  /** Names the chart for assistive tech (caption of its data table). */
+  title?: string;
 }
 
-export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutProps) {
+export function Donut({ slices, size = 140, centerLabel, centerValue, title = 'Share by category' }: DonutProps) {
   const reduced = useReduceMotion();
   const safeSlices = slices.filter((s) => s.value > 0);
   const inner = Math.round(size * 0.6);
@@ -26,6 +29,7 @@ export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutPro
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <div className="contents" aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -47,6 +51,8 @@ export function Donut({ slices, size = 140, centerLabel, centerValue }: DonutPro
           <Tooltip contentStyle={chartTooltipStyle} />
         </PieChart>
       </ResponsiveContainer>
+      </div>
+      <ChartDataTable caption={title} rows={safeSlices} />
       {(centerLabel || centerValue) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           {centerValue ? (

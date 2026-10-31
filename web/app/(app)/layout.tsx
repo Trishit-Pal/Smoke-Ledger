@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </a>
       <SceneBackdrop intensity="quiet" />
       <Sidebar />
-      <main id="main-content" tabIndex={-1} className="flex-1 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
             WCAG-AA contrast over the moving scene. */}
         <div
@@ -42,7 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* The wrapper carries the safe-area inset (and a matching bg so the inset
           strip is filled) so the nav itself stays a fixed 4rem of touch targets
           — it can't grow under system font scaling and clip page content. */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden z-50 bg-card pb-[env(safe-area-inset-bottom)]">
+      <div className="fixed bottom-0 left-0 right-0 md:hidden z-50 bg-card pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <BottomNav />
       </div>
       {/* CHARACTER: event-driven overlays. Order doesn't matter — both portal

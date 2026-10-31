@@ -195,7 +195,7 @@ export function LogEditModal({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
 
         {/* Modal */}
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,40rem)] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card border border-border shadow-xl overflow-y-auto">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,40rem)] max-h-[90dvh] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card border border-border shadow-xl overflow-y-auto">
           <Dialog.Description className="sr-only">
             Edit the details of this log entry, then save or delete it.
           </Dialog.Description>
@@ -229,7 +229,7 @@ export function LogEditModal({
             {/* Brand selection */}
             <FieldRow label="Brand" hint="Required">
               <div className="flex flex-col gap-sm">
-                <div className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                <div className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide scroll-fade-x">
                   {visibleBrands.map((b) => (
                     <button
                       key={b.id}
@@ -255,7 +255,7 @@ export function LogEditModal({
             {/* Variant selection */}
             {selectedBrand && selectedBrand.variants.length > 0 ? (
               <FieldRow label="Variant" sublabel="Strength, flavor, or type — optional">
-                <div className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                <div className="flex gap-sm overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide scroll-fade-x">
                   {selectedBrand.variants.map((v) => (
                     <button
                       key={v.id}
