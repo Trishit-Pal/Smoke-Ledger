@@ -12,8 +12,8 @@ import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 type CookieOptions = AuthCookieOptions;
 
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
   const supabaseUrl = readSupabaseUrl();
   const supabaseAnonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {

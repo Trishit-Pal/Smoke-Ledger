@@ -35,8 +35,8 @@ export const viewport: Viewport = {
   themeColor: '#0B0F14',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const nonce = headers().get('x-nonce') ?? undefined;
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${fraunces.variable}`}>
       <body>

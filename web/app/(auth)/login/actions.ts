@@ -66,7 +66,7 @@ export async function signInWithPasswordAction(
     // DB-backed token bucket (same `consume_rate_limit` RPC as OTP). Fail-open
     // so a missing service-role key can't lock everyone out of sign-in —
     // Supabase's native auth limits remain as a backstop. See SCALING_PLAN.md §2a.
-    const rateOk = await checkRateLimits(loginRateLimitKeys(getClientIp(), email), {
+    const rateOk = await checkRateLimits(loginRateLimitKeys(await getClientIp(), email), {
       failOpen: true,
     });
     if (!rateOk) {
@@ -76,7 +76,7 @@ export async function signInWithPasswordAction(
       };
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     try {
       cookieStore.set(REMEMBER_ME_COOKIE, rememberMe ? '1' : '', {
         path: '/',

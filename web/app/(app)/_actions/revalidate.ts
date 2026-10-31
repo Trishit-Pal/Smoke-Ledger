@@ -27,7 +27,7 @@ export async function revalidateAppViews(): Promise<void> {
 // Resolves the user id from the session so only that user's tag is invalidated.
 // Call alongside revalidateAppViews() + router.refresh() on brand changes.
 export async function revalidateBrands(): Promise<void> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

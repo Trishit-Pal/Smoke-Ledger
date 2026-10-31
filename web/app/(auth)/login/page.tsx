@@ -19,12 +19,8 @@ import { signInWithPasswordAction } from './actions';
 import { precheckResendAction } from '../_actions/authPrechecks';
 import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { initialLoginActionState, type LoginActionState } from './loginActionState';
-import {
-  sendPhoneOtpAction,
-  verifyPhoneOtpAction,
-  initialPhoneOtpActionState,
-  type PhoneOtpActionState,
-} from './_actions/phoneOtp';
+import { sendPhoneOtpAction, verifyPhoneOtpAction } from './_actions/phoneOtp';
+import { initialPhoneOtpActionState, type PhoneOtpActionState } from './phoneOtpState';
 import { PasswordField } from '@web/components/auth/PasswordField';
 import {
   INPUT_STYLE,

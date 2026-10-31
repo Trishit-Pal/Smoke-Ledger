@@ -25,18 +25,23 @@ function first(value: string | string[] | undefined): string {
  * token is only redeemed when the person on this device presses Continue
  * (a POST to confirmEmailLinkAction). Security scan F6.
  */
-export default async function ConfirmEmailLinkPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ConfirmEmailLinkPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const sp = await searchParams;
   const link = readAuthLink(
-    new URLSearchParams({ token_hash: first(searchParams.token_hash), type: first(searchParams.type) }),
+    new URLSearchParams({ token_hash: first(sp.token_hash), type: first(sp.type) }),
   );
   if (link.kind !== 'confirm' || !isSupabaseServerConfigured()) {
     redirect('/login?error=invalid_or_expired_link');
   }
-  const nextPath = sanitizeCallbackNextPath(first(searchParams.next) || null);
+  const nextPath = sanitizeCallbackNextPath(first(sp.next) || null);
 
   const {
     data: { user },
-  } = await createClient().auth.getUser();
+  } = await (await createClient()).auth.getUser();
   // Any existing session counts (phone-only included), so the warning cannot be skipped.
   const signedInAs = maskAccount(user);
 

@@ -48,9 +48,8 @@ const config = {
   // a false "log not saved" error and leaving the router cache stale).
   // Enable "Skew Protection" in the Vercel project settings to complete this.
   deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
-  experimental: {
-    outputFileTracingRoot: path.join(__dirname, '..'),
-  },
+  // Stable (top-level) since Next 15; was experimental.outputFileTracingRoot in 14.
+  outputFileTracingRoot: path.join(__dirname, '..'),
   eslint: {
     dirs: ['app', 'components', 'hooks', 'lib'],
   },
