@@ -36,9 +36,11 @@ export function ThemedSelect({
   const [activeIndex, setActiveIndex] = React.useState(-1);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const listRef = React.useRef<HTMLUListElement | null>(null);
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   // Per-instance prefix so option ids don't collide when multiple ThemedSelects
   // coexist on a page (keeps aria-activedescendant correct for screen readers).
   const optionId = React.useId();
+  const listId = `${optionId}-list`;
 
   const selectedIndex = options.findIndex((o) => o.value === value);
   const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : '';
@@ -64,11 +66,18 @@ export function ThemedSelect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Closing the list unmounts the focused element, which would drop focus to
+  // <body>; hand it back to the trigger so keyboard users keep their place.
+  const closeAndRefocus = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
   const commit = (index: number) => {
     const opt = options[index];
     if (!opt) return;
     onChange(opt.value);
-    setOpen(false);
+    closeAndRefocus();
   };
 
   const onButtonKeyDown = (e: React.KeyboardEvent) => {
@@ -103,7 +112,7 @@ export function ThemedSelect({
         break;
       case 'Escape':
         e.preventDefault();
-        setOpen(false);
+        closeAndRefocus();
         break;
       case 'Tab':
         setOpen(false);
@@ -119,7 +128,9 @@ export function ThemedSelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
         aria-label={ariaLabel}
+        ref={triggerRef}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onButtonKeyDown}
         className="focus-ring"
@@ -143,6 +154,7 @@ export function ThemedSelect({
       {open ? (
         <ul
           ref={listRef}
+          id={listId}
           role="listbox"
           tabIndex={-1}
           aria-label={ariaLabel}
@@ -185,17 +197,19 @@ export function ThemedSelect({
                   padding: '8px 10px',
                   borderRadius: 6,
                   cursor: 'pointer',
-                  color: isSelected ? 'var(--accent)' : 'var(--text)',
+                  color: isSelected ? 'var(--accent-ink)' : 'var(--text)',
                   background: isSelected
                     ? 'var(--accent-soft)'
                     : isActive
-                      ? 'var(--bg-elevated)'
+                      ? 'var(--rule)'
                       : 'transparent',
+                  // Marker so the keyboard-active row is visible even in dark mode.
+                  boxShadow: isActive ? 'inset 3px 0 0 var(--accent-ink)' : undefined,
                 }}
               >
                 <span>{opt.label}</span>
                 {isSelected ? (
-                  <span aria-hidden style={{ color: 'var(--accent)' }}>
+                  <span aria-hidden style={{ color: 'var(--accent-ink)' }}>
                     ✓
                   </span>
                 ) : null}

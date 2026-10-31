@@ -15,7 +15,7 @@ export default function NotFound(): React.ReactElement {
             <Text variant="small" muted>
               We could not find that page. It might have been moved or the link is incorrect.
             </Text>
-            <Link href="/" className="text-accent text-small font-medium hover:opacity-80 mt-sm">
+            <Link href="/" className="text-accent-ink text-small font-medium hover:opacity-80 mt-sm">
               Back to home
             </Link>
           </div>

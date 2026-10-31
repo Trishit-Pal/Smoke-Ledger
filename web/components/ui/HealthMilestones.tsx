@@ -112,7 +112,7 @@ export function HealthMilestones({ lastSmokeIso }: HealthMilestonesProps) {
               key={m.minutes}
               className={cn(
                 'rounded-pill border px-md py-xs text-caption font-medium',
-                reached && 'bg-accent-soft text-accent border-accent/30',
+                reached && 'bg-accent-soft text-accent-ink border-accent/30',
                 !reached && isNext && 'border-accent text-text',
                 !reached && !isNext && 'border-border text-text-muted opacity-60',
               )}

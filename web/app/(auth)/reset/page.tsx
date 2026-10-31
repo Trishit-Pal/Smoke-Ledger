@@ -41,8 +41,8 @@ const PRIMARY_CTA_STYLE: React.CSSProperties = {
   padding: '0 24px',
   border: 'none',
   borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
+  background: 'var(--accent-ink)',
+  color: 'var(--on-accent)',
   fontFamily: 'var(--font-sans)',
   fontWeight: 600,
   fontSize: 14,
@@ -111,7 +111,7 @@ export default function ResetPage() {
           caption="Account · Reset"
           title={
             <>
-              Check your <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>inbox</span>.
+              Check your <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>inbox</span>.
             </>
           }
           subtitle="If an account exists for that email, we just sent a password reset link."
@@ -122,7 +122,7 @@ export default function ResetPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}
@@ -140,7 +140,7 @@ export default function ResetPage() {
         caption="Account · Reset"
         title={
           <>
-            A <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>new</span> line.
+            A <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>new</span> line.
           </>
         }
         subtitle="Enter your email and we will send you a reset link."
@@ -212,7 +212,7 @@ export default function ResetPage() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}

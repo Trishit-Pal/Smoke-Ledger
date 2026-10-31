@@ -6,8 +6,8 @@ const PRIMARY_CTA_STYLE: React.CSSProperties = {
   padding: '0 28px',
   border: 'none',
   borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
+  background: 'var(--accent-ink)',
+  color: 'var(--on-accent)',
   fontFamily: 'var(--font-sans)',
   fontWeight: 600,
   fontSize: 15,
@@ -67,7 +67,7 @@ export function LandingFinalCta() {
           className="editorial-headline"
           style={{ fontSize: 'clamp(40px, 6vw, 64px)', margin: 0 }}
         >
-          Today is <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>fine</span>.
+          Today is <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>fine</span>.
         </h2>
         <p
           style={{
@@ -111,7 +111,7 @@ export function LandingFinalCta() {
             textDecoration: 'none',
           }}
         >
-          Already have an account? <span style={{ color: 'var(--accent)' }}>Sign in →</span>
+          Already have an account? <span style={{ color: 'var(--accent-ink)' }}>Sign in →</span>
         </Link>
       </div>
     </section>

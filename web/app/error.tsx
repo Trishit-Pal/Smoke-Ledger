@@ -40,7 +40,7 @@ export default function GlobalError({ error, reset }: Props): React.ReactElement
               </Text>
             ) : null}
             <Button title="Try again" variant="primary" fullWidth onPress={reset} />
-            <Link href="/" className="text-accent text-small font-medium hover:opacity-80 mt-sm">
+            <Link href="/" className="text-accent-ink text-small font-medium hover:opacity-80 mt-sm">
               Return home
             </Link>
           </div>

@@ -239,7 +239,7 @@ export function LogEditModal({
                         setSelectedVariant(null);
                       }}
                       className={
-                        'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                        'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
                         (selectedBrand?.id === b.id
                           ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
                           : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')
@@ -262,7 +262,7 @@ export function LogEditModal({
                       type="button"
                       onClick={() => setSelectedVariant(v)}
                       className={
-                        'shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                        'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
                         (selectedVariant?.id === v.id
                           ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
                           : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')

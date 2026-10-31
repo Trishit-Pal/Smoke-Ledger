@@ -410,7 +410,7 @@ export function DashboardClient({
                 role="tab"
                 aria-selected={selected}
                 onClick={() => setWindowDays(w.days)}
-                className="min-h-[40px] px-md rounded-full text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                className="min-h-11 px-md rounded-full text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 style={{
                   background: selected ? 'var(--text)' : 'transparent',
                   color: selected ? 'var(--bg)' : 'var(--text-muted)',
@@ -424,6 +424,7 @@ export function DashboardClient({
 
         {/* ─────────────── Headline · the period in one number ─────────────── */}
         <section style={idx(2)} aria-labelledby="period-heading" className="flex flex-col subsection-gap">
+          <h1 className="sr-only">Dashboard</h1>
           <h2 id="period-heading" className="sr-only">{periodCap}</h2>
 
           <div className="flex items-end justify-between gap-lg flex-wrap">
@@ -432,6 +433,7 @@ export function DashboardClient({
               <span className="editorial-caption mb-sm">{periodCap}</span>
               <div
                 className="editorial-numeral editorial-headline-rise"
+                role="img"
                 aria-label={
                   hidden
                     ? 'Count hidden'
@@ -445,6 +447,7 @@ export function DashboardClient({
               <span className="editorial-caption mb-sm">Spend</span>
               <div
                 className="editorial-numeral--small nums-tabular"
+                role="img"
                 aria-label={hidden ? 'Spend hidden' : `Spent ${money(spend)}`}
               >
                 {hidden ? '•••' : money(spend, { compact: true })}
@@ -469,7 +472,7 @@ export function DashboardClient({
               onAdvanced={() => router.push('/log/new')}
             />
             {toast ? (
-              <p role="status" aria-live="polite" className="text-small text-accent mt-md">{toast}</p>
+              <p role="status" aria-live="polite" className="text-small text-accent-ink mt-md">{toast}</p>
             ) : null}
             {quickLogError ? (
               <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
@@ -481,7 +484,7 @@ export function DashboardClient({
                     type="button"
                     onClick={() => runQuickLog(lastLogParams)}
                     disabled={quickLogPending}
-                    className="shrink-0 inline-flex items-center min-h-[36px] px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="shrink-0 inline-flex items-center min-h-11 px-md rounded-md text-small font-medium text-text border border-[var(--warn-earth)] hover:bg-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {quickLogPending ? 'Retrying…' : 'Retry'}
                   </button>
@@ -606,11 +609,11 @@ export function DashboardClient({
         {goalProgress ? (
           <section style={idx(5)} aria-labelledby="goal-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
-              <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent transition-colors">
+              <Link href="/goals" id="goal-heading" className="editorial-caption hover:text-accent-ink transition-colors">
                 Your goal
               </Link>
               {hasMoreGoals ? (
-                <Link href="/goals" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+                <Link href="/goals" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                   View all goals →
                 </Link>
               ) : null}
@@ -663,7 +666,7 @@ export function DashboardClient({
           <section style={idx(7)} aria-labelledby="activity-heading" className="flex flex-col subsection-gap">
             <div className="flex items-baseline justify-between gap-md">
               <SectionLabel id="activity-heading" spacing="none">Recent activity</SectionLabel>
-              <Link href="/log" className="text-small text-text-muted hover:text-accent transition-colors shrink-0">
+              <Link href="/log" className="text-small text-text-muted hover:text-accent-ink transition-colors shrink-0">
                 View all →
               </Link>
             </div>

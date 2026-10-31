@@ -131,7 +131,7 @@ export function OnboardingDoneClient({
         >
           You&rsquo;re set up.
           <br />
-          <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>
+          <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>
             One stick at a time.
           </span>
         </h2>
@@ -417,8 +417,8 @@ function DashboardButton({ onClick }: DashboardButtonProps) {
         padding: '0 24px',
         border: 'none',
         cursor: 'pointer',
-        background: 'var(--accent)',
-        color: '#ffffff',
+        background: 'var(--accent-ink)',
+        color: 'var(--on-accent)',
         borderRadius: 10,
         fontFamily: 'var(--font-sans)',
         fontWeight: 600,

@@ -36,8 +36,8 @@ export function LandingPrivacy() {
           }}
         >
           &ldquo;No ads. No upsell. No third-party trackers. Encrypted at rest. Yours to{' '}
-          <span style={{ color: 'var(--accent)' }}>export</span> or{' '}
-          <span style={{ color: 'var(--accent)' }}>delete</span>.&rdquo;
+          <span style={{ color: 'var(--accent-ink)' }}>export</span> or{' '}
+          <span style={{ color: 'var(--accent-ink)' }}>delete</span>.&rdquo;
         </p>
         <div
           className="rule-draw"
@@ -55,7 +55,7 @@ export function LandingPrivacy() {
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',
             fontSize: 13,
-            color: 'var(--accent)',
+            color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
           }}

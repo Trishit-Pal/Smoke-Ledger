@@ -29,7 +29,7 @@ export function ChoiceRun<T extends string | number>({
   ariaLabel,
 }: ChoiceRunProps<T>) {
   return (
-    <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-baseline">
+    <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-center">
       {options.map((opt, i) => {
         const active = opt.value === value;
         return (
@@ -44,7 +44,7 @@ export function ChoiceRun<T extends string | number>({
               aria-pressed={active}
               onClick={() => onSelect(active && allowClear ? null : opt.value)}
               className={
-                'editorial-caption px-xs py-xs rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+                'editorial-caption inline-flex items-center min-h-11 px-sm rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
                 (active
                   ? 'text-text underline underline-offset-4 decoration-1'
                   : 'text-text-muted hover:text-text')

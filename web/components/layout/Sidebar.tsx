@@ -37,7 +37,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 h-dvh sticky top-0 z-10 bg-bg border-r border-border px-md py-lg">
       <div className="px-sm mb-xl">
-        <h3 className="text-h3 font-semibold text-text">Smoke Ledger</h3>
+        <p className="text-h3 font-semibold text-text">Smoke Ledger</p>
         <p className="text-caption uppercase text-text-muted mt-1 tracking-wide">
           India · INR
         </p>
@@ -55,7 +55,7 @@ export function Sidebar() {
                 'flex items-center gap-sm px-md py-sm rounded-md text-body transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
                 active
-                  ? 'bg-accent-soft text-accent'
+                  ? 'bg-accent-soft text-accent-ink'
                   : 'text-text-muted hover:bg-card hover:text-text',
               )}
             >

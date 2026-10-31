@@ -221,9 +221,9 @@ export function HistoryClient({
               className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"
               style={idx(0)}
             />
-            <span className="editorial-caption nums-tabular">
+            <h1 className="editorial-caption nums-tabular">
               {spanLabel ? `History · ${spanLabel}` : 'History'}
-            </span>
+            </h1>
             <span
               aria-hidden
               className="h-px flex-1 bg-[var(--rule-strong)] rule-draw"

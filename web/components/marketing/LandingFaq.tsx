@@ -46,7 +46,7 @@ export function LandingFaq() {
             className="editorial-headline"
             style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
           >
-            Quiet <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>answers</span>.
+            Quiet <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>answers</span>.
           </h2>
         </header>
 

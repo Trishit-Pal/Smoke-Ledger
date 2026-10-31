@@ -59,7 +59,7 @@ export function LandingProductBento() {
             className="editorial-headline"
             style={{ fontSize: 'clamp(32px, 4.5vw, 48px)', margin: 0 }}
           >
-            What you get, in four <span style={{ color: 'var(--accent)', fontStyle: 'italic' }}>plates</span>.
+            What you get, in four <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>plates</span>.
           </h2>
         </header>
 
@@ -87,7 +87,7 @@ export function LandingProductBento() {
               <span
                 className="editorial-numeral--small"
                 style={{
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   fontSize: 'clamp(48px, 6vw, 72px)',
                   lineHeight: 1,
                 }}

@@ -31,7 +31,7 @@ export default function OnboardingError({
             <Button title="Try again" variant="primary" fullWidth onPress={reset} />
             <Link
               href="/onboarding/privacy"
-              className="text-accent text-small font-medium hover:opacity-80 mt-sm"
+              className="text-accent-ink text-small font-medium hover:opacity-80 mt-sm"
             >
               Restart onboarding
             </Link>

@@ -15,6 +15,7 @@ export interface ThemeToggleProps {
 
 const PILL_WIDTH = 64;
 const PILL_HEIGHT = 32;
+const HIT_HEIGHT = 44; // WCAG 2.5.8 target size; the visible pill stays 32px
 const THUMB_SIZE = 24;
 const THUMB_INSET = 4;
 
@@ -66,17 +67,29 @@ export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
         style={{
           position: 'relative',
           width: PILL_WIDTH,
-          height: PILL_HEIGHT,
-          border: '1px solid var(--rule)',
-          borderRadius: 999,
-          background: 'var(--bg-elevated)',
+          height: HIT_HEIGHT,
+          border: 0,
+          background: 'transparent',
           cursor: 'pointer',
           padding: 0,
           display: 'inline-flex',
           alignItems: 'center',
-          transition: 'background 200ms ease, border-color 200ms ease',
         }}
       >
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: (HIT_HEIGHT - PILL_HEIGHT) / 2,
+            width: PILL_WIDTH,
+            height: PILL_HEIGHT,
+            border: '1px solid var(--rule)',
+            borderRadius: 999,
+            background: 'var(--bg-elevated)',
+            transition: 'background 200ms ease, border-color 200ms ease',
+          }}
+        >
         {/* Sun glyph (left) */}
         <span
           aria-hidden
@@ -134,10 +147,11 @@ export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
               ? '0 2px 6px rgba(0,0,0,0.4)'
               : '0 2px 8px rgba(47,163,155,0.45)',
             transition:
-              'left 320ms cubic-bezier(0.34, 1.56, 0.64, 1), background 240ms ease, box-shadow 240ms ease',
+              'left 320ms var(--ease-editorial), background 240ms ease, box-shadow 240ms ease',
             willChange: 'left',
           }}
         />
+        </span>
       </button>
     </div>
   );

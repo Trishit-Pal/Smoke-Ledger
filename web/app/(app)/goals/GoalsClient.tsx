@@ -60,7 +60,7 @@ function TypePicker({ value, onChange, disabled }: TypePickerProps) {
             'px-md py-sm rounded-full border text-small font-medium transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
             value === m.type
-              ? 'border-accent bg-accent-soft text-accent'
+              ? 'border-accent bg-accent-soft text-accent-ink'
               : 'border-border bg-transparent text-text-muted hover:border-text-muted',
             disabled && 'opacity-50 pointer-events-none',
           )}
