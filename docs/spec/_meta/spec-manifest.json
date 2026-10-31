@@ -48,7 +48,7 @@
         "src/lib/auth-errors.ts",
         "src/lib/emailOtpType.ts"
       ],
-      "last_verified_commit": "3a97c1f",
+      "last_verified_commit": "17834cc",
       "status": "current"
     },
     {
@@ -136,7 +136,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "f1ab5c4",
+      "last_verified_commit": "17834cc",
       "status": "current"
     }
   ]

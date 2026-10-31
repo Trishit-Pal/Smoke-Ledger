@@ -4,6 +4,9 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-10-31 — 17834cc
+- auth, infra-ops: re-stamped after merging the scene-tiers and responsive work into main; no behaviour the sections describe changed.
+
 ## 2026-10-31 — f1ab5c4
 - infra-ops: re-stamped after the dependency restore (root package.json, lockfiles, dependabot.yml); no infrastructure behaviour changed.
 
