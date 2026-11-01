@@ -20,6 +20,8 @@ export interface ProgressRingProps {
   /** Lets the caller size the ring from CSS (e.g. `w-10 sm:w-16`); the SVG
    *  scales with its box via viewBox, so one instance serves every breakpoint. */
   className?: string;
+  /** No halo. Use where the ring is small or beside a numeral it must not outshine. */
+  quiet?: boolean;
 }
 
 export function ProgressRing({
@@ -29,6 +31,7 @@ export function ProgressRing({
   color = 'var(--accent)',
   ringBg = 'var(--rule)',
   className,
+  quiet = false,
 }: ProgressRingProps) {
   const reduced = useReduceMotion();
   const radius = (size - strokeWidth) / 2;
@@ -54,7 +57,7 @@ export function ProgressRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           style={{
-            filter: `drop-shadow(0 0 ${ringGlow(size, { quietBelow: 48 })}px ${color})`,
+            filter: quiet ? undefined : `drop-shadow(0 0 ${ringGlow(size)}px ${color})`,
             transition: reduced ? 'none' : 'stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         />

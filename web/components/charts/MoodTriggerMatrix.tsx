@@ -10,9 +10,11 @@ export interface MoodTriggerMatrixProps {
   logs: CigaretteLog[];
   /** Formats an amount in the ledger's currency. */
   money: (amount: number) => string;
+  /** Formats a stick count; the caller masks it in discreet mode. Defaults to the number. */
+  formatCount?: (n: number) => string;
 }
 
-export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
+export function MoodTriggerMatrix({ logs, money, formatCount = String }: MoodTriggerMatrixProps) {
   const matrix = React.useMemo(() => moodTriggerMatrix(logs, 3), [logs]);
 
   if (matrix.total === 0 || matrix.moods.length === 0 || matrix.triggers.length === 0) {
@@ -47,7 +49,7 @@ export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
                 <span className="font-semibold">{pair.trigger}</span>
               </span>
               <span className="text-text-muted">
-                {pair.count}× · avg {pair.avgUnitPriceInr == null ? '—' : money(pair.avgUnitPriceInr)}
+                {formatCount(pair.count)}× · avg {pair.avgUnitPriceInr == null ? '—' : money(pair.avgUnitPriceInr)}
               </span>
             </li>
           ))}
@@ -93,7 +95,7 @@ export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
                       )}
                       style={count > 0 ? { background: `rgba(47,163,155,${opacity})` } : undefined}
                     >
-                      {count > 0 ? count : <span className="sr-only">0</span>}
+                      {count > 0 ? formatCount(count) : <span className="sr-only">0</span>}
                     </td>
                   );
                 })}

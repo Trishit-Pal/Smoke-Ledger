@@ -99,8 +99,9 @@ glossary, `06-goals-insights`, and the privacy policy so that:
   - Data reads use a client built with the **caller's JWT**, so RLS scopes every query:
     `createClient(url, anon, { global: { headers: { Authorization } } })`.
   - The route calls the **explicit-client loaders** in `web/lib/server/data.ts`
-    (`loadProfile`, `loadLogsPage`, `loadGoals`, `loadDailySummary`): they take
-    `(supabase, userId, …)`, never read cookies, never redirect. The cached `getServer*`
+    (`loadProfile`, `loadLogsPage`, `loadGoals`, `loadDailySummary`): they take the
+    client (and the verified `userId` where the query needs it), never read cookies,
+    never redirect. The cached `getServer*`
     wrappers are the cookie path for pages and must not be called from this route (they
     `redirect('/login')` when there is no cookie session).
   - The service-role client is used **only** for the `consume_rate_limit` RPC, which is

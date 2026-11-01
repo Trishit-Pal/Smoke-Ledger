@@ -96,5 +96,6 @@ overlap.
 **Masking is applied at the render site.** `maskInr` / `maskCount` / `maskBrandName`
 (`src/lib/discreet.ts`) are pure helpers; nothing masks at the data source. Every new place a
 money amount or stick count is rendered — headline, chart axis, tooltip, matrix cell, model prose —
-passes through them. A masked heading over an unmasked axis is a leak (Trends, fixed 2026-11-01).
+passes through them. A masked heading over an unmasked axis is a leak (Trends money and stick
+counts, fixed 2026-11-01). The responsive e2e checks currency only; counts are reviewed by hand.
 `KpiCard` takes a pre-masked `value: ReactNode`; do not add a raw-number prop.

@@ -13,21 +13,17 @@ export const auditBodySchema = z.object({
   eventCategory: z
     .enum(['account', 'compliance', 'auth', 'privacy', 'preferences'])
     .default('account'),
+  // Exactly the keys AuditEventPropsMap (src/services/audit.ts) registers.
+  // Register a key there first, then here; the test enumerates both.
   props: z
     .object({
-      // Sent today by consent_accepted (web/app/onboarding/privacy/page.tsx).
-      termsVersion: propValue,
-      privacyVersion: propValue,
-      healthDisclaimerVersion: propValue,
-      // Short, non-prose extras for future events.
-      reason: propValue,
-      count: propValue,
-      ok: propValue,
-      prev: propValue,
-      next: propValue,
-      step: propValue,
-      source: propValue,
-      version: propValue,
+      termsVersion: propValue, // consent_accepted
+      privacyVersion: propValue, // consent_accepted
+      reason: propValue, // consent_revoked
+      goalSet: propValue, // onboarding_completed
+      format: propValue, // account_data_exported_requested
+      enabled: propValue, // discreet_mode_toggled
+      kind: propValue, // reminder_enabled / reminder_disabled
     })
     .strict()
     .optional(),

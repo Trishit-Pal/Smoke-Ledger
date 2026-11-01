@@ -1335,7 +1335,7 @@ export function SettingsClient({
           <SectionHead
             id="account-heading"
             caption="Account"
-            deck="Return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
+            deck="How the ledger looks, and how you leave it: appearance, return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
           />
           <dl className="flex flex-col">
             {/* The only theme control inside the app shell (the global fixed

@@ -9,8 +9,8 @@ describe('ringGlow', () => {
     expect(ringGlow(40)).toBe(5);
   });
 
-  test('drops the glow entirely under 48px when asked to read quiet', () => {
-    expect(ringGlow(40, { quietBelow: 48 })).toBe(0);
-    expect(ringGlow(64, { quietBelow: 48 })).toBe(8);
+  test('a caller can switch the glow off regardless of size', () => {
+    expect(ringGlow(64, { quiet: true })).toBe(0);
+    expect(ringGlow(44, { quiet: false })).toBe(6);
   });
 });

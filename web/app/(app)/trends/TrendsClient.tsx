@@ -52,7 +52,7 @@ import {
 import { todayInZone, daysAgoInZone, dateRange } from '@/lib/date';
 import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
-import { isDiscreetMode, maskInr } from '@/lib/discreet';
+import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, Donut } from '@web/components/charts/dynamic';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
@@ -412,6 +412,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   data={sticksLine}
                   height={180}
                   strokeColor={stickToneColor}
+                  formatY={(v) => maskCount(v, discreet)}
                 />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
@@ -419,7 +420,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   ? 'A flat line. Nothing logged in this window.'
                   : summary.avgSticksPerDay < 1
                     ? 'A sparse week — most days quiet.'
-                    : `Around ${summary.avgSticksPerDay.toFixed(1)} a day, on average.`}
+                    : `Around ${maskCount(summary.avgSticksPerDay.toFixed(1), discreet)} a day, on average.`}
               </p>
             </section>
 
@@ -530,7 +531,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <MoodTriggerMatrix logs={logs} money={(n) => maskInr(n, discreet, money)} />
+                <MoodTriggerMatrix logs={logs} money={(n) => maskInr(n, discreet, money)} formatCount={(n) => maskCount(n, discreet)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 A grid of feelings against situations. The dense cells are the

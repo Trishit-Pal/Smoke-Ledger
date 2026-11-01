@@ -300,10 +300,10 @@ export const getServerLogs = cache(
 export async function loadGoals(
   supabase: SupabaseClient,
   userId: string,
-  opts: { activeOnly?: boolean } = { activeOnly: true },
+  { activeOnly = true }: { activeOnly?: boolean } = {},
 ): Promise<Goal[]> {
   let q = supabase.from('goals').select('*').eq('user_id', userId);
-  if (opts.activeOnly) q = q.eq('status', 'active');
+  if (activeOnly) q = q.eq('status', 'active');
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data as GoalRow[]).map(mapGoal);
@@ -475,14 +475,11 @@ export type DailySummary = {
  *
  * Date params use `from`/`to` (matching RPC param names p_from/p_to).
  */
-// `get_daily_summary` scopes by auth.uid() inside the RPC; userId is accepted for
-// signature parity with the other loaders (and for a future per-user cache key).
+// `get_daily_summary` scopes by auth.uid() inside the RPC, so no userId here.
 export async function loadDailySummary(
   supabase: SupabaseClient,
-  userId: string,
   opts: { from: string; to: string },
 ): Promise<DailySummary[]> {
-  void userId;
   const { data, error } = await supabase.rpc('get_daily_summary', { p_from: opts.from, p_to: opts.to });
   if (error) throw new Error(error.message);
   return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
@@ -498,8 +495,7 @@ export async function loadDailySummary(
 export const getServerDailySummary = cache(
   async (opts: { from: string; to: string }): Promise<DailySummary[]> => {
     const supabase = await createClient();
-    const userId = await requireServerUserId();
-    return loadDailySummary(supabase, userId, opts);
+    return loadDailySummary(supabase, opts);
   },
 );
 

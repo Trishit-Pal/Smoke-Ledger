@@ -12,11 +12,16 @@ describe('server data loaders take an explicit client', () => {
   test('exports client-parameterised loaders for profile, logs page, goals, daily summary', () => {
     // Whitespace-insensitive: the signature may wrap across lines.
     const flat = src.replace(/\s+/g, ' ').replace(/\( /g, '(');
-    for (const name of ['loadProfile', 'loadLogsPage', 'loadGoals', 'loadDailySummary']) {
+    for (const name of ['loadProfile', 'loadLogsPage', 'loadGoals']) {
       expect(flat, `missing export ${name}(supabase, userId, …)`).toContain(
         `export async function ${name}(supabase: SupabaseClient, userId: string`,
       );
     }
+    // get_daily_summary scopes by auth.uid() inside the RPC: no userId, and the
+    // cookie wrapper must not pay an extra auth round-trip to fetch one.
+    expect(flat).toContain('export async function loadDailySummary(supabase: SupabaseClient, opts:');
+    const wrapper = flat.slice(flat.indexOf('export const getServerDailySummary'));
+    expect(wrapper.slice(0, 400)).not.toContain('requireServerUserId');
   });
   test('createAdminClient is used only for the brand catalog', () => {
     const uses = src.split('\n').filter((l) => /createAdminClient\(\)/.test(l));

@@ -7,15 +7,6 @@ export interface RequestOriginHeaders {
 }
 
 /**
- * True only for a request a page on our own origin made.
- *
- * Next 14.2 already compares Origin with Host for server actions, but it lets a
- * missing Origin through and rejects `Origin: null` only because
- * `new URL('null')` happens to throw. An action that signs a browser in must
- * not rest on that, so it checks Fetch Metadata first and an exact Origin match
- * second, failing closed on anything else.
- */
-/**
  * Route-handler adapter over `isSameOriginRequest`: reads the same three
  * headers the server-action path checks (`x-forwarded-host` wins over `host`
  * behind Vercel's proxy). Every API route that mutates on behalf of a cookie
@@ -30,6 +21,15 @@ export function requireSameOrigin(request: Request): boolean {
   });
 }
 
+/**
+ * True only for a request a page on our own origin made.
+ *
+ * Next 14.2 already compares Origin with Host for server actions, but it lets a
+ * missing Origin through and rejects `Origin: null` only because
+ * `new URL('null')` happens to throw. An action that signs a browser in must
+ * not rest on that, so it checks Fetch Metadata first and an exact Origin match
+ * second, failing closed on anything else.
+ */
 export function isSameOriginRequest({ secFetchSite, origin, host }: RequestOriginHeaders): boolean {
   if (secFetchSite) return secFetchSite === 'same-origin';
   if (!origin || !host) return false;
