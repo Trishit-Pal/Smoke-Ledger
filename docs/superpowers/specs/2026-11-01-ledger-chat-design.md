@@ -96,9 +96,16 @@ glossary, `06-goals-insights`, and the privacy policy so that:
   path (CSRF). The native path carries no Origin and is covered by the Bearer check.
   `user_id` comes only from the verified user and is never a tool argument.
 - **Two clients, least privilege:**
-  - Data reads use a client built with the **caller's JWT**, so RLS scopes every query.
+  - Data reads use a client built with the **caller's JWT**, so RLS scopes every query:
+    `createClient(url, anon, { global: { headers: { Authorization } } })`.
+  - The route calls the **explicit-client loaders** in `web/lib/server/data.ts`
+    (`loadProfile`, `loadLogsPage`, `loadGoals`, `loadDailySummary`): they take
+    `(supabase, userId, …)`, never read cookies, never redirect. The cached `getServer*`
+    wrappers are the cookie path for pages and must not be called from this route (they
+    `redirect('/login')` when there is no cookie session).
   - The service-role client is used **only** for the `consume_rate_limit` RPC, which is
-    granted to `service_role` only.
+    granted to `service_role` only. `web/__tests__/serverDataClients.test.ts` pins that
+    `data.ts` has exactly one admin-client use (the brand catalog cache).
 - **Model:** Claude via tool use (pick the current model at build time). No CSP change is needed
   because there are no browser-side calls.
 - **Tools are the existing domain functions.** They are read-only and scoped to the
