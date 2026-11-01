@@ -519,7 +519,7 @@ export default function Trends() {
               <AnimatedBarChart
                 data={spendBars}
                 height={180}
-                formatY={(v) => ledgerMoney(v, { compact: true })}
+                formatY={(v) => maskInr(v, discreet, (n) => ledgerMoney(n, { compact: true }))}
                 showLabels={false}
               />
             </Reveal>
@@ -575,7 +575,7 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Mood × trigger" right="Where it tends to start" />
             <Reveal dependencyKey={dependencyKey}>
-              <MoodTriggerMatrixView logs={logs} money={(n) => ledgerMoney(n)} />
+              <MoodTriggerMatrixView logs={logs} money={(n) => maskInr(n, discreet, ledgerMoney)} />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               A grid of feelings against situations. The dense cells are the pattern.

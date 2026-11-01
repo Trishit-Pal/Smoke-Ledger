@@ -438,7 +438,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                   title="Daily spend"
                   data={spendBars}
                   height={180}
-                  formatY={(v) => money(v, { compact: true })}
+                  formatY={(v) => maskInr(v, discreet, (n) => money(n, { compact: true }))}
                 />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
@@ -530,7 +530,7 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <MoodTriggerMatrix logs={logs} money={(amount) => money(amount)} />
+                <MoodTriggerMatrix logs={logs} money={(n) => maskInr(n, discreet, money)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 A grid of feelings against situations. The dense cells are the
