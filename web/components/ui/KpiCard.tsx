@@ -33,16 +33,12 @@ export function KpiCard({ label, value, unit, progress, progressColor, children 
           </div>
         </div>
 
-        {/* Below sm a 64px ring starves the numeral of width in a 2-up card on a
-            320px phone, so phones get a 40px ring (the same reading, smaller). */}
+        {/* One ring, sized by CSS: 40px below sm so a 2-up card on a 320px phone
+            keeps room for the numeral, 64px from sm. The glow switches off at the
+            small size so it reads as a quiet measure, not a badge. */}
         {progress !== undefined ? (
           <div aria-hidden className="shrink-0">
-            <span className="sm:hidden">
-              <ProgressRing percent={progress} size={40} strokeWidth={5} color={progressColor} ringBg="var(--rule)" />
-            </span>
-            <span className="hidden sm:inline">
-              <ProgressRing percent={progress} size={64} color={progressColor} ringBg="var(--rule)" />
-            </span>
+            <ProgressRing percent={progress} size={64} color={progressColor} ringBg="var(--rule)" className="w-10 sm:w-16" />
           </div>
         ) : null}
       </div>

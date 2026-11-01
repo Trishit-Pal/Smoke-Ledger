@@ -6,7 +6,10 @@ import { Easing } from 'react-native-reanimated';
 /** The editorial ease-out (expo-like): fast start, long gravitational settle. */
 export const EDITORIAL_EASE = Easing.bezier(0.16, 1, 0.3, 1);
 
-/** Press feedback (scale-in) and its release: short, so taps feel immediate. */
+/** Press-in (scale down): near-instant so the tap registers under the finger. */
+export const PRESS_IN = { duration: 80, easing: EDITORIAL_EASE } as const;
+
+/** Press release and other short feedback: brief, so taps feel immediate. */
 export const PRESS = { duration: 140, easing: EDITORIAL_EASE } as const;
 
 /** Indicators and thumbs moving between positions (tab bar, segmented toggle). */

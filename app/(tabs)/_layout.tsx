@@ -7,9 +7,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
-import { PRESS, SETTLE } from '@/constants/motion';
+import { PRESS, PRESS_IN, SETTLE } from '@/constants/motion';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing, radius } from '@/constants/theme';
@@ -149,7 +148,7 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
 
   return (
     <Pressable
-      onPressIn={() => { if (!reduce) pressScale.value = withTiming(0.88, { duration: 80, easing: Easing.out(Easing.quad) }); }}
+      onPressIn={() => { if (!reduce) pressScale.value = withTiming(0.88, PRESS_IN); }}
       onPressOut={() => { if (!reduce) pressScale.value = withTiming(1, PRESS); }}
       onPress={onPress}
       accessibilityRole="button"
@@ -157,7 +156,16 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
       accessibilityState={{ selected: active }}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 }}
     >
-      <Animated.View style={[{ alignItems: 'center', gap: 2 }, pressStyle]}>
+      {/* Landscape has width, not height: compact lays glyph + label in a row
+          instead of dropping the label (the glyphs are plain text marks). */}
+      <Animated.View
+        style={[
+          compact
+            ? { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }
+            : { alignItems: 'center', gap: 2 },
+          pressStyle,
+        ]}
+      >
         <Animated.Text
           maxFontSizeMultiplier={1.4}
           style={[
@@ -167,17 +175,15 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
         >
           {glyph}
         </Animated.Text>
-        {compact ? null : (
-          // Fixed-height bar: cap scaling so large text can't clip the label.
-          <Text
-            variant="caption"
-            maxFontSizeMultiplier={1.3}
-            color={active ? theme.accent : theme.textFaint}
-            style={{ fontSize: 10, letterSpacing: 0.3 }}
-          >
-            {label}
-          </Text>
-        )}
+        {/* Fixed-height bar: cap scaling so large text can't clip the label. */}
+        <Text
+          variant="caption"
+          maxFontSizeMultiplier={1.3}
+          color={active ? theme.accent : theme.textFaint}
+          style={{ fontSize: 10, letterSpacing: 0.3 }}
+        >
+          {label}
+        </Text>
       </Animated.View>
     </Pressable>
   );

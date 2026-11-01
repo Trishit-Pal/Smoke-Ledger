@@ -102,7 +102,7 @@ export function MilestoneCelebration() {
         // The overlay scrolls (not the card) so the confetti can still spill past
         // the card edge; `margin: auto` on the card centres it without clipping
         // its top on a short landscape phone the way align-items:center would.
-        overflowY: 'auto',
+        overflow: 'hidden auto', // x hidden: confetti past the edge must not add a scrollbar
         overscrollBehavior: 'contain',
         padding: 24,
       }}
@@ -115,7 +115,7 @@ export function MilestoneCelebration() {
           width: 440,
           maxWidth: '100%',
           margin: 'auto',
-          padding: '32px clamp(20px, 6vw, 36px)',
+          padding: 'theme(spacing.xxl) clamp(theme(spacing.lg), 6vw, theme(spacing.xxl))',
           boxShadow: 'var(--shadow-card)',
           position: 'relative',
           overflow: 'visible',
