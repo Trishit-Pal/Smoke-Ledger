@@ -21,8 +21,10 @@ function normalizeToken(raw: string): string {
 }
 
 function addNumber(set: Set<string>, n: number): void {
+  // The value itself and its usual roundings; never floor/ceil, which would
+  // let a figure one off the data pass as verified.
   const abs = Math.abs(n);
-  for (const s of [String(abs), String(Math.round(abs)), abs.toFixed(1), abs.toFixed(2), String(Math.floor(abs)), String(Math.ceil(abs))]) {
+  for (const s of [String(abs), String(Math.round(abs)), abs.toFixed(1), abs.toFixed(2)]) {
     set.add(normalizeToken(s));
   }
 }
@@ -44,13 +46,17 @@ function harvest(set: Set<string>, value: unknown): void {
 }
 
 /** Every figure the model may legitimately repeat this turn. */
-export function allowedNumbers(outcomes: readonly ToolOutcome[], opts: { year: string }): Set<string> {
+export function allowedNumbers(
+  outcomes: readonly ToolOutcome[],
+  opts: { year: string; extraText?: readonly string[] },
+): Set<string> {
   const set = new Set<string>([opts.year]);
   for (const o of outcomes) {
     if (!o.ok) continue;
     harvest(set, o.data);
     harvest(set, o.rows);
   }
+  for (const text of opts.extraText ?? []) harvest(set, text);
   return set;
 }
 
