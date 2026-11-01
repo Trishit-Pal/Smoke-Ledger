@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { setSetting } from '@/db/repositories/settings';
 import { USER_THEME_SETTING_KEY } from '@web/lib/userTheme';
 
@@ -25,19 +24,12 @@ const THUMB_INSET = 4;
 export function ThemeToggle({ placement = 'fixed', ariaLabel }: ThemeToggleProps) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
-  const pathname = usePathname();
 
   React.useEffect(() => setMounted(true), []);
 
   const currentTheme = theme === 'system' ? resolvedTheme : theme;
   const isDark = currentTheme !== 'light';
   const label = ariaLabel ?? (isDark ? 'Switch to light mode' : 'Switch to dark mode');
-
-  // Suppress the global "fixed" toggle on onboarding routes — the rail and
-  // the Done page render their own placement-aware instances.
-  if (placement === 'fixed' && pathname?.startsWith('/onboarding')) {
-    return null;
-  }
 
   const wrapperClass =
     placement === 'fixed'

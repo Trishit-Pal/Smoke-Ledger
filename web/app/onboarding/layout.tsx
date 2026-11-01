@@ -3,7 +3,10 @@ import { OnboardingProgress, OnboardingRail } from '@web/components/onboarding/O
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
+    // data-app-shell: hides the global fixed ThemeToggle (globals.css :has rule);
+    // the rail and the Done page render their own placements.
     <div
+      data-app-shell
       style={{
         position: 'relative',
         minHeight: '100dvh',

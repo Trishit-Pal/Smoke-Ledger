@@ -65,6 +65,9 @@ Six theme-aware series (teal, terracotta, blue, violet, amber, green). Ticks dar
 - **EditorialInput** — borderless input with a single hairline underline that strengthens on
   focus; tabular figures.
 - **EditorialPillRow** — horizontally-scrolling hairline-outline pills (brand / variant pickers).
+- **`.page-column`** — the one reading measure for every authenticated page: `max-w` 44 → 52 → 60rem
+  at `md`/`lg`/`xl`, with the horizontal padding. Pages add their own vertical rhythm. Never
+  re-type the widths inline.
 
 ## Motion
 
@@ -82,3 +85,16 @@ WCAG AA in both themes. `color-scheme` ties native controls (date / select popup
 to the app theme so they stay legible in dark mode. Focus-visible rings (accent, 2px, offset).
 Touch targets ≥44px. Tabular figures keep ledger columns aligned. Discreet/masking modes never
 drop below AA contrast.
+
+**44px, two mechanisms, one rule.** `min-h-11 min-w-11` when the control may grow to fill its
+target (text-link buttons, inputs, nav items). `.hit-target` when the visual must stay compact
+(pills in a `ChoiceRun`, steppers, caption-sized source links): it grows only the tap area with an
+invisible `::after`. Never put `.hit-target` on or beside a destructive control — the halo can
+steal a tap meant for its neighbour, and the responsive e2e credits it as 44px without checking
+overlap.
+
+**Masking is applied at the render site.** `maskInr` / `maskCount` / `maskBrandName`
+(`src/lib/discreet.ts`) are pure helpers; nothing masks at the data source. Every new place a
+money amount or stick count is rendered — headline, chart axis, tooltip, matrix cell, model prose —
+passes through them. A masked heading over an unmasked axis is a leak (Trends, fixed 2026-11-01).
+`KpiCard` takes a pre-masked `value: ReactNode`; do not add a raw-number prop.
