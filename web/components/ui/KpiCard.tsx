@@ -26,15 +26,23 @@ export function KpiCard({ label, value, unit, progress, progressColor, children 
       <div className="flex items-start justify-between gap-md">
         <div className="flex flex-col min-w-0">
           <p className="editorial-caption">{label}</p>
-          <div className="mt-sm flex items-end gap-xs">
-            <span className="editorial-numeral--micro nums-tabular">{value}</span>
+          {/* Wraps so "12 cigarettes" never overflows a 2-up card on a 320px phone. */}
+          <div className="mt-sm flex flex-wrap items-end gap-x-xs min-w-0">
+            <span className="editorial-numeral--micro nums-tabular break-words min-w-0">{value}</span>
             {unit ? <span className="mb-xs text-small text-text-muted">{unit}</span> : null}
           </div>
         </div>
 
+        {/* Below sm a 64px ring starves the numeral of width in a 2-up card on a
+            320px phone, so phones get a 40px ring (the same reading, smaller). */}
         {progress !== undefined ? (
-          <div aria-hidden>
-            <ProgressRing percent={progress} size={64} color={progressColor} ringBg="var(--rule)" />
+          <div aria-hidden className="shrink-0">
+            <span className="sm:hidden">
+              <ProgressRing percent={progress} size={40} strokeWidth={5} color={progressColor} ringBg="var(--rule)" />
+            </span>
+            <span className="hidden sm:inline">
+              <ProgressRing percent={progress} size={64} color={progressColor} ringBg="var(--rule)" />
+            </span>
           </div>
         ) : null}
       </div>

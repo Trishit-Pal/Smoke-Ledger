@@ -39,9 +39,9 @@ export function MoodTriggerMatrix({ logs, money }: MoodTriggerMatrixProps) {
           {matrix.topPairs.map((pair) => (
             <li
               key={`${pair.mood}-${pair.trigger}`}
-              className="flex items-center justify-between text-small"
+              className="flex items-center justify-between gap-sm text-small"
             >
-              <span className="text-text">
+              <span className="text-text min-w-0 break-words">
                 <span className="font-semibold">{pair.mood}</span>
                 <span className="text-text-faint mx-1">×</span>
                 <span className="font-semibold">{pair.trigger}</span>

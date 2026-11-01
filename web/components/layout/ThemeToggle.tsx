@@ -38,7 +38,7 @@ export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
 
   const wrapperClass =
     placement === 'fixed'
-      ? 'fixed top-4 right-4 z-50 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]'
+      ? 'theme-toggle-fixed fixed top-4 right-4 z-50 mt-[env(safe-area-inset-top)] mr-[env(safe-area-inset-right)]'
       : placement === 'floating-onboarding'
         ? 'absolute z-10'
         : '';

@@ -379,7 +379,7 @@ function SummaryRow({ label, value, sub, accent }: SummaryRowProps) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '120px 1fr',
+        gridTemplateColumns: 'minmax(0, clamp(84px, 28%, 120px)) minmax(0, 1fr)',
         gap: 16,
         alignItems: 'baseline',
       }}

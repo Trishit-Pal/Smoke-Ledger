@@ -9,7 +9,8 @@ export function GoToHomepageLink() {
   if (pathname === PUBLIC_LINKS.home) return null;
 
   return (
-    <footer className="fixed bottom-4 right-4 z-40 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
+    // short-landscape:hidden — on a sideways phone the fixed link covers the auth form's footer links.
+    <footer className="short-landscape:hidden fixed bottom-4 right-4 z-40 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
       <Link
         href={PUBLIC_LINKS.home}
         className="text-small font-semibold text-accent-ink hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent rounded-sm"

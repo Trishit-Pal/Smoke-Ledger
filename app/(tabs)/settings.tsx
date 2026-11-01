@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Constants from 'expo-constants';
 import {
   View,
   Switch,
@@ -50,6 +51,9 @@ import {
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant } from '@/types';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
+
+// Single source: app.config.js `version` (also drives EAS runtimeVersion).
+const APP_VERSION = Constants.expoConfig?.version ?? '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1527,7 +1531,7 @@ export default function Settings() {
             />
           </View>
           <Text variant="caption" faint style={{ paddingTop: spacing.xs }}>
-            v0.2.0
+            v{APP_VERSION}
           </Text>
         </View>
       </Stage>

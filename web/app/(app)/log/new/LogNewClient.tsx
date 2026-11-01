@@ -139,7 +139,7 @@ const EditorialInput = React.forwardRef<
       ref={ref}
       {...props}
       className={
-        'w-full bg-transparent border-0 border-b border-[var(--rule)] focus:border-[var(--text)] py-sm text-body text-text placeholder:text-text-faint outline-none transition-colors nums-tabular ' +
+        'w-full bg-transparent border-0 border-b border-[var(--rule)] focus:border-[var(--text)] min-h-11 py-sm text-body text-text placeholder:text-text-faint outline-none transition-colors nums-tabular ' +
         (props.className ?? '')
       }
     />
@@ -289,7 +289,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
   const quantityChoices = QUANTITY_OPTIONS.map((n) => ({ value: n, label: String(n) }));
 
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
+    <div className="relative page-column pt-xl pb-xxxl md:pt-xxl">
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
       <div className="editorial-stage flex flex-col gap-xl">
@@ -430,7 +430,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
             type="button"
             onClick={() => setShowAdvanced((s) => !s)}
             aria-expanded={showAdvanced}
-            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            className="inline-flex items-center min-h-11 text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >
             {showAdvanced ? 'Hide trigger, mood, context, notes' : 'Add trigger, mood, context, notes'}
@@ -589,7 +589,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
           <button
             type="button"
             onClick={() => router.back()}
-            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            className="min-h-11 px-xs text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >
             Cancel

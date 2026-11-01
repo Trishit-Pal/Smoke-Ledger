@@ -3,11 +3,11 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { ViewProps, StyleProp, ViewStyle, LayoutChangeEvent, Platform } from 'react-native';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { SETTLE } from '@/constants/motion';
 
 export interface TiltProps extends ViewProps {
   maxDeg?: number;
@@ -40,8 +40,8 @@ export function Tilt({ maxDeg = 6, style, children, ...rest }: TiltProps) {
       scale.value = withTiming(1.02, { duration: 120 });
     })
     .onFinalize(() => {
-      rx.value = withSpring(0, { damping: 12, stiffness: 120 });
-      ry.value = withSpring(0, { damping: 12, stiffness: 120 });
+      rx.value = withTiming(0, SETTLE);
+      ry.value = withTiming(0, SETTLE);
       scale.value = withTiming(1, { duration: 200 });
     }), [maxDeg]);
 

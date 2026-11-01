@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@web/components/ui/cn';
 import { isNavActive } from '@web/lib/nav';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavItem {
   href: string;
@@ -79,6 +80,12 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* lg+ only: at md the rail is 72px and the 64px pill would crowd it;
+          Settings carries the toggle at every width. */}
+      <div className="hidden lg:flex mt-auto px-md">
+        <ThemeToggle placement="inline" />
+      </div>
     </aside>
   );
 }

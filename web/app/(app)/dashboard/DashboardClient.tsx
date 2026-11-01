@@ -377,7 +377,7 @@ export function DashboardClient({
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl">
+    <div className="relative page-column pt-xl pb-xxxl md:pt-xxl">
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
       <div className="editorial-stage flex flex-col section-gap">
@@ -707,7 +707,7 @@ export function DashboardClient({
           <button
             type="button"
             onClick={() => router.push('/history')}
-            className="text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+            className="inline-flex items-center min-h-11 text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
             style={{ textDecorationColor: 'var(--rule-strong)' }}
           >
             View full history →

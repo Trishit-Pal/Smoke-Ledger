@@ -1,6 +1,6 @@
 {
   "name": "smoke-ledger-india",
-  "version": "0.2.0",
+  "version": "3.0.0",
   "main": "expo-router/entry",
   "scripts": {
     "setup:env": "node scripts/copy-env-if-missing.js",

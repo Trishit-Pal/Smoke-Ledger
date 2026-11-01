@@ -229,7 +229,7 @@ export function QuickLogStrip({
           type="button"
           onClick={onAdvanced}
           className="
-            self-start text-small text-text-muted hover:text-text
+            self-start inline-flex items-center min-h-11 text-small text-text-muted hover:text-text
             underline underline-offset-4 decoration-1
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm
           "

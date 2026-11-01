@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   FlatList,
-  Dimensions,
   Pressable,
   ListRenderItemInfo,
   Linking,
@@ -22,6 +21,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { fetchRandomFacts, markFactSeen } from '@/db/repositories/facts';
 import type { SmokingFact } from '@/constants/facts';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { useLayout } from '@/hooks/useLayout';
 
 const SPACING = 12;
 
@@ -36,7 +36,8 @@ export function FactsCarousel({ count = 5 }: FactsCarouselProps) {
   const [activeIdx, setActiveIdx] = useState(0);
   const scrollX = useSharedValue(0);
   const listRef = useRef<FlatList<SmokingFact>>(null);
-  const screenW = Dimensions.get('window').width;
+  // Window width (not a one-off Dimensions read) so cards resize on rotation/split-screen.
+  const { width: screenW } = useLayout();
   const cardW = Math.min(screenW - spacing.lg * 2, 360);
 
   useEffect(() => {
@@ -149,7 +150,7 @@ function FactCard({
 
   return (
     <Animated.View style={[{ width: cardW }, animStyle]}>
-      <Card style={{ height: 200, justifyContent: 'space-between' }}>
+      <Card style={{ minHeight: 200, justifyContent: 'space-between' }}>
         <View style={{ gap: spacing.xs }}>
           <Text variant="caption" muted>
             {fact.category.toUpperCase()}

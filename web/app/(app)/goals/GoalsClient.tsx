@@ -56,7 +56,7 @@ function TypePicker({ value, onChange, disabled }: TypePickerProps) {
           disabled={disabled}
           onClick={() => onChange(m.type)}
           className={cn(
-            'px-md py-sm rounded-full border text-small font-medium transition-colors',
+            'min-h-11 px-md py-sm rounded-full border text-small font-medium transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
             value === m.type
               ? 'border-accent bg-accent-soft text-accent-ink'
@@ -348,7 +348,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   const idx = (n: number): React.CSSProperties => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
-    <div className="editorial-stage flex flex-col subsection-gap max-w-2xl mx-auto px-lg md:px-xxl">
+    <div className="editorial-stage flex flex-col subsection-gap page-column">
       {/* Masthead */}
       <div style={idx(0)} className="flex items-start justify-between gap-md">
         <EditorialMasthead

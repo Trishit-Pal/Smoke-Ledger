@@ -152,7 +152,7 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
           gap: 16,
           perspective: 1200,
           transformStyle: 'preserve-3d',
@@ -345,7 +345,7 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  width: 200,
+                  width: 'min(200px, 60vw)',
                   padding: 0,
                   lineHeight: 1,
                 }}

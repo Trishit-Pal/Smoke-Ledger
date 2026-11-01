@@ -39,6 +39,40 @@ const STEPS: StepEntry[] = [
   { key: 'done', index: '05', label: 'Done', href: null },
 ];
 
+/**
+ * Below md the rail is hidden, so phones get this instead: a single hairline
+ * that fills with the journey (ink, not accent — progress isn't a "win"), plus
+ * a small-caps caption. Same step source as the rail, so the two never disagree.
+ */
+export function OnboardingProgress() {
+  const pathname = usePathname();
+  const activeStep = pathnameToStep(pathname);
+  const i = STEPS.findIndex((s) => s.key === activeStep);
+  const last = STEPS.length - 1;
+  return (
+    <div className="md:hidden mb-lg flex flex-col gap-xs">
+      <div
+        role="progressbar"
+        aria-label="Onboarding progress"
+        aria-valuemin={1}
+        aria-valuemax={STEPS.length}
+        aria-valuenow={i + 1}
+        aria-valuetext={`${STEPS[i].label}, step ${i + 1} of ${STEPS.length}`}
+        className="relative h-px w-full"
+        style={{ background: 'var(--rule)' }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+          style={{ width: `${(i / last) * 100}%`, background: 'var(--text)' }}
+        />
+      </div>
+      <span className="editorial-caption" aria-hidden>
+        {STEPS[i].label} · {i + 1} of {STEPS.length}
+      </span>
+    </div>
+  );
+}
+
 export function OnboardingRail() {
   const pathname = usePathname();
   const activeStep = pathnameToStep(pathname);
