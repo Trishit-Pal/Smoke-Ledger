@@ -20,6 +20,11 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@react-native-async-storage/async-storage"  # native module pinned by SDK 56
         update-types: ["version-update:semver-major"]
+      # Every expo-* package is versioned with the Expo SDK; a lone major bump
+      # (expo-linking 58 vs expo-router 56.x) fails npm ci with ERESOLVE.
+      # Move them together in a deliberate SDK upgrade. The `expo` package itself is unaffected.
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /web
