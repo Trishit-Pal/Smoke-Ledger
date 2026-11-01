@@ -108,14 +108,13 @@ export function MilestoneCelebration() {
       }}
     >
       <div
-        className="character-modal"
+        className="character-modal py-xxl px-[clamp(theme(spacing.lg),6vw,theme(spacing.xxl))]"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--bg-elevated)',
           width: 440,
           maxWidth: '100%',
           margin: 'auto',
-          padding: 'theme(spacing.xxl) clamp(theme(spacing.lg), 6vw, theme(spacing.xxl))',
           boxShadow: 'var(--shadow-card)',
           position: 'relative',
           overflow: 'visible',
