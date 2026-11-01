@@ -136,16 +136,25 @@ async function requireServerUserId(): Promise<string> {
   return user.id;
 }
 
+/**
+ * Explicit-client loaders (`load*`). They take the Supabase client and the
+ * verified user id instead of reading cookies, so a route authenticated by a
+ * Bearer JWT (native) can reuse the same queries under RLS. They never redirect
+ * and never touch the admin client. The cached `getServer*` wrappers below are
+ * the cookie-session path pages use; they delegate here.
+ */
+export async function loadProfile(supabase: SupabaseClient, userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
+  if (error || !data) return null;
+  return mapProfile(data as ProfileRow);
+}
+
 export const getServerProfile = cache(async (): Promise<UserProfile> => {
   const supabase = await createClient();
   const userId = await requireServerUserId();
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error || !data) redirect('/login');
-  return mapProfile(data as ProfileRow);
+  const profile = await loadProfile(supabase, userId);
+  if (!profile) redirect('/login');
+  return profile;
 });
 
 /** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
@@ -223,16 +232,16 @@ function mapRpcLog(row: RpcLogRow): CigaretteLog {
  * Keyset-paginated server-side log fetch backed by the `list_logs_page` RPC.
  * Prefer this over `getServerLogs` for any view that may display large date ranges.
  */
-export async function getServerLogsPage(opts?: {
+export interface LogsPageOpts {
   fromDate?: string;
   toDate?: string;
   brandId?: string;
   triggerTag?: string;
   cursor?: LogCursor | null;
   limit?: number;
-}): Promise<LogPage> {
-  const supabase = await createClient();
-  const userId = await requireServerUserId();
+}
+
+export async function loadLogsPage(supabase: SupabaseClient, userId: string, opts?: LogsPageOpts): Promise<LogPage> {
   const limit = Math.max(1, Math.min(opts?.limit ?? SERVER_LOGS_PAGE_SIZE, 5000));
 
   const { data, error } = await supabase.rpc('list_logs_page', {
@@ -255,6 +264,12 @@ export async function getServerLogsPage(opts?: {
       : null;
 
   return { logs, nextCursor };
+}
+
+export async function getServerLogsPage(opts?: LogsPageOpts): Promise<LogPage> {
+  const supabase = await createClient();
+  const userId = await requireServerUserId();
+  return loadLogsPage(supabase, userId, opts);
 }
 
 /**
@@ -282,30 +297,29 @@ export const getServerLogs = cache(
   },
 );
 
+export async function loadGoals(
+  supabase: SupabaseClient,
+  userId: string,
+  { activeOnly = true }: { activeOnly?: boolean } = {},
+): Promise<Goal[]> {
+  let q = supabase.from('goals').select('*').eq('user_id', userId);
+  if (activeOnly) q = q.eq('status', 'active');
+  const { data, error } = await q.order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as GoalRow[]).map(mapGoal);
+}
+
 export const getServerGoals = cache(async (): Promise<Goal[]> => {
   const supabase = await createClient();
   const userId = await requireServerUserId();
-  const { data, error } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data as GoalRow[]).map(mapGoal);
+  return loadGoals(supabase, userId, { activeOnly: true });
 });
 
 /** All goals regardless of status — for the goals management page. */
 export const getServerAllGoals = cache(async (): Promise<Goal[]> => {
   const supabase = await createClient();
   const userId = await requireServerUserId();
-  const { data, error } = await supabase
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data as GoalRow[]).map(mapGoal);
+  return loadGoals(supabase, userId, { activeOnly: false });
 });
 
 /** Per-user cache tag for the brand+variant Data Cache. Bust via `revalidateBrands()`. */
@@ -461,22 +475,27 @@ export type DailySummary = {
  *
  * Date params use `from`/`to` (matching RPC param names p_from/p_to).
  */
+// `get_daily_summary` scopes by auth.uid() inside the RPC, so no userId here.
+export async function loadDailySummary(
+  supabase: SupabaseClient,
+  opts: { from: string; to: string },
+): Promise<DailySummary[]> {
+  const { data, error } = await supabase.rpc('get_daily_summary', { p_from: opts.from, p_to: opts.to });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    localDate: String(r.local_date),
+    sticks: Number(r.sticks),
+    // Postgres `numeric` is returned as a string by supabase-js (like baseline_per_day).
+    // Always coerce via Number() — mirrors the C4 fix pattern.
+    totalSpendInr: Number(r.total_spend_inr),
+    avgUnitPriceInr: r.avg_unit_price_inr != null ? Number(r.avg_unit_price_inr) : null,
+  }));
+}
+
 export const getServerDailySummary = cache(
   async (opts: { from: string; to: string }): Promise<DailySummary[]> => {
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc('get_daily_summary', {
-      p_from: opts.from,
-      p_to: opts.to,
-    });
-    if (error) throw new Error(error.message);
-    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
-      localDate: String(r.local_date),
-      sticks: Number(r.sticks),
-      // Postgres `numeric` is returned as a string by supabase-js (like baseline_per_day).
-      // Always coerce via Number() — mirrors the C4 fix pattern.
-      totalSpendInr: Number(r.total_spend_inr),
-      avgUnitPriceInr: r.avg_unit_price_inr != null ? Number(r.avg_unit_price_inr) : null,
-    }));
+    return loadDailySummary(supabase, opts);
   },
 );
 

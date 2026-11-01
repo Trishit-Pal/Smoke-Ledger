@@ -116,7 +116,7 @@ function EditorialPillRow({ items, ariaLabel }: EditorialPillRowProps<unknown>) 
           aria-pressed={it.selected}
           onClick={it.onPress}
           className={
-            'shrink-0 inline-flex items-center min-h-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
+            'shrink-0 inline-flex items-center justify-center min-h-11 min-w-11 px-md rounded-md border text-small transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ' +
             (it.selected
               ? 'border-[var(--text)] bg-[var(--text)] text-[var(--bg)]'
               : 'border-[var(--rule-strong)] text-text-muted hover:text-text hover:border-[var(--text)]')

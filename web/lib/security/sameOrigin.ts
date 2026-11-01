@@ -7,6 +7,21 @@ export interface RequestOriginHeaders {
 }
 
 /**
+ * Route-handler adapter over `isSameOriginRequest`: reads the same three
+ * headers the server-action path checks (`x-forwarded-host` wins over `host`
+ * behind Vercel's proxy). Every API route that mutates on behalf of a cookie
+ * session calls this first; SameSite=Lax alone is not a CSRF control.
+ */
+export function requireSameOrigin(request: Request): boolean {
+  const h = request.headers;
+  return isSameOriginRequest({
+    secFetchSite: h.get('sec-fetch-site'),
+    origin: h.get('origin'),
+    host: h.get('x-forwarded-host') ?? h.get('host'),
+  });
+}
+
+/**
  * True only for a request a page on our own origin made.
  *
  * Next 14.2 already compares Origin with Host for server actions, but it lets a

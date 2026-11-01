@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { createClient } from '@web/lib/supabase/server';
+import { requireSameOrigin } from '@web/lib/security/sameOrigin';
+import { auditBodySchema } from './schema';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 import { serverLog } from '@web/lib/log';
-
-const auditBodySchema = z.object({
-  eventType: z.string().min(1).max(80),
-  eventCategory: z
-    .enum(['account', 'compliance', 'auth', 'privacy', 'preferences'])
-    .default('account'),
-  props: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
-});
 
 function isEdgeAuditSuccess(status: number, body: string): boolean {
   if (status === 204) return true;
@@ -27,6 +20,11 @@ function isEdgeAuditSuccess(status: number, body: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    // Cookie-session route: a cross-site page must not be able to write audit
+    // rows as the signed-in user. SameSite=Lax alone is not that guarantee.
+    if (!requireSameOrigin(request)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
     const parsed = auditBodySchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: 'validation_error' }, { status: 400 });
@@ -74,7 +72,7 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 204 });
     }
 
-    serverLog('error', 'api.audit.edge_failed', { status: edgeRes.status, body: edgeBody });
+    serverLog('error', 'api.audit.edge_failed', { status: edgeRes.status }); // body omitted: may echo request content
 
     if (edgeRes.status === 429) {
       return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
