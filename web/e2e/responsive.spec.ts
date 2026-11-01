@@ -149,13 +149,31 @@ async function audit(page: Page, checkInputFont: boolean): Promise<Issue[]> {
   }, checkInputFont);
 }
 
+/**
+ * `goto` that tolerates the previous page still navigating. After `networkidle`
+ * Next's router keeps prefetching <Link> targets (and the dev server compiles
+ * them on demand); under load that late navigation interrupts the next goto
+ * ("Navigation to X is interrupted by another navigation to Y", where Y is the
+ * page we just left). Never seen in CI across two full runs; seen locally with
+ * four engines on one dev server. One retry on exactly that error.
+ */
+async function gotoSettled(page: Page, route: string) {
+  try {
+    await page.goto(route, { waitUntil: 'networkidle', timeout: 90_000 });
+  } catch (e) {
+    if (!(e instanceof Error) || !/interrupted by another navigation/.test(e.message)) throw e;
+    await page.waitForLoadState('networkidle');
+    await page.goto(route, { waitUntil: 'networkidle', timeout: 90_000 });
+  }
+}
+
 async function sweep(page: Page, routes: string[], info: TestInfo) {
   const failures: string[] = [];
   const isMobile = !!info.project.use.isMobile;
   for (const vp of viewportsFor(page, info)) {
     await page.setViewportSize(vp);
     for (const route of routes) {
-      await page.goto(route, { waitUntil: 'networkidle', timeout: 90_000 });
+      await gotoSettled(page, route);
       await page.evaluate(() => document.fonts.ready);
       // Auditing whatever page a redirect landed on (e.g. a lost session → /login)
       // would pass silently. Onboarding may forward within the wizard.
