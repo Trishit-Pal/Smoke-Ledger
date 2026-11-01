@@ -161,7 +161,7 @@ export function QuickLogStrip({
             title={repeatDisabledTitle}
             className="
               inline-flex items-center justify-center
-              min-h-[44px] px-md rounded-md
+              min-h-11 min-w-11 px-md rounded-md
               border text-text font-medium text-body
               transition-colors hover:border-text/40
               disabled:opacity-50 disabled:cursor-not-allowed

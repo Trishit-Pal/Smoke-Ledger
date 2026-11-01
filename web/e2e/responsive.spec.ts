@@ -175,6 +175,29 @@ async function sweep(page: Page, routes: string[], info: TestInfo) {
 
 // The dev server compiles each route on first hit; WebKit/Firefox can time out
 // waiting on that, so compile everything once per worker before any sweep.
+/**
+ * Discreet mode: the user's own totals are masked, so no currency amount may be
+ * visible in the ledger. Public-health facts ("costs around ₹1.4 lakh per
+ * year") are not the user's data and are excluded by their section label.
+ */
+async function expectNoLedgerMoney(page: Page) {
+  const main = page.locator('#main-content');
+  await expect(main).toContainText('•••');
+  // Recharts measures its container after mount and only then draws axis
+  // ticks, so `networkidle` fires before any axis text exists. On pages with
+  // a chart, wait for the first y-axis tick to be drawn before reading the DOM.
+  if ((await main.locator('.recharts-responsive-container').count()) > 0) {
+    await expect(main.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toBeVisible();
+  }
+  const leaked = await main.evaluate((root) => {
+    const clone = root.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[aria-label="Did you know facts"]').forEach((n) => n.remove());
+    const m = (clone.textContent ?? '').match(/[₹€]\s?\d[\d,.]*|\d[\d,.]*\s?[₹€]/);
+    return m ? m[0] : null;
+  });
+  expect(leaked, `discreet mode leaked "${leaked}" on ${new URL(page.url()).pathname}`).toBeNull();
+}
+
 test.beforeAll(async ({ playwright }, info) => {
   test.setTimeout(300_000);
   const ctx = await playwright.request.newContext({ baseURL: info.project.use.baseURL });
@@ -252,14 +275,21 @@ test.describe('responsive · logged-in pages (local Supabase only)', () => {
 
     const admin = getAdmin()!;
     await admin.from('user_profiles').update({ discreet_mode: true }).eq('id', onboarded.id);
+    // Fresh page: WebKit (tablet-safari) hit an internal error on goto right
+    // after the sweep's 12 viewport/route changes. The session cookie is on
+    // the context, so the new page is still signed in.
+    // ponytail: if WebKit still crashes here, pin this check to desktop-chromium.
+    const fresh = await page.context().newPage();
     try {
-      await page.setViewportSize({ width: 1440, height: 900 });
-      await page.goto('/dashboard', { waitUntil: 'networkidle' });
-      const main = page.locator('#main-content');
-      await expect(main).toContainText('•••');
-      // No amount may leak beside the masks, symbol before (₹12) or after (12,00 €).
-      await expect(main).not.toContainText(/[₹€]\s?\d|\d\s?[₹€]/);
+      await fresh.setViewportSize({ width: 1440, height: 900 });
+      // /trends too: its charts render money on axes and tooltips, not only in
+      // headline numerals, and a masked heading over an unmasked axis is a leak.
+      for (const route of ['/dashboard', '/trends']) {
+        await fresh.goto(route, { waitUntil: 'networkidle' });
+        await expectNoLedgerMoney(fresh);
+      }
     } finally {
+      await fresh.close();
       await admin.from('user_profiles').update({ discreet_mode: false }).eq('id', onboarded.id);
     }
   });
