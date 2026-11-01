@@ -56,6 +56,8 @@ import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
+import { recordAuditEvent } from '@/services/audit';
+import { clearTranscript } from '@web/components/chat/transcriptStore';
 import { describeError, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
@@ -87,6 +89,7 @@ type BusyAction =
   | 'toggle-discreet'
   | 'toggle-hide'
   | 'toggle-analytics'
+  | 'toggle-ledger-chat'
   | 'add-brand'
   | 'save-price';
 
@@ -94,6 +97,7 @@ export interface SettingsClientProps {
   profile: UserProfile;
   brands: (Brand & { variants: BrandVariant[] })[];
   analyticsOptIn: boolean;
+  ledgerChatOptIn: boolean;
   initialAction?: string;
 }
 
@@ -242,9 +246,17 @@ export function SettingsClient({
   profile,
   brands: initialBrands,
   analyticsOptIn: initialAnalyticsOptIn,
+  ledgerChatOptIn: initialLedgerChatOptIn,
   initialAction,
 }: SettingsClientProps) {
   const router = useRouter();
+
+  // Ask the ledger consent: a settings key, like analytics; re-synced from the
+  // server prop after router.refresh() so another tab's change shows here.
+  const [ledgerChatOptIn, setLedgerChatOptIn] = React.useState(initialLedgerChatOptIn);
+  React.useEffect(() => {
+    setLedgerChatOptIn(initialLedgerChatOptIn);
+  }, [initialLedgerChatOptIn]);
 
   // ── Baseline edit-in-place state ────────────────────────────────────────
   const initialBaseline =
@@ -406,6 +418,25 @@ export function SettingsClient({
     }
   };
 
+  const onToggleLedgerChat = async (value: boolean) => {
+    setBusy('toggle-ledger-chat');
+    setError(null);
+    try {
+      await setSetting('consent.ledgerChatOptIn', value);
+      if (!value) clearTranscript();
+      setLedgerChatOptIn(value);
+      try {
+        await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', { enabled: value });
+      } catch {
+        // The consent itself is saved; the audit row is best-effort here.
+      }
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onExportJson = async () => {
     setBusy('export-json');
     setError(null);
@@ -541,6 +572,7 @@ export function SettingsClient({
         dispatchFarewell();
         await new Promise((r) => setTimeout(r, 1600));
       }
+      clearTranscript();
       await getSupabase().auth.signOut();
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
@@ -557,6 +589,7 @@ export function SettingsClient({
     setBusy('return-home');
     setError(null);
     try {
+      clearTranscript();
       await getSupabase().auth.signOut();
       router.replace('/');
     } catch (e) {
@@ -1052,6 +1085,18 @@ export function SettingsClient({
                   onChange={(value) => void onToggleAnalytics(value)}
                   disabled={busy != null}
                   ariaLabel="Anonymous analytics"
+                />
+              }
+            />
+            <PrefRow
+              label="Ask the ledger"
+              sublabel="Sends your ledger's figures, and on request recent entries, to Anthropic's AI model to answer your questions. Off by default; turning it off clears the conversation on this device."
+              control={
+                <EditorialSwitch
+                  checked={ledgerChatOptIn}
+                  onChange={(value) => void onToggleLedgerChat(value)}
+                  disabled={busy != null}
+                  ariaLabel="Ask the ledger"
                 />
               }
             />

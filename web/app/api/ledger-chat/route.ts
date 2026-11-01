@@ -7,6 +7,7 @@ import { timezoneForCountry } from '@/lib/regions';
 import { checkRateLimits } from '@web/lib/auth/rateLimit';
 import { serverLog } from '@web/lib/log';
 import { resolveChatCaller } from '@web/lib/server/ledgerChat/auth';
+import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 import { runLedgerChatTurn } from '@web/lib/server/ledgerChat/turn';
 import { loadDailySummary, loadGoals, loadLogsPage, loadProfile, toDailySummaryRow } from '@web/lib/server/data';
 import { cleanEnvValue } from '@web/lib/supabase/env';
@@ -40,7 +41,7 @@ function envInt(name: string, fallback: number): number {
 export async function POST(request: Request) {
   const startedAt = Date.now();
   try {
-    if (cleanEnvValue(process.env.LEDGER_CHAT_ENABLED) !== 'true') return fail('feature_disabled', 503);
+    if (!isLedgerChatEnabled()) return fail('feature_disabled', 503);
     const apiKey = cleanEnvValue(process.env.ANTHROPIC_API_KEY);
     if (!apiKey) return fail('server_misconfigured', 500);
 

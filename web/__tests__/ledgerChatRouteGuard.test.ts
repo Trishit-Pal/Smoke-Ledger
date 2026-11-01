@@ -18,7 +18,7 @@ describe('ledger-chat route guards', () => {
   });
 
   test('checks the kill switch, consent, and limits before loading any data', () => {
-    const killSwitch = route.indexOf("process.env.LEDGER_CHAT_ENABLED");
+    const killSwitch = route.indexOf('isLedgerChatEnabled()');
     const consent = route.indexOf(".from('settings_kv')");
     const limits = route.indexOf('checkRateLimits(');
     const loads = route.indexOf('loadProfile(');

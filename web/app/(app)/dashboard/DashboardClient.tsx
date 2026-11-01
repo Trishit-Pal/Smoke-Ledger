@@ -50,6 +50,7 @@ import { ActivityLog } from '@web/components/dashboard/ActivityLog';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import { FloatingOrb } from '@web/components/visual/FloatingOrb';
 import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
+import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
 import {
   dispatchMood,
   dispatchMilestone,
@@ -64,6 +65,8 @@ export interface DashboardClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
   summary: DailySummaryRow[];
   summarySinceYmd: string;
+  /** Server flag for Ask the ledger; the launcher stays hidden while false. */
+  ledgerChatEnabled: boolean;
 }
 
 type WindowDays = 1 | 7 | 30 | 365;
@@ -139,6 +142,7 @@ export function DashboardClient({
   brands,
   summary,
   summarySinceYmd,
+  ledgerChatEnabled,
 }: DashboardClientProps) {
   const router = useRouter();
   const [quickLogError, setQuickLogError] = React.useState<string | null>(null);
@@ -703,15 +707,25 @@ export function DashboardClient({
         ) : null}
 
         {/* ─────────────── Footer ─────────────── */}
-        <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.push('/history')}
-            className="inline-flex items-center min-h-11 text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
-            style={{ textDecorationColor: 'var(--rule-strong)' }}
-          >
-            View full history →
-          </button>
+        <footer style={idx(11)} className="rule-hair pt-md flex items-center justify-between gap-md">
+          <div className="flex flex-wrap items-center gap-x-lg gap-y-xs">
+            <button
+              type="button"
+              onClick={() => router.push('/history')}
+              className="inline-flex items-center min-h-11 text-small text-text-muted hover:text-text underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm"
+              style={{ textDecorationColor: 'var(--rule-strong)' }}
+            >
+              View full history →
+            </button>
+            <AskLedgerLauncher
+              enabled={ledgerChatEnabled}
+              profile={profile}
+              logs={logs}
+              rows={summary}
+              goals={goals}
+              today={today}
+            />
+          </div>
           <span className="text-caption text-text-faint italic">Quiet, on purpose.</span>
         </footer>
       </div>

@@ -23,6 +23,7 @@ export const AnalyticsEvents = {
   DISCREET_MODE_ENABLED: 'discreet_mode_enabled',
   BRAND_CREATED: 'brand_created',
   BRAND_FAVORITED: 'brand_favorited',
+  LEDGER_CHAT_ASKED: 'ledger_chat_asked',
 } as const;
 
 export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];
@@ -57,4 +58,6 @@ export interface EventPayloadMap {
   brand_created: { category: BrandCategory; is_seed: boolean };
   // Same treatment: category + is_seed instead of brand_id UUID.
   brand_favorited: { category: BrandCategory; is_seed: boolean };
+  // Whether a starter was tapped and how many tools answered; never the question.
+  ledger_chat_asked: { starter: boolean; tools: number };
 }
