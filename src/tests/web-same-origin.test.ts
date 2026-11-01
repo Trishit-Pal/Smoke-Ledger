@@ -35,3 +35,26 @@ describe('isSameOriginRequest', () => {
     expect(isSameOriginRequest({ secFetchSite: null, origin: `https://${HOST}`, host: null })).toBe(false);
   });
 });
+
+describe('requireSameOrigin', () => {
+  // The audit API route had no CSRF check at all; it relied on SameSite=Lax alone.
+  // This adapter reads the three request headers the server-action path already
+  // checks, so a route handler and an action enforce the same rule.
+  const { requireSameOrigin } = require('../../web/lib/security/sameOrigin') as typeof import('../../web/lib/security/sameOrigin');
+  const req = (h: Record<string, string>) => new Request('https://app.example/api/x', { method: 'POST', headers: h });
+
+  it('accepts a same-origin fetch and rejects a cross-site one', () => {
+    expect(requireSameOrigin(req({ 'sec-fetch-site': 'same-origin' }))).toBe(true);
+    expect(requireSameOrigin(req({ 'sec-fetch-site': 'cross-site', origin: 'https://app.example' }))).toBe(false);
+  });
+
+  it('matches Origin against x-forwarded-host first, then host', () => {
+    expect(requireSameOrigin(req({ origin: 'https://app.example', 'x-forwarded-host': 'app.example', host: 'internal' }))).toBe(true);
+    expect(requireSameOrigin(req({ origin: 'https://app.example', host: 'app.example' }))).toBe(true);
+    expect(requireSameOrigin(req({ origin: 'https://evil.example', host: 'app.example' }))).toBe(false);
+  });
+
+  it('fails closed with no Origin and no Fetch Metadata', () => {
+    expect(requireSameOrigin(req({ host: 'app.example' }))).toBe(false);
+  });
+});
