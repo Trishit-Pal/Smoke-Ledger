@@ -11,6 +11,9 @@ export type ThemeTogglePlacement = 'fixed' | 'inline' | 'floating-onboarding';
 
 export interface ThemeToggleProps {
   placement?: ThemeTogglePlacement;
+  /** When the toggle sits in a labelled row (Settings), pass that label so
+   *  screen readers hear one name, not the row's and the switch's. */
+  ariaLabel?: string;
 }
 
 const PILL_WIDTH = 64;
@@ -19,7 +22,7 @@ const HIT_HEIGHT = 44; // WCAG 2.5.8 target size; the visible pill stays 32px
 const THUMB_SIZE = 24;
 const THUMB_INSET = 4;
 
-export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
+export function ThemeToggle({ placement = 'fixed', ariaLabel }: ThemeToggleProps) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
@@ -28,7 +31,7 @@ export function ThemeToggle({ placement = 'fixed' }: ThemeToggleProps) {
 
   const currentTheme = theme === 'system' ? resolvedTheme : theme;
   const isDark = currentTheme !== 'light';
-  const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  const label = ariaLabel ?? (isDark ? 'Switch to light mode' : 'Switch to dark mode');
 
   // Suppress the global "fixed" toggle on onboarding routes — the rail and
   // the Done page render their own placement-aware instances.

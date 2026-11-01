@@ -1055,13 +1055,6 @@ export function SettingsClient({
                 />
               }
             />
-            {/* The only theme control inside the app shell (the global fixed
-                toggle is hidden there — see .theme-toggle-fixed in globals.css). */}
-            <PrefRow
-              label="Dark theme"
-              sublabel="Ink on paper, or paper on ink. Follows your account."
-              control={<ThemeToggle placement="inline" />}
-            />
           </dl>
         </section>
 
@@ -1345,8 +1338,15 @@ export function SettingsClient({
             deck="Return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
           />
           <dl className="flex flex-col">
+            {/* The only theme control inside the app shell (the global fixed
+                toggle is hidden there — see .theme-toggle-fixed in globals.css). */}
             <PrefRow
               strongRule
+              label="Dark theme"
+              sublabel="Ink on paper, or paper on ink. Follows your account."
+              control={<ThemeToggle placement="inline" ariaLabel="Dark theme" />}
+            />
+            <PrefRow
               label="Return to home page"
               sublabel="Signs you out and returns to the public home page. Your data is saved — you can sign back in anytime."
               control={

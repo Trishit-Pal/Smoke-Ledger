@@ -62,12 +62,13 @@ export function OnboardingProgress() {
         style={{ background: 'var(--rule)' }}
       >
         <div
-          className="absolute inset-y-0 left-0 transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+          className="absolute inset-y-0 left-0 transition-[width] duration-[720ms] ease-[var(--ease-editorial)] motion-reduce:transition-none"
           style={{ width: `${(i / last) * 100}%`, background: 'var(--text)' }}
         />
       </div>
-      <span className="editorial-caption" aria-hidden>
-        {STEPS[i].label} · {i + 1} of {STEPS.length}
+      {/* Same folio as the rail ("00 · Welcome"), not a wizard counter. */}
+      <span className="editorial-caption nums-tabular" aria-hidden>
+        {STEPS[i].index} · {STEPS[i].label}
       </span>
     </div>
   );
