@@ -71,6 +71,7 @@ import {
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant, UserProfile } from '@/types';
 import { SectionLabel } from '@web/components/visual';
+import { ThemeToggle } from '@web/components/layout/ThemeToggle';
 
 type BusyAction =
   | null
@@ -181,7 +182,7 @@ function EditorialSwitch({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="relative inline-flex h-6 w-11 items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:opacity-60 disabled:cursor-not-allowed"
+      className="hit-target relative inline-flex h-6 w-11 items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:opacity-60 disabled:cursor-not-allowed"
       style={{
         borderColor: 'var(--rule-strong)',
         backgroundColor: checked ? 'var(--text)' : 'transparent',
@@ -226,7 +227,7 @@ function TextLink({
       disabled={disabled}
       aria-busy={busy}
       aria-label={ariaLabel}
-      className="text-small underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors min-h-[32px] px-xs"
+      className="text-small underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center min-h-11 min-w-11 px-xs"
       style={{
         color: destructive ? 'var(--warn-earth)' : 'var(--text)',
         textDecorationColor: destructive ? 'var(--warn-earth)' : 'var(--rule-strong)',
@@ -717,7 +718,7 @@ export function SettingsClient({
   // Render
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+    <div className="relative page-column pt-xl pb-32 md:pt-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
@@ -1053,6 +1054,13 @@ export function SettingsClient({
                   ariaLabel="Anonymous analytics"
                 />
               }
+            />
+            {/* The only theme control inside the app shell (the global fixed
+                toggle is hidden there — see .theme-toggle-fixed in globals.css). */}
+            <PrefRow
+              label="Dark theme"
+              sublabel="Ink on paper, or paper on ink. Follows your account."
+              control={<ThemeToggle placement="inline" />}
             />
           </dl>
         </section>

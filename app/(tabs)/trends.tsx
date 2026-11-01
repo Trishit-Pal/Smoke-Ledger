@@ -28,6 +28,7 @@ import {
   View,
 } from 'react-native';
 import { Screen } from '@/components/ui/Screen';
+import { Columns } from '@/components/ui/Columns';
 import { Text } from '@/components/ui/Text';
 import { Divider } from '@/components/ui/Divider';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -485,6 +486,7 @@ export default function Trends() {
             ) : null}
           </View>
 
+          <Columns>
           {/* ─── Daily sticks line ─── */}
           <View style={{ gap: spacing.md }}>
             <SectionHeader
@@ -528,6 +530,8 @@ export default function Trends() {
             </Text>
           </View>
 
+          </Columns>
+
           {/* ─── Day × hour heatmap ─── */}
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Day × hour" right="When the week breathes" />
@@ -540,6 +544,7 @@ export default function Trends() {
             <YearNote show={isYear} />
           </View>
 
+          <Columns>
           {/* ─── Time of day ─── */}
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Time of day" right="24-hour distribution" />
@@ -563,6 +568,8 @@ export default function Trends() {
             </Text>
             <YearNote show={isYear} />
           </View>
+
+          </Columns>
 
           {/* ─── Mood × trigger matrix ─── */}
           <View style={{ gap: spacing.md }}>

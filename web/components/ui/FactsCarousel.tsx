@@ -97,7 +97,7 @@ export function FactsCarousel({ count = 5 }: FactsCarouselProps) {
                 <button
                   type="button"
                   onClick={() => window.open(fact.sourceUrl, '_blank', 'noopener,noreferrer')}
-                  className="text-caption uppercase text-accent-ink hover:opacity-80 self-start mt-auto cursor-pointer"
+                  className="hit-target focus-ring text-caption uppercase text-accent-ink hover:opacity-80 self-start mt-auto cursor-pointer"
                 >
                   {fact.source}
                 </button>

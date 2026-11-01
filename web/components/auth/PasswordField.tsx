@@ -29,8 +29,8 @@ const TOGGLE_BUTTON_STYLE: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 28,
-  height: 28,
+  width: 44, // 44px tap target; the eye glyph stays its own size
+  height: 44,
   background: 'transparent',
   border: 'none',
   cursor: 'pointer',
@@ -83,7 +83,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
         <input
           ref={forwardedRef}
           type={revealed ? 'text' : 'password'}
-          style={{ ...INPUT_STYLE, paddingRight: 36, ...style }}
+          style={{ ...INPUT_STYLE, paddingRight: 44, ...style }}
           className={className ?? 'focus-ring'}
           {...inputProps}
         />

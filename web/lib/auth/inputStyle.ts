@@ -2,7 +2,7 @@ import type * as React from 'react';
 
 export const INPUT_STYLE: React.CSSProperties = {
   width: '100%',
-  height: 40,
+  height: 44, // PRODUCT.md touch target
   padding: '0 0 4px 0',
   background: 'transparent',
   border: 'none',
@@ -47,7 +47,7 @@ export const PRIMARY_CTA_STYLE: React.CSSProperties = {
 };
 
 export const SECONDARY_CTA_STYLE: React.CSSProperties = {
-  height: 40,
+  height: 44,
   padding: '0 18px',
   border: '1px solid var(--rule)',
   borderRadius: 10,

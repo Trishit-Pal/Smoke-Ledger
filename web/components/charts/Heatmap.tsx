@@ -85,7 +85,9 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
   const gap = 1.5;
 
   return (
-    <div ref={containerRef} className="w-full overflow-x-auto" style={{ height }}>
+    // minHeight, not height: a classic horizontal scrollbar (narrow phones, where
+    // drawWidth > width) adds its own height below the SVG instead of clipping it.
+    <div ref={containerRef} className="w-full overflow-x-auto overflow-y-hidden" style={{ minHeight: height }}>
       {width > 0 ? (
         <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max)}>
           {DAY_LABELS.map((label, row) => (

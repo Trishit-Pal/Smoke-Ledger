@@ -6,7 +6,7 @@ export default function AppLoading() {
     <div
       role="status"
       aria-label="Loading"
-      className="mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-xxxl md:pt-xxl md:px-xxl"
+      className="page-column pt-xl pb-xxxl md:pt-xxl"
     >
       <div className="flex items-center gap-md">
         <span aria-hidden className="h-px flex-1 bg-[var(--rule-strong)]" />

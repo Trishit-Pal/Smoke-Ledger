@@ -6,12 +6,15 @@ module.exports = {
   expo: {
     name: 'Smoke Ledger',
     slug: 'smoke-ledger-india',
-    version: '0.2.0',
+    version: '3.0.0',
     // Pins the OTA runtime to the marketing version so an EAS Update can only
     // ship against a matching native build. Bump `version` when shipping new
     // native code (and use OTA for JS-only fixes within that version).
     runtimeVersion: { policy: 'appVersion' },
-    orientation: 'portrait',
+    // v3: follows the device (phone landscape, Android tablets/foldables, split-screen).
+    // iOS stays phone-only (supportsTablet false) until the tablet layouts are proven
+    // on Android — enabling iPad is a one-way door on the App Store.
+    orientation: 'default',
     icon: './assets/icon.png',
     scheme: 'smokeledger',
     userInterfaceStyle: 'automatic',

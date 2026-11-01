@@ -4,9 +4,10 @@ import { Pressable, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { Text } from './Text';
+import { PRESS } from '@/constants/motion';
 import { useTheme } from '@/hooks/useTheme';
 import { radius, spacing } from '@/constants/theme';
 import { tap } from '@/lib/haptics';
@@ -30,8 +31,8 @@ export function Chip({ label, selected, onPress, disabled, style, accessibilityL
 
   return (
     <Pressable
-      onPressIn={() => { if (!reduce) scale.value = withSpring(0.94, { damping: 20 }); }}
-      onPressOut={() => { if (!reduce) scale.value = withSpring(1, { damping: 20 }); }}
+      onPressIn={() => { if (!reduce) scale.value = withTiming(0.94, PRESS); }}
+      onPressOut={() => { if (!reduce) scale.value = withTiming(1, PRESS); }}
       onPress={() => {
         if (disabled) return;
         tap();

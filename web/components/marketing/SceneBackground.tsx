@@ -117,7 +117,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
 
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, budget.dprCap));
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(window.innerWidth, window.innerHeight, false); // false: CSS keeps 100%/100%
       // UnrealBloomPass requires tone mapping — without it, any pixel the
       // additive bloom composite pushes past 1.0 hard-clips to pure white
       // instead of compressing softly, reading harsher than the restrained
@@ -281,11 +281,18 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
         mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
       };
+      // Coalesced to one resize per frame: mobile address-bar show/hide fires a
+      // burst of resize events while scrolling; each one would reallocate buffers.
+      let resizeRaf = 0;
       const onResize = () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        composer?.setSize(window.innerWidth, window.innerHeight);
+        if (resizeRaf) return;
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = 0;
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight, false);
+          composer?.setSize(window.innerWidth, window.innerHeight);
+        });
       };
       if (budget.parallax) window.addEventListener('mousemove', onMouse, { passive: true });
       window.addEventListener('resize', onResize);
@@ -400,6 +407,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         stop();
         if (budget.parallax) window.removeEventListener('mousemove', onMouse);
         window.removeEventListener('resize', onResize);
+        cancelAnimationFrame(resizeRaf);
         document.removeEventListener('visibilitychange', onVisibility);
         window.clearInterval(idleTimer);
         for (const ev of WAKE_EVENTS) window.removeEventListener(ev, wake);

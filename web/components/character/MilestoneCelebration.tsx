@@ -99,8 +99,11 @@ export function MilestoneCelebration() {
         backdropFilter: 'blur(2px)',
         zIndex: 1000,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        // The overlay scrolls (not the card) so the confetti can still spill past
+        // the card edge; `margin: auto` on the card centres it without clipping
+        // its top on a short landscape phone the way align-items:center would.
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
         padding: 24,
       }}
     >
@@ -111,7 +114,8 @@ export function MilestoneCelebration() {
           background: 'var(--bg-elevated)',
           width: 440,
           maxWidth: '100%',
-          padding: '32px 36px',
+          margin: 'auto',
+          padding: '32px clamp(20px, 6vw, 36px)',
           boxShadow: 'var(--shadow-card)',
           position: 'relative',
           overflow: 'visible',

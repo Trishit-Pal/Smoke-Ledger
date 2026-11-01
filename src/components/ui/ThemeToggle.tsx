@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Pressable } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { SETTLE } from '@/constants/motion';
 import { Text } from './Text';
 import { useTheme } from '@/hooks/useTheme';
 import { useThemeStore, type ThemePreference } from '@/store/theme';
@@ -27,7 +28,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const target = activeIdx * SEGMENT_W;
-    slideX.value = reduce ? target : withSpring(target, { damping: 22, stiffness: 280 });
+    slideX.value = reduce ? target : withTiming(target, SETTLE);
   }, [activeIdx, reduce, slideX]);
 
   const thumbStyle = useAnimatedStyle(() => ({ transform: [{ translateX: slideX.value }] }));

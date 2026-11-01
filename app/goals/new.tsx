@@ -120,7 +120,9 @@ export default function GoalNewScreen() {
   });
 
   return (
-    <Screen>
+    // scroll={false}: the inner ScrollView owns scrolling (no nested scroll views),
+    // same as log/new — keeps focused fields reachable above a landscape keyboard.
+    <Screen scroll={false} noPadding bottomInset>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}

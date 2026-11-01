@@ -328,7 +328,7 @@ export default function OnboardingPrivacyPage() {
             type="button"
             onClick={stampAll}
             disabled={allOn}
-            className="focus-ring"
+            className="focus-ring hit-target"
             style={{
               background: 'transparent',
               border: 'none',

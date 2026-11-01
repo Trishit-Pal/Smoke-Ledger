@@ -140,7 +140,7 @@ export default function OnboardingUsagePage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))',
           gap: 24,
           alignItems: 'end',
           padding: '24px 0',
@@ -222,8 +222,8 @@ export default function OnboardingUsagePage() {
             className="focus-ring"
             aria-label="Decrease"
             style={{
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               borderRadius: 999,
               border: '1px solid var(--rule)',
               background: 'var(--bg-elevated)',
@@ -251,8 +251,8 @@ export default function OnboardingUsagePage() {
             className="focus-ring"
             aria-label="Increase"
             style={{
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               borderRadius: 999,
               border: '1px solid var(--rule)',
               background: 'var(--bg-elevated)',
@@ -369,7 +369,7 @@ export default function OnboardingUsagePage() {
                 key={opt.id}
                 type="button"
                 onClick={() => setUsage({ purchasePref: opt.id })}
-                className="focus-ring"
+                className="focus-ring hit-target"
                 style={{
                   height: 34,
                   padding: '0 14px',
