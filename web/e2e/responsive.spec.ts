@@ -246,7 +246,7 @@ test.describe('responsive · public & auth pages', () => {
     test.skip(info.project.name !== 'desktop-chromium' && info.project.name !== 'chromium', 'one engine is enough');
     await page.setViewportSize({ width: 320, height: 640 });
     for (const route of PUBLIC_ROUTES) {
-      await page.goto(route, { waitUntil: 'networkidle' });
+      await gotoSettled(page, route);
       await page.addStyleTag({
         content:
           '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }',
@@ -303,7 +303,7 @@ test.describe('responsive · logged-in pages (local Supabase only)', () => {
       // /trends too: its charts render money on axes and tooltips, not only in
       // headline numerals, and a masked heading over an unmasked axis is a leak.
       for (const route of ['/dashboard', '/trends']) {
-        await fresh.goto(route, { waitUntil: 'networkidle' });
+        await gotoSettled(fresh, route);
         await expectNoLedgerMoney(fresh);
       }
     } finally {
