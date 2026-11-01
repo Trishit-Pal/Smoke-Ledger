@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
@@ -119,74 +119,57 @@ jobs:
 
   rls-integration:
     runs-on: ubuntu-latest
-    # No `if:` gate — this job is mandatory on every PR.
-    # Rationale: rls-integration is the sole automated safety net for
-    # cross-tenant data leakage.  Silently skipping it when secrets are
-    # absent defeats the purpose; a missing secret should block CI, not
-    # green-light it.
-    #
-    # Concurrency: serialise runs that target the same ref so two PRs
-    # cannot race against the shared CI Supabase project.  cancel-in-progress
-    # is false because tests clean up probe rows both inline in each it() block
-    # AND in an afterAll() hook (added in H5).  An interrupted run will skip
-    # the afterAll cleanup, leaving probe rows that the next run treats as
-    # noise; flipping to true is therefore acceptable if queue depth becomes
-    # the bigger problem, at the cost of some test-row leakage between runs.
-    concurrency:
-      group: rls-integration-${{ github.ref }}
-      cancel-in-progress: false
+    # Mandatory on every PR (no `if:` gate): the sole automated cross-tenant
+    # isolation guard. Runs against a throwaway local Supabase built from this
+    # PR's own migrations, so it needs no secrets, no hosted CI project, and
+    # cannot drift from the schema under test. Fork PRs run it too.
+    # Trade-off: edge functions are not served locally (verify-backend skips
+    # that check) and the local stack uses the CLI's public demo JWT keys,
+    # which are safe only because the stack lives and dies on this runner.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
       - name: Install root dependencies
         run: npm ci
 
-      - name: Verify required E2E secrets
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
-          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
-          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
-          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
-          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
-        run: |
-          missing=()
-          [ -z "$E2E_SUPABASE_URL" ]       && missing+=("E2E_SUPABASE_URL        — anon-accessible URL of the CI Supabase project")
-          [ -z "$E2E_SUPABASE_ANON_KEY" ]  && missing+=("E2E_SUPABASE_ANON_KEY   — anon/public API key of the CI Supabase project")
-          [ -z "$E2E_USER_A_EMAIL" ]        && missing+=("E2E_USER_A_EMAIL         — email of pre-created test user A on the CI project")
-          [ -z "$E2E_USER_A_PASSWORD" ]     && missing+=("E2E_USER_A_PASSWORD      — password of test user A")
-          [ -z "$E2E_USER_B_EMAIL" ]        && missing+=("E2E_USER_B_EMAIL         — email of pre-created test user B on the CI project")
-          [ -z "$E2E_USER_B_PASSWORD" ]     && missing+=("E2E_USER_B_PASSWORD      — password of test user B")
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing required secrets for rls-integration job:"
-            printf '  - %s\n' "${missing[@]}"
-            echo ""
-            echo "See docs/deployment/production-ops-checklist.md section 6 for setup."
-            exit 1
-          fi
-          echo "All required secrets present."
+      - name: Start local Supabase (applies every migration on a fresh DB)
+        run: npx supabase start
 
-      - name: Verify CI project schema is current
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      - name: Provision throwaway test users and export test env
+        run: |
+          set -euo pipefail
+          status=$(npx supabase status -o env)
+          url=$(printf '%s\n' "$status" | sed -n 's/^API_URL="\(.*\)"$/\1/p')
+          anon=$(printf '%s\n' "$status" | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')
+          [ -n "$url" ] && [ -n "$anon" ] || { echo "::error::could not read local API_URL/ANON_KEY"; exit 1; }
+          for u in A B; do
+            pw=$(openssl rand -hex 16)
+            echo "::add-mask::$pw"
+            email="ci-${u,,}-${GITHUB_RUN_ID}@example.test"
+            # Local GoTrue auto-confirms; require a session back so a config
+            # change that re-enables email confirmation fails loudly here.
+            curl -fsS "$url/auth/v1/signup" -H "apikey: $anon" -H 'Content-Type: application/json' \
+              -d "{\"email\":\"$email\",\"password\":\"$pw\"}" | grep -q '"access_token"' \
+              || { echo "::error::signup for user $u returned no session (is email confirmation on?)"; exit 1; }
+            { echo "E2E_USER_${u}_EMAIL=$email"; echo "E2E_USER_${u}_PASSWORD=$pw"; } >> "$GITHUB_ENV"
+          done
+          { echo "E2E_SUPABASE_URL=$url"; echo "E2E_SUPABASE_ANON_KEY=$anon"; } >> "$GITHUB_ENV"
+
+      - name: Verify local schema has the required RPCs and revokes
         run: node scripts/verify-backend.mjs
 
       - name: RLS integration tests
         run: npm test -- rls.integration.test.ts
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
-          E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
-          E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
-          E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
-          E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
 
   secrets:
     runs-on: ubuntu-latest

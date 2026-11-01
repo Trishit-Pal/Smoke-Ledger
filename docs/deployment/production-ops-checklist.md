@@ -82,94 +82,28 @@ Deploy **edge functions before** client builds that stop calling `record_audit_e
 
 ## 6. CI integration test setup (mandatory — not optional)
 
-The `rls-integration` CI job is a required status check.  It will block CI
-with a hard failure if any of the six secrets below are absent.  This is
-intentional: the job is the sole automated guard against cross-tenant data
-leakage in RLS policies.
+The `rls-integration` CI job is the sole automated guard against cross-tenant
+data leakage in RLS policies, and it must run on every PR.
 
-### 6a. Dedicated CI Supabase project
+It runs against a **throwaway local Supabase started inside the job**
+(`supabase start`), built from the PR's own migrations. There is **nothing to
+set up**: no hosted CI project, no `E2E_*` secrets, no manual `db:push`, no
+test users to create (two are signed up per run with random passwords).
 
-Use a **separate free-tier Supabase project** for CI — not production, not
-your local dev stack.  Reasons:
+Notes:
 
-- Integration tests insert and delete real rows; they must not touch
-  production data.
-- The anon key ends up in GitHub Actions secrets, which gives it a larger
-  blast radius than the production anon key warrants.
-- A dedicated project can be paused or reset without affecting any users.
-
-### 6b. Required GitHub Actions secrets
-
-Add these in **GitHub → repo Settings → Secrets and variables → Actions →
-Repository secrets**:
-
-| Secret | What it should contain |
-|--------|----------------------|
-| `E2E_SUPABASE_URL` | The anon-accessible URL of the CI project (`https://<ref>.supabase.co`) |
-| `E2E_SUPABASE_ANON_KEY` | The anon/public API key of the CI project (safe to expose to Actions) |
-| `E2E_USER_A_EMAIL` | Email of pre-created test user A on the CI project |
-| `E2E_USER_A_PASSWORD` | Password of test user A |
-| `E2E_USER_B_EMAIL` | Email of pre-created test user B on the CI project |
-| `E2E_USER_B_PASSWORD` | Password of test user B |
-
-The CI job uses only the anon key.  No service-role key is needed or wanted
-in CI secrets.
-
-### 6c. Creating the two test users (one-time, manual)
-
-The test users must exist and be confirmed before CI runs.  Create them once
-via the Supabase Auth dashboard:
-
-1. Open the CI project in the Supabase dashboard.
-2. Go to **Authentication → Users → Add user → Create new user**.
-3. Enter the email and password you intend to store as `E2E_USER_A_*`.
-4. Tick **"Auto Confirm User"** (or confirm via the email link) so the account
-   is active immediately.
-5. Repeat for `E2E_USER_B_*`.
-
-Alternatively, use the Supabase MCP tool:
-
-```
-mcp__claude_ai_Supabase__execute_sql — INSERT into auth.users is not
-recommended; use the dashboard or the Admin API instead.
-```
-
-Do **not** add a CI step that creates users automatically — that requires the
-service-role key in CI, which expands blast radius unnecessarily.
-
-### 6d. Applying migrations to the CI project
-
-The CI job runs `node scripts/verify-backend.mjs` before the tests to confirm
-that required RPCs are present.  If the CI project schema is out of date, that
-step fails with a clear error before any test runs.
-
-To apply the latest migrations to the CI project, run these commands once from
-a maintainer's machine:
-
-```bash
-# Link to the CI project (one-time per machine)
-supabase link --project-ref <ci-project-ref>
-
-# Apply all pending migrations
-npm run db:push
-
-# Verify RPCs exist and schema is current
-npm run verify:backend
-```
-
-Re-run `npm run db:push` whenever a new migration is merged to main.
-
-### 6e. Branch protection — add rls-integration as a required check
-
-The workflow file cannot enforce branch protection rules; a repository admin
-must do this once manually:
-
-**GitHub → repo Settings → Branches → Branch protection rules → Edit rule for
-`main` → Require status checks to pass before merging → Search for
-"rls-integration" → Add it as a required check → Save changes.**
-
-Without this step, a contributor can merge a PR even if `rls-integration`
-fails, which defeats the purpose of making the job mandatory.
+- The local stack uses the Supabase CLI's public demo keys. That is safe only
+  because the stack exists solely on the CI runner for the length of the job.
+  **Never** point `E2E_SUPABASE_URL` at a real project from a PR workflow.
+- Edge functions are not served locally, so `verify-backend.mjs` skips the
+  deployed-functions check in CI. Verify those with `npm run verify:backend`
+  against production after `npm run functions:deploy:all`.
+- If `[auth.email] enable_confirmations` is ever turned on in
+  `supabase/config.toml`, the user-provisioning step fails loudly (it expects
+  a session back from sign-up).
+- Branch protection (making `rls-integration` a required check) needs a public
+  repo or GitHub Pro; the free plan on a private repo returns 403. Until then
+  the job is advisory at merge time — check it is green before merging.
 
 ## 6b. Export behaviour (H2 audit note)
 
