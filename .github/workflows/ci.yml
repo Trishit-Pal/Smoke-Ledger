@@ -18,7 +18,8 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright does not support.
+    runs-on: ubuntu-24.04
     # Secrets cannot be read in a step `if:` (GitHub rejects the whole workflow,
     # which kept CI at 0 jobs for weeks). Derive a flag here and test that.
     env:
