@@ -439,7 +439,7 @@ export default function NewLog() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <Screen scroll={false} noPadding>
+    <Screen scroll={false} noPadding bottomInset>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

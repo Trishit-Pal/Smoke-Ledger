@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/immutability -- Reanimated SharedValue is a mutable box; writing `.value` in press handlers is its documented API */
 import React from 'react';
 import { Pressable, ViewStyle, StyleProp, ActivityIndicator, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Text } from './Text';
 import { useTheme } from '@/hooks/useTheme';
 import { palette, radius, spacing } from '@/constants/theme';
@@ -29,7 +29,7 @@ export interface ButtonProps {
 // Module-level constants — avoids re-allocating on every render
 const HEIGHTS: Record<ButtonSize, number> = { sm: 40, md: 48, lg: 56 };
 const PADDINGS: Record<ButtonSize, number> = { sm: spacing.md, md: spacing.xl, lg: spacing.xl };
-const SPRING = { damping: 18, stiffness: 300 };
+import { PRESS } from '@/constants/motion';
 
 export function Button({
   title, onPress, variant = 'primary', size = 'md',
@@ -62,8 +62,8 @@ export function Button({
 
   return (
     <Pressable
-      onPressIn={() => { if (!disabled && !loading && !reduce) scale.value = withSpring(0.96, SPRING); }}
-      onPressOut={() => { if (!disabled && !loading && !reduce) scale.value = withSpring(1, SPRING); }}
+      onPressIn={() => { if (!disabled && !loading && !reduce) scale.value = withTiming(0.96, PRESS); }}
+      onPressOut={() => { if (!disabled && !loading && !reduce) scale.value = withTiming(1, PRESS); }}
       onPress={() => { if (!disabled && !loading) { tap(); onPress?.(); } }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}

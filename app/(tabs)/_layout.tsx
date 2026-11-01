@@ -6,14 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { PRESS, SETTLE } from '@/constants/motion';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing, radius } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
+import { useLayout } from '@/hooks/useLayout';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
@@ -38,8 +39,14 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();
-  const BAR_H = 56;
-  const BOTTOM_PAD = Math.max(insets.bottom, 8);
+  // Landscape phone: labels drop out (glyph + a11y label remain) so the bar is
+  // shorter, but each tab keeps a 44pt touch target (50 - 6 paddingTop).
+  const { isShort } = useLayout();
+  const BAR_H = isShort ? 50 : 56;
+  // Absolute children ignore the bar's paddingLeft, so the indicator adds the
+  // inset itself to stay centred over the active tab on a rotated notched phone.
+  const insetLeft = insets.left;
+  const BOTTOM_PAD = Math.max(insets.bottom, isShort ? spacing.xs : spacing.sm);
 
   // Pixel-based indicator position — avoids % strings in worklets (JS-thread trap)
   const containerW = useSharedValue(0);
@@ -48,12 +55,12 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
   useEffect(() => {
     indicatorPos.value = reduce
       ? state.index
-      : withSpring(state.index, { damping: 22, stiffness: 300 });
+      : withTiming(state.index, SETTLE);
   }, [state.index, reduce, indicatorPos]);
 
   const indicatorStyle = useAnimatedStyle(() => {
     const tabW = containerW.value / N;
-    return { left: indicatorPos.value * tabW + tabW / 2 - INDICATOR_W / 2 };
+    return { left: insetLeft + indicatorPos.value * tabW + tabW / 2 - INDICATOR_W / 2 };
   });
 
   return (
@@ -63,6 +70,9 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
         borderTopWidth: 1,
         borderTopColor: theme.border,
         paddingBottom: BOTTOM_PAD,
+        // Rotated notched phones put the notch/home bar at the sides.
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
         paddingTop: 6,
         height: BAR_H + BOTTOM_PAD,
         shadowColor: theme.mode === 'dark' ? theme.accent : '#000',
@@ -105,6 +115,7 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
               a11yLabel={tab.a11y}
               active={state.index === i}
               reduce={reduce}
+              compact={isShort}
               onPress={() => { if (state.index !== i && route) navigation.navigate(route.name); }}
             />
           );
@@ -120,16 +131,17 @@ interface TabItemProps {
   a11yLabel: string;
   active: boolean;
   reduce: boolean;
+  compact: boolean;
   onPress: () => void;
 }
 
-const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce, onPress }: TabItemProps) {
+const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce, compact, onPress }: TabItemProps) {
   const theme = useTheme();
   const pressScale = useSharedValue(1);
   const glyphScale = useSharedValue(1);
 
   useEffect(() => {
-    glyphScale.value = reduce ? (active ? 1.15 : 1) : withSpring(active ? 1.15 : 1, { damping: 18 });
+    glyphScale.value = reduce ? (active ? 1.15 : 1) : withTiming(active ? 1.15 : 1, SETTLE);
   }, [active, reduce, glyphScale]);
 
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: pressScale.value }] }));
@@ -138,7 +150,7 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
   return (
     <Pressable
       onPressIn={() => { if (!reduce) pressScale.value = withTiming(0.88, { duration: 80, easing: Easing.out(Easing.quad) }); }}
-      onPressOut={() => { if (!reduce) pressScale.value = withSpring(1, { damping: 18 }); }}
+      onPressOut={() => { if (!reduce) pressScale.value = withTiming(1, PRESS); }}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
@@ -147,6 +159,7 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
     >
       <Animated.View style={[{ alignItems: 'center', gap: 2 }, pressStyle]}>
         <Animated.Text
+          maxFontSizeMultiplier={1.4}
           style={[
             { fontSize: 14, fontWeight: active ? '700' : '500', color: active ? theme.accent : theme.textFaint },
             glyphStyle,
@@ -154,9 +167,17 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
         >
           {glyph}
         </Animated.Text>
-        <Text variant="caption" color={active ? theme.accent : theme.textFaint} style={{ fontSize: 10, letterSpacing: 0.3 }}>
-          {label}
-        </Text>
+        {compact ? null : (
+          // Fixed-height bar: cap scaling so large text can't clip the label.
+          <Text
+            variant="caption"
+            maxFontSizeMultiplier={1.3}
+            color={active ? theme.accent : theme.textFaint}
+            style={{ fontSize: 10, letterSpacing: 0.3 }}
+          >
+            {label}
+          </Text>
+        )}
       </Animated.View>
     </Pressable>
   );

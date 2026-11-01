@@ -10,6 +10,7 @@ import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialFieldRow } from '@web/components/editorial/EditorialFieldRow';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { LEGAL_LINKS } from '@web/lib/legal';
+import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
 import { TurnstileWidget, isCaptchaConfigured } from '@web/components/security/Turnstile';
 import { emailZodStrict } from '@web/lib/auth/email';
 import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
@@ -22,19 +23,6 @@ const schema = z.object({
   email: emailZodStrict,
 });
 type FormValues = z.infer<typeof schema>;
-
-const INPUT_STYLE: React.CSSProperties = {
-  width: '100%',
-  height: 40,
-  padding: '0 0 4px 0',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid var(--rule)',
-  outline: 'none',
-  color: 'var(--text)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-};
 
 const PRIMARY_CTA_STYLE: React.CSSProperties = {
   height: 52,

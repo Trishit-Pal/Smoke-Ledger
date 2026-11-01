@@ -209,7 +209,7 @@ export function HistoryClient({
   const trailingIndex = (groups.length || 1) + 2;
 
   return (
-    <div className="relative mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg pt-xl pb-32 md:pt-xxl md:px-xxl">
+    <div className="relative page-column pt-xl pb-32 md:pt-xxl">
       {/* Atmospheric paper noise — purely decorative, behind everything. */}
       <div aria-hidden className="paper-noise absolute inset-0 -z-10" />
 
@@ -271,7 +271,7 @@ export function HistoryClient({
                   aria-label="Search entries by brand, variant, or note"
                   autoComplete="off"
                   spellCheck={false}
-                  className="flex-1 min-w-0 bg-transparent border-0 p-0 text-body text-text placeholder:text-text-faint focus:outline-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
+                  className="flex-1 min-w-0 min-h-11 bg-transparent border-0 p-0 text-body text-text placeholder:text-text-faint focus:outline-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
                 />
                 {query ? (
                   <button

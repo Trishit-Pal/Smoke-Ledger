@@ -47,6 +47,9 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
+    // Dev server, not `next start`: production CSP sends upgrade-insecure-requests,
+    // and WebKit then rewrites every http://127.0.0.1 asset to https and renders
+    // the page unstyled (verified 2026-11-01). The responsive spec warms routes first.
     command: `npm run dev -- --port ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
@@ -57,10 +60,17 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
     },
   },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
+  // Default: one desktop Chromium project runs the functional specs. E2E_RESPONSIVE=1
+  // swaps in the cross-browser/device matrix that runs only the responsive spec,
+  // so the 10 functional specs never multiply across browsers (CI minutes) —
+  // see the `responsive-e2e` CI job.
+  projects: process.env.E2E_RESPONSIVE
+    ? [
+        { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } }, // + Edge (Chromium)
+        { name: 'desktop-firefox', use: { ...devices['Desktop Firefox'] } },
+        { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
+        { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
+        { name: 'tablet-safari', use: { ...devices['iPad Pro 11'] } },
+      ].map((p) => ({ ...p, testMatch: /responsive\.spec\.ts/ }))
+    : [{ name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /responsive\.spec\.ts/ }],
 });

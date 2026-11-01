@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { OnboardingRail } from '@web/components/onboarding/OnboardingRail';
+import { OnboardingProgress, OnboardingRail } from '@web/components/onboarding/OnboardingRail';
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -34,6 +34,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
             overflowX: 'hidden',
           }}
         >
+          <OnboardingProgress />
           {children}
         </main>
       </div>

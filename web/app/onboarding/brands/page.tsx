@@ -190,7 +190,7 @@ export default function OnboardingBrandsPage() {
                 key={c.id}
                 type="button"
                 onClick={() => setCategory(c.id)}
-                className="focus-ring"
+                className="focus-ring hit-target"
                 style={{
                   height: 28,
                   padding: '0 12px',
@@ -343,6 +343,7 @@ export default function OnboardingBrandsPage() {
                 key={brand.id}
                 type="button"
                 onClick={() => void onToggle(brand)}
+                className="focus-ring hit-target"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -448,6 +449,7 @@ function SearchInput({ query, onChange }: SearchInputProps) {
         <button
           type="button"
           onClick={() => onChange('')}
+          className="focus-ring hit-target"
           style={{
             background: 'none',
             border: 'none',

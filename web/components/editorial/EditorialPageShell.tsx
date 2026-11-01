@@ -80,7 +80,9 @@ export function EditorialPageShell({
         className="hidden md:block"
         style={{
           position: 'absolute',
-          top: 'clamp(28px, 6vw, 64px)',
+          // ≥76px clears the fixed ThemeToggle (top 16px + 44px hit + gutter),
+          // which it collided with between 768 and ~900px.
+          top: 'max(76px, clamp(28px, 6vw, 64px))',
           right: `max(1rem, calc(50% - ${maxWidth / 2}px - 116px))`,
           zIndex: 2,
           pointerEvents: 'none',

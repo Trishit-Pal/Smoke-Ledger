@@ -61,7 +61,8 @@ export { expect };
 export async function login(page: Page, user: { email: string; password: string }): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email').fill(user.email);
-  await page.getByLabel('Password').fill(user.password);
+  // exact: the reveal button's "Show password (press and hold)" label also contains "password".
+  await page.getByLabel('Password', { exact: true }).fill(user.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 30_000 });
 }

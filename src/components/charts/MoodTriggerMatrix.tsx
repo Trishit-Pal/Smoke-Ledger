@@ -12,6 +12,9 @@ export interface MoodTriggerMatrixProps {
 }
 
 const PRETTY = (s: string) => s.replace(/_/g, ' ');
+// Mood label column: scales with the row (and font size) instead of a fixed 80px,
+// which clipped labels under large text and wasted width on tablets.
+const LABEL_COL = { flex: 1.6, minWidth: 64, paddingRight: spacing.xs } as const;
 
 export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
   const theme = useTheme();
@@ -51,7 +54,7 @@ export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
       {m.moods.length > 0 && m.triggers.length > 0 ? (
         <View>
           <View style={{ flexDirection: 'row' }}>
-            <View style={{ width: 80 }} />
+            <View style={LABEL_COL} />
             {m.triggers.map((t) => (
               <Text key={t} variant="caption" muted style={{ flex: 1, textAlign: 'center' }}>
                 {PRETTY(t).slice(0, 5)}
@@ -60,7 +63,7 @@ export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
           </View>
           {m.moods.map((mood) => (
             <View key={mood} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <Text variant="caption" style={{ width: 80 }}>
+              <Text variant="caption" style={LABEL_COL} numberOfLines={1}>
                 {PRETTY(mood)}
               </Text>
               {m.triggers.map((trig) => {

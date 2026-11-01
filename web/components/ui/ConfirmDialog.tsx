@@ -32,7 +32,7 @@ export function ConfirmDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,24rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card border border-border p-lg shadow-xl">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,24rem)] max-h-[90dvh] overflow-y-auto overscroll-contain -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card border border-border p-lg shadow-xl">
           <Dialog.Title asChild>
             <Text variant="h2">{title}</Text>
           </Dialog.Title>

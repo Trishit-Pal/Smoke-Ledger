@@ -177,6 +177,65 @@ jobs:
         if: always()
         run: npx supabase stop --no-backup
 
+  responsive-e2e:
+    # Every page × viewport × engine (Chromium/Edge, Firefox, WebKit phone,
+    # Chrome phone, WebKit iPad) for overflow, target size and iOS input zoom.
+    # Logged-in pages seed throwaway users on a local Supabase built from this
+    # PR's migrations, so it needs no secrets and can never touch prod (the spec
+    # also refuses any non-local Supabase URL). Uses the dev server (see
+    # playwright.config.ts: prod CSP's upgrade-insecure-requests breaks WebKit on
+    # http loopback); the spec warms every route before sweeping.
+    runs-on: ubuntu-24.04 # Playwright does not support 26.04 yet (see verify)
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Start local Supabase (applies every migration on a fresh DB)
+        run: npx supabase start
+
+      - name: Export local stack env
+        run: |
+          set -euo pipefail
+          status=$(npx supabase status -o env)
+          get() { printf '%s\n' "$status" | sed -n "s/^$1=\"\(.*\)\"$/\1/p"; }
+          url=$(get API_URL); anon=$(get ANON_KEY); service=$(get SERVICE_ROLE_KEY)
+          [ -n "$url" ] && [ -n "$anon" ] && [ -n "$service" ] || { echo "::error::could not read local stack env"; exit 1; }
+          # CLI demo keys: public and only valid for this runner's throwaway stack.
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$url"; echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon"
+            echo "E2E_SUPABASE_URL=$url"; echo "E2E_SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: web
+
+      - name: Responsive E2E
+        run: npm run test:e2e:responsive
+        working-directory: web
+        env:
+          E2E_RESPONSIVE: '1'
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
+
   secrets:
     runs-on: ubuntu-latest
     steps:

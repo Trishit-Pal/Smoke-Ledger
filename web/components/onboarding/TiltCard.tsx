@@ -66,7 +66,7 @@ export function TiltCard({
       onKeyDown={handleKey}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      className={className}
+      className={onClick ? `focus-ring ${className ?? ''}` : className}
       style={{
         transformStyle: 'preserve-3d',
         transform: reduce

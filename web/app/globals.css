@@ -217,6 +217,46 @@
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
   }
 
+  /* iOS zooms the page when a focused field's text is under 16px. On touch
+     devices only, floor form text at 16px; desktop keeps the 15px body scale. */
+  @media (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
+
+  /* Hit target — grows the *tappable* area to ≥44×44 (PRODUCT.md a11y) with an
+     invisible ::after, so compact editorial pills/steppers keep their visual
+     size. Neighbours must keep ≥(44 − visual)/2 px of gap or the areas overlap. */
+  .hit-target {
+    position: relative;
+  }
+  .hit-target::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Inside the authenticated shell the fixed top-right toggle sat on every
+     masthead rule; there the toggle lives in Settings (+ Sidebar at lg). :has()
+     keys off the shell itself, so no route list can drift out of date. */
+  body:has([data-app-shell]) .theme-toggle-fixed {
+    display: none;
+  }
+
+  /* Page column — the one reading measure for every authenticated page, so the
+     ultrawide cap lives in one place. Only width + horizontal padding: pages
+     keep their own vertical rhythm (pt-*, pb-*). */
+  .page-column {
+    @apply mx-auto w-full max-w-[44rem] lg:max-w-[52rem] xl:max-w-[60rem] px-lg md:px-xxl;
+  }
+
   /* ───────── Editorial utilities (dashboard pilot) ───────── */
 
   /* Tabular figures for ledger numbers — DM Sans supports `tnum`. */

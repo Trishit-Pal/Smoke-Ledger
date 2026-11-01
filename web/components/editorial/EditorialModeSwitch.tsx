@@ -40,7 +40,7 @@ export function EditorialModeSwitch<T extends string>({
               role="tab"
               aria-selected={selected}
               onClick={() => onChange(opt.value)}
-              className="focus-ring"
+              className="focus-ring hit-target"
               style={{
                 background: 'transparent',
                 border: 'none',

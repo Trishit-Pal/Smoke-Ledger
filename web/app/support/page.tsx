@@ -77,6 +77,8 @@ export default function SupportPage() {
             color: 'var(--accent-ink)',
             textDecoration: 'underline',
             textUnderlineOffset: 4,
+            // An address has no spaces; at 22px it is wider than a 320px phone.
+            overflowWrap: 'anywhere',
           }}
         >
           {LEGAL_COPY.supportEmail}

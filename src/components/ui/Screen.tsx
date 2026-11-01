@@ -3,6 +3,7 @@ import { View, ScrollView, StatusBar, StyleProp, ViewStyle, RefreshControl } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing } from '@/constants/theme';
+import { CONTENT_MAX_WIDTH } from '@/hooks/useLayout';
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -14,6 +15,11 @@ export interface ScreenProps {
   noPadding?: boolean;
   /** Optional masthead area rendered above the scroll content (e.g. with PaperNoise overlay) */
   masthead?: React.ReactNode;
+  /**
+   * Pad the bottom safe area too. Tab screens leave it to the tab bar; modals
+   * and stack screens (no tab bar) set this so content clears the home bar.
+   */
+  bottomInset?: boolean;
 }
 
 export function Screen({
@@ -25,18 +31,27 @@ export function Screen({
   onRefresh,
   noPadding,
   masthead,
+  bottomInset = false,
 }: ScreenProps) {
   const theme = useTheme();
   const pad = noPadding ? 0 : spacing.lg;
   const inner = (
-    <View style={[{ flex: 1, padding: pad, gap: spacing.lg }, contentStyle]}>
+    // Centred reading measure: on a tablet, unfolded foldable or landscape the
+    // column stops at CONTENT_MAX_WIDTH instead of stretching edge to edge.
+    // Screens that want two columns compose rows themselves via useLayout().
+    <View
+      style={[
+        { flex: 1, padding: pad, gap: spacing.lg, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
+        contentStyle,
+      ]}
+    >
       {children}
     </View>
   );
   return (
     <SafeAreaView
       style={[{ flex: 1, backgroundColor: theme.bg }, style]}
-      edges={['top', 'left', 'right']}
+      edges={bottomInset ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right']}
     >
       <StatusBar
         barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'}
