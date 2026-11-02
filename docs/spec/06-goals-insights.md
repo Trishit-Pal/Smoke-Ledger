@@ -27,6 +27,13 @@ take the in-memory log array from the session store and return numbers and text.
 Supabase is involved only for persisting goals and, on the trends screen, for
 the background `v_mood_trigger_heatmap` view and the `get_random_facts` RPC.
 
+Ledger Chat ("Ask the ledger") is a separate, opt-in surface that calls these
+same functions through read-only tools (`src/domain/ledgerChat/tools.ts`) and
+lets a model narrate around the results. It does not change anything in this
+section: insights stay deterministic, and the chat's figures are these
+functions' outputs. Its security and privacy model is in
+`08-security-privacy.md`.
+
 ## What the user experiences
 
 On the home screen (native: `app/(tabs)/index.tsx`; web: `DashboardClient.tsx`)
@@ -161,6 +168,8 @@ a single day holds ≥22% of sticks over 30 days (minimum 7 total sticks).
 
 Only `insights[0]` is shown on the home screen as the "From your week"
 blockquote. All insights are available for a future dedicated insights panel.
+The chat's `insights` tool returns the full list (minus ids and timestamps) as
+data the model may paraphrase; it adds no rows of its own.
 
 ### Mood × trigger correlations
 
@@ -292,6 +301,11 @@ These rules must not break.
 - Health milestones render a "general health information, not medical advice"
   disclaimer. This is the load-bearing liability mitigation, not the source
   attributions.
+- Insights never call a model. `generateInsights` and everything else in
+  `src/domain` stays pure and deterministic; the chat in
+  `src/domain/ledgerChat` only *reads* these functions, and its tool outputs
+  must equal a direct call on the same inputs (pinned by
+  `src/tests/ledgerChatTools.test.ts`).
 
 ## Edge cases and gotchas
 

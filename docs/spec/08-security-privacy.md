@@ -7,8 +7,11 @@ sources:
   - web/lib/supabase/server.ts
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
+  - web/app/api/**
+  - web/lib/server/ledgerChat/**
+  - src/domain/ledgerChat/**
   - docs/security/**
-last_verified_commit: 6268c8d
+last_verified_commit: 020192b
 status: current
 ---
 
@@ -117,6 +120,23 @@ On `reauth_required`, web sends the user to `/login?next=/settings?action=delete
 
 The Edge Function also applies dual rate limiting: per-IP (hashed with SHA-256) and per-user, both capped at 5 requests per 10 minutes. Both use `consume_rate_limit` via the service-role client and fail closed — if the Postgres call fails, the function returns 429 rather than silently disabling the gate.
 
+### Ask the ledger (third-party AI processor)
+
+Ledger Chat is the one place personal data leaves the Supabase/Vercel boundary for a third party. It is opt-in and off by default, and the route that serves it (`web/app/api/ledger-chat/route.ts`) is built so that nothing reaches Anthropic unless every gate below has passed, in this order:
+
+1. **Kill switch.** `LEDGER_CHAT_ENABLED` must be `true` (`web/lib/server/ledgerChat/enabled.ts`); otherwise 503 and the launcher is not rendered at all (`getDashboardData` / `getTrendsPageData` pass the flag).
+2. **Caller.** `resolveChatCaller` (`web/lib/server/ledgerChat/auth.ts`) accepts either a cookie session **plus** `requireSameOrigin` (CSRF), or a native `Authorization: Bearer <Supabase JWT>` verified with `auth.getUser(token)`. No session → 401; cross-site cookie → 403. `user_id` is only ever the verified user and is never a tool argument. `web/middleware.ts` returns early for `/api/ledger-chat` only, because its session gate would otherwise redirect the cookie-less native request to `/login`; every other API path keeps the gate.
+3. **Consent.** The `settings_kv` key `consent.ledgerChatOptIn` must be exactly `true`, read with the caller's own client; anything else → 403 `consent_required`. The panel asks for it the first time an answer would leave the app ("Turn on and ask") and Settings › Privacy holds the off switch. Both write the audit event `ledger_chat_consent_toggled { enabled }` (category `privacy`), registered in `src/services/audit.ts`, `supabase/functions/_shared/auditAllowlist.ts` and `web/app/api/audit/schema.ts`.
+4. **Limits.** `checkRateLimits` (`web/lib/auth/rateLimit.ts`, service role, HMAC-keyed, fail closed) with two buckets: `ledger_chat_user` (`LEDGER_CHAT_DAILY_CAP_USER`, default 20 per day) and `ledger_chat_global` (`LEDGER_CHAT_DAILY_CAP_GLOBAL`, default 500 per day). The hard money cap is the spend limit on the API key in the Anthropic console.
+
+Only then are the reader's data loaded — with the caller's JWT client, so RLS applies: `loadProfile`, `loadLogsPage` (90 days, 200 rows, as Trends), `loadDailySummary` (floored at onboarding, as Home), `loadGoals`. The explicit-client loaders are used; the cookie-path `getServer*` wrappers never are (`web/__tests__/ledgerChatRouteGuard.test.ts` pins this and the gate order).
+
+**What the model sees.** Tool outputs only, plus the reader-context block (country, currency, timezone, today, baseline, days of data, goal types — no name, birth date, phone or place). The nine tools (`src/domain/ledgerChat/tools.ts`) are read-only wrappers over `src/domain`; `recent_entries` is the only one that returns raw rows (last 1–30 days, ≤200 rows, notes trimmed to 120 characters, no ids), fetched only when the model asks for it. **In discreet mode, brand names are replaced with aliases and notes dropped before any tool runs** (`aliasLogsForDiscreet`, `src/domain/ledgerChat/context.ts`). This is the one deliberate exception to DESIGN.md's "mask at the render site, never at the source" rule: the render site for this data is a third party, so the masking has to happen before egress. Row values on the client are still masked at render (`isHomeTotalsHidden`, tap to reveal).
+
+**What the model may say.** The system prompt (`web/lib/server/ledgerChat/prompt.ts`) forbids numbers, links, markdown, medical advice and judgement, and declares tool results and entries to be data, never instructions. The turn engine (`web/lib/server/ledgerChat/turn.ts`) enforces the part prompts cannot: narration is sanitised to plain text (`sanitizeNarration`), and every digit-run in it must exist in this turn's tool results or read as a time or short duration (`findUnverifiedNumbers`); one retry, then the fixed fallback sentence with the rows. At most three model calls per turn; a `refusal` stop yields a calm fallback and runs no tools; unknown or invalid tool calls become `is_error` results, never throws.
+
+**What is stored and logged.** Nothing server-side: no chat table, so `export_account_data`, `erase_account_data` and `verify:sovereignty` are unchanged. The conversation lives in the browser's `localStorage` (`ledger-chat:v1:<userId>`, last 20 turns) and is cleared on sign-out and when consent is turned off. Server logs carry tool names and token counts only (`api.ledger_chat.turn`), never the question, the answer or the user id. The usage event `ledger_chat_asked` records `{ starter, tools }` under the analytics opt-in. Anthropic's processing (US, no training, limited retention) is disclosed in both privacy policies; `LEGAL_VERSIONS.privacy` moved to 2026-11-02, which by design does not re-consent existing users — the feature's own opt-in is the consent.
+
 ## Invariants
 
 These rules must not break:
@@ -136,6 +156,12 @@ These rules must not break:
 7. `AUDIT_PEPPER` must never appear in source code, logs, or environment variables accessible to client bundles. It lives only in the Edge Function secrets dashboard and in the `app.audit_pepper` GUC (which is set per `docs/runbooks/audit-pepper-rotation.md`).
 
 8. The `v_daily_summary_user` view must have `security_invoker = true` so that RLS on the underlying `cigarette_logs` table applies when authenticated users query it directly. Set in `supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:57`.
+
+9. Nothing reaches the AI processor before the kill switch, the caller guard, the consent key and the rate limits have all passed, in that order, and the reads behind it run on the caller's JWT, never the service role (`web/__tests__/ledgerChatRouteGuard.test.ts`).
+
+10. The chat never stores prompts, answers or transcripts server-side, and never logs them. If a chat table is ever added it must join `export_account_data`, `erase_account_data` and `verify:sovereignty` in the same change.
+
+11. Every figure the chat shows comes from a tool result; narration that states a figure the tools did not produce is rewritten or replaced (`src/domain/ledgerChat/guard.ts`, `web/__tests__/ledgerChatTurn.test.ts`). Discreet readers' brand names and notes are aliased or dropped before egress.
 
 ## Edge cases and gotchas
 
@@ -173,6 +199,8 @@ These rules must not break:
 - `v_daily_summary_user` view respects RLS: User B cannot see User A's rows even via a direct `user_id` filter on the view.
 
 The `rls-integration` CI job is configured as a required branch protection check (`docs/deployment/production-ops-checklist.md:§6e`).
+
+**Unit — Ask the ledger.** `src/tests/ledgerChatTools.test.ts`, `ledgerChatStarters.test.ts` and `ledgerChatGuard.test.ts` (Jest) pin that each tool equals the direct domain call, that `recent_entries` strips ids, trims notes and aliases brands in discreet mode, and that the number guard accepts tool figures, times and durations but flags anything else. `web/__tests__/ledgerChatTurn.test.ts` (Vitest, fake model) proves the loop cap, the unmodified assistant turn, the guard retry and fallback, and the refusal path; `ledgerChatRouteGuard.test.ts` and `ledgerChatMiddleware.test.ts` pin the gate order, the absence of `getServer*` calls, and that only `/api/ledger-chat` is carved out of the middleware. `web/e2e/ledger-chat.spec.ts` drives the real panel with the route mocked (consent, rows, limit message, discreet masking, 320px).
 
 **Live sovereignty probe.** `scripts/verify-sovereignty.mjs` (invoked as `npm run verify:sovereignty`) tests 17 invariants against the live project using only the public anon key: zero rows readable across all tenant tables, anon rejection of all data-rights RPCs, and `POST /functions/v1/delete-account` returning 401 without a JWT. Results are documented in `docs/security/sovereignty-audit-2026-06.md`.
 
