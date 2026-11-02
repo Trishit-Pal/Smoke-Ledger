@@ -341,17 +341,41 @@ export const ImportProfileSchema = z
   })
   .strict();
 
-export const EXPORT_SCHEMA_VERSION = 2 as const;
+export const EXPORT_SCHEMA_VERSION = 3 as const;
+
+/** Import accepts the current export version and the previous one (v2 had no account block). */
+const ACCEPTED_EXPORT_VERSIONS = z.union([z.literal(2), z.literal(EXPORT_SCHEMA_VERSION)]);
+
+/** v3: the sign-in record, read-only context carried in the file (not re-imported). */
+export const ImportAccountSchema = z
+  .object({
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+    createdAt: IsoUtcSchema.nullable(),
+    lastSignInAt: IsoUtcSchema.nullable(),
+  })
+  .strict();
+
+export const ImportErrorEventSchema = z
+  .object({
+    category: z.string(),
+    message: z.string(),
+    route: z.string().nullable(),
+    createdAt: IsoUtcSchema,
+  })
+  .strict();
 
 export const ImportEnvelopeSchema = z
   .object({
-    version: z.literal(EXPORT_SCHEMA_VERSION),
+    version: ACCEPTED_EXPORT_VERSIONS,
     exportedAt: IsoUtcSchema,
     profile: ImportProfileSchema,
     brands: z.array(ImportBrandSchema).max(1_000),
     logs: z.array(ImportLogSchema).max(10_000),
     goals: z.array(ImportGoalSchema).max(500),
     settings: z.record(z.unknown()).optional(),
+    account: ImportAccountSchema.optional(),
+    errorEvents: z.array(ImportErrorEventSchema).max(10_000).optional(),
   })
   .strict();
 

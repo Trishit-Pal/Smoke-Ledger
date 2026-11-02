@@ -24,7 +24,7 @@ describe('exportAccountData pagination', () => {
       .fn()
       .mockResolvedValueOnce({
         data: {
-          version: 2,
+          version: 3,
           exportedAt: '2026-01-01T00:00:00Z',
           hasMore: true,
           nextCursorTs: '2026-01-01T00:00:00Z',
@@ -36,7 +36,7 @@ describe('exportAccountData pagination', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          version: 2,
+          version: 3,
           exportedAt: '2026-01-01T00:00:00Z',
           hasMore: false,
           logs: [{ id: 'log_b' }],
@@ -74,7 +74,7 @@ describe('exportAccountData pagination', () => {
   it('sets truncated=false on a single-page export where hasMore is immediately false', async () => {
     const rpc = jest.fn().mockResolvedValueOnce({
       data: {
-        version: 2,
+        version: 3,
         exportedAt: '2026-01-01T00:00:00Z',
         hasMore: false,
         logs: [{ id: 'only_log' }],
@@ -97,7 +97,7 @@ describe('exportAccountData pagination', () => {
       .fn()
       .mockResolvedValueOnce({
         data: {
-          version: 2,
+          version: 3,
           exportedAt: '2026-01-01T00:00:00Z',
           hasMore: true,
           nextCursorTs: 'ts_1',
@@ -108,7 +108,7 @@ describe('exportAccountData pagination', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          version: 2,
+          version: 3,
           exportedAt: '2026-01-01T00:00:00Z',
           hasMore: true,
           nextCursorTs: 'ts_2',
@@ -119,7 +119,7 @@ describe('exportAccountData pagination', () => {
       })
       .mockResolvedValueOnce({
         data: {
-          version: 2,
+          version: 3,
           exportedAt: '2026-01-01T00:00:00Z',
           hasMore: false,
           logs: [{ id: 'log_3' }],
@@ -142,7 +142,7 @@ describe('exportAccountData pagination', () => {
     // loop terminates at MAX_EXPORT_PAGES calls and marks the payload truncated.
     const alwaysMore = {
       data: {
-        version: 2,
+        version: 3,
         exportedAt: '2026-01-01T00:00:00Z',
         hasMore: true,
         nextCursorTs: 'cursor_ts',
@@ -176,7 +176,7 @@ describe('exportAccountData pagination', () => {
     // chunk, our computed value must win.
     const rpc = jest.fn().mockResolvedValueOnce({
       data: {
-        version: 2,
+        version: 3,
         exportedAt: '2026-01-01T00:00:00Z',
         hasMore: false,
         truncated: false, // from RPC — should be overridden by our calculation
@@ -191,5 +191,49 @@ describe('exportAccountData pagination', () => {
 
     // Single page, naturally ended — must be false regardless of chunk field.
     expect(result.truncated).toBe(false);
+  });
+
+  it('keeps the first-page account block and error events when later pages add only logs', async () => {
+    const account = {
+      email: 'a@example.com',
+      phone: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      lastSignInAt: '2026-02-01T00:00:00Z',
+    };
+    const errorEvents = [
+      { category: 'x', message: 'boom', route: '/r', createdAt: '2026-01-02T00:00:00Z' },
+    ];
+    const rpc = jest
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          version: 3,
+          exportedAt: '2026-01-01T00:00:00Z',
+          hasMore: true,
+          nextCursorTs: 'ts_1',
+          nextCursorId: 'id_1',
+          logs: [{ id: 'log_1' }],
+          account,
+          errorEvents,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          version: 3,
+          exportedAt: '2026-01-01T00:00:00Z',
+          hasMore: false,
+          logs: [{ id: 'log_2' }],
+        },
+        error: null,
+      });
+    mockGetSupabase.mockReturnValue({ rpc });
+
+    const result = await exportAccountData();
+
+    expect(result.version).toBe(3);
+    expect(result.account).toEqual(account);
+    expect(result.errorEvents).toEqual(errorEvents);
+    expect(result.logs).toEqual([{ id: 'log_1' }, { id: 'log_2' }]);
   });
 });
