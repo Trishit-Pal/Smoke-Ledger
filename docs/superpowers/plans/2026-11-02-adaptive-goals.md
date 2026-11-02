@@ -275,7 +275,7 @@ Add `GOAL_PROPOSAL_ACCEPTED: 'goal_proposal_accepted'`, `GOAL_PROPOSAL_DISMISSED
 
 **Files:** `web/app/(app)/goals/GoalsClient.tsx`, `web/app/(app)/goals/GoalCard.tsx`, new `web/app/(app)/goals/GoalStateCaption.tsx`.
 
-- `GoalStateCaption` props `{ state: GoalState; overDays: number; heldDays: number }` → `span.editorial-caption` text: `On track` / `At risk · over once this week` (overDays 1) or `At risk · over ${n} times this week` (2) or `At risk · close to the cap today` (0) / `Off track · over ${n} of the last 7 days` / `Met · held ${heldDays} days`. Colour accent for on_track and met, warn-earth otherwise.
+- `GoalStateCaption` props `{ state: GoalState; overDays: number; heldDays: number }` → `span.editorial-caption` text: `On track` / `At risk · over once in the last 7 days` (overDays 1) or `At risk · over ${n} times this week` (2) or `At risk · close to the cap today` (0) / `Off track · over ${n} of the last 7 days` / `Met · held ${heldDays} days`. Colour accent for on_track and met, warn-earth otherwise.
 - `GoalCard` gains props `state`, `overDays`, `heldDays`, `proposal: Proposal | null`, `proposalCopy`, `onAccept(goal, p)`, `onDismiss(goal, kind)`. Tone for the % numeral and ring comes from `state` (accent iff on_track or met). Under the heading: `GoalStateCaption` for active goals. If a proposal: hairline, `MetricRow` (label `Next step` or `Re-anchor`, subtitle `proposalCopy.basis`, value `proposalCopy.valueLabel`), headline text, buttons `Accept` (secondary sm) · `Edit` (ghost sm → `onEdit` with the form target prefilled to `p.value`) · `Not now` (ghost sm).
 - Done goals (`completed` / `abandoned`): show `Completed ${formatIndianDate(completedAt)}` or `Set aside ${…}` when `completedAt` exists (else `Completed` / `Set aside`), hide the ring and %, only the Delete action.
 - `GoalsClient`:
@@ -297,7 +297,7 @@ Add `GOAL_PROPOSAL_ACCEPTED: 'goal_proposal_accepted'`, `GOAL_PROPOSAL_DISMISSED
 - Scenarios (each `test.skip(!canSeed(), …)` like `onboarding.spec.ts`; dates computed from IST today):
   1. Create via proposal: 14 days at 9/day → `/goals` → New goal → Daily cap → button `Use 8 / day` → Create goal → `Daily cap: 8/day` visible.
   2. Quit date auto-completes: seed `quit_date` with `start_date` 10 days ago, `end_date` today → visit `/goals` → text `Quit day.` visible, then `listGoalStatuses` shows `completed`.
-  3. At risk: cap 5 started 10 days ago, one day at 7 three days ago, other days 3 → caption `At risk · over once this week`.
+  3. At risk: cap 5 started 10 days ago, one day at 7 three days ago, other days 3 → caption `At risk · over once in the last 7 days`.
   4. Off track and re-anchor: cap 5, 4 of the last 7 days at 9 → caption contains `Off track`; click `Accept` → the card shows a cap of `9`.
 **Verify:** `cd web && npx playwright test e2e/goals.spec.ts --list` (authed specs skip on this machine without `web/.env.e2e`; CI runs them).
 
@@ -306,7 +306,7 @@ Add `GOAL_PROPOSAL_ACCEPTED: 'goal_proposal_accepted'`, `GOAL_PROPOSAL_DISMISSED
 **Files:** `web/app/(app)/dashboard/DashboardClient.tsx`, new `web/lib/goals/firstSuggestionStore.ts`.
 
 - Replace `goalToneColor` logic with `goalState` (accent iff on_track or met; warn-earth otherwise).
-- Under the goal verse, one `p.text-small.text-text-muted` wrapped in `Link href="/goals"`: met → `Held for ${heldDays} days. A next step is waiting on the goals page.`; off_track with proposal → `Over the cap on ${overDays} of the last 7 days. A re-anchor is waiting.`; at_risk → `Over once this week.` (or `Close to the cap today.` when overDays is 0); on_track → nothing.
+- Under the goal verse, one `p.text-small.text-text-muted` wrapped in `Link href="/goals"`: met → `Held for ${heldDays} days. A next step is waiting on the goals page.`; off_track with proposal → `Over the cap on ${overDays} of the last 7 days. A re-anchor is waiting.`; at_risk → `Over once in the last 7 days.` (or `Close to the cap.` when overDays is 0); on_track → nothing.
 - First-goal suggestion: when there is no active goal, `proposeStart('daily_cap', …)` is non-null, and not dismissed: section with `SectionLabel` `A first goal`, sentence `${loggedDays} days in the ledger. Your average is ${avg} a day — a cap at ${value}?`, `Link` to `/goals?type=daily_cap` labelled `See the suggestion`, ghost `Button` `Not now`. Under `isHomeTotalsHidden`/discreet, mask the figures the same way the page masks its other counts.
 - `firstSuggestionStore.ts`: `isFirstSuggestionDismissed(userId, today): boolean` and `dismissFirstSuggestion(userId, today): void` using `localStorage` key `goals.firstSuggestion.dismissedOn:${userId}`; dismissed means stored date within `PROPOSAL_SNOOZE_DAYS`. SSR-safe (guard `typeof window`). Find the user id the same way the chat transcript store does (`web/components/chat/transcriptStore.ts`).
 - Run the same reconcile mount effect as Task 9 (extract a small hook `web/lib/goals/useGoalReconcile.ts` used by both pages — refactor Task 9's effect into it).
