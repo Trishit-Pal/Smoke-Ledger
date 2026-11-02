@@ -11,10 +11,11 @@ import { formatMoney } from '@/lib/format';
 import { regionFor } from '@/lib/regions';
 import type { Goal, GoalType } from '@/types';
 import { describeError } from '@/lib/errors';
-
+import { canContinueGoalStep } from './goalStepView';
 
 interface GoalOption {
-  id: GoalType;
+  /** `null` is "Suggest one later": no goal now, the ledger proposes one after a week. */
+  id: GoalType | null;
   roman: string;
   label: string;
   hint: string;
@@ -29,6 +30,18 @@ interface GoalOption {
 
 // The default no-smoke window seeded at signup (refine the exact hours in-app).
 const DEFAULT_WINDOW_LABEL = '10:00 pm – 6:00 am';
+
+// Card IV. Not a GoalType; shown only when no goal was saved earlier in onboarding.
+const SUGGEST_LATER: GoalOption = {
+  id: null,
+  roman: 'IV.',
+  label: 'Suggest one later',
+  hint: 'After a week of logging',
+  example: 'the ledger proposes a cap from your own numbers',
+  unit: '',
+  placeholder: '',
+  defaultTarget: 0,
+};
 
 function goalOptions(country: string | null): GoalOption[] {
   const region = regionFor(country) ?? regionFor(null)!;
@@ -74,7 +87,6 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
   const options = goalOptions(country);
   // Draft-backed so the choice + target survive back/forward navigation.
   const { goalType: type, goalTarget: target, setGoal } = useOnboardingDraft();
-  const setType = (goalType: GoalType) => setGoal({ goalType });
   const setTarget = (goalTarget: string) => setGoal({ goalTarget });
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -106,14 +118,14 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
   }, []);
 
   const loaded = existing !== undefined;
-  const selected = options.find((g) => g.id === type) ?? null;
-  const canContinue =
-    loaded &&
-    selected !== null &&
-    (Boolean(selected.window) || (target !== '' && Number(target) > 0));
+  // Card IV stays out once a goal exists; the ghost "Keep and continue" covers that.
+  const cards = existing === null ? [...options, SUGGEST_LATER] : options;
+  // Only real goal types carry a target panel; null type is card IV.
+  const selected = type == null ? null : (options.find((g) => g.id === type) ?? null);
+  const canContinue = canContinueGoalStep({ loaded, type, selected, target });
 
   const onSetGoal = async () => {
-    if (!type) return;
+    if (type == null) return onSkip();
     setSubmitting(true);
     setError(null);
     try {
@@ -188,17 +200,19 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
           transformStyle: 'preserve-3d',
         }}
       >
-        {options.map((g) => {
+        {cards.map((g) => {
           const isSelected = type === g.id;
           return (
             <TiltCard
-              key={g.id}
+              key={g.id ?? 'later'}
               max={isSelected ? 4 : 9}
               lift={isSelected ? 18 : 12}
               glare
               onClick={() => {
-                setType(g.id);
-                setTarget(g.window ? '' : String(g.defaultTarget));
+                setGoal({
+                  goalType: g.id,
+                  goalTarget: g.window || g.id === null ? '' : String(g.defaultTarget),
+                });
               }}
               ariaLabel={`Choose ${g.label}`}
               style={{

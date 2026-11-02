@@ -274,7 +274,7 @@ export function OnboardingDoneClient({
                       fontFamily: 'var(--font-display)',
                     }}
                   >
-                    Skipped — that&rsquo;s fine
+                    Suggested after a week of logging
                   </span>
                 )
               }

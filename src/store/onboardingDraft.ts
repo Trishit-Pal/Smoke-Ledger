@@ -17,7 +17,7 @@ interface UsagePatch {
 }
 
 interface GoalPatch {
-  goalType?: GoalType;
+  goalType?: GoalType | null;
   goalTarget?: string;
 }
 
