@@ -62,6 +62,7 @@ describe('reconcileGoals', () => {
     expect(writer.setGoalStatus).toHaveBeenCalledWith('q', 'completed');
     expect(writer.updateGoal).toHaveBeenCalledWith('c', { meta: { metOn: TODAY } });
     expect(res.applied).toHaveLength(2);
+    expect(res.failed).toEqual([]);
     expect(res.goals[0]).toMatchObject({ status: 'completed', completedAt: NOW });
     expect(res.goals[1].meta).toEqual({ metOn: TODAY });
   });
@@ -73,6 +74,9 @@ describe('reconcileGoals', () => {
     const res = await reconcileGoals(goals, heldLogs, TODAY, writer, NOW);
 
     expect(res.applied.map((t) => t.goalId)).toEqual(['c']);
+    expect(res.failed).toHaveLength(1);
+    expect(res.failed[0].transition.goalId).toBe('q');
+    expect(res.failed[0].error).toEqual(new Error('offline'));
     expect(res.goals[0].status).toBe('active');
     expect(res.goals[1].meta).toEqual({ metOn: TODAY });
   });
@@ -85,6 +89,7 @@ describe('reconcileGoals', () => {
     expect(writer.setGoalStatus).not.toHaveBeenCalled();
     expect(writer.updateGoal).not.toHaveBeenCalled();
     expect(res.applied).toEqual([]);
+    expect(res.failed).toEqual([]);
     expect(res.goals).toEqual(goals);
   });
 });

@@ -104,6 +104,20 @@ describe('planGoalTransitions', () => {
   });
 });
 
+describe('plan -> apply -> plan', () => {
+  it('is empty the second time for a mark_met goal and an auto_complete goal', () => {
+    const goals = [
+      mkGoal({ id: 'cap' }),
+      mkGoal({ id: 'quit', type: 'quit_date', targetValue: 0, endDate: TODAY }),
+    ];
+    const logs = run(14);
+    const first = planGoalTransitions(goals, logs, TODAY);
+    expect(first.map((t) => t.kind).sort()).toEqual(['auto_complete', 'mark_met']);
+    const applied = applyGoalTransitions(goals, first, '2025-05-31T10:00:00.000Z');
+    expect(planGoalTransitions(applied, logs, TODAY)).toEqual([]);
+  });
+});
+
 describe('applyGoalTransitions', () => {
   const NOW = '2025-05-31T10:00:00.000Z';
 

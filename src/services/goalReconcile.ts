@@ -14,15 +14,25 @@ export interface GoalWriter {
   updateGoal: (id: string, patch: GoalPatchInput) => Promise<unknown>;
 }
 
+export interface ReconcileFailure {
+  transition: GoalTransition;
+  error: unknown;
+}
+export interface ReconcileResult {
+  goals: Goal[];
+  applied: GoalTransition[];
+  failed: ReconcileFailure[];
+}
+
 function write(writer: GoalWriter, t: GoalTransition): Promise<unknown> {
   return t.kind === 'auto_complete'
     ? writer.setGoalStatus(t.goalId, 'completed')
-    : writer.updateGoal(t.goalId, { meta: { ...t.meta } });
+    : writer.updateGoal(t.goalId, { meta: { ...t.meta } }); // spread: GoalMeta is an interface, not assignable to Record<string, unknown>
 }
 
 /**
- * Writes each due transition in order. A rejected write is skipped (it stays out
- * of `applied`) so one failure never blocks the rest or throws.
+ * Writes each due transition in order. A rejected write stays out of `applied` and
+ * is reported in `failed`, so one failure never blocks the rest or throws.
  */
 export async function reconcileGoals(
   goals: Goal[],
@@ -30,17 +40,19 @@ export async function reconcileGoals(
   today: string,
   writer: GoalWriter,
   nowIso: string = new Date().toISOString(),
-): Promise<{ goals: Goal[]; applied: GoalTransition[] }> {
+): Promise<ReconcileResult> {
   const applied: GoalTransition[] = [];
+  const failed: ReconcileFailure[] = [];
   for (const t of planGoalTransitions(goals, logs, today)) {
     try {
       await write(writer, t);
       applied.push(t);
-    } catch {
-      // ponytail: skipped; the next reconcile re-plans it, so no retry queue.
+    } catch (error: unknown) {
+      // ponytail: failures are reported, not dropped; no retry queue, the next reconcile re-plans them.
+      failed.push({ transition: t, error });
     }
   }
-  return { goals: applyGoalTransitions(goals, applied, nowIso), applied };
+  return { goals: applyGoalTransitions(goals, applied, nowIso), applied, failed };
 }
 
 /** The quiet moment to show when a goal completes; null when there is nothing to say. */
