@@ -70,9 +70,9 @@ Trigger helpers that are `SECURITY INVOKER` need the opposite care. (The one tha
 
 1. Computes `user_hash = sha256(uid || ':' || pepper)` using `extensions.digest` and the `app.audit_pepper` GUC (or the Vault secret `audit_pepper`).
 2. Rewrites all `audit_events` rows for this user: nulls out `user_id`, replaces `props_json` with `{"hashed_user_id": "<hash>"}`.
-3. Patches all `error_events` rows for this user: adds `hashed_user_id` to `details_json`, nulls out `user_id`.
+3. Deletes all `error_events` rows for this user (they used to be kept with a hashed id).
 4. Deletes all product data (logs, brands, variants, goals, reminders, settings, price entries, usage events, facts seen).
-5. Resets the profile row, including the otherwise-immutable `full_name`, `date_of_birth`, `gender`, plus `mobile_e164` and `place` (it sets the transaction-local `app.erasing` flag, which `enforce_profile_identity_rules` honours), and sets `deleted_at = now()`.
+5. Resets the profile row, including the otherwise-immutable `full_name`, `date_of_birth`, `gender`, plus `mobile_e164` and `place` (it sets the transaction-local `app.erasing` flag, which `enforce_profile_identity_rules` honours), removes the same three keys from `auth.users.raw_user_meta_data`, and no longer sets `deleted_at` (`20261104100000_erase_auth_metadata.sql`).
 6. Re-seeds default brands via `smoke_seed.apply_default_brands(uid)`.
 7. Inserts a final `account_data_erased` audit event with `prior_identity_erased: true` (still attributed to the live user, since auth deletion comes later). That row is the record that the user's earlier name / DOB / gender existed before they re-entered new ones.
 
