@@ -1,5 +1,4 @@
-import { describe, expect, test } from 'vitest';
-import { sessionUserId } from '../lib/goals/sessionUserId';
+import { sessionUserId } from '@/lib/goals/sessionUserId';
 
 describe('sessionUserId', () => {
   test('resolves the signed-in user id', async () => {

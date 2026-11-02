@@ -1,5 +1,4 @@
-import { describe, expect, it } from 'vitest';
-import { canContinueGoalStep } from '../app/onboarding/goal/goalStepView';
+import { canContinueGoalStep } from '@/domain/goalStepView';
 
 const cap = { window: false };
 const win = { window: true };

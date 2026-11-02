@@ -33,6 +33,14 @@ import {
 import { isBirthdayToday } from '@/domain/age';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
+import { goalCardModel } from '@/domain/goalCardModel';
+import { homeGoalLine } from '@/domain/goalAdherence';
+import { loggedDays, proposeStart } from '@/domain/goalProposals';
+import { PROPOSAL_DATA_WINDOW_DAYS } from '@/domain/goalMeta';
+import { firstSuggestionSentence, shouldShowFirstSuggestion } from '@/domain/firstSuggestion';
+import { sessionUserId } from '@/lib/goals/sessionUserId';
+import { dismissFirstSuggestion, isFirstSuggestionDismissed } from '@/lib/goals/firstSuggestionStore';
+import { getSupabase } from '@/lib/supabase';
 import { generateInsights } from '@/domain/insights';
 import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry } from '@/lib/regions';
@@ -449,6 +457,52 @@ export default function Home() {
     : null;
 
   const hidden = isHomeTotalsHidden(profile);
+  const goalCard = useMemo(
+    () =>
+      activeGoal
+        ? goalCardModel(activeGoal, logs, today, {
+            currency,
+            formatMoney: (n) => formatMoney(n, currency, { locale }),
+            formatDate: formatIndianDate,
+            hideMoney: goalHideMoney,
+          })
+        : null,
+    [activeGoal, logs, today, currency, locale, goalHideMoney],
+  );
+  // Teal only for on track / met; terracotta for any concern (never red).
+  const goalPositive = goalCard?.state === 'on_track' || goalCard?.state === 'met';
+  // Every figure in the line is a count of days; hidden Home totals show no line at all.
+  const goalLine =
+    goalCard && !hidden
+      ? homeGoalLine(goalCard.state, goalCard.overDays, goalCard.heldDays, goalCard.proposal !== null)
+      : null;
+
+  // First-goal suggestion: only with no active goal and enough history. "Not now" is per user, on
+  // this device; the id comes from the local session. On any failure it stays hidden.
+  const [suggestionUser, setSuggestionUser] = useState<{ id: string; dismissed: boolean } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void sessionUserId(() => getSupabase().auth.getSession())
+      .then(async (id) => {
+        if (cancelled || !id) return;
+        const dismissed = await isFirstSuggestionDismissed(id, today);
+        if (!cancelled) setSuggestionUser({ id, dismissed });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+  const firstProposal = useMemo(
+    () => (activeGoal ? null : proposeStart('daily_cap', logs, today, { currency })),
+    [activeGoal, logs, today, currency],
+  );
+  const showFirstSuggestion = shouldShowFirstSuggestion({
+    hasActiveGoal: activeGoal !== null,
+    proposal: firstProposal,
+    dismissed: suggestionUser?.dismissed ?? false,
+    userKnown: suggestionUser !== null,
+  });
 
   // ── Character: greet once on mount, fire milestone modal on streak ↑ to a tier ──
   useEffect(() => {
@@ -811,13 +865,7 @@ export default function Home() {
               <Text variant="h2" faint> · </Text>
               <Text
                 variant="h2"
-                color={
-                  goalProgress.atRisk
-                    ? theme.warnEarth
-                    : goalProgress.isOnTrack
-                    ? theme.accent
-                    : theme.textMuted
-                }
+                color={goalPositive ? theme.accent : theme.warnEarth}
                 style={{ fontVariant: ['tabular-nums'] }}
               >
                 {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
@@ -825,13 +873,56 @@ export default function Home() {
             </View>
             <ProgressBar
               value={goalProgress.percent}
-              tone={goalProgress.atRisk ? 'warn' : goalProgress.isOnTrack ? 'success' : 'default'}
+              tone={goalPositive ? 'success' : 'warnEarth'}
               height={2}
             />
             {goalExplanation ? (
               <Text variant="small" muted>{goalExplanation}</Text>
             ) : null}
+            {goalLine ? <Text variant="small" muted>{goalLine}</Text> : null}
           </Pressable>
+        </FadeSlideIn>
+      ) : null}
+
+      {/* ── A first goal — a quiet suggestion, only when there is none ── */}
+      {showFirstSuggestion && firstProposal && suggestionUser ? (
+        <FadeSlideIn index={3}>
+          <View style={{ gap: spacing.sm }}>
+            <Text
+              variant="caption"
+              style={{ textTransform: 'uppercase', letterSpacing: 1.6, color: theme.textMuted }}
+            >
+              A first goal
+            </Text>
+            <Text muted>
+              {firstSuggestionSentence(
+                firstProposal,
+                loggedDays(logs, ledgerDaysAgo(PROPOSAL_DATA_WINDOW_DAYS - 1), today),
+                hidden,
+              )}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <Pressable
+                onPress={() => router.push('/goals/new?type=daily_cap')}
+                accessibilityRole="link"
+                accessibilityLabel="See the suggestion"
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text variant="small" style={{ textDecorationLine: 'underline', fontWeight: '500' }}>
+                  See the suggestion
+                </Text>
+              </Pressable>
+              <Button
+                title="Not now"
+                variant="ghost"
+                size="md"
+                onPress={() => {
+                  void dismissFirstSuggestion(suggestionUser.id, today);
+                  setSuggestionUser({ ...suggestionUser, dismissed: true });
+                }}
+              />
+            </View>
+          </View>
         </FadeSlideIn>
       ) : null}
 

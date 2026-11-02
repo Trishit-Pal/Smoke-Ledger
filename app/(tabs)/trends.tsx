@@ -33,6 +33,8 @@ import { Text } from '@/components/ui/Text';
 import { Divider } from '@/components/ui/Divider';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/charts/LineChart';
+import { hasCapLine, pickCapGoal, withCapLine } from '@/domain/capLine';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { AnimatedBarChart } from '@/components/charts/AnimatedBarChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { Donut } from '@/components/charts/Donut';
@@ -173,6 +175,7 @@ export default function Trends() {
   const theme = useTheme();
   const logs = useSession((s) => s.logs);
   const profile = useSession((s) => s.profile);
+  const goals = useSession((s) => s.goals);
 
   const discreet = isDiscreetMode(profile);
 
@@ -239,9 +242,18 @@ export default function Trends() {
   );
 
   // Chart series
+  const capGoal = useMemo(() => pickCapGoal(goals), [goals]);
   const sticksLine = useMemo(
-    () => currentStats.map((s) => ({ label: s.date.slice(5), value: s.sticks })),
-    [currentStats],
+    () =>
+      withCapLine(
+        currentStats.map((s) => ({ label: s.date.slice(5), value: s.sticks })),
+        capGoal,
+        currentStats.map((s) => s.date),
+        // A daily cap is only comparable when every point is one calendar day. Raw-log windows
+        // fill every day; the year summary rows can be sparse, so check the count.
+        currentStats.length === windowDays,
+      ),
+    [currentStats, capGoal, windowDays],
   );
   const spendBars = useMemo(
     () => currentStats.map((s) => ({ label: s.date.slice(5), value: Math.round(s.spendInr) })),
@@ -498,6 +510,7 @@ export default function Trends() {
                 data={sticksLine}
                 height={180}
                 strokeColor={stickToneColor}
+                formatY={(v) => maskCount(v, discreet)}
               />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
@@ -507,6 +520,11 @@ export default function Trends() {
                 ? 'A sparse window — most days quiet.'
                 : `Around ${summary.avgSticksPerDay.toFixed(1)} a day, on average.`}
             </Text>
+            {capGoal && hasCapLine(sticksLine) ? (
+              <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
+                — dashed line: your {goalTypeLabel(capGoal.type).toLowerCase()}
+              </Text>
+            ) : null}
           </View>
 
           {/* ─── Daily spend bars ─── */}

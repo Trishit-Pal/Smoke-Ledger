@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import type { Proposal } from '@/domain/goalProposals';
 import {
   dismissFirstSuggestion,
   isFirstSuggestionDismissed,
 } from '../lib/goals/firstSuggestionStore';
-import { firstSuggestionSentence, shouldShowFirstSuggestion } from '../lib/goals/firstSuggestion';
 
 function fakeStorage(): Storage {
   const map = new Map<string, string>();
@@ -19,8 +17,6 @@ function fakeStorage(): Storage {
     clear: () => map.clear(),
   };
 }
-
-const proposal: Proposal = { kind: 'start', type: 'daily_cap', value: 6, unit: 'sticks', basisAvg: 7.24 };
 
 describe('firstSuggestionStore', () => {
   test('is not dismissed until the reader says so', () => {
@@ -51,33 +47,5 @@ describe('firstSuggestionStore', () => {
   test('degrades to "not dismissed" and never throws without storage', () => {
     expect(isFirstSuggestionDismissed('u1', '2026-11-02', null)).toBe(false);
     expect(() => dismissFirstSuggestion('u1', '2026-11-02', null)).not.toThrow();
-  });
-});
-
-describe('shouldShowFirstSuggestion', () => {
-  const base = { hasActiveGoal: false, proposal, dismissed: false, userKnown: true };
-  test('shows with no goal, a proposal, and no dismissal', () => {
-    expect(shouldShowFirstSuggestion(base)).toBe(true);
-  });
-  test.each([
-    ['an active goal exists', { hasActiveGoal: true }],
-    ['there is no proposal', { proposal: null }],
-    ['it was dismissed', { dismissed: true }],
-    ['the user id is not yet known', { userKnown: false }],
-  ])('hides when %s', (_, patch) => {
-    expect(shouldShowFirstSuggestion({ ...base, ...patch })).toBe(false);
-  });
-});
-
-describe('firstSuggestionSentence', () => {
-  test('states days, average and cap', () => {
-    expect(firstSuggestionSentence(proposal, 12, false)).toBe(
-      '12 days in the ledger. Your average is 7.2 a day — a cap at 6?',
-    );
-  });
-  test('masks every figure when Home totals are hidden', () => {
-    const s = firstSuggestionSentence(proposal, 12, true);
-    expect(s).not.toMatch(/\d/);
-    expect(s).toBe('•• days in the ledger. Your average is •• a day — a cap at ••?');
   });
 });

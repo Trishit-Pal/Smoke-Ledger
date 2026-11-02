@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import type { Goal } from '@/types';
-import { hasCapLine, pickCapGoal, withCapLine } from '../lib/goals/capLine';
+import { capStepPath, hasCapLine, pickCapGoal, withCapLine } from '@/domain/capLine';
 
 function goal(over: Partial<Goal>): Goal {
   return {
@@ -74,5 +73,20 @@ describe('hasCapLine', () => {
     expect(hasCapLine([{ label: 'a', value: 1 }])).toBe(false);
     expect(hasCapLine([{ label: 'a', value: 1, cap: null }])).toBe(false);
     expect(hasCapLine([{ label: 'a', value: 1, cap: null }, { label: 'b', value: 2, cap: 4 }])).toBe(true);
+  });
+});
+
+describe('capStepPath', () => {
+  it('holds each cap until the next point, then steps', () => {
+    expect(capStepPath([{ x: 0, y: 10 }, { x: 10, y: 10 }, { x: 20, y: 4 }])).toBe(
+      'M 0 10 L 10 10 L 10 10 L 20 10 L 20 4',
+    );
+  });
+  it('starts a fresh segment after a gap and draws nothing for no caps', () => {
+    expect(capStepPath([{ x: 0, y: null }, { x: 10, y: 6 }, { x: 20, y: 6 }])).toBe('M 10 6 L 20 6 L 20 6');
+    expect(capStepPath([{ x: 0, y: null }, { x: 10, y: null }])).toBe('');
+  });
+  it('lifts the pen across a mid-series gap', () => {
+    expect(capStepPath([{ x: 0, y: 5 }, { x: 10, y: null }, { x: 20, y: 5 }])).toBe('M 0 5 M 20 5');
   });
 });

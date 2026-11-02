@@ -14,6 +14,7 @@ import { PaperNoise } from '@/components/ui/PaperNoise';
 import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { emptyGoalForm } from '@/domain/goalForm';
+import { canContinueGoalStep } from '@/domain/goalStepView';
 import { loadGoalStep, skipGoalStep, submitGoalStep } from '@/services/onboarding';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { useSession } from '@/store/session';
@@ -22,7 +23,8 @@ import type { Goal, GoalType } from '@/types';
 
 
 interface GoalOption {
-  id: GoalType;
+  /** `null` is "Suggest one later": no goal now, the ledger proposes one after a week. */
+  id: GoalType | null;
   roman: string;
   label: string;
   hint: string;
@@ -73,12 +75,24 @@ const GOAL_OPTIONS: GoalOption[] = [
   },
 ];
 
+// Card IV. Not a GoalType; shown only when no goal was saved earlier in onboarding.
+const SUGGEST_LATER: GoalOption = {
+  id: null,
+  roman: 'IV.',
+  label: 'Suggest one later',
+  hint: 'After a week of logging',
+  example: 'the ledger proposes a cap from your own numbers',
+  unit: '',
+  placeholder: '',
+  defaultTarget: 0,
+};
+
 export default function GoalSetup() {
   const router = useRouter();
   const theme = useTheme();
   // Draft-backed so the choice + target survive back/forward navigation.
   const { goalType: type, goalTarget: target, setGoal } = useOnboardingDraft();
-  const setType = (goalType: GoalType) => setGoal({ goalType });
+  const setType = (goalType: GoalType | null) => setGoal({ goalType });
   const setTarget = (goalTarget: string) => setGoal({ goalTarget });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -111,14 +125,14 @@ export default function GoalSetup() {
   }, []);
 
   const loaded = existing !== undefined;
-  const selected = GOAL_OPTIONS.find((g) => g.id === type) ?? null;
-  const canSetGoal =
-    loaded &&
-    selected !== null &&
-    (Boolean(selected.window) || (target !== '' && Number(target) > 0));
+  // Card IV stays out once a goal exists; the ghost "Keep and continue" covers that.
+  const cards = existing === null ? [...GOAL_OPTIONS, SUGGEST_LATER] : GOAL_OPTIONS;
+  // Only real goal types carry a target panel; null type is card IV.
+  const selected = type == null ? null : (GOAL_OPTIONS.find((g) => g.id === type) ?? null);
+  const canSetGoal = canContinueGoalStep({ loaded, type, selected, target });
 
   const onSetGoal = async () => {
-    if (!type) return;
+    if (type == null) return onSkip();
     setSubmitting(true);
     setErrorMsg(null);
     try {
@@ -190,10 +204,10 @@ export default function GoalSetup() {
       {/* Goal option cards */}
       <FadeSlideIn index={4}>
         <View style={{ gap: spacing.sm }}>
-          {GOAL_OPTIONS.map((g) => {
+          {cards.map((g) => {
             const isSelected = type === g.id;
             return (
-              <Tilt key={g.id} maxDeg={isSelected ? 3 : 6}>
+              <Tilt key={g.id ?? 'later'} maxDeg={isSelected ? 3 : 6}>
                 <Pressable
                   onPress={() => {
                     setType(g.id);
@@ -278,7 +292,7 @@ export default function GoalSetup() {
 
       {/* Target input — revealed when type selected */}
       {selected ? (
-        <Reveal dependencyKey={selected.id} duration={300}>
+        <Reveal dependencyKey={selected.id ?? 'later'} duration={300}>
           <Card>
             <View style={{ gap: spacing.sm }}>
               <View
@@ -337,7 +351,7 @@ export default function GoalSetup() {
               onPress={() => router.push('/onboarding/usage')}
             />
             <Button
-              title={submitting ? 'Saving…' : 'Set goal →'}
+              title={submitting ? 'Saving…' : type == null ? 'Continue →' : 'Set goal →'}
               loading={submitting}
               disabled={!canSetGoal || submitting}
               style={{ flex: 2 }}
