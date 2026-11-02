@@ -72,6 +72,13 @@ describe('dailyAdherence', () => {
     expect(out[4].cap).toBe(3);
   });
 
+  it('omits days before the goal started', () => {
+    const goal = mkGoal({ startDate: dayShift(TODAY, -3) });
+    const out = dailyAdherence(goal, run(6, 9), TODAY);
+    expect(out).toHaveLength(4);
+    expect(out[0].date).toBe(dayShift(TODAY, -3));
+  });
+
   it('uses spend for a daily spend cap', () => {
     const goal = mkGoal({ type: 'spend_cap_daily', targetValue: 100 });
     const out = dailyAdherence(goal, [mkLog(TODAY, 1, 150)], TODAY, 1);
@@ -109,6 +116,11 @@ describe('goalState (daily cap)', () => {
   it('is at_risk, not met, when metOn is set but one day is over', () => {
     const goal = mkGoal({ meta: { metOn: dayShift(TODAY, -5) } });
     expect(goalState(goal, [mkLog(dayShift(TODAY, -1), 6)], TODAY)).toBe('at_risk');
+  });
+
+  it('is on_track for a goal started today despite heavy smoking before it', () => {
+    const goal = mkGoal({ startDate: TODAY });
+    expect(goalState(goal, run(6, 9), TODAY)).toBe('on_track');
   });
 
   it('is not at_risk for a zero cap with nothing smoked', () => {

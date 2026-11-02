@@ -36,16 +36,19 @@ function dayAdherenceOn(goal: Goal, logs: CigaretteLog[], date: string): DayAdhe
   return { date, used, cap, over: used > cap, logged: logs.some((l) => l.localDate === date) };
 }
 
-/** The last `days` days ending `today`, ascending, each judged against the cap in force that day. */
+/**
+ * The last `days` days ending `today`, ascending, each judged against the cap in force that day.
+ * Days before the goal started are omitted, so a new goal has a short record.
+ */
 export function dailyAdherence(
   goal: Goal,
   logs: CigaretteLog[],
   today: string,
   days = LOOKBACK_DAYS,
 ): DayAdherence[] {
-  return Array.from({ length: days }, (_, i) =>
-    dayAdherenceOn(goal, logs, dayShift(today, -(days - 1 - i))),
-  );
+  return Array.from({ length: days }, (_, i) => dayShift(today, -(days - 1 - i)))
+    .filter((date) => date >= goal.startDate)
+    .map((date) => dayAdherenceOn(goal, logs, date));
 }
 
 /**
@@ -75,6 +78,7 @@ function dailyCapState(goal: Goal, logs: CigaretteLog[], today: string): GoalSta
   if (over >= OFF_TRACK_OVER_DAYS) return 'off_track';
   if (over >= 1) return 'at_risk';
   const t = week[week.length - 1];
+  if (!t) return 'on_track'; // goal starts after today
   // `used > 0` keeps a zero cap with nothing smoked from reading as at risk.
   if (t.used > 0 && t.used >= t.cap * AT_RISK_RATIO) return 'at_risk';
   return readGoalMeta(goal).metOn ? 'met' : 'on_track';
