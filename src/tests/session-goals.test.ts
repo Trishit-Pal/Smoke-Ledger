@@ -2,7 +2,9 @@
  * Mobile goals in the session store: due transitions are reconciled after every load,
  * announced once through consumeGoalMoments, and a failed write is surfaced, never thrown.
  */
-jest.mock('@/db/repositories/logs', () => ({ listLogs: jest.fn().mockResolvedValue([]) }));
+jest.mock('@/db/repositories/logs', () => ({
+  listLogsPage: jest.fn().mockResolvedValue({ logs: [], nextCursor: null }),
+}));
 jest.mock('@/db/repositories/summary', () => ({ getDailySummary: jest.fn().mockResolvedValue([]) }));
 jest.mock('@/db/repositories/brands', () => ({ listBrandsWithVariants: jest.fn().mockResolvedValue([]) }));
 jest.mock('@/db/repositories/goals', () => ({
@@ -17,6 +19,7 @@ jest.mock('@/lib/catalogStorageNative', () => ({ makeNativeCatalogStorage: jest.
 jest.mock('@/services/analytics', () => ({ track: jest.fn() }));
 
 import * as goalsRepo from '@/db/repositories/goals';
+import * as logsRepo from '@/db/repositories/logs';
 import * as profileRepo from '@/db/repositories/profile';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -59,6 +62,19 @@ describe('session goals reconcile', () => {
     const moments = useSession.getState().consumeGoalMoments();
     expect(moments).toEqual([{ goalId: 'g1', kind: 'auto_complete', reason: 'quit_date' }]);
     expect(useSession.getState().consumeGoalMoments()).toEqual([]);
+  });
+
+  it('boot and refreshLogs read the goal window in one page of up to 2000 rows', async () => {
+    listAllGoals.mockResolvedValue([]);
+    const listLogsPage = logsRepo.listLogsPage as jest.Mock;
+    await useSession.getState().boot();
+    await useSession.getState().refreshLogs();
+    expect(listLogsPage).toHaveBeenCalledTimes(2);
+    for (const [opts] of listLogsPage.mock.calls) {
+      expect(opts).toMatchObject({ limit: 2000 });
+      expect(opts.fromDate).toBeDefined();
+      expect(opts.toDate).toBeDefined();
+    }
   });
 
   it('refreshGoals does not re-announce once the write has landed', async () => {

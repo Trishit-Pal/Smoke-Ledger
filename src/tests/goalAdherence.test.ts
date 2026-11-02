@@ -108,9 +108,20 @@ describe('goalState (daily cap)', () => {
     expect(goalState(mkGoal({ targetValue: 10 }), [mkLog(TODAY, 7)], TODAY)).toBe('on_track');
   });
 
-  it('is met when metOn is set and the week is clean', () => {
+  it('is met when metOn is set and the hold is still live', () => {
     const goal = mkGoal({ meta: { metOn: dayShift(TODAY, -1) } });
-    expect(goalState(goal, run(6, 2), TODAY)).toBe('met');
+    expect(goalState(goal, run(14, 2), TODAY)).toBe('met');
+  });
+
+  it('is on_track, not met, when metOn is set but the reader stopped logging', () => {
+    const goal = mkGoal({ meta: { metOn: dayShift(TODAY, -20) } });
+    expect(goalState(goal, run(5, 2), TODAY)).toBe('on_track');
+  });
+
+  it('is on_track, not met, after going over twice and a clean week since', () => {
+    const goal = mkGoal({ meta: { metOn: dayShift(TODAY, -20) } });
+    const logs = [...run(7, 2), mkLog(dayShift(TODAY, -9), 6), mkLog(dayShift(TODAY, -10), 6)];
+    expect(goalState(goal, logs, TODAY)).toBe('on_track');
   });
 
   it('is at_risk, not met, when metOn is set but one day is over', () => {
@@ -192,6 +203,15 @@ describe('holdStatus', () => {
     expect(holdStatus(mkGoal(), run(120, 2), TODAY).runDays).toBe(90);
   });
 
+  it('counts logged days in the 14 days ending yesterday, not the whole run', () => {
+    // clean for 20 days, but only days -15..-20 were logged: the last two weeks are empty
+    const logs = run(6, 2, 15);
+    expect(holdStatus(mkGoal({ startDate: dayShift(TODAY, -20) }), logs, TODAY)).toEqual({
+      runDays: 20,
+      isHeld: false,
+    });
+  });
+
   it('returns zero for goals that are not daily-cap-like', () => {
     const goal = mkGoal({ type: 'weekly_target', targetValue: 30 });
     expect(holdStatus(goal, run(14, 2), TODAY)).toEqual({ runDays: 0, isHeld: false });
@@ -247,7 +267,7 @@ describe('homeGoalLine', () => {
   });
 
   it('does not claim zero over days for an off-track goal without a daily record', () => {
-    expect(homeGoalLine('off_track', 0, 0, false)).toBe('Over the cap.');
+    expect(homeGoalLine('off_track', 0, 0, false)).toBe('Off track.');
   });
 
   it('counts the over days of an at-risk goal over a rolling window', () => {

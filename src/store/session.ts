@@ -75,6 +75,18 @@ function withMoments(queued: GoalTransition[], applied: GoalTransition[]): GoalT
 // windows on demand so we keep the boot payload small.
 const LOG_LOOKBACK_DAYS = 90;
 export const HISTORY_LOG_LOOKBACK_DAYS = 365;
+// ponytail: one page of up to 2000 rows; the 90-day window holds >= 22 entries a day under that
+// ceiling. If nextCursor is ever non-null, page until it is null.
+const GOAL_WINDOW_LOG_LIMIT = 2000;
+
+async function loadGoalWindowLogs() {
+  const { logs } = await logsRepo.listLogsPage({
+    fromDate: daysAgoIst(LOG_LOOKBACK_DAYS),
+    toDate: todayIst(),
+    limit: GOAL_WINDOW_LOG_LIMIT,
+  });
+  return logs;
+}
 
 interface SessionState {
   booted: boolean;
@@ -160,7 +172,7 @@ export const useSession = create<SessionState>((set, get) => ({
     await maybeSyncDefaultBrandCatalog(catalogStorage).catch(() => undefined);
     const [profile, logs, brands, goals, summary] = await Promise.all([
       profileRepo.getProfile(),
-      logsRepo.listLogs({ fromDate: daysAgoIst(LOG_LOOKBACK_DAYS), toDate: todayIst() }),
+      loadGoalWindowLogs(),
       brandsRepo.listBrandsWithVariants(),
       goalsRepo.listAllGoals(),
       fetchSummary(),
@@ -182,11 +194,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   refreshLogs: async () => {
-    const logs = await logsRepo.listLogs({
-      fromDate: daysAgoIst(LOG_LOOKBACK_DAYS),
-      toDate: todayIst(),
-    });
-    set({ logs });
+    set({ logs: await loadGoalWindowLogs() });
   },
   refreshBrands: async () => {
     const brands = await brandsRepo.listBrandsWithVariants();

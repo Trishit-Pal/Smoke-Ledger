@@ -81,7 +81,8 @@ function dailyCapState(goal: Goal, logs: CigaretteLog[], today: string): GoalSta
   if (!t) return 'on_track'; // goal starts after today
   // `used > 0` keeps a zero cap with nothing smoked from reading as at risk.
   if (t.used > 0 && t.used >= t.cap * AT_RISK_RATIO) return 'at_risk';
-  return readGoalMeta(goal).metOn ? 'met' : 'on_track';
+  // met is live: metOn records a past hold, but the hold must still stand (still logging, still clean).
+  return readGoalMeta(goal).metOn && holdStatus(goal, logs, today).isHeld ? 'met' : 'on_track';
 }
 
 export function goalState(goal: Goal, logs: CigaretteLog[], today: string): GoalState {
@@ -124,7 +125,7 @@ export function homeGoalLine(
         ? `Held for ${heldDays} days. A next step is waiting on the goals page.`
         : `Held for ${heldDays} days.`; // snoozed or at the floor: nothing is waiting
     case 'off_track':
-      if (overDays === 0) return 'Over the cap.'; // no daily record (weekly cap): no count to give
+      if (overDays === 0) return 'Off track.'; // no daily record (weekly cap, quit/reduction): no cap or count to claim
       return hasProposal
         ? `Over the cap on ${overDays} of the last ${LOOKBACK_DAYS} days. A re-anchor is waiting.`
         : `Over the cap on ${overDays} of the last ${LOOKBACK_DAYS} days.`;

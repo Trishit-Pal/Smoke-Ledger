@@ -100,10 +100,12 @@ export function proposeStart(
 
 export function proposeNext(goal: Goal, logs: CigaretteLog[], today: string, opts: Opts): Proposal | null {
   if (!isDailyCapLike(goal) || !readGoalMeta(goal).metOn) return null;
+  const hold = holdStatus(goal, logs, today);
+  if (!hold.isHeld) return null; // metOn is a past hold; "fourteen days under X" must still be true
   if (!hasEnoughHistory(logs, today) || isSnoozed(goal, 'next', today)) return null;
   const cap = capOn(goal, today) ?? goal.targetValue;
   const yesterday = dayShift(today, -1);
-  const heldDays = holdStatus(goal, logs, today).runDays;
+  const heldDays = hold.runDays;
 
   if (goal.type === 'spend_cap_daily') {
     const step = moneyStep(opts.currency);

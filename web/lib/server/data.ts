@@ -162,6 +162,8 @@ export const getServerProfile = cache(async (): Promise<UserProfile> => {
 
 /** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
 const SERVER_LOGS_PAGE_SIZE = 200;
+/** Row limit for goal-consuming loaders (adherence, holds, proposals); see getDashboardData. */
+const GOAL_WINDOW_LOG_LIMIT = 2000;
 
 export interface LogCursor {
   ts: string;
@@ -430,8 +432,10 @@ export async function getDashboardData() {
   const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
   // Raw logs (60-day) still power quick-log inference, insights, and the week strip.
   const fromDate = daysAgoInZone(60, zone);
-  const [logs, goals, brands, summary] = await Promise.all([
-    getServerLogs({ fromDate }),
+  // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
+  // ceiling. If nextCursor is ever non-null, page until it is null.
+  const [{ logs }, goals, brands, summary] = await Promise.all([
+    getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
     getServerGoals(),
     getServerBrandsWithVariants(),
     getServerDailySummary({ from: summarySinceYmd, to: today }),
@@ -540,9 +544,11 @@ export async function getGoalsPageData() {
   const today = todayInZone(zone);
   // 60-day raw logs power evaluateGoal's daily/weekly/rolling-average reads.
   const fromDate = daysAgoInZone(60, zone);
-  const [goals, logs] = await Promise.all([
+  // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
+  // ceiling. If nextCursor is ever non-null, page until it is null.
+  const [goals, { logs }] = await Promise.all([
     getServerAllGoals(),
-    getServerLogs({ fromDate }),
+    getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
   ]);
   return { profile, goals, logs, today };
 }

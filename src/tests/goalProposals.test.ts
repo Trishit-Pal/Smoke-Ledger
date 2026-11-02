@@ -152,6 +152,29 @@ describe('proposeNext', () => {
     expect(proposeNext(mkGoal(), run(14, 3), TODAY, INR)).toBeNull();
   });
 
+  it('is null when the reader stopped logging after the hold (5 of the last 14 days logged)', () => {
+    expect(proposeNext(metGoal(), run(5, 3), TODAY, INR)).toBeNull();
+    // enough history for a proposal (7 logged in 30 days) but the hold is gone
+    expect(proposeNext(metGoal(), [...run(5, 3), ...run(5, 3, null, 20)], TODAY, INR)).toBeNull();
+  });
+
+  it('is null after going over twice and a clean week since', () => {
+    const logs = [...run(7, 3), mkLog(dayShift(TODAY, -9), 6), mkLog(dayShift(TODAY, -10), 6), ...run(4, 3, null, 11)];
+    expect(proposeNext(metGoal(), logs, TODAY, INR)).toBeNull();
+  });
+
+  it('is present for a genuine hold', () => {
+    expect(proposeNext(metGoal(), run(14, 3), TODAY, INR)).not.toBeNull();
+  });
+
+  it('steps down from the cap in force today, not targetValue', () => {
+    const stepped = metGoal({
+      targetValue: 6,
+      meta: met({ steps: [{ cap: 4, from: '2025-01-01', reason: 'start' }] }),
+    });
+    expect(proposeNext(stepped, run(14, 4), TODAY, INR)).toMatchObject({ value: 3 });
+  });
+
   it('is null for goals that are not daily-cap-like or without enough history', () => {
     expect(proposeNext(metGoal({ type: 'weekly_target' }), run(14, 3), TODAY, INR)).toBeNull();
     expect(
@@ -194,8 +217,8 @@ describe('proposeNext', () => {
     expect(proposeNext(goal, run(14, 2, 65), TODAY, INR)).toMatchObject({
       type: 'spend_cap_daily', value: 60, unit: 'money', basisAvg: 65,
     });
-    expect(proposeNext(goal, run(14, 2, 200), TODAY, INR)).toMatchObject({ value: 90 });
-    expect(proposeNext(goal, run(14, 2, 200), TODAY, EUR)).toMatchObject({ value: 90 }); // 90 / 5
+    expect(proposeNext(goal, run(14, 2, 95), TODAY, INR)).toMatchObject({ value: 90 });
+    expect(proposeNext(goal, run(14, 2, 95), TODAY, EUR)).toMatchObject({ value: 90 }); // 90 / 5
     expect(proposeNext(metGoal({ type: 'spend_cap_daily', targetValue: 10 }), run(14, 1, 5), TODAY, INR)).toBeNull();
   });
 });
@@ -239,6 +262,14 @@ describe('proposeReanchor', () => {
     expect(proposeReanchor(snoozed(14), logs, TODAY, INR)).not.toBeNull();
   });
 
+  it('measures against the cap in force today, not targetValue', () => {
+    const stepped = mkGoal({
+      targetValue: 20,
+      meta: { steps: [{ cap: 4, from: '2025-01-01', reason: 'start' }] },
+    });
+    expect(proposeReanchor(stepped, run(14, 9, null, 0), TODAY, INR)).toMatchObject({ value: 9, overDays: 7 });
+  });
+
   it('a next-dismissal does not snooze a re-anchor', () => {
     const goal = mkGoal({ meta: { dismissals: { next: TODAY } } });
     expect(proposeReanchor(goal, run(14, 9, null, 0), TODAY, INR)).not.toBeNull();
@@ -247,7 +278,7 @@ describe('proposeReanchor', () => {
 
 describe('proposalFor', () => {
   const goal = mkGoal({ meta: met() });
-  const logs = run(14, 3, null, 0);
+  const logs = run(14, 3);
 
   it('met proposes next, off_track proposes re-anchor, other states none', () => {
     expect(proposalFor(goal, logs, TODAY, 'met', INR)?.kind).toBe('next');
