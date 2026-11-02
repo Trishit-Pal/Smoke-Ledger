@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: 1a4c025
+last_verified_commit: 256c296
 status: current
 ---
 
@@ -199,7 +199,10 @@ in force that day:
 - None over, but today is already at 80% of today's cap (and something was
   smoked): `at_risk` (`AT_RISK_RATIO`). The `used > 0` guard keeps a zero cap with
   nothing smoked from reading as at risk.
-- Otherwise `met` if the goal carries `meta.metOn`, else `on_track`.
+- Otherwise `met` if the goal carries `meta.metOn` **and** `holdStatus(...).isHeld`
+  is still true, else `on_track`. `metOn` is only the record of a past hold; met is
+  a live condition. A reader who stops logging, or who goes over and then has a
+  clean week, falls back to `on_track` and is not offered a next step.
 
 Every other type has no daily record, so its state is taken from `evaluateGoal`:
 `off_track` when not on track, `at_risk` when `atRisk`, else `on_track`. Such a goal
@@ -232,8 +235,9 @@ nothing when on track; "Close to the cap." / "Over once in the last 7 days." /
 "Over N times in the last 7 days." when at risk; "Over the cap on N of the last 7
 days." (plus "A re-anchor is waiting." when a proposal exists) when off track;
 "Held for N days." (plus "A next step is waiting on the goals page.") when met. A
-goal with no daily record (a weekly cap) reports zero over days and gets the plain
-"Off track" / "Over the cap." rather than an invented count.
+goal with no daily record (a weekly cap, a quit date, a reduction goal) reports
+zero over days and gets the plain caption "Off track" and Home line "Off track." rather than an invented
+count or a claim about a cap it may not have.
 
 **Colour.** Teal (`--accent` on web, `theme.accent` on mobile) appears only for
 `on_track` and `met`. Every concern, including at risk and off track, is the
@@ -245,7 +249,7 @@ tone for this.
 number the reader may accept. There are three kinds:
 
 - **Start**: a first cap for a new goal, shown on the create form.
-- **Next**: the next step down for a goal that is *met*.
+- **Next**: the next step down for a goal that is *met*, that is, one whose hold still stands (`metOn` and `isHeld`); the sentence "Fourteen days under X" is then true.
 - **Re-anchor**: a cap the reader can actually keep, for a goal that is *off
   track*.
 
@@ -427,6 +431,17 @@ status via `listAllGoals`, reconciles them (above), and the store wraps the CRUD
 paths (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`). `addGoal` takes
 `{ fromProposal }` for analytics. `refreshGoals` re-fetches and reconciles on
 demand.
+
+**Log window and its ceiling.** Adherence, holds and proposals read raw logs, and a
+heavy logger would exceed the 200-row cap of the generic log loaders within about
+ten days. So the goal-consuming loaders fetch their existing window in one page of
+up to 2000 rows: on web `getGoalsPageData` (60 days) and `getDashboardData` (60
+days) through `getServerLogsPage({ fromDate, limit: 2000 })`; on mobile `boot` and
+`refreshLogs` (90 days) through `listLogsPage({ fromDate, toDate, limit: 2000 })`.
+It is still one request per load. The ceiling is 2000 rows: it covers at least 33
+entries a day over 60 days and 22 over 90. If a page ever comes back with a cursor,
+the upgrade path is to page until `nextCursor` is null; the
+30-day proposal window stays complete in practice.
 
 ### Insights
 

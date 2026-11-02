@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — 256c296
+- goals-insights: met is live (`metOn` and a standing hold, else on_track; next step needs the hold too); Home "Off track." for goals with no over days; log window ceiling (one page of up to 2000 rows for goal loaders, web and mobile).
+- architecture: dashboard and mobile boot/refreshLogs read goal windows in one page of up to 2000 rows (`getServerLogsPage`, `listLogsPage`).
+
 ## 2026-11-02 — 9d24456
 - architecture: the session store reconciles goals on boot and refresh in the reader's zone and holds `pendingGoalMoments` / `goalsReconcileFailed`; web reconciles through `useGoalReconcile` on Home and /goals; `getTrendsPageData` loads active goals; goal engine in `src/domain`, `src/services` in the layout; `goals` table row updated.
 - identity-profile: the goal step's fourth card "Suggest one later" (default while no goal type is chosen, hidden once a goal exists, Continue skips, done page wording).

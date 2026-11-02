@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "9d24456",
+      "last_verified_commit": "256c296",
       "status": "current"
     },
     {
@@ -115,7 +115,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "1a4c025",
+      "last_verified_commit": "256c296",
       "status": "current"
     },
     {

@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: 9d24456
+last_verified_commit: 256c296
 status: current
 ---
 
@@ -76,7 +76,7 @@ Cross-device/cross-screen freshness is handled by `RealtimeRefresher` (`src/comp
 ### Data flow: viewing the dashboard (web)
 
 1. Next.js calls `getDashboardData()` in the page's Server Component (`web/lib/server/data.ts:377–386`).
-2. `getDashboardData` fetches the profile first (its `onboardedAt` floors the summary range), then four cached fetchers in parallel: `getServerLogs` (60-day window — still powers quick-log inference, insights, and the week strip), `getServerGoals`, `getServerBrandsWithVariants`, and `getServerDailySummary` (up to 365 days — the single source of truth for the dashboard's timeframe totals). `toDailySummaryRow()` adapts the server rows to the domain engine's shape.
+2. `getDashboardData` fetches the profile first (its `onboardedAt` floors the summary range), then four cached fetchers in parallel: `getServerLogsPage` (60-day window, one page of up to 2000 rows — still powers quick-log inference, insights, and the week strip), `getServerGoals`, `getServerBrandsWithVariants`, and `getServerDailySummary` (up to 365 days — the single source of truth for the dashboard's timeframe totals). `toDailySummaryRow()` adapts the server rows to the domain engine's shape.
 3. Each fetcher calls `requireServerUserId()` which redirects to `/login` if the session is missing — no page-level auth guard needed.
 4. Domain functions in `src/domain/` process the returned arrays in the Server Component or a Client Component to produce the numbers the user sees. No business logic runs inside Next.js route handlers.
 5. Goal transitions are the one write that originates on a dashboard-type page. The server components only load goals; the client components on Home and `/goals` run `useGoalReconcile` (`web/lib/goals/useGoalReconcile.ts`) once per goals snapshot, which writes any due status change through the same goal repository (browser Supabase client, RLS-scoped), announces completions, then revalidates and `router.refresh()`es. The writes are idempotent, so two pages or two tabs doing it at once is harmless. `getTrendsPageData` also loads the active goals (`getServerGoals`, request-cached, so no extra query when another loader already asked) for the Trends cap line, and `mapGoal` carries `completed_at`. The goal modules under `web/lib/goals/` mostly re-export `src/domain` (`capLine`, `goalCardModel`) so web and native share one implementation; only web-only pieces (the CSS colour map, the hook, the localStorage dismissal store) live there.
@@ -129,7 +129,7 @@ Every table uses `user_id = auth.uid()` RLS policies so no query from a client c
 
 **The `listLogs` helper is capped at 200 rows.** `listLogs` in `logs.ts` is a legacy flat-array helper. It internally delegates to `listLogsPage`, which uses a keyset-paginated RPC. If the result is capped and there is a next cursor, it fires `logClientError` as a migration hint (`src/db/repositories/logs.ts:333–338`). New code that needs deep history should use `listLogsPage` directly and loop over pages.
 
-**`boot()` fetches a 90-day window, not the full history.** The session store loads only the last 90 days of logs on startup to keep the payload small (`src/store/session.ts`). History does not use `HISTORY_LOG_LOOKBACK_DAYS`. Web History calls `list_logs_page` with no `fromDate` (200-row keyset + Load older). Native History merges the 90-day boot slice with Load older; if the store is empty it fetches the first unbounded page so logs older than 90 days still appear.
+**`boot()` fetches a 90-day window, not the full history.** The session store loads only the last 90 days of logs on startup to keep the payload small (`src/store/session.ts`). It reads them with `listLogsPage` in one page of up to 2000 rows (the same read serves `refreshLogs`), so goal adherence is not cut off by the 200-row cap. History does not use `HISTORY_LOG_LOOKBACK_DAYS`. Web History calls `list_logs_page` with no `fromDate` (200-row keyset + Load older). Native History merges the 90-day boot slice with Load older; if the store is empty it fetches the first unbounded page so logs older than 90 days still appear.
 
 **Web `unstable_cache` and the service-role key.** `getServerBrandsWithVariants` uses `unstable_cache` (Next.js Data Cache) for cross-request caching, but only when a service-role key is available. Inside `unstable_cache` callbacks, cookies are forbidden — so the RLS client cannot be used. The admin client bypasses RLS, but every query inside the cached callback is explicitly scoped to `userId` (`web/lib/server/data.ts:304–361`). If the service-role key is absent, the function falls back to the per-request RLS client, uncached.
 
