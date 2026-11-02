@@ -20,6 +20,7 @@ describe('auditBodySchema props', () => {
     ['onboarding_completed', { goalSet: true }],
     ['account_data_exported_requested', { format: 'csv' }],
     ['discreet_mode_toggled', { enabled: false }],
+    ['ledger_chat_consent_toggled', { enabled: true, privacyVersion: '2026-11-02' }],
     ['reminder_enabled', { kind: 'evening' }],
   ])('accepts the registered props of %s', (eventType, props) => {
     expect(auditBodySchema.safeParse({ eventType, props }).success).toBe(true);

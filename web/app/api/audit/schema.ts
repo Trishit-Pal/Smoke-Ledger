@@ -22,7 +22,7 @@ export const auditBodySchema = z.object({
       reason: propValue, // consent_revoked
       goalSet: propValue, // onboarding_completed
       format: propValue, // account_data_exported_requested
-      enabled: propValue, // discreet_mode_toggled
+      enabled: propValue, // discreet_mode_toggled / ledger_chat_consent_toggled
       kind: propValue, // reminder_enabled / reminder_disabled
     })
     .strict()

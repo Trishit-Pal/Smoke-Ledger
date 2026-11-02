@@ -5,6 +5,7 @@ import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { maybeSyncDefaultBrandCatalog } from '@/lib/catalogSync';
 import { invalidateAnalyticsConsentCache } from '@/services/analytics';
+import { clearTranscript } from '@web/components/chat/transcriptStore';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setInitialized } = useAuth();
@@ -33,10 +34,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session) {
         void maybeSyncDefaultBrandCatalog().catch(() => {});
       } else {
-        // Clean account-switch isolation: drop in-memory session data and the
-        // (user-keyed) analytics-consent cache so nothing carries to the next user.
+        // Clean account-switch isolation: drop in-memory session data, the
+        // (user-keyed) analytics-consent cache, and the on-device chat
+        // transcript so nothing carries to the next user. This covers every
+        // way a session ends: sign-out, expiry, deletion, reset-password.
         reset();
         invalidateAnalyticsConsentCache();
+        clearTranscript();
       }
     });
     return () => subscription.unsubscribe();

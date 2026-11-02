@@ -17,6 +17,7 @@ export const AUDIT_EVENT_TYPES = new Set<string>([
   'phone_otp_sent',
   'phone_otp_verified',
   'phone_otp_rate_limited',
+  'ledger_chat_consent_toggled',
 ]);
 
 export const AUDIT_EVENT_CATEGORIES = new Set<string>([

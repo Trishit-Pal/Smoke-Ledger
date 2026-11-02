@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@web/lib/supabase/server';
 import { createAdminClient } from '@web/lib/supabase/admin';
+import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
@@ -440,6 +441,7 @@ export async function getDashboardData() {
     brands,
     summary: summary.map(toDailySummaryRow),
     summarySinceYmd,
+    ledgerChatEnabled: isLedgerChatEnabled(),
   };
 }
 
@@ -518,7 +520,7 @@ export async function getTrendsPageData() {
     getServerLogs({ fromDate: fromDate90 }),    // raw logs, 90-day capped at 200 — for hour/dow/brand/mood charts
     getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
   ]);
-  return { profile, logs, dailySummary };
+  return { profile, logs, dailySummary, ledgerChatEnabled: isLedgerChatEnabled() };
 }
 
 export async function getNewLogPageData() {
@@ -543,10 +545,16 @@ export async function getGoalsPageData() {
 }
 
 export async function getSettingsPageData() {
-  const [profile, brands, analyticsOptIn] = await Promise.all([
+  const [profile, brands, analyticsOptIn, ledgerChatOptIn] = await Promise.all([
     getServerProfile(),
     getServerBrandsWithVariants(),
     getServerSetting<boolean>('consent.analyticsOptIn'),
+    getServerSetting<boolean>('consent.ledgerChatOptIn'),
   ]);
-  return { profile, brands, analyticsOptIn: analyticsOptIn === true };
+  return {
+    profile,
+    brands,
+    analyticsOptIn: analyticsOptIn === true,
+    ledgerChatOptIn: ledgerChatOptIn === true,
+  };
 }

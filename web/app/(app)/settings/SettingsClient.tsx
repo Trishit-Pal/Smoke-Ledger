@@ -56,6 +56,10 @@ import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
+import { recordAuditEvent } from '@/services/audit';
+import { LEGAL_VERSIONS } from '@/lib/legal';
+import { clearTranscript } from '@web/components/chat/transcriptStore';
+import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
@@ -87,6 +91,7 @@ type BusyAction =
   | 'toggle-discreet'
   | 'toggle-hide'
   | 'toggle-analytics'
+  | 'toggle-ledger-chat'
   | 'add-brand'
   | 'save-price';
 
@@ -94,6 +99,7 @@ export interface SettingsClientProps {
   profile: UserProfile;
   brands: (Brand & { variants: BrandVariant[] })[];
   analyticsOptIn: boolean;
+  ledgerChatOptIn: boolean;
   initialAction?: string;
 }
 
@@ -242,9 +248,18 @@ export function SettingsClient({
   profile,
   brands: initialBrands,
   analyticsOptIn: initialAnalyticsOptIn,
+  ledgerChatOptIn: initialLedgerChatOptIn,
   initialAction,
 }: SettingsClientProps) {
   const router = useRouter();
+
+  // Ask the ledger consent: a settings key, like analytics; re-synced from the
+  // server prop after router.refresh() so another tab's change shows here.
+  const [ledgerChatOptIn, setLedgerChatOptIn] = React.useState(initialLedgerChatOptIn);
+  const [confirmLedgerChat, setConfirmLedgerChat] = React.useState(false);
+  React.useEffect(() => {
+    setLedgerChatOptIn(initialLedgerChatOptIn);
+  }, [initialLedgerChatOptIn]);
 
   // ── Baseline edit-in-place state ────────────────────────────────────────
   const initialBaseline =
@@ -359,6 +374,8 @@ export function SettingsClient({
     setError(null);
     try {
       await updateProfile({ discreetMode: value });
+      // A transcript saved before discreet mode holds real brand names; drop it.
+      if (value) clearTranscript();
       await revalidateAppViews();
       router.refresh();
       if (value) {
@@ -404,6 +421,39 @@ export function SettingsClient({
     } finally {
       setBusy(null);
     }
+  };
+
+  const saveLedgerChat = async (value: boolean) => {
+    setBusy('toggle-ledger-chat');
+    setError(null);
+    try {
+      await setSetting('consent.ledgerChatOptIn', value);
+      if (!value) clearTranscript();
+      setLedgerChatOptIn(value);
+      try {
+        await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+          enabled: value,
+          privacyVersion: LEGAL_VERSIONS.privacy,
+        });
+      } catch {
+        // The consent itself is saved; the audit row is best-effort here.
+      }
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(null);
+      setConfirmLedgerChat(false);
+    }
+  };
+
+  // Turning it on from here must show the same notice the panel shows, so the
+  // consent rests on the same words wherever it is given. Turning it off is direct.
+  const onToggleLedgerChat = (value: boolean) => {
+    if (value) {
+      setConfirmLedgerChat(true);
+      return;
+    }
+    void saveLedgerChat(false);
   };
 
   const onExportJson = async () => {
@@ -541,6 +591,7 @@ export function SettingsClient({
         dispatchFarewell();
         await new Promise((r) => setTimeout(r, 1600));
       }
+      clearTranscript();
       await getSupabase().auth.signOut();
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
@@ -557,6 +608,7 @@ export function SettingsClient({
     setBusy('return-home');
     setError(null);
     try {
+      clearTranscript();
       await getSupabase().auth.signOut();
       router.replace('/');
     } catch (e) {
@@ -653,6 +705,8 @@ export function SettingsClient({
     setError(null);
     try {
       await eraseAllUserData();
+      // "Everything" includes the on-device chat transcript.
+      clearTranscript();
       await wipeSecureStore();
       router.replace('/onboarding/privacy');
     } catch (e) {
@@ -679,6 +733,7 @@ export function SettingsClient({
       // Best-effort local cleanup; the account is already gone server-side, so
       // never block the homepage redirect on it.
       try {
+        clearTranscript();
         await wipeSecureStore();
       } catch {
         // Ignore — deletion already succeeded; the redirect must still happen.
@@ -1055,7 +1110,31 @@ export function SettingsClient({
                 />
               }
             />
+            <PrefRow
+              label="Ask the ledger"
+              sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
+              control={
+                <EditorialSwitch
+                  checked={ledgerChatOptIn}
+                  onChange={onToggleLedgerChat}
+                  disabled={busy != null}
+                  ariaLabel="Ask the ledger"
+                />
+              }
+            />
           </dl>
+          <ConfirmDialog
+            open={confirmLedgerChat}
+            title="Turn on Ask the ledger"
+            description={LEDGER_CHAT_NOTICE_TEXT}
+            confirmLabel="Turn on"
+            cancelLabel="Not now"
+            loading={busy === 'toggle-ledger-chat'}
+            onConfirm={() => void saveLedgerChat(true)}
+            onOpenChange={(open) => {
+              if (!open) setConfirmLedgerChat(false);
+            }}
+          />
         </section>
 
         {/* ─────────────── Brand catalog ─────────────── */}
