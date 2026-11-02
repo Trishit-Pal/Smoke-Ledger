@@ -8,10 +8,11 @@
  *     exportedAt, truncated, logs, profile). This is the H2 contract — the
  *     `truncated` field MUST be present even on small exports.
  *
- *   - Erase data + Delete account: validates the dialog text contains a
+ *   - Erase data + Delete account: validates the confirmation dialog contains a
  *     clear consequence statement ("irreversible", "permanently", "all data"),
- *     then DISMISSES the dialog. We never confirm the destructive action in
- *     CI; that would delete the shared test user every run.
+ *     then CANCELS. We never confirm the destructive action against the shared
+ *     test user; the real deletion runs on a throwaway account in
+ *     account-deletion.spec.ts.
  *
  * Credential-gated: skipped when E2E_LOGIN_EMAIL / E2E_LOGIN_PASSWORD are
  * unset, matching the existing pattern.
@@ -27,7 +28,7 @@ test.describe('data export & deletion (DPDP)', () => {
     test.skip(!loginEmail || !loginPassword, 'Set E2E_LOGIN_EMAIL and E2E_LOGIN_PASSWORD to run.');
     await page.goto('/login');
     await page.getByLabel('Email').fill(loginEmail!);
-    await page.getByLabel('Password').fill(loginPassword!);
+    await page.getByLabel('Password', { exact: true }).fill(loginPassword!);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForLoadState('networkidle');
     // If the test user is fresh and still in onboarding, bounce to settings —
@@ -67,38 +68,43 @@ test.describe('data export & deletion (DPDP)', () => {
     }
   });
 
+  // The destructive gates are a Radix ConfirmDialog (role="dialog"), not a
+  // native window.confirm — an earlier version of these tests listened for a
+  // `dialog` event that never fired.
   test('Erase data confirm dialog states the consequence clearly', async ({ page }) => {
-    let dialogMessage: string | null = null;
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.dismiss();
-    });
     await page.getByRole('button', { name: 'Erase all app data' }).click();
-    // Give the dialog handler a moment to fire and record the message.
-    await page.waitForTimeout(150);
+    const dialog = page.getByRole('dialog', { name: /Erase all app data/ });
+    await expect(dialog).toBeVisible();
 
-    expect(dialogMessage).not.toBeNull();
+    const message = (await dialog.textContent())?.toLowerCase() ?? '';
     // Should reference irreversibility / scope so the user can't accept blindly.
-    expect(dialogMessage!.toLowerCase()).toMatch(/erase|delete|all/);
+    expect(message).toMatch(/erase|delete|all/);
     // Should not leak raw error codes or developer noise.
-    expect(dialogMessage!.toLowerCase()).not.toContain('undefined');
-    expect(dialogMessage!.toLowerCase()).not.toContain('null');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
   });
 
-  test('Delete account confirm dialog states permanence and scope', async ({ page }) => {
-    let dialogMessage: string | null = null;
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.dismiss();
-    });
-    await page.getByRole('button', { name: 'Delete account' }).click();
-    await page.waitForTimeout(150);
+  test('Delete account confirm dialog states permanence, scope and the sign-in step', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: 'Delete account — permanent' }).click();
+    const dialog = page.getByRole('dialog', { name: /Delete your account permanently/ });
+    await expect(dialog).toBeVisible();
 
-    expect(dialogMessage).not.toBeNull();
+    const message = (await dialog.textContent())?.toLowerCase() ?? '';
     // DPDP best-effort: the dialog must explicitly state account-level
     // consequence (not just "are you sure?").
-    expect(dialogMessage!.toLowerCase()).toMatch(/delete.*account|permanent/);
-    expect(dialogMessage!.toLowerCase()).not.toContain('undefined');
-    expect(dialogMessage!.toLowerCase()).not.toContain('null');
+    expect(message).toMatch(/delete.*account|permanent/);
+    // The server may demand a fresh sign-in first; the user must be told so the
+    // detour is not mistaken for a completed deletion.
+    expect(message).toContain('sign in again');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toHaveCount(0);
   });
 });

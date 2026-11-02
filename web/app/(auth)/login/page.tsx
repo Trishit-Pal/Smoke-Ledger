@@ -476,7 +476,7 @@ function LoginPageInner() {
           </label>
 
           {reason === 'reauth' && !passwordError ? (
-            <InlineInfo message="Confirm it's you to finish deleting your account." />
+            <InlineInfo tone="warn" message="Confirm it's you to finish deleting your account." />
           ) : null}
           {passwordError ? <InlineError key={passwordError} message={passwordError} /> : null}
           {resendInfo ? <InlineInfo message={resendInfo} /> : null}
@@ -746,13 +746,14 @@ function InlineError({ message }: { message: string }) {
   );
 }
 
-function InlineInfo({ message }: { message: string }) {
+/** `warn` is for concern (terracotta); the teal accent is for positive states only. */
+function InlineInfo({ message, tone = 'info' }: { message: string; tone?: 'info' | 'warn' }) {
   return (
     <p
       role="status"
       style={{
         fontSize: 13,
-        color: 'var(--accent-ink)',
+        color: tone === 'warn' ? 'var(--warn-earth)' : 'var(--accent-ink)',
         fontFamily: 'var(--font-display)',
         fontStyle: 'italic',
         margin: '12px 0 0 0',

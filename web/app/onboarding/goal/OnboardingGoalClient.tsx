@@ -4,16 +4,14 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { TiltCard } from '@web/components/onboarding/TiltCard';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
-import { createGoal } from '@/db/repositories/goals';
-import { buildGoalPayload, emptyGoalForm } from '@/domain/goalForm';
-import { setOnboardingStep } from '@/db/repositories/profile';
+import { emptyGoalForm } from '@/domain/goalForm';
+import { loadGoalStep, skipGoalStep, submitGoalStep } from '@/services/onboarding';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
-import { track } from '@/services/analytics';
-import { AnalyticsEvents } from '@/constants/events';
 import { formatMoney } from '@/lib/format';
 import { regionFor } from '@/lib/regions';
-import type { GoalType } from '@/types';
-import { toSafeErrorMessage } from '@/lib/errors';
+import type { Goal, GoalType } from '@/types';
+import { describeError } from '@/lib/errors';
+
 
 interface GoalOption {
   id: GoalType;
@@ -80,10 +78,39 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
   const setTarget = (goalTarget: string) => setGoal({ goalTarget });
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // The goal saved earlier in this onboarding (Back / refresh / re-login).
+  // Continue edits it in place instead of tripping the one-active-per-type rule.
+  // `undefined` = still loading: both buttons wait, so a submit can never race
+  // the lookup and create a duplicate.
+  const [existing, setExisting] = React.useState<Goal | null | undefined>(undefined);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    loadGoalStep()
+      .then((draft) => {
+        if (cancelled) return;
+        setExisting(draft.existing);
+        // Seed the draft only when the user has not chosen anything yet.
+        if (draft.goalType && useOnboardingDraft.getState().goalType == null) {
+          setGoal({ goalType: draft.goalType, goalTarget: draft.goalTarget });
+        }
+      })
+      .catch(() => {
+        // No prefill; Continue still saves a fresh goal.
+        if (!cancelled) setExisting(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loaded = existing !== undefined;
   const selected = options.find((g) => g.id === type) ?? null;
   const canContinue =
-    selected !== null && (Boolean(selected.window) || (target !== '' && Number(target) > 0));
+    loaded &&
+    selected !== null &&
+    (Boolean(selected.window) || (target !== '' && Number(target) > 0));
 
   const onSetGoal = async () => {
     if (!type) return;
@@ -96,17 +123,17 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
         type === 'no_smoke_window'
           ? emptyGoalForm('no_smoke_window')
           : { ...emptyGoalForm(type), target };
-      const result = buildGoalPayload(form, []);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      await createGoal(result.payload);
-      await track(AnalyticsEvents.GOAL_CREATED, { type });
-      await setOnboardingStep('brands');
+      const saved = await submitGoalStep(form, existing ?? null);
+      setExisting(saved);
       router.push('/onboarding/brands');
     } catch (e) {
-      setError(toSafeErrorMessage(e, 'dependency_failure'));
+      setError(describeError(e, 'dependency_failure'));
+      // The goal may have been created before a later write failed: re-read it
+      // so a retry edits that goal instead of creating it again.
+      // Awaited so the buttons stay disabled until the re-read lands.
+      await loadGoalStep()
+        .then((d) => setExisting(d.existing))
+        .catch(() => {});
     } finally {
       setSubmitting(false);
     }
@@ -114,12 +141,15 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
 
   const onSkip = async () => {
     setSubmitting(true);
+    setError(null);
     try {
-      await setOnboardingStep('brands');
-    } catch {
-      // non-fatal; middleware will still allow forward motion
+      await skipGoalStep();
+      router.push('/onboarding/brands');
+    } catch (e) {
+      setError(describeError(e, 'dependency_failure'));
+    } finally {
+      setSubmitting(false);
     }
-    router.push('/onboarding/brands');
   };
 
   return (
@@ -365,9 +395,10 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
       <OnboardingStepFooter
         onBack={() => router.push('/onboarding/usage')}
         secondary={{
-          label: 'Skip for now',
+          // With a goal already saved, skipping means leaving it as it is.
+          label: existing ? 'Keep and continue' : 'Skip for now',
           onPress: onSkip,
-          disabled: submitting,
+          disabled: submitting || !loaded,
         }}
         primary={{
           label: submitting ? 'Saving…' : 'Continue →',

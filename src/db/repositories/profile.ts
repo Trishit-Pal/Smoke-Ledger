@@ -99,6 +99,9 @@ export async function updateProfile(patch: Partial<UserProfile>): Promise<UserPr
   if (defined.appLockEnabled !== undefined) row.app_lock_enabled = defined.appLockEnabled;
   if (defined.hideTotalsOnHome !== undefined) row.hide_totals_on_home = defined.hideTotalsOnHome;
   if (defined.onboardedAt !== undefined) row.onboarded_at = defined.onboardedAt;
+  // Sent with the step's own data so save + advance is one atomic row update.
+  // The DB trigger keeps the step monotonic, so a re-submit cannot regress it.
+  if (defined.onboardingStep !== undefined) row.onboarding_step = defined.onboardingStep;
   // Identity fields: writable once (the DB trigger rejects a second change).
   if (defined.fullName !== undefined) row.full_name = defined.fullName;
   if (defined.dateOfBirth !== undefined) row.date_of_birth = defined.dateOfBirth;
@@ -167,7 +170,8 @@ export interface ComplianceConsentPatch {
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
-  marketingConsentAt?: string | null;
+  /** Advance the step in the same UPDATE as the consent columns. */
+  onboardingStep?: OnboardingStep;
 }
 
 export async function saveComplianceConsents(patch: ComplianceConsentPatch): Promise<void> {
@@ -175,6 +179,7 @@ export async function saveComplianceConsents(patch: ComplianceConsentPatch): Pro
   const userId = await requireUserId();
   const row: Record<string, unknown> = {};
 
+  if (patch.onboardingStep !== undefined) row.onboarding_step = patch.onboardingStep;
   if (patch.ageConfirmedAt !== undefined) row.age_confirmed_at = patch.ageConfirmedAt;
   if (patch.termsVersion !== undefined) row.terms_version = patch.termsVersion;
   if (patch.privacyVersion !== undefined) row.privacy_version = patch.privacyVersion;
@@ -184,7 +189,6 @@ export async function saveComplianceConsents(patch: ComplianceConsentPatch): Pro
   if (patch.dataProcessingConsentAt !== undefined) {
     row.data_processing_consent_at = patch.dataProcessingConsentAt;
   }
-  if (patch.marketingConsentAt !== undefined) row.marketing_consent_at = patch.marketingConsentAt;
 
   if (!Object.keys(row).length) return;
 

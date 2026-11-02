@@ -4,12 +4,12 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
-import { setSetting } from '@/db/repositories/settings';
-import { getProfile, updateProfile, setOnboardingStep, setRegion } from '@/db/repositories/profile';
+import { setRegion } from '@/db/repositories/profile';
+import { loadUsageStep, submitUsageStep } from '@/services/onboarding';
 import { CountryField } from '@web/components/settings/CountryField';
 import { isRegionPickerEnabled, regionChangeNeeded, regionFor } from '@/lib/regions';
 import { formatMoney } from '@/lib/format';
-import { useOnboardingDraft } from '@/store/onboardingDraft';
+import { isUsageDraftEmpty, useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 const PRICE_PER_STICK = 18;
@@ -57,22 +57,37 @@ export default function OnboardingUsagePage() {
   const [savedCountry, setSavedCountry] = React.useState<string | null>(null);
   const [country, setCountry] = React.useState(INDIA_COUNTRY);
   const pickerOn = isRegionPickerEnabled();
+  // Server is the source of truth: when the draft is empty (refresh, re-login,
+  // Back after saving) seed it from what was saved. Un-saved edits always win.
+  const draftEmpty = draftPerDay == null && draftWindow == null && pref == null;
   React.useEffect(() => {
-    if (!pickerOn) return;
+    // Nothing to fetch: the draft already holds the values and no country field.
+    if (!draftEmpty && !pickerOn) return;
     let cancelled = false;
-    getProfile()
-      .then((profile) => {
+    loadUsageStep()
+      .then(({ profile, draft }) => {
         if (cancelled) return;
         setSavedCountry(profile.country ?? null);
         setCountry(profile.country ?? INDIA_COUNTRY);
+        // Re-check at resolve time: an edit made while the load was in
+        // flight must win over the server values.
+        if (draft && isUsageDraftEmpty()) {
+          setUsage({
+            perDay: draft.perDay,
+            windowDays: draft.windowDays,
+            ...(draft.purchasePref ? { purchasePref: draft.purchasePref } : {}),
+          });
+        }
       })
       .catch(() => {
-        // Keep India; Continue will still save whatever the user picks.
+        // Keep the defaults; Continue will still save whatever the user picks.
       });
     return () => {
       cancelled = true;
     };
-  }, [pickerOn]);
+    // Mount-only: hydrate once; later edits live in the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const region = regionFor(country);
 
   const n = Math.max(0, Math.min(MAX_TICKS, Number(perDay) || 0));
@@ -91,16 +106,16 @@ export default function OnboardingUsagePage() {
     setSubmitting(true);
     setError(null);
     try {
-      await Promise.all([
-        setSetting('onboarding.typicalDaily', parsed),
-        setSetting('onboarding.purchasePref', pref),
-        updateProfile({
-          baselinePerDay: parsed,
-          baselineWindowDays: windowDays,
-        }),
-      ]);
-      if (pickerOn && regionChangeNeeded(savedCountry, country)) await setRegion(country);
-      await setOnboardingStep('goal');
+      // Country first: if it fails, the step has not advanced and the user
+      // retries both. setRegion with an unchanged country is idempotent.
+      // Once saved it is remembered, so a retry after a failed baseline write
+      // does not run set_region (and its brand re-seed) a second time.
+      if (pickerOn && regionChangeNeeded(savedCountry, country)) {
+        await setRegion(country);
+        setSavedCountry(country);
+      }
+      // Baseline + step advance land in one profile update (see submitUsageStep).
+      await submitUsageStep({ perDay: parsed, windowDays, purchasePref: pref });
       router.push('/onboarding/goal');
     } catch (e) {
       setError(toSafeErrorMessage(e, 'dependency_failure'));

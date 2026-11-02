@@ -61,6 +61,7 @@ import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
 import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
+import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
@@ -318,9 +319,11 @@ export function SettingsClient({
   const [exportWarning, setExportWarning] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<BusyAction>(null);
-  const [confirmAction, setConfirmAction] = React.useState<'erase' | 'delete' | 'leave' | null>(
-    null,
-  );
+  // 'delete-resume' is the second confirmation after the re-auth detour: a
+  // fresh sign-in alone must never delete an account.
+  const [confirmAction, setConfirmAction] = React.useState<
+    'erase' | 'delete' | 'delete-resume' | 'leave' | null
+  >(null);
 
   // Keep the toast dismissal timer in a ref so we can clear it on unmount and
   // before re-arming — avoids a setState-after-unmount and matches DashboardClient.
@@ -337,13 +340,15 @@ export function SettingsClient({
     toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
-  // ── Re-auth resume: open delete dialog if redirected back with ?action=delete ──
+  // ── Re-auth resume: redirected back with ?action=delete after the fresh
+  // sign-in the server demanded. Re-confirm with distinct copy; the user must
+  // see that nothing has been deleted yet.
   const initialActionHandled = React.useRef(false);
   React.useEffect(() => {
     if (initialActionHandled.current) return;
     if (initialAction === 'delete' && confirmAction === null) {
       initialActionHandled.current = true;
-      setConfirmAction('delete');
+      setConfirmAction('delete-resume');
       router.replace('/settings');
     }
   }, [initialAction, confirmAction, router]);
@@ -717,18 +722,26 @@ export function SettingsClient({
     }
   };
 
-  const onDeleteAccount = async () => {
+  // `resume` = the second confirmation after the re-auth detour. A further
+  // reauth_required there is shown as an error instead of redirecting again,
+  // so the flow can never loop silently between login and Settings.
+  const onDeleteAccount = async (resume = false) => {
     setBusy('delete-account');
     setError(null);
-    // Hoisted so finally can read it — suppresses dialog close on reauth redirect.
+    // Set by the reauth callback (not inferred from the error code, so a real
+    // "not signed in" failure is still shown). Suppresses the error stripe and
+    // keeps the dialog open so there is no flash before navigation lands.
     let isReauthRedirect = false;
     try {
       await deleteUserAccount({
-        onReauthRequired: () => {
-          router.push(
-            `/login?next=${encodeURIComponent('/settings?action=delete')}&reason=reauth`,
-          );
-        },
+        onReauthRequired: resume
+          ? undefined
+          : () => {
+              isReauthRedirect = true;
+              router.push(
+                `/login?next=${encodeURIComponent(DELETE_RESUME_PATH)}&reason=reauth`,
+              );
+            },
       });
       // Best-effort local cleanup; the account is already gone server-side, so
       // never block the homepage redirect on it.
@@ -740,12 +753,10 @@ export function SettingsClient({
       }
       // Account is gone — return the user to the public homepage with a
       // confirmation flag (the landing page shows a dismissible notice).
-      router.replace('/?deleted=1');
+      router.replace(`/?${ACCOUNT_DELETED_PARAM}=1`);
     } catch (e) {
-      // When onReauthRequired fires, it throws AppError('authentication_error').
-      // The redirect IS the UX — suppress the error stripe and keep the dialog
-      // open so there is no flash before navigation lands.
-      isReauthRedirect = isAppError(e) && e.code === 'authentication_error';
+      // The reauth redirect IS the UX; every other failure (including "not
+      // signed in") is shown, otherwise a silent dialog reads as success.
       if (!isReauthRedirect) {
         setError(describeError(e, 'dependency_failure'));
       }
@@ -1527,12 +1538,32 @@ export function SettingsClient({
       <ConfirmDialog
         open={confirmAction === 'delete'}
         title="Delete your account permanently?"
-        description="This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone."
+        description="This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone. You may be asked to sign in again before anything is deleted."
         confirmLabel="Delete account"
         destructive
         loading={busy === 'delete-account'}
         onConfirm={() => void onDeleteAccount()}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
+        onOpenChange={(open) => {
+          if (open || busy === 'delete-account') return;
+          setConfirmAction(null);
+        }}
+      />
+      {/* After the re-auth detour. Dismissing must say so: the user has just
+          signed in again and could otherwise assume the deletion went through. */}
+      <ConfirmDialog
+        open={confirmAction === 'delete-resume'}
+        title="Signed in again. Delete your account now?"
+        description="Delete the account you just signed in to. This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone."
+        confirmLabel="Delete account"
+        destructive
+        loading={busy === 'delete-account'}
+        onConfirm={() => void onDeleteAccount(true)}
+        onOpenChange={(open) => {
+          // Esc / overlay must not close (or claim "not deleted") mid-request.
+          if (open || busy === 'delete-account') return;
+          setConfirmAction(null);
+          setError('Your account has not been deleted.');
+        }}
       />
       <ConfirmDialog
         open={confirmAction === 'leave'}

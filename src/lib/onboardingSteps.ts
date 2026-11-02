@@ -1,92 +1,78 @@
 import type { OnboardingStep } from '@/types';
 
-
-
-/** Web pathname order — keep in sync with web/middleware.ts ORDER map. */
-
+/**
+ * Single source of truth for onboarding step order. Consumed by the web
+ * middleware (`web/middleware.ts`), the post-auth router
+ * (`web/lib/auth/postAuthDestination.ts`) and the Expo layout
+ * (`app/onboarding/_layout.tsx`), so the gate can never drift between them.
+ *
+ * `user_profiles.onboarding_step` means "the next page the user should see":
+ * each step writes the *following* step before navigating. A DB trigger
+ * (`trg_user_profiles_onboarding_step_monotonic`) guarantees the value only
+ * ever moves forward, so re-submitting an earlier step is harmless.
+ */
 export const ONBOARDING_ROUTE_ORDER: Record<string, number> = {
-
   '/onboarding/privacy': 0,
-
   '/onboarding/usage': 1,
-
   '/onboarding/setup': 1,
-
   '/onboarding/baseline': 1,
-
   '/onboarding/goal': 2,
-
   '/onboarding/brands': 3,
-
   '/onboarding/done': 4,
-
   '/onboarding/notifications': 4,
-
 };
-
-
 
 export const ONBOARDING_STEP_INDEX: Record<OnboardingStep, number> = {
-
   privacy: 0,
-
   usage: 1,
-
   setup: 1,
-
   baseline: 1,
-
   goal: 2,
-
   brands: 3,
-
   done: 4,
-
 };
 
-
-
 /** Expo Router paths (no /onboarding prefix in keys — pass full path). */
-
 export const MOBILE_ONBOARDING_ROUTES = [
-
   '/onboarding/privacy',
-
   '/onboarding/usage',
-
   '/onboarding/setup',
-
   '/onboarding/baseline',
-
   '/onboarding/goal',
-
   '/onboarding/brands',
-
   '/onboarding/done',
-
   '/onboarding/notifications',
-
 ] as const;
+
+// The welcome page (web `/onboarding`, mobile `/onboarding/welcome`) is always
+// reachable. Matched by equality, not as a map entry: `'/onboarding'` as a key
+// would prefix-match every onboarding route.
+const WELCOME_PATHS = new Set(['/onboarding', '/onboarding/', '/onboarding/welcome']);
 
 export function onboardingStepIndex(step: OnboardingStep | null | undefined): number {
   return ONBOARDING_STEP_INDEX[step ?? 'privacy'] ?? 0;
 }
 
 export function onboardingRouteIndex(pathname: string): number | null {
+  if (WELCOME_PATHS.has(pathname)) return 0;
   const match = Object.entries(ONBOARDING_ROUTE_ORDER).find(
     ([route]) => pathname === route || pathname.startsWith(`${route}/`),
   );
   return match ? match[1] : null;
 }
 
+/**
+ * A page is reachable when it is at or before the saved step. The step is the
+ * next page to see, so `<=` (not `<= current + 1`): the old allowance let a
+ * user deep-link past the step they had not saved yet.
+ */
 export function canAccessOnboardingStep(
   currentStep: OnboardingStep | null | undefined,
   requestedPath: string,
 ): boolean {
   const requested = onboardingRouteIndex(requestedPath);
   if (requested == null) return true;
-  const current = onboardingStepIndex(currentStep);
-  return requested <= current + 1;
+  return requested <= onboardingStepIndex(currentStep);
 }
 
 export function earliestOnboardingRoute(step: OnboardingStep | null | undefined): string {
@@ -95,13 +81,15 @@ export function earliestOnboardingRoute(step: OnboardingStep | null | undefined)
   return entry?.[0] ?? '/onboarding/privacy';
 }
 
-export function hasRequiredConsents(profile: {
+export interface ConsentProfile {
   ageConfirmedAt?: string | null;
   termsVersion?: string | null;
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
-} | null): boolean {
+}
+
+export function hasRequiredConsents(profile: ConsentProfile | null | undefined): boolean {
   return Boolean(
     profile?.ageConfirmedAt &&
       profile?.termsVersion &&
@@ -109,4 +97,53 @@ export function hasRequiredConsents(profile: {
       profile?.healthDisclaimerVersion &&
       profile?.dataProcessingConsentAt,
   );
+}
+
+export interface ResumeProfile extends ConsentProfile {
+  onboardingStep?: OnboardingStep | null;
+}
+
+/** The snake_case `user_profiles` columns the gates select. */
+export interface ResumeProfileRow {
+  onboarding_step?: string | null;
+  age_confirmed_at?: string | null;
+  terms_version?: string | null;
+  privacy_version?: string | null;
+  health_disclaimer_version?: string | null;
+  data_processing_consent_at?: string | null;
+}
+
+/**
+ * One mapping from a raw profile row to the gate's shape, shared by the web
+ * middleware and post-auth routing so a new consent column cannot be added to
+ * one and forgotten in the other.
+ */
+export function resumeProfileFromRow(row: ResumeProfileRow | null | undefined): ResumeProfile {
+  return {
+    onboardingStep: (row?.onboarding_step as OnboardingStep | null | undefined) ?? null,
+    ageConfirmedAt: row?.age_confirmed_at ?? null,
+    termsVersion: row?.terms_version ?? null,
+    privacyVersion: row?.privacy_version ?? null,
+    healthDisclaimerVersion: row?.health_disclaimer_version ?? null,
+    dataProcessingConsentAt: row?.data_processing_consent_at ?? null,
+  };
+}
+
+/**
+ * The step to gate on. A saved step wins; a consented profile with no step
+ * (rows from before the privacy page wrote one) counts as 'usage' so it is not
+ * re-asked for consent; anything else is 'privacy'. Every gate (web middleware,
+ * post-auth routing, the Expo layout) must derive the step through this so the
+ * "where to resume" and "may I see this page" answers can never disagree — a
+ * resume target that the access check then rejects is a redirect loop.
+ */
+export function effectiveOnboardingStep(profile: ResumeProfile | null | undefined): OnboardingStep {
+  // The consent gate wins over any saved step.
+  if (!hasRequiredConsents(profile)) return 'privacy';
+  return profile?.onboardingStep ?? 'usage';
+}
+
+/** Where a not-yet-onboarded user should land: the privacy step until the consents exist, then the saved step. */
+export function resumeOnboardingRoute(profile: ResumeProfile | null | undefined): string {
+  return earliestOnboardingRoute(effectiveOnboardingStep(profile));
 }

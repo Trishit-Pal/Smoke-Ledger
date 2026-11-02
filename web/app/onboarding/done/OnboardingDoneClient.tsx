@@ -21,6 +21,18 @@ import type { GoalType } from '@/types';
 interface GoalSummary {
   type: GoalType;
   targetValue: number;
+  meta?: Record<string, unknown> | null;
+}
+
+/**
+ * The figure the summary prints for a goal. A no-smoke window stores an inert
+ * targetValue (1); its real size is the protected hours from meta.
+ */
+function goalFigure(goal: GoalSummary): number {
+  if (goal.type !== 'no_smoke_window') return goal.targetValue;
+  const start = typeof goal.meta?.startHour === 'number' ? goal.meta.startHour : 22;
+  const end = typeof goal.meta?.endHour === 'number' ? goal.meta.endHour : 6;
+  return (end - start + 24) % 24;
 }
 
 interface GoalDisplay {
@@ -241,7 +253,7 @@ export function OnboardingDoneClient({
                       style={{ fontStyle: 'normal', display: 'inline-flex', alignItems: 'baseline' }}
                     >
                       {goalDisplay.prefix ?? ''}
-                      <DigitRoll value={goal.targetValue} delay={700} />
+                      <DigitRoll value={goalFigure(goal)} delay={700} />
                     </span>{' '}
                     <span
                       style={{

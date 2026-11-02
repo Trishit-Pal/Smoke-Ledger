@@ -4,6 +4,22 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — b9ac848
+- architecture, data-model, auth, identity-profile, logging, security-privacy: re-stamped after merging main (Ask the ledger, PR #103) into the onboarding re-entry branch; the security-privacy invariants now run 1–12 (the re-auth invariant is 12, the chat invariants keep 9–11). Settings gained the chat consent switch beside the analytics one (documented under security-privacy); no behaviour the other sections describe changed. celebrations stays drifting: its files come from the chat branch and were not re-verified.
+
+## 2026-11-02 — e1a652d
+- data-model, security-privacy: `marketing_consent_at` cleared (per-user audit) and locked by CHECK; ADR `docs/architecture/marketing-consent.md`.
+- identity-profile: goal step abandons every stray onboarding goal after save; usage saves the country before advancing; consent retries never re-audit.
+- security-privacy: the delete-account re-auth detour now finishes the deletion on mobile (login reads `reason=reauth`, returns to `DELETE_RESUME_PATH`), both platforms re-confirm with "Signed in again…" and say so when cancelled; new invariant 12 (a sign-in never deletes). Line refs for `delete-account/index.ts` refreshed.
+- auth: mobile login's `reason` / `deleted` params.
+
+## 2026-11-01 — e1a652d
+- identity-profile: new "Onboarding: saving, going back, and coming back" section — shared `src/services/onboarding.ts` step writes (idempotent consent with audit-before-write, baseline/goal hydration from the server, goal edit-in-place, Keep and continue), one step-order source in `src/lib/onboardingSteps.ts` (`<=` gate, `effectiveOnboardingStep`/`resumeOnboardingRoute`, no redirect loop), `setFavorite`; onboarding globs added to the section's sources.
+- data-model: `trg_user_profiles_onboarding_step_monotonic` + `onboarding_step_rank`; the step is written in the same UPDATE as each step's data and only moves forward.
+- auth: post-sign-in routing resumes a consented, not-onboarded user at the saved step instead of `/onboarding/privacy`.
+- logging: `setFavorite` beside `toggleFavorite`.
+- security-privacy: grant discipline for SECURITY INVOKER trigger helpers (the rank helper must stay executable by `authenticated`).
+
 ## 2026-11-02 — fbd177e
 - security-privacy: gate order now lists the profile gates before the limits; summary-based figures named; re-stamped after the review fix passes (masked narration, shared confirmed-email rule in src/lib/compliance, exact-match carve-out, abort budget).
 - infra-ops: region corrected to cle1 (Cleveland, next to us-east-2); re-stamped.

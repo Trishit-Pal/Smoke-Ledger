@@ -18,7 +18,9 @@ describe('scripts/sql/smoke.sql', () => {
 });
 
 function readMigration(name: string): string {
-  return readFileSync(join(MIGRATIONS_DIR, name), 'utf8');
+  // Normalise line endings: a Windows checkout (core.autocrlf) yields CRLF,
+  // which broke multi-line expectations such as the logs-RPC policy check.
+  return readFileSync(join(MIGRATIONS_DIR, name), 'utf8').replace(/\r\n/g, '\n');
 }
 
 /** Every `REVOKE ALL ON FUNCTION public.* ... FROM ...` line in a migration. */
@@ -186,5 +188,53 @@ describe('20261031000000_logs_insert_via_rpc.sql', () => {
 
   it('revokes the table INSERT privilege from signed-in clients', () => {
     expect(sql).toMatch(/REVOKE INSERT ON public\.cigarette_logs FROM authenticated;/);
+  });
+});
+
+// Retire the marketing-consent stamps the old mobile consent screen wrote from
+// the analytics checkbox: clear them, audit each one, and keep the column empty.
+describe('20261102120000_clear_marketing_consent.sql', () => {
+  const sql = readMigration('20261102120000_clear_marketing_consent.sql');
+  const read = (rel: string) =>
+    readFileSync(join(__dirname, '../..', rel), 'utf8').replace(/\r\n/g, '\n');
+
+  it('clears only rows that hold a stamp', () => {
+    expect(sql).toMatch(
+      /UPDATE public\.user_profiles\s+SET marketing_consent_at = NULL\s+WHERE marketing_consent_at IS NOT NULL\s+RETURNING id/,
+    );
+  });
+
+  it('audits exactly the cleared rows, from the same statement, with no PII in props', () => {
+    expect(sql).toMatch(/WITH cleared AS \(/);
+    expect(sql).toMatch(/INSERT INTO public\.audit_events[\s\S]+FROM cleared;/);
+    expect(sql).toContain("'marketing_consent_cleared', 'compliance'");
+    expect(sql).toContain("jsonb_build_object('reason', 'analytics_opt_in_misrecorded')");
+    // The original timestamp must not be copied into the audit props.
+    const props = sql.slice(sql.indexOf('jsonb_build_object('), sql.indexOf('FROM cleared'));
+    expect(props).not.toContain('marketing_consent_at');
+  });
+
+  it('keeps the column empty with a re-runnable CHECK added after the clear', () => {
+    const drop = sql.indexOf('DROP CONSTRAINT IF EXISTS user_profiles_marketing_consent_unused');
+    const add = sql.indexOf('ADD CONSTRAINT user_profiles_marketing_consent_unused');
+    expect(sql.indexOf('WITH cleared AS')).toBeLessThan(drop);
+    expect(drop).toBeGreaterThan(-1);
+    expect(add).toBeGreaterThan(drop);
+    expect(sql).toMatch(/CHECK \(marketing_consent_at IS NULL\)/);
+  });
+
+  it('the cleared event is server-only: no client registry or allowlist can emit it', () => {
+    for (const rel of [
+      'src/services/audit.ts',
+      'supabase/functions/_shared/auditAllowlist.ts',
+      'web/app/api/audit/schema.ts',
+    ]) {
+      expect(read(rel)).not.toContain('marketing_consent_cleared');
+    }
+  });
+
+  it('no app code writes the column any more', () => {
+    expect(read('src/db/repositories/profile.ts')).not.toContain('row.marketing_consent_at');
+    expect(read('src/services/onboarding.ts')).not.toMatch(/marketingConsentAt\s*:/);
   });
 });

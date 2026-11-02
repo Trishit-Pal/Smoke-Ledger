@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Alert, Switch, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -8,13 +8,14 @@ import { Divider } from '@/components/ui/Divider';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { saveComplianceConsents, setOnboardingStep } from '@/db/repositories/profile';
-import { setSetting } from '@/db/repositories/settings';
+import { consentsCurrent, submitConsentStep } from '@/services/onboarding';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
-import { recordAuditEvent } from '@/services/audit';
-import { LEGAL_URLS, LEGAL_VERSIONS } from '@/lib/legal';
+import { useSession } from '@/store/session';
+import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
-import { invalidateAnalyticsConsentCache } from '@/services/analytics';
+
+// Stagger between stamps when "Acknowledge all" is pressed (a visual beat, not a save).
+const STAMP_STAGGER_MS = 120;
 
 interface ConsentItem {
   id: string;
@@ -64,8 +65,17 @@ export default function Privacy() {
   const theme = useTheme();
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Set once the consent write lands, so a retry after a later failure
+  // (profile refresh, navigation) never records a second consent audit.
+  const savedRef = useRef(false);
+  // Saved profile: a re-tick at the same legal versions skips the consent
+  // rewrite + duplicate audit. The layout gates on this in-memory profile, so
+  // refresh it after the step writes before navigating.
+  const profile = useSession((s) => s.profile);
+  const refreshProfile = useSession((s) => s.refreshProfile);
 
-  // Draft-backed so ticked consents survive back/forward navigation.
+  // Draft-backed so ticked consents survive back/forward navigation within the
+  // session. Never hydrated from the server: consent is a fresh decision.
   const { consents, setConsent } = useOnboardingDraft();
   const values: Record<string, boolean> = {
     age: consents.age ?? false,
@@ -82,9 +92,13 @@ export default function Privacy() {
   const ackCount = Object.values(values).filter(Boolean).length;
 
   const stampAll = () => {
-    CONSENT_ROWS.forEach((row, i) => {
-      setTimeout(() => setConsent(row.id, true), i * 120);
+    required.forEach((row, i) => {
+      setTimeout(() => setConsent(row.id, true), i * STAMP_STAGGER_MS);
     });
+    // Land the optional tick together with the last required one: Continue
+    // enables the moment the required rows are in, so nothing may still be
+    // pending after that.
+    setTimeout(() => setConsent('analytics', true), (required.length - 1) * STAMP_STAGGER_MS);
   };
 
   const onContinue = async () => {
@@ -92,28 +106,12 @@ export default function Privacy() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      const now = new Date().toISOString();
-      await Promise.all([
-        saveComplianceConsents({
-          ageConfirmedAt: now,
-          termsVersion: LEGAL_VERSIONS.terms,
-          privacyVersion: LEGAL_VERSIONS.privacy,
-          healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
-          dataProcessingConsentAt: now,
-          // Write marketing_consent_at only when user opted in
-          marketingConsentAt: analyticsOptIn ? now : null,
-        }),
-        setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),
-        setSetting('consent.privacyVersion', LEGAL_VERSIONS.privacy),
-        setSetting('consent.medicalDisclaimerVersion', LEGAL_VERSIONS.medicalDisclaimer),
-        setSetting('consent.analyticsOptIn', analyticsOptIn),
-      ]);
-      invalidateAnalyticsConsentCache();
-      await recordAuditEvent('consent_accepted', 'compliance', {
-        termsVersion: LEGAL_VERSIONS.terms,
-        privacyVersion: LEGAL_VERSIONS.privacy,
+      await submitConsentStep({
+        alreadyConsented: savedRef.current || consentsCurrent(profile),
+        analyticsOptIn,
       });
-      await setOnboardingStep('usage');
+      savedRef.current = true;
+      await refreshProfile();
       router.push('/onboarding/usage');
     } catch (e) {
       setErrorMsg(toSafeErrorMessage(e, 'dependency_failure'));

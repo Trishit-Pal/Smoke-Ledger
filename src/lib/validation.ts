@@ -12,6 +12,8 @@ import { z } from 'zod';
 import { CONTEXT_OPTIONS } from '@/constants/contexts';
 import { MOOD_OPTIONS } from '@/constants/moods';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
+import { ONBOARDING_STEP_INDEX } from '@/lib/onboardingSteps';
+import type { OnboardingStep } from '@/types';
 
 /* ---------- Primitive / shared ---------- */
 
@@ -216,6 +218,16 @@ export const PinSchema = z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits')
 
 export const GENDER_VALUES = ['male', 'female', 'other', 'undisclosed'] as const;
 
+/**
+ * Mirrors the user_profiles.onboarding_step CHECK constraint. Derived from the
+ * step-order map so the two TypeScript copies cannot drift; the SQL CHECK and
+ * onboarding_step_rank() still have to be widened by hand with it.
+ */
+export const ONBOARDING_STEP_VALUES = Object.keys(ONBOARDING_STEP_INDEX) as [
+  OnboardingStep,
+  ...OnboardingStep[],
+];
+
 export const ProfileSchema = z
   .object({
     baselinePerDay: z.number().min(0).max(200).nullable().optional(),
@@ -224,6 +236,8 @@ export const ProfileSchema = z
     appLockEnabled: z.boolean().optional(),
     hideTotalsOnHome: z.boolean().optional(),
     onboardedAt: IsoUtcSchema.nullable().optional(),
+    // Written together with a step's data so "save + advance" is one row update.
+    onboardingStep: z.enum(ONBOARDING_STEP_VALUES).optional(),
     // Identity — set once at signup (or via the completion form), then immutable
     // server-side. age is derived from dateOfBirth; never stored as a stale int.
     fullName: z.string().trim().min(1).max(80).optional(),
@@ -249,6 +263,17 @@ export type ProfileInput = z.infer<typeof ProfileSchema>;
 
 /** Partial profile updates (repository / settings). */
 export const ProfilePatchSchema = ProfileSchema.partial().strict();
+
+/** The onboarding baseline step (`src/services/onboarding.ts`). */
+export const OnboardingUsageSchema = z
+  .object({
+    perDay: z.number().min(0).max(200),
+    windowDays: z.union([z.literal(7), z.literal(30)]),
+    purchasePref: z.enum(['single', 'pack', 'mixed']),
+  })
+  .strict();
+
+export type OnboardingUsageInput = z.infer<typeof OnboardingUsageSchema>;
 
 /* ---------- Import envelope ---------- */
 

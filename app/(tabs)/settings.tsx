@@ -12,7 +12,7 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -40,6 +40,7 @@ import {
 import { AnalyticsEvents } from '@/constants/events';
 import { LEGAL_URLS } from '@/lib/legal';
 import { describeError, isAppError } from '@/lib/errors';
+import { ACCOUNT_DELETED_PARAM } from '@/lib/reauth';
 import { dispatchFarewell } from '@/lib/character/mood';
 import { computeAge } from '@/domain/age';
 import {
@@ -801,12 +802,26 @@ export default function Settings() {
     );
   };
 
-  const deleteAccount = () => {
+  // 'resume' is the second confirmation after the re-auth detour (login sends
+  // the user back here at DELETE_RESUME_PATH). A fresh sign-in alone must never
+  // delete an account, and cancelling must say that nothing was deleted —
+  // otherwise "it made me sign in again" reads as "it's done".
+  const deleteAccount = (variant: 'first' | 'resume' = 'first') => {
     Alert.alert(
-      'Delete your account permanently?',
-      'This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone.',
+      variant === 'resume'
+        ? 'Signed in again. Delete your account now?'
+        : 'Delete your account permanently?',
+      variant === 'resume'
+        ? 'Delete the account you just signed in to. This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone.'
+        : 'This removes your authentication account, every log, every preference, and every custom brand. It is permanent and cannot be undone. You may be asked to sign in again before anything is deleted.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            if (variant === 'resume') setError('Your account has not been deleted.');
+          },
+        },
         {
           text: 'Delete account',
           style: 'destructive',
@@ -816,10 +831,15 @@ export default function Settings() {
             let isReauthRedirect = false;
             try {
               await deleteUserAccount({
-                onReauthRequired: () => {
-                  isReauthRedirect = true;
-                  router.replace('/login?reason=reauth');
-                },
+                // After the detour a further reauth_required is shown as an
+                // error, never another redirect: no silent login ↔ Settings loop.
+                onReauthRequired:
+                  variant === 'resume'
+                    ? undefined
+                    : () => {
+                        isReauthRedirect = true;
+                        router.replace('/login?reason=reauth');
+                      },
               });
               // Best-effort local cleanup; never block the redirect on it.
               try {
@@ -831,7 +851,7 @@ export default function Settings() {
               // sign-out farewell. Bridge the gap so the overlay is seen.
               dispatchFarewell();
               await new Promise((r) => setTimeout(r, 1600));
-              router.replace('/login');
+              router.replace(`/login?${ACCOUNT_DELETED_PARAM}=1`);
             } catch (e) {
               if (!isReauthRedirect) {
                 setError(describeError(e, 'dependency_failure'));
@@ -844,6 +864,20 @@ export default function Settings() {
       ],
     );
   };
+
+  // Re-auth resume: the login screen returns here with ?action=delete after
+  // the fresh sign-in the server demanded. Clear the param so a later visit
+  // does not re-open the prompt, then re-confirm.
+  const { action } = useLocalSearchParams<{ action?: string }>();
+  const resumeHandled = useRef(false);
+  useEffect(() => {
+    if (resumeHandled.current || action !== 'delete') return;
+    resumeHandled.current = true;
+    router.setParams({ action: '' });
+    deleteAccount('resume');
+    // deleteAccount is a stable closure over state setters; run once per resume.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action]);
 
   const eraseAll = () => {
     Alert.alert(

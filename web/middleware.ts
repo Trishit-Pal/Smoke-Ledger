@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isEmailConfirmed } from '@/lib/compliance';
 import { isReauthRequest } from '@/lib/reauth';
+import {
+  canAccessOnboardingStep,
+  effectiveOnboardingStep,
+  hasRequiredConsents,
+  resumeOnboardingRoute,
+  resumeProfileFromRow,
+} from '@/lib/onboardingSteps';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
 import {
   applyAuthCookiePolicy,
@@ -177,29 +184,27 @@ export async function middleware(request: NextRequest) {
     .maybeSingle();
 
   const onboarded = !!profile?.onboarded_at;
-  const hasRequiredConsents = Boolean(
-    profile?.age_confirmed_at &&
-      profile?.terms_version &&
-      profile?.privacy_version &&
-      profile?.health_disclaimer_version &&
-      profile?.data_processing_consent_at,
-  );
+  // Step order + consent gate come from the shared helper so web, mobile and
+  // the post-auth router agree (src/lib/onboardingSteps.ts).
+  const steps = resumeProfileFromRow(profile);
+  const consented = hasRequiredConsents(steps);
+  // Where a not-yet-onboarded user resumes: privacy until consented, then the
+  // saved step — so a re-login mid-wizard never re-asks for consent.
+  const resume = resumeOnboardingRoute(steps);
 
   if (pathname === '/') {
     return finalize(
-      NextResponse.redirect(
-        new URL(onboarded && hasRequiredConsents ? '/dashboard' : '/onboarding/privacy', request.url),
-      ),
+      NextResponse.redirect(new URL(onboarded && consented ? '/dashboard' : resume, request.url)),
     );
   }
 
   if (
-    !hasRequiredConsents &&
+    !consented &&
     pathname !== '/onboarding' &&
     pathname !== '/onboarding/privacy' &&
     !isRecoveryRoute(pathname)
   ) {
-    return finalize(NextResponse.redirect(new URL('/onboarding/privacy', request.url)));
+    return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
 
   if (
@@ -208,50 +213,21 @@ export async function middleware(request: NextRequest) {
     !isPublicRoute(pathname) &&
     !isRecoveryRoute(pathname)
   ) {
-    return finalize(NextResponse.redirect(new URL('/onboarding/privacy', request.url)));
+    return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
 
   // Enforce funnel step order so a partially-onboarded user can't skip ahead
-  // by typing a deeper URL. The current step is whatever they have NOT yet
-  // completed — i.e. the next page they should see.
-  if (!onboarded && isOnboardingRoute(pathname)) {
-    const ORDER: Record<string, number> = {
-      '/onboarding': 0,
-      '/onboarding/privacy': 0,
-      '/onboarding/usage': 1,
-      '/onboarding/setup': 1,
-      '/onboarding/baseline': 1,
-      '/onboarding/goal': 2,
-      '/onboarding/brands': 3,
-      '/onboarding/done': 4,
-    };
-    const stepIndex: Record<string, number> = {
-      privacy: 0,
-      usage: 1,
-      setup: 1,
-      baseline: 1,
-      goal: 2,
-      brands: 3,
-      done: 4,
-    };
-    const requestedRoute = Object.keys(ORDER).find(
-      (r) => pathname === r || pathname.startsWith(`${r}/`),
-    );
-    if (requestedRoute) {
-      const requested = ORDER[requestedRoute];
-      const current = stepIndex[(profile?.onboarding_step as string) ?? 'privacy'] ?? 0;
-      // Allow moving forward to the next step but not skipping ahead.
-      if (requested > current + 1) {
-        const target = (Object.entries(ORDER).find(([, v]) => v === current) ?? ['/onboarding/privacy'])[0];
-        return finalize(NextResponse.redirect(new URL(target, request.url)));
-      }
-    }
+  // by typing a deeper URL. onboarding_step is the next page they should see.
+  if (
+    !onboarded &&
+    isOnboardingRoute(pathname) &&
+    !canAccessOnboardingStep(effectiveOnboardingStep(steps), pathname)
+  ) {
+    return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
 
   if (onboarded && isOnboardingRoute(pathname)) {
-    // Done summary is the one onboarding route a freshly-onboarded user is
-    // allowed to see, and only while their step is still 'done' (i.e. they
-    // haven't visited the dashboard yet).
+    // Done summary is the one onboarding route an onboarded user may still see.
     const isDonePath = pathname === '/onboarding/done';
     const stepIsDone = profile?.onboarding_step === 'done';
     if (!(isDonePath && stepIsDone)) {
