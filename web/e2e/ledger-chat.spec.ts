@@ -100,4 +100,18 @@ test.describe('ask the ledger', () => {
     const fits = await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
   });
+
+  test('with reduced motion the panel fades in without sliding or rising', async ({ page, onboarded }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await seedLogs(onboarded.id, [{ localDate: istYmdDaysAgo(0), quantity: 2, totalPriceInr: 40, unitPriceInr: 20 }]);
+
+    await login(page, onboarded);
+    await page.getByRole('button', { name: /^Ask the ledger/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog).toBeVisible();
+
+    // The reduced-motion override swaps the slide/rise keyframes for an opacity-only fade.
+    const animation = await dialog.evaluate((el) => getComputedStyle(el).animationName);
+    expect(animation).toBe('ask-sheet-fade');
+  });
 });

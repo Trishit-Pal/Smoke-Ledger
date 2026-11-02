@@ -13,6 +13,14 @@ const dashboard = readFileSync(join(__dirname, '..', 'app', '(app)', 'dashboard'
 const trends = readFileSync(join(__dirname, '..', 'app', '(app)', 'trends', 'TrendsClient.tsx'), 'utf8');
 const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'SettingsClient.tsx'), 'utf8');
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
+const css = readFileSync(join(__dirname, '..', 'app', 'globals.css'), 'utf8');
+
+/** The catch block that follows the consent audit call in `src`. */
+function auditCatch(src: string): string {
+  const audit = src.indexOf("recordAuditEvent('ledger_chat_consent_toggled'");
+  const katch = src.indexOf('catch', audit);
+  return src.slice(katch, src.indexOf('}', katch) + 1);
+}
 
 describe('AskLedgerPanel', () => {
   test('renders figures through MetricRow and masks at the render site with the shared helpers', () => {
@@ -48,6 +56,24 @@ describe('AskLedgerPanel', () => {
     expect(panel).toContain('Turn on and ask');
     // The audit call sits inside a try block.
     expect(panel.slice(audit - 200, audit)).toMatch(/try\s*\{/);
+  });
+
+  test('a failed consent audit call is logged, in the panel and in Settings, never silently dropped', () => {
+    for (const src of [panel, settings]) {
+      const block = auditCatch(src);
+      expect(block).toMatch(/catch \(\w+\)/);
+      expect(block).toContain('logClientError(');
+      expect(src).toContain("import { logClientError } from '@/lib/logger'");
+    }
+  });
+
+  test('with reduced motion the sheet only fades: no slide, no rise', () => {
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.ask-sheet\[data-state='open'\]\s*\{\s*animation:\s*ask-sheet-fade\b/,
+    );
+    const fade = css.slice(css.indexOf('@keyframes ask-sheet-fade'), css.indexOf('.ask-sheet[data-state'));
+    expect(fade).toContain('opacity');
+    expect(fade).not.toContain('transform');
   });
 
   test('renders the answer as plain text, never as HTML', () => {

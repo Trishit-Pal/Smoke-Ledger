@@ -91,7 +91,7 @@ function okData(name: string, input: unknown, c: ToolContext = ctx()): Record<st
 
 describe('TOOL_DEFS', () => {
   it('every tool is strict with a closed object schema', () => {
-    expect(TOOL_DEFS.length).toBe(9);
+    expect(TOOL_DEFS.length).toBe(8);
     for (const t of TOOL_DEFS) {
       expect(t.strict).toBe(true);
       expect(t.input_schema.type).toBe('object');
@@ -229,7 +229,7 @@ describe('spend_outlook', () => {
   });
 });
 
-describe('goal_status and insights', () => {
+describe('goal_status', () => {
   it('goal_status strips goal ids', () => {
     const data = okData('goal_status', {}) as { goals: Record<string, unknown>[] };
     expect(data.goals.length).toBe(1);
@@ -246,13 +246,13 @@ describe('goal_status and insights', () => {
     expect(String(r.rows[0].label)).not.toMatch(/[₹€\d]/);
   });
 
-  it('insights strips ids and timestamps', () => {
-    const data = okData('insights', {}) as { insights: Record<string, unknown>[] };
-    expect(Array.isArray(data.insights)).toBe(true);
-    for (const i of data.insights) {
-      expect(i).not.toHaveProperty('id');
-      expect(i).not.toHaveProperty('generatedAt');
-    }
+});
+
+describe('insights', () => {
+  // Its figures could reach the reader only through prose the prompt forbids.
+  it('is not a tool the model can call', () => {
+    expect(TOOL_DEFS.map((t) => t.name)).not.toContain('insights');
+    expect(runTool('insights', {}, ctx())).toEqual({ ok: false, error: 'unknown tool: insights' });
   });
 });
 

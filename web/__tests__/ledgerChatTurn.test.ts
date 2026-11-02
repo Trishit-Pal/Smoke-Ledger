@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import { buildToolContext } from '@/domain/ledgerChat/context';
 import type { DailySummaryRow } from '@/domain/periodSummary';
@@ -110,6 +110,27 @@ describe('runLedgerChatTurn', () => {
     expect(result.usage.guardRetries).toBe(1);
     expect(result.answer).toBe(FALLBACK_ANSWER);
     expect(result.rows.length).toBeGreaterThan(0);
+  });
+
+  describe('effort', () => {
+    afterEach(() => vi.unstubAllEnvs());
+    const effortSent = async () => {
+      const { client, calls } = fakeClient([message([text('Nothing to add.')], 'end_turn')]);
+      await run(client);
+      return calls[0].output_config?.effort;
+    };
+
+    test('asks for medium effort when LEDGER_CHAT_EFFORT is medium (owner testing)', async () => {
+      vi.stubEnv('LEDGER_CHAT_EFFORT', 'medium');
+      expect(await effortSent()).toBe('medium');
+    });
+
+    test('stays at low effort when LEDGER_CHAT_EFFORT is unset or anything else', async () => {
+      vi.stubEnv('LEDGER_CHAT_EFFORT', 'max');
+      expect(await effortSent()).toBe('low');
+      vi.unstubAllEnvs();
+      expect(await effortSent()).toBe('low');
+    });
   });
 
   test('a refusal yields the calm fallback and runs no tools', async () => {

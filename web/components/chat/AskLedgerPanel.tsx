@@ -29,6 +29,7 @@ import {
 import { isHomeTotalsHidden, maskNumbers } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { logClientError } from '@/lib/logger';
 import { localeForCountry } from '@/lib/regions';
 import { track } from '@/services/analytics';
 import { recordAuditEvent } from '@/services/audit';
@@ -148,7 +149,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
           setPending(null);
           setDraft('');
           setStatus('idle');
-          void track(AnalyticsEvents.LEDGER_CHAT_ASKED, { starter, tools: body.toolsUsed.length });
+          void track(AnalyticsEvents.LEDGER_CHAT_ASKED, { starter, tools: body.toolsUsed });
           return;
         }
         const body = (await res.json().catch(() => null)) as { error?: ChatErrorCode } | null;
@@ -183,9 +184,11 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         enabled: true,
         privacyVersion: LEGAL_VERSIONS.privacy,
       });
-    } catch {
+    } catch (e) {
       // Consent is already saved. The audit row is best-effort here: the edge
       // allowlist may lag a deploy, and that must never block the answer.
+      // Logged, not dropped: a missing row is a gap in the consent evidence.
+      void logClientError(e, { category: 'client.audit.ledger_chat', route: 'ask-ledger-panel' });
     }
     await send(pending.question, pending.starter);
   };

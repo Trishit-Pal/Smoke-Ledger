@@ -58,6 +58,7 @@ import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { logClientError } from '@/lib/logger';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
 import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
@@ -435,8 +436,10 @@ export function SettingsClient({
           enabled: value,
           privacyVersion: LEGAL_VERSIONS.privacy,
         });
-      } catch {
-        // The consent itself is saved; the audit row is best-effort here.
+      } catch (e) {
+        // The consent itself is saved; the audit row is best-effort here, but
+        // a missing row is a gap in the consent evidence, so it is logged.
+        void logClientError(e, { category: 'client.audit.ledger_chat', route: 'settings' });
       }
     } catch (e) {
       setError(describeError(e));

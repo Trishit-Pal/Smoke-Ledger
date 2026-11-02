@@ -21,4 +21,10 @@ describe('middleware carve-out for /api/ledger-chat', () => {
     expect(middleware).not.toMatch(/startsWith\('\/api\/?'\)/);
     expect(middleware).not.toMatch(/startsWith\('\/api'\)/);
   });
+
+  test('the carve-out is an exact match, so no sub-path of the chat route skips the middleware', () => {
+    // The route re-applies the gates the middleware skips; a sub-path would get neither.
+    expect(middleware).toContain("pathname === '/api/ledger-chat'");
+    expect(middleware).not.toMatch(/startsWith\(\s*['"`]\/api\/ledger-chat/);
+  });
 });

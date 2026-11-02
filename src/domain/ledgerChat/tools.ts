@@ -16,10 +16,8 @@ import {
 import { moodTriggerMatrix } from '@/domain/correlations';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { evaluateGoal } from '@/domain/goals';
-import { generateInsights } from '@/domain/insights';
 import { periodWithTrend, savedAllTime, totalsForWindow, weightedAvgUnitPrice } from '@/domain/periodSummary';
 import { hourBucketLabel } from '@/lib/date';
-import { formatMoney } from '@/lib/format';
 
 export const TOOL_NAMES = [
   'compare_periods',
@@ -29,7 +27,6 @@ export const TOOL_NAMES = [
   'when_and_why',
   'brand_mix',
   'goal_status',
-  'insights',
   'recent_entries',
 ] as const;
 
@@ -124,13 +121,6 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'goal_status',
     description: 'Progress on each active goal. Use for "how am I doing on my goal".',
-    strict: true,
-    input_schema: schema({}),
-  },
-  {
-    name: 'insights',
-    description:
-      'The app\'s own rules-based observations about the last 30 days (peak hour, dominant trigger, trend versus baseline, brand concentration).',
     strict: true,
     input_schema: schema({}),
   },
@@ -349,17 +339,6 @@ function goalStatus(_input: unknown, ctx: ToolContext): ToolOutcome {
   };
 }
 
-function insights(_input: unknown, ctx: ToolContext): ToolOutcome {
-  const money = (n: number) => formatMoney(n, ctx.currency, { locale: ctx.locale });
-  const list = generateInsights(ctx.logs, ctx.today, money);
-  // ponytail: no rows — insight titles are sentences, not figures; the narration carries them.
-  return {
-    ok: true,
-    data: { insights: list.map(({ id: _id, generatedAt: _at, ...rest }) => rest) },
-    rows: [],
-  };
-}
-
 function cleanNote(note: string): string {
   return note.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, NOTE_MAX_CHARS);
 }
@@ -406,7 +385,6 @@ const RUNNERS: Record<ToolName, Runner> = {
   when_and_why: withInput(emptyInput, whenAndWhy),
   brand_mix: withInput(emptyInput, brandMix),
   goal_status: withInput(emptyInput, goalStatus),
-  insights: withInput(emptyInput, insights),
   recent_entries: withInput(recentEntriesInput, recentEntries),
 };
 

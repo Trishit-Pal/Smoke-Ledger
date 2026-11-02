@@ -94,7 +94,8 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
           { type: 'text', text: contextBlock },
         ],
         tools: TOOLS,
-        output_config: { effort: 'low' },
+        // ponytail: medium only for the owner's testing; any other value stays low.
+        output_config: { effort: process.env.LEDGER_CHAT_EFFORT?.trim() === 'medium' ? 'medium' : 'low' },
         messages,
       },
       { signal: input.signal },

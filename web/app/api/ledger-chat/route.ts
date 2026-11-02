@@ -13,7 +13,8 @@ import { runLedgerChatTurn } from '@web/lib/server/ledgerChat/turn';
 import { loadDailySummary, loadGoals, loadLogsPage, loadProfile, toDailySummaryRow } from '@web/lib/server/data';
 import { cleanEnvValue } from '@web/lib/supabase/env';
 
-// Two model calls plus four parallel reads fit well inside this; Hobby allows 300s.
+// Consent, profile, two rate-limit RPCs, three parallel reads, then two to four
+// model calls fit well inside this; Hobby allows 300s.
 export const maxDuration = 30;
 // Production Supabase is in AWS us-east-2 (Ohio); cle1 (Cleveland) is the Vercel
 // region next to it, so the tool queries stay in-region.

@@ -58,6 +58,7 @@ export interface EventPayloadMap {
   brand_created: { category: BrandCategory; is_seed: boolean };
   // Same treatment: category + is_seed instead of brand_id UUID.
   brand_favorited: { category: BrandCategory; is_seed: boolean };
-  // Whether a starter was tapped and how many tools answered; never the question.
-  ledger_chat_asked: { starter: boolean; tools: number };
+  // Whether a starter was tapped and which tools answered (names from a fixed set
+  // the route validates); never the question or the answer.
+  ledger_chat_asked: { starter: boolean; tools: string[] };
 }
