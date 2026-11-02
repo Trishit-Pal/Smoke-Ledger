@@ -44,6 +44,43 @@ const _goalProgressValid: EventPayloadMap['goal_progress_viewed'] = { goal_type:
 const _goalProgressSpend: EventPayloadMap['goal_progress_viewed'] = { goal_type: 'spend_cap_daily' };
 
 // ---------------------------------------------------------------------------
+// goal_created: optional from_proposal boolean; must NOT accept goal_id
+// ---------------------------------------------------------------------------
+
+// @ts-expect-error goal_id is not in goal_created payload
+const _goalCreatedWithId: EventPayloadMap['goal_created'] = { type: 'daily_cap', goal_id: 'abc-123' };
+
+const _goalCreatedPlain: EventPayloadMap['goal_created'] = { type: 'taper' };
+const _goalCreatedFromProposal: EventPayloadMap['goal_created'] = { type: 'daily_cap', from_proposal: true };
+
+// ---------------------------------------------------------------------------
+// goal_proposal_accepted: must NOT accept goal_id; must accept type + kind
+// ---------------------------------------------------------------------------
+
+// @ts-expect-error goal_id is not in goal_proposal_accepted payload
+const _proposalAcceptedWithId: EventPayloadMap['goal_proposal_accepted'] = { type: 'daily_cap', kind: 'next', goal_id: 'abc-123' };
+
+const _proposalAcceptedValid: EventPayloadMap['goal_proposal_accepted'] = { type: 'spend_cap_daily', kind: 'start' };
+
+// ---------------------------------------------------------------------------
+// goal_proposal_dismissed: must NOT accept goal_id; must accept type + kind
+// ---------------------------------------------------------------------------
+
+// @ts-expect-error goal_id is not in goal_proposal_dismissed payload
+const _proposalDismissedWithId: EventPayloadMap['goal_proposal_dismissed'] = { type: 'daily_cap', kind: 'reanchor', goal_id: 'abc-123' };
+
+const _proposalDismissedValid: EventPayloadMap['goal_proposal_dismissed'] = { type: 'daily_cap', kind: 'reanchor' };
+
+// ---------------------------------------------------------------------------
+// goal_auto_completed: must NOT accept goal_id; must accept type + reason
+// ---------------------------------------------------------------------------
+
+// @ts-expect-error goal_id is not in goal_auto_completed payload
+const _autoCompletedWithId: EventPayloadMap['goal_auto_completed'] = { type: 'quit_date', reason: 'quit_date', goal_id: 'abc-123' };
+
+const _autoCompletedValid: EventPayloadMap['goal_auto_completed'] = { type: 'taper', reason: 'taper_done' };
+
+// ---------------------------------------------------------------------------
 // insight_viewed: must NOT accept insight_id; must accept insight_category
 // ---------------------------------------------------------------------------
 
@@ -99,12 +136,17 @@ describe('EventPayloadMap shape contracts', () => {
 
   it('goal_progress_viewed accepts all GoalType values', () => {
     const types: Array<EventPayloadMap['goal_progress_viewed']['goal_type']> = [
-      'daily_cap', 'spend_cap_daily', 'no_smoke_window', 'reduction_target', 'weekly_target', 'quit_date',
+      'daily_cap', 'spend_cap_daily', 'no_smoke_window', 'reduction_target', 'weekly_target', 'quit_date', 'taper',
     ];
     types.forEach((goal_type) => {
       const payload: EventPayloadMap['goal_progress_viewed'] = { goal_type };
       expect(payload.goal_type).toBe(goal_type);
     });
+  });
+
+  it('goal_progress_viewed accepts taper as a goal_type', () => {
+    const payload: EventPayloadMap['goal_progress_viewed'] = { goal_type: 'taper' };
+    expect(payload.goal_type).toBe('taper');
   });
 
   it('insight_viewed accepts all insight_category values', () => {

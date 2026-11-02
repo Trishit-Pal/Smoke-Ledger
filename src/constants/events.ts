@@ -4,6 +4,8 @@
 // Design rule: payloads must NOT carry UUIDs, per-row IDs, or user-input text.
 // Use aggregate/enum fields only so no downstream consumer can reconstruct timelines.
 
+import type { DismissKind } from '@/domain/goalMeta';
+import type { ProposalKind } from '@/domain/goalProposals';
 import type { BrandCategory, GoalType } from '@/types';
 
 export const AnalyticsEvents = {
@@ -16,6 +18,9 @@ export const AnalyticsEvents = {
   LOG_DELETED: 'log_deleted',
   GOAL_CREATED: 'goal_created',
   GOAL_PROGRESS_VIEWED: 'goal_progress_viewed',
+  GOAL_PROPOSAL_ACCEPTED: 'goal_proposal_accepted',
+  GOAL_PROPOSAL_DISMISSED: 'goal_proposal_dismissed',
+  GOAL_AUTO_COMPLETED: 'goal_auto_completed',
   INSIGHT_VIEWED: 'insight_viewed',
   REPORT_VIEWED: 'report_viewed',
   REMINDER_ENABLED: 'reminder_enabled',
@@ -44,9 +49,14 @@ export interface EventPayloadMap {
   log_edited: { field_changed?: 'quantity' | 'price' | 'time' | 'meta' | 'multiple' };
   // Knowing a deletion occurred is enough; the row ID adds no analytics value.
   log_deleted: Record<string, never>;
-  goal_created: { type: GoalType };
+  // from_proposal is true when the goal was created by accepting a proposal.
+  goal_created: { type: GoalType; from_proposal?: boolean };
   // goal_type replaces goal_id — identifies which kind of goal was viewed, not which row.
   goal_progress_viewed: { goal_type: GoalType };
+  // kind is the proposal kind (start/next/reanchor); no goal or proposal ids.
+  goal_proposal_accepted: { type: GoalType; kind: ProposalKind };
+  goal_proposal_dismissed: { type: GoalType; kind: DismissKind };
+  goal_auto_completed: { type: GoalType; reason: 'quit_date' | 'taper_done' };
   // insight_category replaces insight_id — per-session IDs are ephemeral random values
   // (generated via makeId), not canonical seeds, so they constitute soft PII.
   insight_viewed: { insight_category: 'time_of_day' | 'trigger' | 'trend' | 'brand' | 'dow' | 'onboarding' };
