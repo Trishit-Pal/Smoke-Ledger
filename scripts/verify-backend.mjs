@@ -127,6 +127,9 @@ async function main() {
   await checkRpcExists(supabase, 'sync_default_brand_catalog');
   await checkRpcExists(supabase, 'refresh_seed_prices_from_catalog');
 
+  // service_role only: the anon call is denied (42501), which still proves the function exists.
+  await checkRpcExists(supabase, 'purge_expired_records');
+
   // record_audit_event must NOT be callable by anon/unauthenticated
   try {
     const { error } = await supabase.rpc('record_audit_event', {
@@ -206,6 +209,7 @@ async function main() {
     skip('export pagination smoke', 'set E2E_USER_A_EMAIL / E2E_USER_A_PASSWORD');
   }
 
+  note("Manual (owner action if pg_cron is absent): SELECT jobname, schedule FROM cron.job WHERE jobname = 'purge-expired-records'; scripts/sql/smoke.sql also gates this in CI");
   note('Manual: Supabase Auth → Enable Confirm email');
   note('Manual: Edge secrets → ALLOWED_ORIGINS, AUDIT_PEPPER, SUPABASE_SERVICE_ROLE_KEY');
   note('Manual: Optional Captcha (Turnstile) + NEXT_PUBLIC_TURNSTILE_SITE_KEY on web');
