@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: 256c296
+last_verified_commit: 13fe5cf
 status: current
 ---
 
@@ -441,7 +441,10 @@ days) through `getServerLogsPage({ fromDate, limit: 2000 })`; on mobile `boot` a
 It is still one request per load. The ceiling is 2000 rows: it covers at least 33
 entries a day over 60 days and 22 over 90. If a page ever comes back with a cursor,
 the upgrade path is to page until `nextCursor` is null; the
-30-day proposal window stays complete in practice.
+30-day proposal window stays complete in practice. Ask the ledger reads the same ceiling
+(`GOAL_WINDOW_LOG_LIMIT`, exported from `web/lib/server/data.ts`) over its own 90-day
+window, so its goal line agrees with Home for a heavy logger; the model's
+`recent_entries` keeps its own 200-row slice, so what the model sees does not grow.
 
 ### Insights
 
@@ -496,7 +499,8 @@ nPrice }>`. Logs missing either field are silently skipped. The function returns
   if no priced logs exist in the pair).
 
 The matrix is displayed on the Trends screen as an `MoodTriggerMatrix` chart
-component. The database also maintains a `v_mood_trigger_heatmap` view
+component. Under discreet mode its pair count and cell counts mask through
+`formatCount` (the mobile view takes it as a prop). The database also maintains a `v_mood_trigger_heatmap` view
 (`supabase/migrations/20260504000000_enhancements.sql:157`) that aggregates the
 same data server-side with `security_invoker = true`, so it inherits
 `cigarette_logs` RLS. The in-memory function and the DB view are independent;
@@ -774,10 +778,13 @@ anchor).
   next step or a re-anchor, and never reach `met`; a quit date gets a start date
   proposal and completes on its date; no-smoke windows and legacy reduction goals
   get no proposal at all.
-- Under discreet mode the screen-reader data tables behind the Trends charts
-  (`ChartDataTable`, now with a Cap column) and the mobile "Around X a day"
-  sentence under the sticks chart are not masked. Both pre-date this work; the
-  cap line widened the first.
+- Under discreet mode every Trends chart masks its tooltip, labels, sr-only data
+  table (including the Cap column) and brand names, and mobile masks the deck and
+  "Around X a day" (see Security and privacy for the render sites). Two things stay
+  visible on purpose: the heatmap's busiest-hour clock time ("at 15:00", a pattern,
+  not a count) and the digit-free captions "A flat line." / "A sparse window".
+  The mobile wiring of the chart formatters has no automated test, and the
+  strengthened discreet e2e runs only in CI.
 - A failed reconcile write is retried only by the next load; there is no retry
   queue or backoff, and mobile shows the failure notice only on the goals tab.
 - `no_smoke_window` still reads its hours straight from `goal.meta` rather than

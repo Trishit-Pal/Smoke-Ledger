@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "256c296",
+      "last_verified_commit": "13fe5cf",
       "status": "current"
     },
     {
@@ -115,7 +115,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "256c296",
+      "last_verified_commit": "13fe5cf",
       "status": "current"
     },
     {
@@ -129,10 +129,16 @@
         "web/components/character/**",
         "src/lib/achievements.ts",
         "app/(tabs)/index.tsx",
-        "web/app/(app)/dashboard/**"
+        "web/app/(app)/dashboard/**",
+        "app/onboarding/done.tsx",
+        "web/app/onboarding/done/**",
+        "web/app/(auth)/login/page.tsx",
+        "web/components/marketing/AccountDeletedNotice.tsx",
+        "web/components/character/MilestoneCelebration.tsx",
+        "app/(auth)/login.tsx"
       ],
-      "last_verified_commit": "1a40fb0",
-      "status": "drifting"
+      "last_verified_commit": "13fe5cf",
+      "status": "current"
     },
     {
       "id": "security-privacy",
@@ -147,9 +153,11 @@
         "web/app/api/**",
         "web/lib/server/ledgerChat/**",
         "src/domain/ledgerChat/**",
+        "src/lib/discreet.ts",
+        "web/components/charts/**",
         "docs/security/**"
       ],
-      "last_verified_commit": "9d24456",
+      "last_verified_commit": "13fe5cf",
       "status": "current"
     },
     {

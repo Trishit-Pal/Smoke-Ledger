@@ -12,8 +12,10 @@ sources:
   - web/app/onboarding/done/**
   - web/app/(auth)/login/page.tsx
   - web/components/marketing/AccountDeletedNotice.tsx
-last_verified_commit: 1a40fb0
-status: drifting
+  - web/components/character/MilestoneCelebration.tsx
+  - app/(auth)/login.tsx
+last_verified_commit: 13fe5cf
+status: current
 ---
 
 # Celebrations
@@ -34,15 +36,15 @@ On the dashboard, two kinds of moments trigger a celebration.
 
 **Grand milestones.** The long-haul tiers (60, 100, 365 days) carry a `grand` flag. For these, the modal shows the `victory` pose instead of `applaud`, and the confetti burst is fuller (≈32 flecks on web, 28 on mobile vs. the standard 18/14). The masthead companion also switches to `victory` and fires its own burst. This is the one place the dormant `victory` mood is used.
 
-**Onboarding completion.** The final onboarding screen (web `onboarding/done`, mobile `app/onboarding/done.tsx`) shows a `victory` figure with a one-shot confetti burst as the "you're set up" ledger prints. This is self-contained — onboarding is outside the `(app)` shell, so no event-bus listener is mounted there; the figure and burst are rendered directly and gated locally by reduce-motion.
+**Onboarding completion.** The final onboarding screen (web `onboarding/done`, mobile `app/onboarding/done.tsx`) shows a `victory` figure with a one-shot confetti burst as the "you're set up" ledger prints. This is self-contained — onboarding is outside the `(app)` shell, so no event-bus listener is mounted there; the figure and burst (24 flecks on web, 22 on mobile) are rendered directly and gated locally by reduce-motion. The web summary beside it prints the chosen goal (a no-smoke window shows its protected hours, a taper shows "Gradual taper · sticks / day") or, when none was set, "Suggested after a week of logging".
 
 **Streak break (negative).** When a streak of 3+ days drops to 0, the masthead companion shows the `concern` mood with the caption "Streak reset — tomorrow is a fresh page." (no modal — a setback is never framed as a celebration). On mobile a soft `warn()` haptic accompanies it. The copy is forward-looking and never guilt-trips.
 
-**Account deletion (negative).** After a successful deletion, the web landing page shows a dismissible notice with a `bye`-pose figure and "Your account and all its data have been deleted. You're welcome back anytime." On mobile, the `bye` farewell overlay (`dispatchFarewell`) plays for ~1.6s before returning to sign-in. Warm wave-off, not guilt.
+**Account deletion (negative).** After a successful deletion, the web landing page shows a dismissible notice with a `bye`-pose figure and "Your account and all its data have been deleted. You're welcome back anytime." On mobile, the `bye` farewell overlay (`dispatchFarewell`) plays for ~1.6s before returning to `/login?deleted=1`, where the sign-in screen shows the same sentence as a dismissible text notice (no figure). Both platforms read the flag through `ACCOUNT_DELETED_PARAM` (`src/lib/reauth.ts`). Warm wave-off, not guilt.
 
 **Re-login.** The login screen greets returning users with the `greet` figure and a "Welcome back." caption on arrival (success redirects via a server action, so the warm beat lives on arrival rather than after submit).
 
-For modal celebrations the overlay is semi-transparent and auto-dismisses after 5.2 seconds. The user can dismiss earlier by tapping anywhere outside the card, tapping "Carry on", or — on web — pressing Escape. The figure shown in the modal is `applaud` for standard tiers and `victory` for grand tiers.
+For modal celebrations the overlay is semi-transparent and auto-dismisses after 5.2 seconds. On web the overlay itself scrolls (the card is centred with `margin: auto`), so on a short landscape phone the top of the card is never clipped, while confetti can still spill past the card edge. The user can dismiss earlier by tapping anywhere outside the card, tapping "Carry on", or — on web — pressing Escape. The figure shown in the modal is `applaud` for standard tiers and `victory` for grand tiers.
 
 Achievement celebrations are also self-limiting per session: once the user has **deliberately** dismissed an achievement twice in a single login session, no further achievement modal (or its companion confetti) appears for the rest of that session. The cap resets on the next login. The 5.2-second auto-dismiss does not count toward the cap — only an intentional tap/button/back/Escape does.
 
@@ -60,7 +62,7 @@ Three named events are defined:
 - `character:milestone` — opens the celebration modal.
 - `character:farewell` — opens the logout overlay (not related to celebrations).
 
-`MilestoneEventDetail` (`mood.ts:35–44`) carries `type` (`'streak' | 'birthday'`), `days` (an integer; `0` for birthdays), `title`, and an optional `body`. `dispatchMilestone` (`mood.ts:55–57`) emits the event. `milestoneForStreak` (`mood.ts:86–89`) maps a streak integer to its tier detail, returning `null` for non-tier values so the caller can skip non-milestone days. It injects `type: 'streak'` onto the returned object (`return tier ? { ...tier, type: 'streak' as const } : null`) — the `MILESTONE_TIERS` entries themselves omit `type`, so the factory is the single place that stamps it. This matters because every downstream `d.type === 'streak'` check (the masthead caption and the modal `Day N` header) depends on it; before this was fixed, streak milestones arrived with `type === undefined` and fell through to the birthday branch.
+`MilestoneEventDetail` (`mood.ts:35`) carries `type` (`'streak' | 'birthday'`), `days` (an integer; `0` for birthdays), `title`, and an optional `body`. `dispatchMilestone` emits the event. `milestoneForStreak` (`mood.ts:123`) maps a streak integer to its tier detail, returning `null` for non-tier values so the caller can skip non-milestone days. It injects `type: 'streak'` onto the returned object (`return tier ? { ...tier, type: 'streak' as const } : null`) — the `MILESTONE_TIERS` entries themselves omit `type`, so the factory is the single place that stamps it. This matters because every downstream `d.type === 'streak'` check (the masthead caption and the modal `Day N` header) depends on it; before this was fixed, streak milestones arrived with `type === undefined` and fell through to the birthday branch.
 
 The streak tiers live in `MILESTONE_TIERS`. The 60/100/365 entries carry `grand: true`, which the modal reads to switch the pose to `victory` and widen the confetti:
 
@@ -77,13 +79,13 @@ The streak tiers live in `MILESTONE_TIERS`. The 60/100/365 entries carry `grand:
 
 ### Birthday detection — `src/domain/age.ts`
 
-`isBirthdayToday(dobIso, today)` (`age.ts:44–60`) compares local month and day against the user's stored ISO date of birth. It has one special case: people born on February 29 get their birthday on March 1 in non-leap years. The function takes an injected `today` parameter so it is easily testable without touching system time.
+`isBirthdayToday(dobIso, today)` (`age.ts:44`) compares local month and day against the user's stored ISO date of birth. It has one special case: people born on February 29 get their birthday on March 1 in non-leap years. The function takes an injected `today` parameter so it is easily testable without touching system time.
 
 ### Dispatch sites
 
 **Mobile (`app/(tabs)/index.tsx`).**
 
-The birthday effect runs after the profile loads (`index.tsx:426–439`). A `birthdayFiredRef` ref prevents it from firing more than once per session. When `isBirthdayToday` returns true, `dispatchMilestone` is called with `type: 'birthday'`, `days: 0`, and the hardcoded title/body strings.
+The birthday effect runs after the profile loads. A `birthdayFiredRef` ref prevents it from firing more than once per session. When `isBirthdayToday` returns true, `dispatchMilestone` is called with `type: 'birthday'`, `days: 0`, and the hardcoded title/body strings.
 
 The streak effect stores the previous streak value in `prevStreakRef`. It calls `milestoneForStreak` and dispatches a milestone when `streak > prev` — so the milestone never fires on first load. When the streak drops to `0` from a previous value of `3` or more, it instead dispatches a `concern` mood (the streak-break nudge) plus a `warn()` haptic on mobile; smaller drops and non-zero values are ignored. On first render, `prevStreakRef` is set to the current value and the effect returns early.
 
@@ -154,13 +156,13 @@ The `seed` prop acts purely as a memoisation key. Changing `seed` regenerates th
 
 **`days: 0` seed for birthday confetti.** Because birthdays always pass `seed=0` to `ConfettiBurst`, every birthday celebration produces the same random seed for the distribution memoisation. Since `Math.random()` is called at memo-creation time the distribution will vary across sessions, but within one mount cycle with `seed=0` it is always the same fleck layout. This is cosmetically fine.
 
-**Web differences.** The web `MilestoneCelebration` renders via `createPortal` to `document.body` and uses `window.addEventListener` / `window.dispatchEvent`. It adds an Escape-key listener when open (`web/components/character/MilestoneCelebration.tsx:58–65`). The mobile version uses a React Native `Modal` with `onRequestClose` for the Android back button. Functionally equivalent.
+**Web differences.** The web `MilestoneCelebration` renders via `createPortal` to `document.body` and uses `window.addEventListener` / `window.dispatchEvent`. It adds an Escape-key listener when open (`web/components/character/MilestoneCelebration.tsx:78–82`). The mobile version uses a React Native `Modal` with `onRequestClose` for the Android back button. Functionally equivalent.
 
 **Confetti in the modal vs. the masthead.** The celebration modal renders its own `ConfettiBurst`, and the masthead `CharacterCompanion` separately renders one when it receives the `applaud`/`victory` mood. Both are now gated on reduce-motion (the earlier asymmetry — modal burst ungated — was fixed in this section's latest pass).
 
 ## Tests
 
-`src/tests/age.test.ts` — the `isBirthdayToday` describe block covers: match on month+day (`age.test.ts:51–54`), non-match on differing month or day (`age.test.ts:56–59`), malformed/impossible dates (`age.test.ts:62–64`), and the Feb 29 / non-leap-year case (`age.test.ts:67–75`). This is the only automated test coverage for the celebrations system. There are no unit tests for `MilestoneCelebration`, `CharacterCompanion`, `ConfettiBurst`, `Figure`, or the dispatch/milestone logic in `mood.ts`.
+`src/tests/age.test.ts` — the `isBirthdayToday` describe block covers: match on month+day (`age.test.ts:51–54`), non-match on differing month or day (`age.test.ts:56–59`), malformed/impossible dates (`age.test.ts:62–64`), and the Feb 29 / non-leap-year case (`age.test.ts:67–75`). `src/tests/achievements.test.ts` pins the suppression rule (cap of 2, not suppressed below it). `web/__tests__/milestoneOverlayStyles.test.ts` reads the web `MilestoneCelebration` source and fails if a Tailwind `theme()` call lands in an inline style or the card loses its `py-xxl` / clamp padding classes. There are no unit tests for `CharacterCompanion`, `ConfettiBurst`, `Figure`, or the dispatch/milestone logic in `mood.ts`, and the overlay scroll layout is not tested at all.
 
 ## Open gaps
 

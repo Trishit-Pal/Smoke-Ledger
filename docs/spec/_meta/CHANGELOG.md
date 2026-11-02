@@ -4,6 +4,13 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — 13fe5cf
+- celebrations: full re-verify against the code. Fixed stale line references, the "only test is age.test.ts" claim (now also achievements and milestone-overlay-styles tests), the web modal's scrolling overlay, onboarding burst counts and goal summary wording, and the mobile login's deleted-account notice; sources now list every file the section describes (mobile login, web MilestoneCelebration). Re-stamped current.
+- security-privacy: new "Discreet mode: masking at the render site" subsection and invariant (sr-only tables, aria-labels, SVG titles, tooltips, brand aliases via `src/lib/discreet.ts`); chat log window is now one page of up to 2000 rows (model's `recent_entries` still 200); panel session lookup never rejects; open gaps record the visible heatmap peak hour, digit-free mobile captions, untested mobile chart wiring and the CI-only discreet e2e. Sources add `src/lib/discreet.ts` and `web/components/charts/**`.
+- goals-insights: chat reads the 2000-row goal window; mood x trigger counts mask; the unmasked-sr-only-tables gap is closed (replaced by the known remaining items).
+- architecture: `GOAL_WINDOW_LOG_LIMIT` is exported and shared with the chat route.
+- DESIGN.md: the masking rule now names sr-only tables, aria-labels, SVG titles, tooltips, keys and brand aliasing.
+
 ## 2026-11-02 — 256c296
 - goals-insights: met is live (`metOn` and a standing hold, else on_track; next step needs the hold too); Home "Off track." for goals with no over days; log window ceiling (one page of up to 2000 rows for goal loaders, web and mobile).
 - architecture: dashboard and mobile boot/refreshLogs read goal windows in one page of up to 2000 rows (`getServerLogsPage`, `listLogsPage`).
