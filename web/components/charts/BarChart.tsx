@@ -85,7 +85,7 @@ export function BarChart({
         </RBarChart>
       </ResponsiveContainer>
     </div>
-    <ChartDataTable caption={title} rows={data} />
+    <ChartDataTable caption={title} rows={data} formatValue={formatY} />
     </>
   );
 }

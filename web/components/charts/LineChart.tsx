@@ -87,7 +87,7 @@ export function LineChart({ data, height = 160, formatY, strokeColor, title = 'L
         </RLineChart>
       </ResponsiveContainer>
     </div>
-    <ChartDataTable caption={title} rows={data} />
+    <ChartDataTable caption={title} rows={data} formatValue={formatY} />
     </>
   );
 }

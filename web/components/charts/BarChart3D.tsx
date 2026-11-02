@@ -21,9 +21,11 @@ export interface BarChart3DDatum {
 export interface BarChart3DProps {
   data: BarChart3DDatum[];
   color?: string;
+  /** Formats the per-bar value (visible + aria), e.g. discreet masking. Default: String. */
+  formatValue?: (v: number) => string;
 }
 
-export function BarChart3D({ data, color = CHART_SERIES[0] }: BarChart3DProps) {
+export function BarChart3D({ data, color = CHART_SERIES[0], formatValue = String }: BarChart3DProps) {
   const reduced = useReduceMotion();
 
   if (!data.length) {
@@ -36,7 +38,7 @@ export function BarChart3D({ data, color = CHART_SERIES[0] }: BarChart3DProps) {
     <div
       className="scene-3d relative h-52 w-full"
       role="img"
-      aria-label={`${data.map((d) => `${d.label} ${d.value}`).join(', ')}`}
+      aria-label={`${data.map((d) => `${d.label} ${formatValue(d.value)}`).join(', ')}`}
     >
       <div
         className="absolute inset-x-4 bottom-8 top-4 flex items-end justify-between gap-sm"
@@ -71,7 +73,7 @@ export function BarChart3D({ data, color = CHART_SERIES[0] }: BarChart3DProps) {
                 />
               </div>
               <div className="text-center">
-                <p className="text-small font-medium text-text nums-tabular">{d.value}</p>
+                <p className="text-small font-medium text-text nums-tabular">{formatValue(d.value)}</p>
                 <p className="editorial-caption-tight">{d.label}</p>
               </div>
             </div>
