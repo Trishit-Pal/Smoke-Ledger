@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { createGoal, updateGoal, setGoalStatus, deleteGoal } from '@/db/repositories/goals';
 import { toSafeErrorMessage } from '@/lib/errors';
 import {
   GOAL_TYPE_META,
+  creatableGoalTypes,
   emptyGoalForm,
+  proposalToForm,
   goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
@@ -16,13 +18,22 @@ import {
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
+import { describeProposal, proposeStart } from '@/domain/goalProposals';
+import type { SpendPeriod } from '@/domain/goalMeta';
+import { formatMoney } from '@/lib/format';
+import { localeForCountry } from '@/lib/regions';
+import { formatIndianDate } from '@/lib/date';
+import { isDiscreetMode } from '@/lib/discreet';
+import { track } from '@/services/analytics';
+import { AnalyticsEvents } from '@/constants/events';
 import { GoalCard } from './GoalCard';
+import { GoalProposal } from './GoalProposal';
+import { isFromProposal, offersStartProposal, parseTypeParam, periodUnitLabel } from './goalsView';
 import { Button } from '@web/components/ui/Button';
 import { Input } from '@web/components/ui/Input';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
 import { EmptyState } from '@web/components/ui/EmptyState';
-import { cn } from '@web/components/ui/cn';
-import { SectionLabel } from '@web/components/visual';
+import { ChoiceRun, SectionLabel } from '@web/components/visual';
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import { dispatchGoalCompletion, dispatchGoalDeletion } from '@web/lib/character/mood';
@@ -36,40 +47,13 @@ export interface GoalsClientProps {
 
 type BusyKey = null | 'submit' | string;
 
-// ── Goal type picker ────────────────────────────────────────────────────────
-
-interface TypePickerProps {
-  value: GoalFormState['type'];
-  onChange: (t: GoalFormState['type']) => void;
-  disabled?: boolean;
-}
-
-function TypePicker({ value, onChange, disabled }: TypePickerProps) {
-  return (
-    <div role="group" aria-label="Goal type" className="flex flex-wrap gap-sm">
-      {GOAL_TYPE_META.map((m) => (
-        <button
-          key={m.type}
-          type="button"
-          role="button"
-          aria-pressed={value === m.type}
-          disabled={disabled}
-          onClick={() => onChange(m.type)}
-          className={cn(
-            'min-h-11 px-md py-sm rounded-full border text-small font-medium transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-            value === m.type
-              ? 'border-accent bg-accent-soft text-accent-ink'
-              : 'border-border bg-transparent text-text-muted hover:border-text-muted',
-            disabled && 'opacity-50 pointer-events-none',
-          )}
-        >
-          {m.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const TYPE_OPTIONS = creatableGoalTypes().map((m) => ({ value: m.type, label: m.label }));
+const PERIOD_OPTIONS: readonly { value: SpendPeriod; label: string }[] = [
+  { value: 'day', label: 'Per day' },
+  { value: 'week', label: 'Per week' },
+  { value: 'month', label: 'Per month' },
+];
+const NO_PROPOSAL_LINE = 'Not enough days logged to suggest one yet — enter a number.';
 
 // ── Goal create / edit form ─────────────────────────────────────────────────
 
@@ -77,11 +61,15 @@ interface GoalFormProps {
   form: GoalFormState;
   logs: CigaretteLog[];
   today: string;
-  currency: UserProfile['currency'];
+  profile: UserProfile;
   isEdit: boolean;
   busy: boolean;
   error: string | null;
+  /** True once the user has taken ("Use") or declined ("Choose my own") the offered proposal. */
+  proposalDecided: boolean;
   onFormChange: (updates: Partial<GoalFormState>) => void;
+  onUseProposal: (updates: Partial<GoalFormState>) => void;
+  onChooseOwn: () => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -90,23 +78,43 @@ function GoalForm({
   form,
   logs,
   today,
-  currency,
+  profile,
   isEdit,
   busy,
   error,
+  proposalDecided,
   onFormChange,
+  onUseProposal,
+  onChooseOwn,
   onSubmit,
   onCancel,
 }: GoalFormProps) {
   const meta = GOAL_TYPE_META.find((m) => m.type === form.type)!;
-  const spendEuro = currency === 'EUR' && form.type === 'spend_cap_daily';
-  const blurb = spendEuro ? 'Keep daily spend under a euro limit.' : meta.blurb;
-  const targetUnit = spendEuro ? '€/day' : meta.targetUnit;
+  const isSpend = form.type === 'spend_cap_daily';
+  const targetUnit = isSpend ? periodUnitLabel(profile.currency, form.period) : meta.targetUnit;
   const derivedBaseline = deriveReductionBaseline(logs, today);
   const baselineHint =
     derivedBaseline > 0
       ? `Your 30-day average is ${derivedBaseline} sticks/day — leave blank to use this.`
       : 'Not enough recent logs to derive a baseline — enter one manually.';
+
+  const proposal = React.useMemo(
+    () =>
+      isEdit || !offersStartProposal(form.type)
+        ? null
+        : proposeStart(form.type, logs, today, { currency: profile.currency, period: form.period }),
+    [isEdit, form.type, form.period, logs, today, profile.currency],
+  );
+  const copy = proposal
+    ? describeProposal(proposal, {
+        formatMoney: (n) => formatMoney(n, profile.currency, { locale: localeForCountry(profile.country) }),
+        formatDate: formatIndianDate,
+        hideMoney: isDiscreetMode(profile) && form.type === 'spend_cap_daily',
+      })
+    : null;
+  const offered = !isEdit && !proposalDecided && proposal && copy ? { proposal, copy } : null;
+  const showInputs = isEdit || !offered;
+  const showNoProposal = !isEdit && offersStartProposal(form.type) && proposal === null;
 
   return (
     <div className="border border-border rounded-lg p-lg flex flex-col gap-md bg-card">
@@ -115,14 +123,50 @@ function GoalForm({
       {!isEdit ? (
         <div className="flex flex-col gap-sm">
           <span className="text-caption uppercase text-text-muted">Type</span>
-          <TypePicker value={form.type} onChange={(t) => onFormChange({ type: t, target: '', baseline: '', quitDate: '' })} disabled={busy} />
-          <p className="text-small text-text-muted">{blurb}</p>
+          <ChoiceRun
+            ariaLabel="Goal type"
+            options={TYPE_OPTIONS}
+            value={form.type}
+            allowClear={false}
+            onSelect={(t) => {
+              if (t && !busy) onFormChange({ type: t, target: '', baseline: '', quitDate: '', finalTarget: '', period: 'day' });
+            }}
+          />
+          <p className="text-small text-text-muted">{meta.blurb}</p>
         </div>
       ) : (
-        <p className="text-small text-text-muted">{meta.label} · {blurb}</p>
+        <p className="text-small text-text-muted">{meta.label} · {meta.blurb}</p>
       )}
 
-      {(form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') && (
+      {isSpend && !isEdit ? (
+        <ChoiceRun
+          ariaLabel="Spend period"
+          options={PERIOD_OPTIONS}
+          value={form.period}
+          allowClear={false}
+          onSelect={(period) => {
+            if (period && !busy) onFormChange({ period, target: '' });
+          }}
+        />
+      ) : null}
+      {isSpend && isEdit ? (
+        <p className="text-small text-text-muted">
+          {PERIOD_OPTIONS.find((o) => o.value === form.period)?.label}, fixed when the goal was created.
+        </p>
+      ) : null}
+
+      {offered ? (
+        <GoalProposal
+          proposal={offered.proposal}
+          copy={offered.copy}
+          busy={busy}
+          onUse={() => onUseProposal(proposalToForm(offered.proposal))}
+          onChooseOwn={onChooseOwn}
+        />
+      ) : null}
+      {showNoProposal ? <p className="text-small text-text-muted">{NO_PROPOSAL_LINE}</p> : null}
+
+      {showInputs && (form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') && (
         <Input
           label={`Target (${targetUnit})`}
           type="number"
@@ -135,7 +179,33 @@ function GoalForm({
         />
       )}
 
-      {form.type === 'reduction_target' && (
+      {showInputs && form.type === 'taper' && (
+        <>
+          <Input
+            label="Starting cap (sticks/day)"
+            type="number"
+            min="0.01"
+            step="any"
+            value={form.target}
+            onChange={(e) => onFormChange({ target: e.target.value })}
+            disabled={busy}
+            placeholder="e.g. 8"
+          />
+          <Input
+            label="Final target (sticks/day)"
+            type="number"
+            min="0.01"
+            step="any"
+            value={form.finalTarget}
+            onChange={(e) => onFormChange({ finalTarget: e.target.value })}
+            disabled={busy}
+            placeholder="e.g. 2"
+          />
+          <p className="text-small text-text-muted">Steps down every 14 days, each one offered first.</p>
+        </>
+      )}
+
+      {showInputs && form.type === 'reduction_target' && (
         <>
           <Input
             label={`Target (${targetUnit})`}
@@ -161,7 +231,7 @@ function GoalForm({
         </>
       )}
 
-      {form.type === 'no_smoke_window' && (
+      {showInputs && form.type === 'no_smoke_window' && (
         <div className="flex gap-md">
           <Input
             label="Start hour (0–23)"
@@ -188,7 +258,7 @@ function GoalForm({
         </div>
       )}
 
-      {form.type === 'quit_date' && (
+      {showInputs && form.type === 'quit_date' && (
         <>
           <Input
             label="Quit date"
@@ -232,17 +302,33 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   const [deleteTarget, setDeleteTarget] = React.useState<Goal | null>(null);
   const [formState, setFormState] = React.useState<GoalFormState>(emptyGoalForm());
   const [formError, setFormError] = React.useState<string | null>(null);
+  // The form as seeded by "Use" (null until then) and whether the user took "Choose my own".
+  const [seeded, setSeeded] = React.useState<GoalFormState | null>(null);
+  const [choseOwn, setChoseOwn] = React.useState(false);
+  const searchParams = useSearchParams();
+  const typeParam = parseTypeParam(searchParams.get('type'));
 
   const active = goals.filter((g) => g.status === 'active');
   const paused = goals.filter((g) => g.status === 'paused');
   const done = goals.filter((g) => g.status === 'completed' || g.status === 'abandoned');
 
-  function openCreate() {
+  function openCreate(type?: GoalFormState['type']) {
     setEditing(null);
-    setFormState(emptyGoalForm());
+    setFormState(emptyGoalForm(type));
+    setSeeded(null);
+    setChoseOwn(false);
     setFormError(null);
     setShowForm(true);
   }
+
+  // `?type=` opens the create form with that type selected, once, on mount.
+  const openedFromParam = React.useRef(false);
+  React.useEffect(() => {
+    if (openedFromParam.current || !typeParam) return;
+    openedFromParam.current = true;
+    openCreate(typeParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
+  }, []);
 
   function openEdit(goal: Goal) {
     setEditing(goal);
@@ -259,6 +345,18 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
 
   function patchForm(updates: Partial<GoalFormState>) {
     setFormState((prev) => ({ ...prev, ...updates }));
+    // A new type or period means a new proposal: offer it afresh.
+    if (updates.type !== undefined || updates.period !== undefined) {
+      setSeeded(null);
+      setChoseOwn(false);
+    }
+    setFormError(null);
+  }
+
+  function useProposal(updates: Partial<GoalFormState>) {
+    const next = { ...formState, ...updates };
+    setFormState(next);
+    setSeeded(next);
     setFormError(null);
   }
 
@@ -291,6 +389,10 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
       setBusy('submit');
       try {
         await createGoal(result.payload);
+        void track(AnalyticsEvents.GOAL_CREATED, {
+          type: formState.type,
+          from_proposal: isFromProposal(formState, seeded),
+        });
         await revalidateAppViews();
         router.refresh();
         closeForm();
@@ -357,7 +459,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
           subtitle="Set a cap, a window, or a quit date. Reviewed quietly."
         />
         {!showForm ? (
-          <Button title="New goal" variant="secondary" size="sm" onPress={openCreate} />
+          <Button title="New goal" variant="secondary" size="sm" onPress={() => openCreate()} />
         ) : null}
       </div>
 
@@ -368,11 +470,14 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
             form={formState}
             logs={logs}
             today={today}
-            currency={profile.currency}
+            profile={profile}
             isEdit={editing !== null}
             busy={busy === 'submit'}
             error={formError}
+            proposalDecided={seeded !== null || choseOwn}
             onFormChange={patchForm}
+            onUseProposal={useProposal}
+            onChooseOwn={() => setChoseOwn(true)}
             onSubmit={handleSubmit}
             onCancel={closeForm}
           />
@@ -386,7 +491,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
             title="No goals yet"
             description="Set a daily cap, a spend limit, or a quit date to start tracking progress."
             actionLabel="Set your first goal"
-            onAction={openCreate}
+            onAction={() => openCreate()}
           />
         </div>
       ) : null}
