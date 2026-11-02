@@ -1,7 +1,7 @@
 ---
 section: glossary
 sources: []
-last_verified_commit: fcabb85
+last_verified_commit: 1a4c025
 status: manual
 ---
 
@@ -47,7 +47,7 @@ Crucially, baseline is *derived from history*, not a number the user types and
 forgets. One exception: a reduction goal can *lock* a baseline at the moment the
 goal is created (`current_baseline`), so progress is measured against where you
 started, not a baseline that keeps sliding as you improve
-(`src/domain/goals.ts:127`).
+(`src/domain/goals.ts:159`).
 
 ### Streak
 A run of consecutive days that satisfy some condition, counted backwards from a
@@ -107,13 +107,49 @@ say "after meal"); trigger answers *why*, context answers *the setting*. It is
 optional and used for richer breakdowns rather than the core insights.
 
 ### Goal
-A user-set target the app evaluates against their logs. Six types exist, each
-with its own progress maths in `evaluateGoal` (`src/domain/goals.ts:35`):
-daily cap on sticks, daily spend cap in INR, a no-smoke time window, a weekly
-stick cap, a reduction target (lower your daily average to N), and a quit date.
-Every evaluation returns the same `GoalProgress` shape — a percent, an
-`isOnTrack` flag, an `atRisk` softer warning, remaining headroom, and a plain
-explanation — so the UI renders every goal type uniformly.
+A user-set target the app evaluates against their logs. Seven types exist, each
+with its own progress maths in `evaluateGoal` (`src/domain/goals.ts:54`):
+daily cap on sticks, a taper (a daily cap that steps down), a spend cap in the
+ledger's currency for a day, week or month, a no-smoke time window, a weekly
+stick cap, a quit date, and a reduction target (lower your daily average to N;
+still evaluated, no longer offered when creating). Every evaluation returns the
+same `GoalProgress` shape — a percent, an `isOnTrack` flag, an `atRisk` softer
+warning, remaining headroom, and a plain explanation — so the UI renders every goal
+type uniformly. On top of that every goal has a **state**: on track, at risk, off
+track, or *met* (below).
+
+### Met
+A cap that has held. A daily cap, taper or daily spend cap is *met* once it has
+stayed within the cap for 14 days in a row with at least 10 of the last 14 days
+logged (`holdStatus`, `src/domain/goalAdherence.ts`); the ledger then writes
+`meta.metOn` and the goal reads "Met · held N days" in the accent colour. A met
+goal is offered a next step; a held taper already at its final target
+completes instead. A silent
+fortnight is never a hold, because an empty ledger is within every cap.
+
+### Taper
+A goal type (`taper`) that steps a daily cap down toward a final target, one
+accepted step at a time. It starts at a cap the reader chooses (or accepts from
+the ledger's suggestion); after a hold the ledger proposes the next, lower cap, and
+nothing changes until the reader accepts. The cap history is kept in
+`meta.steps`, so charts and adherence judge each day against the cap that was in
+force then. Reaching the final target and holding it completes the goal.
+
+### Proposal
+A number the ledger derives from the reader's own recent logs and offers, never
+imposes: a **start** (a first cap for a new goal), a **next** step (a lower cap
+for a met goal) or a **re-anchor** (below). Proposals need at least 7 logged days
+in the last 30, are accepted or declined with one tap, and "Not now" hides one for
+14 days (`src/domain/goalProposals.ts`). Under discreet mode a proposal that
+contains money is worded without the amount.
+
+### Re-anchor
+Raising a cap to where the reader actually is, offered when a daily cap is off
+track (over the cap on 3 or more of the last 7 days). It is the ledger's way of
+saying the number was too ambitious, not that the reader failed: the proposed cap
+is the 7-day average rounded up, and accepting it starts a fresh step with the
+hold clock reset. A re-anchor is a step in the goal's history (`reason:
+'reanchor'`), not a new goal.
 
 ### Savings
 Money framed two ways, both fully transparent so the user can trust the number
@@ -217,7 +253,8 @@ adult (`isAdult`, `src/domain/age.ts:80`).
 - This glossary is hand-maintained (`status: manual`) and declares no source
   globs, so `npm run spec:drift` cannot flag it when the underlying code moves.
   If a term's code reference here goes stale, nothing automated will catch it —
-  re-read it whenever the domain layer changes meaningfully.
+  re-read it whenever the domain layer changes meaningfully. (Goal, Met, Taper,
+  Proposal and Re-anchor were last re-read against the code on 2026-11-02.)
 - "Mood" is genuinely overloaded (log mood vs. character mood). The code keeps
   them in separate modules, but the shared word is a standing trap; this entry
   is the disambiguation of record.

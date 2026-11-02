@@ -4,6 +4,11 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — 1a4c025
+- goals-insights: rewrote the Goals subsection for adaptive goals — seven types (taper, spend-cap period), `readGoalMeta` and step history, the four-state vocabulary (rolling last 7 days, window clipped to the goal's start), holds (14 days, 10 logged), proposals and their maths, 14-day snooze, discreet masking, client-side reconcile on load (web hook, mobile store, failed writes surfaced), `completed_at`, Home line, first-goal suggestion, onboarding "Suggest one later", Trends cap line, chat `goal_status`. Replaced the stale "no goals management screen" and "only goals[0]" text; new invariants; sources widened to the new modules and screens; open gaps record the unmasked sr-only tables and mobile "Around X a day", no proposals for week/month caps, and completion on the next visit.
+- data-model: `goals.completed_at`, trigger `goals_stamp_completed_at`, `taper` in the type CHECK, `meta_json` keys, export `completedAt`; corrected the `quit_date` `target_value` description (days, not an epoch day).
+- glossary: Goal now lists seven types and the state; added Met, Taper, Proposal, Re-anchor.
+
 ## 2026-11-02 — b9ac848
 - architecture, data-model, auth, identity-profile, logging, security-privacy: re-stamped after merging main (Ask the ledger, PR #103) into the onboarding re-entry branch; the security-privacy invariants now run 1–12 (the re-auth invariant is 12, the chat invariants keep 9–11). Settings gained the chat consent switch beside the analytics one (documented under security-privacy); no behaviour the other sections describe changed. celebrations stays drifting: its files come from the chat branch and were not re-verified.
 

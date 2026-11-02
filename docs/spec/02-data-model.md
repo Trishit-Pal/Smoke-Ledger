@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: b9ac848
+last_verified_commit: 1a4c025
 status: current
 ---
 
@@ -170,16 +170,17 @@ User-defined targets evaluated against the logs.
 |---|---|---|---|---|
 | `id` | text | NOT NULL | — | PK |
 | `user_id` | uuid | NOT NULL | — | FK → `auth.users.id` ON DELETE CASCADE |
-| `type` | text | NOT NULL | — | CHECK: `daily_cap`, `spend_cap_daily`, `no_smoke_window`, `reduction_target`, `weekly_target`, `quit_date` |
+| `type` | text | NOT NULL | — | CHECK `goals_type_check`: `daily_cap`, `spend_cap_daily`, `no_smoke_window`, `reduction_target`, `weekly_target`, `quit_date`, `taper` (`taper` added by `20261103000000_adaptive_goals.sql`) |
 | `target_value` | float8 | NOT NULL | — | CHECK: > 0 and ≤ 1000 |
 | `current_baseline` | float8 | NULL | — | Locked baseline at goal creation (used by `reduction_target`) |
 | `start_date` | text | NOT NULL | — | `YYYY-MM-DD` |
 | `end_date` | text | NULL | — | `YYYY-MM-DD`; null means open-ended |
 | `status` | text | NOT NULL | `'active'` | CHECK: `active`, `paused`, `completed`, `abandoned` |
-| `meta_json` | jsonb | NULL | — | Type-specific extras (e.g. window start/end hours for `no_smoke_window`) |
+| `meta_json` | jsonb | NULL | — | Type-specific extras: window hours for `no_smoke_window`; `period` for `spend_cap_daily`; `finalTarget` and `steps` for a taper; and, on any cap-like goal, `steps`, `metOn` and `dismissals`. Read only through `readGoalMeta` (`src/domain/goalMeta.ts`) |
 | `created_at` | timestamptz | NOT NULL | — | — |
+| `completed_at` | timestamptz | NULL | — | When the goal last left `active`/`paused` for `completed`/`abandoned`; stamped by trigger `goals_stamp_completed_at`, never by the client. NULL for goals that were already finished before the trigger existed |
 
-`target_value` is interpreted differently per `type`. For `daily_cap` it is sticks; for `spend_cap_daily` it is INR; for `no_smoke_window` it is hours; for `reduction_target` it is a target daily average; for `weekly_target` it is sticks per week; for `quit_date` it is a Unix-epoch day number. The evaluation logic in `src/domain/goals.ts:35` handles the dispatch.
+`target_value` is interpreted differently per `type`. For `daily_cap` it is sticks per day; for `taper` it is the cap in force now (the latest entry in `meta.steps`, so it moves down as steps are accepted); for `spend_cap_daily` it is money in the ledger's currency for the period in `meta.period` (`day`, `week` or `month`; absent means `day`, and the period is fixed after creation); for `no_smoke_window` it is an inert 1 (the hours live in `meta`); for `reduction_target` it is a target daily average; for `weekly_target` it is sticks per week; for `quit_date` it is the number of days from the start date to the quit date at creation (the date itself is `end_date`). The evaluation logic in `src/domain/goals.ts:54` handles the dispatch; the adaptive behaviour (states, proposals, transitions) is described in `06-goals-insights.md`.
 
 **RLS**: single `goals_all` policy FOR ALL using `user_id = (SELECT auth.uid())`.
 
@@ -413,6 +414,11 @@ Calls `public.enforce_profile_identity_rules()`. This trigger has three jobs:
 
 Calls `public.keep_onboarding_step_monotonic()` (`supabase/migrations/20261101120000_onboarding_step_monotonic.sql`). `onboarding_step` means "the next onboarding page to show", and every step writes the following step as it saves. Going Back and pressing Continue again used to rewrite an earlier value, after which the middleware bounced the user away from pages they had already finished. The trigger ranks both values with `public.onboarding_step_rank(text)` (privacy 0 · usage/setup/baseline 1 · goal 2 · brands 3 · done 4) and silently keeps the higher one. A NULL on either side passes through, so `erase_account_data()` can still reset the step and a fresh row can take its first value. An unknown value ranks NULL, so the comparison is NULL, nothing is swapped, and the CHECK constraint rejects it as before. Both functions are `SECURITY INVOKER` with `search_path = ''`; the rank helper is granted to `authenticated` and `service_role` because the trigger runs as the writing role. Widen the rank function together with the CHECK and with `ONBOARDING_STEP_INDEX` in `src/lib/onboardingSteps.ts`.
 
+
+**`goals_stamp_completed_at`** (BEFORE UPDATE OF `status` on `public.goals`)
+
+Calls `public.goals_stamp_completed_at()` (`supabase/migrations/20261103000000_adaptive_goals.sql`). When `status` moves into `completed` or `abandoned` from a state that was not already one of those, it sets `completed_at = now()`; when `status` is `active` or `paused` it clears `completed_at` to NULL. Completed to abandoned (or back) keeps the first stamp. Because the clock is the database's, a client that reconciles a goal late stamps the time of the write, not the quit date. The function is `SECURITY INVOKER` with `search_path = public`, and all privileges are revoked from `PUBLIC`, `anon` and `authenticated`; it is trigger-only and nobody calls it directly. Goals finished before this migration keep `completed_at` NULL: the ledger does not invent dates.
+
 ---
 
 ### RPCs
@@ -433,7 +439,7 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 
 **`mark_fact_seen(p_fact_id text, p_liked boolean DEFAULT NULL)`** — upserts a `user_facts_seen` row. Validates that `p_fact_id` exists in `smoke_seed.smoking_facts` before inserting; an unknown ID raises `22023`. On conflict, updates `seen_at = now()` and sets `liked` only if the new value is not NULL (so an unlike call doesn't erase a prior like).
 
-**`export_account_data(p_from, p_to, p_cursor_ts, p_cursor_id, p_limit)`** — produces a `version: 2` JSON export of the user's data. On the first page it includes profile, brands+variants, goals, settings, reminders, price entries, usage events, audit events, and facts seen, plus a paginated slice of logs. Subsequent pages return only the next log slice. Uses `(ts_utc, id) DESC` keyset pagination so the cursor is stable. Caps `p_limit` at 5000 and floors it at 100. Writes an `account_data_exported` audit event on the first page only.
+**`export_account_data(p_from, p_to, p_cursor_ts, p_cursor_id, p_limit)`** — produces a `version: 2` JSON export of the user's data. On the first page it includes profile, brands+variants, goals, settings, reminders, price entries, usage events, audit events, and facts seen, plus a paginated slice of logs. Subsequent pages return only the next log slice. Uses `(ts_utc, id) DESC` keyset pagination so the cursor is stable. Caps `p_limit` at 5000 and floors it at 100. Each goal in the export carries `completedAt` (added by `20261103000000_adaptive_goals.sql`, which re-issued the function with the same signature so existing grants are kept), and `ImportGoalSchema` accepts it back. Writes an `account_data_exported` audit event on the first page only.
 
 **`erase_account_data()`** — the DPDP right-to-erasure path. It is fail-closed on its secret: if the `app.audit_pepper` GUC is empty or unset it raises `P0001` and aborts, rather than writing a reversible (unpeppered) hash (`supabase/migrations/20260629000000_erase_pepper_guard.sql`). The pepper must be set at the database level (`ALTER DATABASE postgres SET app.audit_pepper = …`, same value as the edge functions' `AUDIT_PEPPER` secret) or every erase call fails. Sequence: (1) re-keys all the user's audit and error event rows by replacing the content with a SHA-256 hash of `uid || pepper` and setting `user_id = NULL` so the rows survive ON DELETE CASCADE; (2) deletes all user-owned data tables; (3) resets `user_profiles` to defaults and sets `deleted_at = now()`; (4) re-seeds default brands so the account is functional if the user logs back in; (5) writes a `account_data_erased` compliance audit event.
 
@@ -454,6 +460,8 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 **`handle_new_user()`** — called by `on_auth_user_created` trigger; described above.
 
 **`enforce_profile_identity_rules()`** — called by `trg_user_profiles_identity_rules` trigger; described above.
+
+**`goals_stamp_completed_at()`** — called by the `goals_stamp_completed_at` trigger; described above.
 
 **`_redact_audit_props(props jsonb)`** — strips known-sensitive keys (password, token, email, phone, OTP, etc.) from a props object before it is stored in `audit_events`. Marked `IMMUTABLE`; never called by clients directly.
 
@@ -515,6 +523,7 @@ These rules must never break:
 8. `cigarette_logs.client_op_id` uniqueness is enforced by a partial index. Create-log RPCs that receive the same op-ID from the same user return the original row, never a duplicate.
 9. `brand_variants.avg_price_inr` is a true running mean maintained via `price_sum_inr` / `price_count`, updated atomically in `create_log_with_rate_limit`. No separate computation step is needed.
 10. `v_daily_summary_user` has `security_invoker = true`. Querying the view never bypasses RLS on the underlying `cigarette_logs` table.
+11. `goals.completed_at` is written only by the `goals_stamp_completed_at` trigger. It is set when a goal first becomes `completed`/`abandoned`, cleared when it returns to `active`/`paused`, and `goals.type` always allows `taper`; widen the CHECK, `GoalTypeSchema` and the `GoalType` union together.
 
 ## Edge cases & gotchas
 
@@ -543,6 +552,7 @@ These rules must never break:
 
 - **`smoke_seed` tables have RLS disabled**. The Supabase advisor flags `smoke_seed.brand_catalog`, `smoke_seed.smoking_facts`, and `smoke_seed.health_milestones` as critical. In practice, these tables have `REVOKE ALL … FROM PUBLIC` and are not directly reachable by PostgREST, but the belt-and-suspenders posture would be to add `ENABLE ROW LEVEL SECURITY` with no policies (which makes them default-deny) or to move them fully outside PostgREST's reach.
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
+- **`goals.completed_at` is NULL for goals finished before `20261103000000_adaptive_goals.sql`**, and for any goal that is active or paused. Readers must treat NULL as "date unknown" (the Done list prints the bare word), not as "never finished". No automated test exercises the trigger itself; `src/tests/session-goals.test.ts` covers the store's local mirror of the stamp.
 - **`goals.start_date` and `end_date` are text**. Like `local_date` on logs, these are `YYYY-MM-DD` strings. They have no CHECK constraint ensuring they are valid dates or that `end_date >= start_date`. The validation lives only in TypeScript.
 - **No automated drift detection for this section**. The manifest globs (`supabase/migrations/**`, `src/types/index.ts`) cover the main sources, but the live DB schema may diverge from the migration files if any out-of-band SQL is run. The integration tests are the only live-schema verification.
 

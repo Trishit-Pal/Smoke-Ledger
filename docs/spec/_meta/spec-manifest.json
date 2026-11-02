@@ -4,7 +4,7 @@
       "id": "glossary",
       "file": "00-glossary.md",
       "sources": [],
-      "last_verified_commit": "fcabb85",
+      "last_verified_commit": "1a4c025",
       "status": "current"
     },
     {
@@ -30,7 +30,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "1a4c025",
       "status": "current"
     },
     {
@@ -96,9 +96,26 @@
         "src/domain/correlations.ts",
         "src/domain/health.ts",
         "src/domain/savings.ts",
-        "src/db/repositories/goals.ts"
+        "src/db/repositories/goals.ts",
+        "src/domain/goalMeta.ts",
+        "src/domain/goalAdherence.ts",
+        "src/domain/goalProposals.ts",
+        "src/domain/goalTransitions.ts",
+        "src/domain/goalForm.ts",
+        "src/domain/goalFormView.ts",
+        "src/domain/goalCardModel.ts",
+        "src/domain/goalReconcileView.ts",
+        "src/domain/goalStepView.ts",
+        "src/domain/capLine.ts",
+        "src/domain/firstSuggestion.ts",
+        "src/services/goalReconcile.ts",
+        "src/lib/goals/**",
+        "web/lib/goals/**",
+        "web/app/(app)/goals/**",
+        "app/(tabs)/goals.tsx",
+        "app/goals/**"
       ],
-      "last_verified_commit": "c3ec7a1",
+      "last_verified_commit": "1a4c025",
       "status": "current"
     },
     {
