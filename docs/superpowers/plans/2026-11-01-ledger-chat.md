@@ -257,6 +257,7 @@ Verified when: all gates below green and reported with output in the PR body.
 - Phase 2: whether Hobby honours `preferredRegion` (observable: check the deployment's function region; fallback is the dashboard setting).
 - Phase 2: whether the Haiku 5.5 prompt prefix reaches the minimum cacheable length (observable: `cache_read_input_tokens` in the probe; not required for correctness).
 - Follow-up PR (fog): native sheet — needs `EXPO_PUBLIC_WEB_BASE_URL` wired (`app.config.js` `extra.webBaseUrl` is read by nothing today) and a Bearer fetch helper.
+- Closed 2026-11-02 (review fixes on PR #103): out-of-range `totals_in_window`, row ids per tool input, live-region announcement, `recent_entries` fence (Guardrail 6), decimal leak, digits in any script, behavioural route test. Still open from that review: consent-read error status, panel split, the remaining lockstep copies, a caller-guard unit test.
 
 ## Always / Never
 

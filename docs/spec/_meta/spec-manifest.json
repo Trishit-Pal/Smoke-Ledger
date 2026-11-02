@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "fbd177e",
+      "last_verified_commit": "474c003",
       "status": "current"
     },
     {
@@ -122,10 +122,12 @@
         "web/app/auth/callback/route.ts",
         "web/app/api/**",
         "web/lib/server/ledgerChat/**",
+        "web/components/chat/**",
         "src/domain/ledgerChat/**",
+        "src/lib/digits.ts",
         "docs/security/**"
       ],
-      "last_verified_commit": "fbd177e",
+      "last_verified_commit": "474c003",
       "status": "current"
     },
     {
