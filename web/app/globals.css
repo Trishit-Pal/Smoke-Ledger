@@ -912,3 +912,50 @@
     opacity: 0 !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Ask the ledger — the slide-over sheet's one authored moment. A slow,
+ * gravitational entrance on the house easing; a bottom rise on phones, a
+ * side slide from md up. Reduced motion keeps only a short crossfade.
+ * ───────────────────────────────────────────────────────────────────────── */
+@keyframes ask-sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ask-sheet-slide {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ask-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.ask-sheet[data-state='open'] {
+  animation: ask-sheet-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (min-width: 768px) {
+  .ask-sheet[data-state='open'] {
+    animation-name: ask-sheet-slide;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask-sheet[data-state='open'] {
+    animation: ask-sheet-fade 200ms ease-out both;
+  }
+}

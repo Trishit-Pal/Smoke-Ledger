@@ -8,12 +8,13 @@ export default async function SettingsPage({
   searchParams?: Promise<{ action?: string }>;
 }) {
   const { action } = (await searchParams) ?? {};
-  const { profile, brands, analyticsOptIn } = await getSettingsPageData();
+  const { profile, brands, analyticsOptIn, ledgerChatOptIn } = await getSettingsPageData();
   return (
     <SettingsClient
       profile={profile}
       brands={brands}
       analyticsOptIn={analyticsOptIn}
+      ledgerChatOptIn={ledgerChatOptIn}
       initialAction={action}
     />
   );

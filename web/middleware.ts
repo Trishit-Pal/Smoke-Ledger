@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isEmailConfirmed } from '@/lib/compliance';
 import { isReauthRequest } from '@/lib/reauth';
 import {
   canAccessOnboardingStep,
@@ -98,6 +99,15 @@ export async function middleware(request: NextRequest) {
     return res;
   };
 
+  // The chat route does its own auth: a cookie session plus same-origin, or a
+  // native Bearer token with no cookie at all. Every gate below would redirect
+  // that native request to /login before the route ran, so it leaves here with
+  // only the security headers. Exact match: no other path is carved out, and
+  // the route re-applies the confirmed-email, consent and onboarded gates itself.
+  if (pathname === '/api/ledger-chat') {
+    return response;
+  }
+
   const supabaseUrl = readSupabaseUrl();
   const supabaseAnonKey = readSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -158,7 +168,7 @@ export async function middleware(request: NextRequest) {
 
   // Email confirmation gate: if Supabase project requires confirmation but the
   // user is somehow signed in without `email_confirmed_at`, bounce them out.
-  if (user.email && !user.email_confirmed_at && !user.phone_confirmed_at) {
+  if (!isEmailConfirmed(user)) {
     await supabase.auth.signOut();
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('error', 'email_not_confirmed');

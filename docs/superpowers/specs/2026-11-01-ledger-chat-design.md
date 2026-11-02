@@ -1,7 +1,9 @@
 ---
 title: Ledger Chat — a per-user reading companion for the ledger
 date: 2026-11-01
-status: draft-design
+status: accepted
+decided: 2026-11-01
+plan: docs/superpowers/plans/2026-11-01-ledger-chat.md
 author: Trishit (with Claude)
 related:
   - docs/spec/00-glossary.md
@@ -13,8 +15,27 @@ supersedes: none
 
 # Ledger Chat
 
-Planned for the first release after v3.0.0. Nothing in this document is built yet;
-it exists so the chatbot PR starts from settled ground.
+Planned for the first release after v3.0.0. Built on `feat/ledger-chat` from the
+plan linked above; the decisions below (2026-11-01) resolve every open item in
+the sections that follow and take precedence where they differ.
+
+## Decisions, 2026-11-01
+
+| # | Decision | Chosen |
+|---|---|---|
+| D1 | Scope | Full model-backed chat now; the one-tap starters are the panel's opening state. The no-AI "phase 0" experiment was dropped. |
+| D2 | Data reaching the model | Aggregates **plus recent raw entries** (the open decision below, resolved as option B). |
+| D3 | How raw entries reach the model | An on-demand `recent_entries` tool: last 1–30 days, ≤200 rows, notes trimmed to 120 characters, no ids, fenced as data; in discreet mode brands are aliased and notes dropped before any tool runs. |
+| D4 | Conversation history | On this device only (`localStorage`, per user, last 20 turns); nothing server-side. |
+| D5 | Response | Single JSON response; no streaming. |
+| D6 | Native | Web first. The route accepts a Bearer JWT from day one; the Expo sheet is a follow-up. |
+| D7 | Limits | 20 messages per user per day, 500 per day globally, env kill switch; the money cap is the console spend limit. |
+| D8 | Language | The reply mirrors the question's language, including Hinglish. |
+| D9 | Surface | A slide-over panel (Radix dialog: right sheet on desktop, bottom sheet on mobile) opened from the dashboard footer and under the Trends end-mark. |
+| D10 | Consent | A consent card inside the panel on the first ask, one tap labelled "Turn on and ask"; the off switch lives in Settings › Privacy. |
+| D11 | Starters | Derived from the ledger's state (active goal, days of data, prices, moods or triggers), not from usage analytics. |
+
+Builder's calls recorded in the plan's "Assumptions" section: model `claude-haiku-5-5` behind `LEDGER_CHAT_MODEL`; consent as the `settings_kv` key `consent.ledgerChatOptIn`; summary-based tools mirror Home and log-based tools mirror Trends; a deterministic number-provenance check with one retry; the launcher hidden until `LEDGER_CHAT_ENABLED=true`; the privacy-version bump does not re-consent anyone (the feature's opt-in is the consent).
 
 ## Intent
 
@@ -136,7 +157,7 @@ glossary, `06-goals-insights`, and the privacy policy so that:
 - Suggested starter questions are derived from the user's own usage (`usage_events`):
   the screens they open most and the times they log.
 
-## Open decision: what data reaches the model
+## Open decision: what data reaches the model (resolved 2026-11-01: option B, see D2/D3)
 
 | | A. Aggregates only (recommended at review) | B. Recent raw entries |
 |---|---|---|

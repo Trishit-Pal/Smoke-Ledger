@@ -66,7 +66,8 @@ export type AuditEventType =
   | 'app_lock_enabled'
   | 'app_lock_disabled'
   | 'reminder_enabled'
-  | 'reminder_disabled';
+  | 'reminder_disabled'
+  | 'ledger_chat_consent_toggled';
 
 export type AuditEventCategory =
   | 'account'
@@ -89,6 +90,9 @@ export interface AuditEventPropsMap {
   app_lock_disabled: Record<string, never>;
   reminder_enabled: { kind: string };
   reminder_disabled: { kind: string };
+  // Consent to send ledger figures to the AI processor (Ask the ledger), with
+  // the privacy-policy version the notice was based on.
+  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string };
 }
 
 function isPrimitive(value: unknown): value is string | number | boolean | null {

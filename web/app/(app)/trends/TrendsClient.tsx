@@ -61,6 +61,8 @@ import { Heatmap } from '@web/components/charts/Heatmap';
 import { MoodTriggerMatrix } from '@web/components/charts/MoodTriggerMatrix';
 import { Reveal } from '@web/components/anim/dynamic';
 import { SectionLabel, ChoiceRun } from '@web/components/visual';
+import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
+import type { DailySummaryRow } from '@/domain/periodSummary';
 import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
 
@@ -83,6 +85,8 @@ export interface TrendsClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
   dailySummary: DailySummary[];
+  /** Server flag for Ask the ledger; the launcher stays hidden while false. */
+  ledgerChatEnabled: boolean;
 }
 
 /**
@@ -153,12 +157,24 @@ function headlineDeck(opts: {
   return `${opts.sticks} ${opts.sticks === 1 ? 'cigarette' : 'cigarettes'} across ${opts.windowDays} days. Average ${opts.avg.toFixed(1)} per day, ${delta} vs the period before.`;
 }
 
-export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps) {
+export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }: TrendsClientProps) {
   const discreet = isDiscreetMode(profile);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(30);
 
   const zone = timezoneForCountry(profile.country);
   const today = todayInZone(zone);
+  // The launcher derives its starter questions from the same per-day rows the
+  // dashboard engine reads; Trends has no goals loaded, so none are passed.
+  const summaryRows = React.useMemo<DailySummaryRow[]>(
+    () =>
+      dailySummary.map((d) => ({
+        date: d.localDate,
+        sticks: d.sticks,
+        spendInr: d.totalSpendInr,
+        avgUnitPriceInr: d.avgUnitPriceInr,
+      })),
+    [dailySummary],
+  );
   const startYmd = daysAgoInZone(windowDays - 1, zone);
   const money = (value: number | null | undefined, opts?: { compact?: boolean }) =>
     formatMoney(value, profile.currency, { ...opts, locale: localeForCountry(profile.country) });
@@ -638,6 +654,16 @@ export function TrendsClient({ profile, logs, dailySummary }: TrendsClientProps)
                 Numbers are a slow mirror.
               </span>
             </footer>
+            <div style={idx(TRAILING_INDEX + 1)} className="flex justify-center">
+              <AskLedgerLauncher
+                enabled={ledgerChatEnabled}
+                profile={profile}
+                logs={logs}
+                rows={summaryRows}
+                goals={[]}
+                today={today}
+              />
+            </div>
           </>
         ) : (
           /* ─────────────── Empty state — a quiet invitation ─────────────── */

@@ -7,7 +7,7 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 ## 2026-11-02 — e1a652d
 - data-model, security-privacy: `marketing_consent_at` cleared (per-user audit) and locked by CHECK; ADR `docs/architecture/marketing-consent.md`.
 - identity-profile: goal step abandons every stray onboarding goal after save; usage saves the country before advancing; consent retries never re-audit.
-- security-privacy: the delete-account re-auth detour now finishes the deletion on mobile (login reads `reason=reauth`, returns to `DELETE_RESUME_PATH`), both platforms re-confirm with "Signed in again…" and say so when cancelled; new invariant 8 (a sign-in never deletes). Line refs for `delete-account/index.ts` refreshed.
+- security-privacy: the delete-account re-auth detour now finishes the deletion on mobile (login reads `reason=reauth`, returns to `DELETE_RESUME_PATH`), both platforms re-confirm with "Signed in again…" and say so when cancelled; new invariant 12 (a sign-in never deletes). Line refs for `delete-account/index.ts` refreshed.
 - auth: mobile login's `reason` / `deleted` params.
 
 ## 2026-11-01 — e1a652d
@@ -16,6 +16,19 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 - auth: post-sign-in routing resumes a consented, not-onboarded user at the saved step instead of `/onboarding/privacy`.
 - logging: `setFavorite` beside `toggleFavorite`.
 - security-privacy: grant discipline for SECURITY INVOKER trigger helpers (the rank helper must stay executable by `authenticated`).
+
+## 2026-11-02 — fbd177e
+- security-privacy: gate order now lists the profile gates before the limits; summary-based figures named; re-stamped after the review fix passes (masked narration, shared confirmed-email rule in src/lib/compliance, exact-match carve-out, abort budget).
+- infra-ops: region corrected to cle1 (Cleveland, next to us-east-2); re-stamped.
+- architecture: re-stamped — loaders unchanged since 020192b apart from the chat route wiring already described.
+
+## 2026-11-02 — 020192b
+- glossary: the "Insight" entry keeps "never an LLM" for insights and points at the new "Ledger Chat" entry (opt-in, separate, every figure from a tool, device-only transcript).
+- goals-insights: Ledger Chat reads these functions through read-only tools and changes nothing here; new invariant that insights never call a model and tool outputs equal direct calls.
+- security-privacy: new "Ask the ledger (third-party AI processor)" subsection (gate order, caller guard, consent key, limits, what the model sees and may say, nothing stored or logged, the discreet-mode egress exception to render-site masking); invariants 9–11; the chat test suites; sources gain web/app/api/**, web/lib/server/ledgerChat/**, src/domain/ledgerChat/** and the manifest now lists the real auth files instead of the stale web/lib/server/auth.ts.
+- infra-ops: Hobby function limit corrected to 300 s; the five LEDGER_CHAT_* / ANTHROPIC_API_KEY variables, the route's maxDuration and region, the console spend cap, and the audit-record redeploy.
+- architecture: re-stamped — the page loaders gained the ledgerChatEnabled / ledgerChatOptIn flags; the data paths described are unchanged.
+- auth, identity-profile, celebrations: left drifting on purpose; their changed files come from commits already on main before this branch and were not re-verified here.
 
 ## 2026-10-31 — e52ffac
 - architecture, auth, identity-profile, infra-ops: re-stamped after merging the scene-tiers and responsive/chart-accessibility work into main alongside the security dependency PR; no behaviour these sections describe changed.

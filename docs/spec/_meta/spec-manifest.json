@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "e52ffac",
+      "last_verified_commit": "fbd177e",
       "status": "current"
     },
     {
@@ -123,7 +123,13 @@
       "sources": [
         "supabase/migrations/**",
         "supabase/functions/**",
-        "web/lib/server/auth.ts",
+        "web/middleware.ts",
+        "web/lib/supabase/server.ts",
+        "web/lib/supabase/admin.ts",
+        "web/app/auth/callback/route.ts",
+        "web/app/api/**",
+        "web/lib/server/ledgerChat/**",
+        "src/domain/ledgerChat/**",
         "docs/security/**"
       ],
       "last_verified_commit": "e1a652d",
@@ -143,7 +149,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "e52ffac",
+      "last_verified_commit": "fbd177e",
       "status": "current"
     }
   ]
