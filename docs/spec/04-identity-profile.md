@@ -16,7 +16,7 @@ sources:
   - web/middleware.ts
   - web/app/onboarding/**
   - app/onboarding/**
-last_verified_commit: b9ac848
+last_verified_commit: 9d24456
 status: current
 ---
 
@@ -197,6 +197,8 @@ The step writes live in one shared module, `src/services/onboarding.ts`, used by
 - `submitConsentStep({ alreadyConsented, analyticsOptIn })` records the five consents and the legal versions, with `onboarding_step = 'usage'` in the same UPDATE. When `alreadyConsented` is true — computed by `consentsCurrent(profile)` on the web server (`web/app/onboarding/privacy/page.tsx`) or from `useSession` on mobile, so the client never receives the whole profile — only the step and the `consent.*` settings are written and no audit row is added. On a fresh consent the `consent_accepted` audit is recorded **before** the profile write: a duplicate row on retry is acceptable, a consent with no audit row is not. It never writes `marketing_consent_at`; the analytics opt-in is not marketing consent (the mobile screen used to conflate the two).
 - `loadUsageStep()` returns the profile plus the saved baseline (`onboarding.typicalDaily` setting, falling back to `baseline_per_day`, window, purchase preference) or `draft: null` if the step was never saved. `submitUsageStep` validates with `OnboardingUsageSchema` (`src/lib/validation.ts`) and writes baseline + `onboarding_step = 'goal'` in one UPDATE.
 - `loadGoalStep()` finds the newest active goal of the three offered types and seeds the draft from it via `goalToFormState`. `submitGoalStep(form, existing)` updates the target when the type is unchanged, otherwise creates the new goal; either way it then abandons every other active goal of the offered types (create-first, so a failed create leaves the live goal untouched, and a retry after any half-failure heals to one active goal; the clients re-read the saved goal on failure), so there is never more than one active onboarding goal (the one-active-per-type rule in `createGoal` used to throw `conflict` here). `skipGoalStep` only advances the step and throws on failure instead of navigating anyway.
+
+The goal step offers a fourth card, **Suggest one later** ("After a week of logging"), on both platforms. It is shown only when no goal has been saved (`loadGoalStep` returned `existing: null`); once a goal exists the card is hidden and the ghost button reads **Keep and continue**. While the draft has no goal type (`goalType: null`, the draft's initial value) it is the selected card, so a person who simply presses Continue creates no goal. Choosing it clears the target, enables Continue (`canContinueGoalStep`, `src/domain/goalStepView.ts`, shared by both clients) and Continue calls `skipGoalStep`, so no goal row is written. The done page then says "Suggested after a week of logging" in place of the goal, and from then on Home offers a first cap once the reader has 7 logged days in 30 (see `06-goals-insights.md`). `GoalPatch.goalType` in the draft is therefore `GoalType | null`.
 - `finishOnboarding()` writes `onboarded_at` and `onboarding_step = 'done'` together; the `onboarding_completed` audit stays best-effort.
 
 The in-memory draft (`src/store/onboardingDraft.ts`) is still never persisted. Each step seeds it from the loader only when it is empty, so un-saved edits survive Back/forward within a session and are lost on refresh by design, while saved values always come back from the server.

@@ -12,7 +12,7 @@ sources:
   - web/app/onboarding/done/**
   - web/app/(auth)/login/page.tsx
   - web/components/marketing/AccountDeletedNotice.tsx
-last_verified_commit: 1a40fb0
+last_verified_commit: 9d24456
 status: current
 ---
 
@@ -93,9 +93,10 @@ On both platforms the streak that drives these effects now comes from `streakFro
 
 ### Goal moments — `GoalMoment`
 
-Two quieter moments got their own overlay (`src/components/character/GoalMoment.tsx` native, `web/components/character/GoalMoment.tsx` web), modelled on `LogoutFarewell` but self-dismissing on a ~2.6 s timer (and on tap/click) because the goals page doesn't navigate afterwards:
+Two quieter moments (three triggers) got their own overlay (`src/components/character/GoalMoment.tsx` native, `web/components/character/GoalMoment.tsx` web), modelled on `LogoutFarewell` but self-dismissing on a ~2.6 s timer (and on tap/click) because the goals page doesn't navigate afterwards:
 
 - **Completion** — the figure applauds with "Well kept." Congratulation, never confetti.
+- **Automatic completion** — when the ledger itself closes a goal (a quit date reached, a taper finished), the same completion overlay fires with its own words from `completionMoment` (`src/services/goalReconcile.ts`): "Quit day." ("The date you set has arrived. The ledger marks it kept.") or "Tapered." ("Every step down was yours to accept. All of them, kept."). It fires once per completion, from the *applied* list of the reconcile run (a write that failed announces nothing), and only for completions, never for a goal merely marked met. On web the `useGoalReconcile` hook dispatches it on Home and on `/goals`; on mobile the session store queues it (`pendingGoalMoments`) and the goals tab announces it when focused, so a completion found at boot appears the first time the reader opens that tab. A reader who opens both web pages in quick succession can in a narrow race see it announced twice; the overlay replaces its state, so it never stacks.
 - **Deletion of an unaccomplished goal** — the figure breathes with "No judgment." Sentiment for a goal let go, never guilt.
 
 The mood bus carries them as `character:goal-completion` / `character:goal-deletion` events with a `{ title, body }` detail (`dispatchGoalCompletion` / `dispatchGoalDeletion` in `src/lib/character/mood.ts` and `web/lib/character/mood.ts`). The component is mounted once — in the web `(app)` layout and in `app/_layout.tsx` on mobile — and renders nothing until an event fires.

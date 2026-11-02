@@ -4,6 +4,13 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — 9d24456
+- architecture: the session store reconciles goals on boot and refresh in the reader's zone and holds `pendingGoalMoments` / `goalsReconcileFailed`; web reconciles through `useGoalReconcile` on Home and /goals; `getTrendsPageData` loads active goals; goal engine in `src/domain`, `src/services` in the layout; `goals` table row updated.
+- identity-profile: the goal step's fourth card "Suggest one later" (default while no goal type is chosen, hidden once a goal exists, Continue skips, done page wording).
+- celebrations: GoalMoment now also fires on automatic completion ("Quit day." / "Tapered."), once, from reconcile's applied list.
+- security-privacy: export carries `completedAt` per goal; chat reader-context lists goal state words; grant note for `goals_stamp_completed_at`. Re-verified and re-stamped.
+- infra-ops: `goals.spec.ts` joins the authenticated e2e suite note. Re-verified and re-stamped.
+
 ## 2026-11-02 — 1a4c025
 - goals-insights: rewrote the Goals subsection for adaptive goals — seven types (taper, spend-cap period), `readGoalMeta` and step history, the four-state vocabulary (rolling last 7 days, window clipped to the goal's start), holds (14 days, 10 logged), proposals and their maths, 14-day snooze, discreet masking, client-side reconcile on load (web hook, mobile store, failed writes surfaced), `completed_at`, Home line, first-goal suggestion, onboarding "Suggest one later", Trends cap line, chat `goal_status`. Replaced the stale "no goals management screen" and "only goals[0]" text; new invariants; sources widened to the new modules and screens; open gaps record the unmasked sr-only tables and mobile "Around X a day", no proposals for week/month caps, and completion on the next visit.
 - data-model: `goals.completed_at`, trigger `goals_stamp_completed_at`, `taper` in the type CHECK, `meta_json` keys, export `completedAt`; corrected the `quit_date` `target_value` description (days, not an epoch day).

@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "9d24456",
       "status": "current"
     },
     {
@@ -72,7 +72,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "9d24456",
       "status": "current"
     },
     {
@@ -131,7 +131,7 @@
         "app/(tabs)/index.tsx",
         "web/app/(app)/dashboard/**"
       ],
-      "last_verified_commit": "1a40fb0",
+      "last_verified_commit": "9d24456",
       "status": "current"
     },
     {
@@ -149,7 +149,7 @@
         "src/domain/ledgerChat/**",
         "docs/security/**"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "9d24456",
       "status": "current"
     },
     {
@@ -166,7 +166,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "fbd177e",
+      "last_verified_commit": "9d24456",
       "status": "current"
     }
   ]
