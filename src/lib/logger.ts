@@ -29,15 +29,15 @@ function safeDetails(ctx: LogErrorContext): Record<string, unknown> {
  * Never throws; audit failures must not break UX.
  */
 export async function logClientError(error: unknown, ctx: LogErrorContext = {}): Promise<void> {
-  const message = safeMessage(error);
-  const category = (ctx.category ?? 'client.error').slice(0, 80);
-
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
-    console.error('[logger]', category, message, ctx);
-  }
-
   try {
+    const message = safeMessage(error);
+    const category = (ctx.category ?? 'client.error').slice(0, 80);
+
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.error('[logger]', category, message, ctx);
+    }
+
     const supabase = getSupabase();
     const {
       data: { user },

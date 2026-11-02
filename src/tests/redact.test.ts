@@ -11,6 +11,7 @@ describe('redactText', () => {
     ['call +91 98765 43210 now', 'call [phone] now'],
     ['phone 9876543210 bad', 'phone [phone] bad'],
     ['phone 415-555-0132 bad', 'phone [phone] bad'],
+    ['phone (415) 555-0132 bad', 'phone [phone] bad'],
     ['+14155550132 rejected', '[phone] rejected'],
     ['user 3f2b8c1e-9a4d-4e6b-8f1a-2c7d5e9b0a13 missing', 'user [id] missing'],
     [`jwt ${JWT} expired`, 'jwt [token] expired'],
@@ -26,6 +27,7 @@ describe('redactText', () => {
     'Request failed with status code 404',
     'Network request failed',
     'retry 2 of 5 after 1500 ms',
+    'duplicate key value violates unique constraint "logs_user_id_date_key"',
     'at 2026-11-03 10:20 row 12345',
   ])('leaves short numbers and plain text alone: %s', (input) => {
     expect(redactText(input)).toBe(input);
@@ -44,6 +46,18 @@ describe('redactText', () => {
   });
 });
 
+describe('redaction cost', () => {
+  it.each([['a-'.repeat(50000)], ['a.'.repeat(50000)], ['a'.repeat(100000)], ['1 '.repeat(50000)]])(
+    'stays linear on pathological input (%#)',
+    (input) => {
+      const t0 = performance.now();
+      redactText(input, 500);
+      redactRoute(`/${input}`);
+      expect(performance.now() - t0).toBeLessThan(200);
+    },
+  );
+});
+
 describe('redactRoute', () => {
   it('drops query strings and replaces numeric ids', () => {
     expect(redactRoute('/goals/1234567/edit?x=a@b.com')).toBe('/goals/:id/edit');
@@ -52,6 +66,9 @@ describe('redactRoute', () => {
     expect(redactRoute('/share/3f2b8c1e-9a4d-4e6b-8f1a-2c7d5e9b0a13#top')).toBe('/share/:id');
     expect(redactRoute(`/auth/${JWT}`)).toBe('/auth/:id');
     expect(redactRoute('/r/5f4dcc3b5aa765d61d8327deb882cf99ab12')).toBe('/r/:id');
+  });
+  it('treats segments with 6+ digits as dynamic', () => {
+    expect(redactRoute('/call/98765-43210/log')).toBe('/call/:id/log');
   });
   it('redacts email path segments', () => {
     expect(redactRoute('/u/jane@example.com/profile')).toBe('/u/:id/profile');

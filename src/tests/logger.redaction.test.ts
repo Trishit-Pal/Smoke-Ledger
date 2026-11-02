@@ -1,6 +1,8 @@
 const insert = jest.fn().mockResolvedValue({ error: null });
 const supabase = {
-  auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u-1' } } }) },
+  auth: {
+    getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u-1' } } }),
+  },
   from: jest.fn(() => ({ insert })),
 };
 jest.mock('@/lib/supabase', () => ({ getSupabase: () => supabase }));
@@ -28,5 +30,14 @@ describe('logClientError redaction', () => {
     const row = insert.mock.calls[0][0];
     expect(row.message.length).toBeLessThanOrEqual(500);
     expect(row.route).toBeNull();
+  });
+
+  it('never throws even when the error stringifies badly', async () => {
+    const bad = {
+      toString: () => {
+        throw new Error('boom');
+      },
+    };
+    await expect(logClientError(bad)).resolves.toBeUndefined();
   });
 });
