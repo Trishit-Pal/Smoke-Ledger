@@ -6,7 +6,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ToolContext } from '@/domain/ledgerChat/context';
 import { allowedNumbers, findUnverifiedNumbers, sanitizeNarration } from '@/domain/ledgerChat/guard';
-import { TOOL_DEFS, runTool, type ToolOutcome } from '@/domain/ledgerChat/tools';
+import { TOOL_DEFS, runTool, toolResultContent, type ToolOutcome } from '@/domain/ledgerChat/tools';
 import type { ChatHistoryTurn, ChatResponse, Row } from '@/domain/ledgerChat/types';
 import { SYSTEM_PROMPT, userContextBlock } from './prompt';
 
@@ -127,13 +127,14 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
     messages.push({ role: 'assistant', content: res.content });
     const results: Anthropic.ToolResultBlockParam[] = toolUses.map((tu) => {
       const outcome = runTool(tu.name, tu.input, ctx);
+      const content = toolResultContent(tu.name, outcome);
       if (outcome.ok) {
         outcomes.push(outcome);
         if (!toolsUsed.includes(tu.name)) toolsUsed.push(tu.name);
         for (const r of outcome.rows) if (!rows.some((x) => x.id === r.id)) rows.push(r);
-        return { type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(outcome.data) };
+        return { type: 'tool_result', tool_use_id: tu.id, content };
       }
-      return { type: 'tool_result', tool_use_id: tu.id, is_error: true, content: JSON.stringify({ error: outcome.error }) };
+      return { type: 'tool_result', tool_use_id: tu.id, is_error: true, content };
     });
     messages.push({ role: 'user', content: results });
   }
