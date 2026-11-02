@@ -40,6 +40,16 @@ export function maskBrandAt(name: string | null | undefined, index: number, disc
   return discreet ? brandAlias(index) : name;
 }
 
+/** Home "last entry" label. Discreet hides the variant too: it can identify the brand. */
+export function lastEntryLabel(
+  brand: string | null | undefined,
+  variant: string | null | undefined,
+  discreet: boolean,
+): string {
+  const name = maskBrandName(brand ?? 'Unknown', discreet);
+  return variant && !discreet ? `${name} · ${variant}` : name;
+}
+
 export function maskNotes(notes: string | null | undefined, discreet: boolean): string | null {
   if (!notes) return null;
   return discreet ? 'Hidden in discreet mode' : notes;

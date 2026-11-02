@@ -3,7 +3,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CigaretteLog } from '@/types';
 import { LineChart } from '@web/components/charts/LineChart';
-import { BarChart } from '@web/components/charts/BarChart';
+import { BarChart, isYAxisVisible } from '@web/components/charts/BarChart';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
 import { Donut, donutTooltipFormatter } from '@web/components/charts/Donut';
 import { Heatmap } from '@web/components/charts/Heatmap';
@@ -33,6 +33,15 @@ describe('chart masking formatters', () => {
 
   it('BarChart forwards formatY to its data table', () => {
     const html = render(React.createElement(BarChart, { data: series, formatY: mask }));
+    expect(html).not.toMatch(/37|4242/);
+    expect(html).toContain(MASK);
+  });
+  it('BarChart y axis: formatY alone shows it, showYAxis=false hides it, table stays masked', () => {
+    // recharts renders nothing in node, so assert the axis decision via the pure helper.
+    expect(isYAxisVisible(undefined)).toBe(false);
+    expect(isYAxisVisible(mask)).toBe(true);
+    expect(isYAxisVisible(mask, false)).toBe(false);
+    const html = render(React.createElement(BarChart, { data: series, formatY: mask, showYAxis: false }));
     expect(html).not.toMatch(/37|4242/);
     expect(html).toContain(MASK);
   });
@@ -100,6 +109,13 @@ describe('chart masking formatters', () => {
   it('Heatmap shows raw counts without a formatter', () => {
     const html = heatmap({});
     expect(html).toContain('37 logs');
+  });
+
+  it('Heatmap singular reads "1 log" with String formatter, masked stays plural', () => {
+    const one = [logs[0]!];
+    expect(heatmap({ formatCount: String }, one)).toContain('1 log — M 9:00');
+    expect(heatmap({ formatCount: mask }, one)).toContain(`${MASK} logs — M 9:00`);
+    expect(heatmap({ formatCount: String })).toContain('37 logs — M 9:00');
   });
 
   it('Heatmap masked title does not reveal a count of 1 via singular/plural', () => {

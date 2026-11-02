@@ -24,6 +24,13 @@ export interface BarChartProps {
   emphasizeLast?: boolean;
   /** Names the chart for assistive tech (caption of its data table). */
   title?: string;
+  /** Visible Y axis; defaults to on whenever `formatY` is passed. */
+  showYAxis?: boolean;
+}
+
+/** recharts renders nothing in node, so the axis decision is a pure helper the test can pin. */
+export function isYAxisVisible(formatY: BarChartProps['formatY'], showYAxis?: boolean): boolean {
+  return showYAxis ?? !!formatY;
 }
 
 export function BarChart({
@@ -33,6 +40,7 @@ export function BarChart({
   showLabels = true,
   emphasizeLast = true,
   title = 'Bar chart',
+  showYAxis,
 }: BarChartProps) {
   const lastIndex = data.length - 1;
   const reduced = useReduceMotion();
@@ -58,7 +66,7 @@ export function BarChart({
           ) : (
             <XAxis dataKey="label" hide />
           )}
-          {formatY ? (
+          {isYAxisVisible(formatY, showYAxis) ? (
             <YAxis
               tickFormatter={formatY}
               tick={chartAxisTick}

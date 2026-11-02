@@ -525,6 +525,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                   data={hourBars}
                   height={160}
                   formatY={(v) => maskCount(v, discreet)}
+                  showYAxis={false}
                 />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">

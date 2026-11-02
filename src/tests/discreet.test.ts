@@ -1,4 +1,4 @@
-import { brandAlias, maskBrandAt } from '@/lib/discreet';
+import { brandAlias, lastEntryLabel, maskBrandAt } from '@/lib/discreet';
 
 describe('brandAlias', () => {
   it('letters A..Z by index, then numbers', () => {
@@ -27,5 +27,19 @@ describe('maskBrandAt', () => {
     expect(maskBrandAt(null, 0, false)).toBe('—');
     expect(maskBrandAt('', 0, false)).toBe('—');
     expect(maskBrandAt(undefined, 0, false)).toBe('—');
+  });
+});
+
+describe('lastEntryLabel', () => {
+  it('shows brand and variant when not discreet', () => {
+    expect(lastEntryLabel('Marlboro', 'Gold', false)).toBe('Marlboro · Gold');
+    expect(lastEntryLabel('Marlboro', null, false)).toBe('Marlboro');
+    expect(lastEntryLabel(null, null, false)).toBe('Unknown');
+  });
+
+  it('never shows variant text when discreet', () => {
+    const label = lastEntryLabel('Marlboro', 'Gold Flake Kings', true);
+    expect(label).toBe('Brand hidden');
+    expect(label).not.toMatch(/Gold|Kings|Marlboro/);
   });
 });

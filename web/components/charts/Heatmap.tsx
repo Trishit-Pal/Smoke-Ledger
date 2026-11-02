@@ -122,7 +122,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount, ini
                   fill={count > 0 ? 'var(--chart-series-1)' : 'var(--chart-grid)'}
                   fillOpacity={count > 0 ? opacity : 0.5}
                 >
-                  <title>{`${fmt(count)} log${formatCount || count !== 1 ? 's' : ''} — ${DAY_LABELS[r]} ${c}:00`}</title>
+                  <title>{`${fmt(count)} log${fmt(count) === '1' ? '' : 's'} — ${DAY_LABELS[r]} ${c}:00`}</title>
                 </rect>
               );
             }),

@@ -45,7 +45,7 @@ import { generateInsights } from '@/domain/insights';
 import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry } from '@/lib/regions';
 import { ledgerMoney } from '@/lib/ledgerMoney';
-import { isHomeTotalsHidden, isDiscreetMode, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
+import { isHomeTotalsHidden, isDiscreetMode, lastEntryLabel, maskBrandName, maskCount, maskInr } from '@/lib/discreet';
 import { dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { createLog } from '@/db/repositories/logs';
 import { track } from '@/services/analytics';
@@ -252,7 +252,7 @@ function QuickLogRow({
   const canRepeatLast = Boolean(lastEntry?.brandId);
 
   const lastBrandLabel = lastEntry
-    ? `${maskBrandName(lastEntry.brandNameSnap ?? 'Unknown', discreet)}${lastEntry.variantSnap ? ` · ${lastEntry.variantSnap}` : ''}`
+    ? lastEntryLabel(lastEntry.brandNameSnap, lastEntry.variantSnap, discreet)
     : null;
 
   const lastPrice =
