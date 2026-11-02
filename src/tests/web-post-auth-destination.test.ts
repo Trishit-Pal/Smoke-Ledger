@@ -39,7 +39,15 @@ describe('postAuthDestination', () => {
 
   it('lets a consented but not onboarded user continue to an onboarding step only', () => {
     expect(postAuthDestination(CONSENTED, null, '/onboarding/goal')).toBe('/onboarding/goal');
-    expect(postAuthDestination(CONSENTED, null, '/log')).toBe('/onboarding/privacy');
+    // A non-onboarding next resumes the wizard at the saved step — never back at
+    // consent (a legacy row with no step resumes at usage).
+    expect(postAuthDestination(CONSENTED, null, '/log')).toBe('/onboarding/usage');
+    expect(postAuthDestination({ ...CONSENTED, onboarding_step: 'goal' }, null, '/log')).toBe(
+      '/onboarding/goal',
+    );
+    expect(postAuthDestination({ ...CONSENTED, onboarding_step: 'brands' }, null, null)).toBe(
+      '/onboarding/brands',
+    );
   });
 
   it('honours next for an onboarded user, else the dashboard', () => {

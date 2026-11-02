@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation';
 import { DigitRoll } from '@web/components/onboarding/DigitRoll';
 import { Stamp } from '@web/components/onboarding/Stamp';
 import { OnboardingStepFooter } from '@web/components/onboarding/OnboardingStepFooter';
-import { listBrands, toggleFavorite } from '@/db/repositories/brands';
-import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
-import { setSetting } from '@/db/repositories/settings';
-import { recordAuditEvent } from '@/services/audit';
+import { listBrands, setFavorite } from '@/db/repositories/brands';
+import { finishOnboarding } from '@/services/onboarding';
 import { useSession } from '@/store/session';
 import type { Brand, BrandCategory } from '@/types';
 import { toSafeErrorMessage } from '@/lib/errors';
@@ -70,6 +68,12 @@ export default function OnboardingBrandsPage() {
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState<BrandCategory | 'all'>('all');
   const [lastToggled, setLastToggled] = React.useState<{ id: string; t: number } | null>(null);
+  // Favourite writes still in flight; Finish waits for them so the summary
+  // (and the dashboard) never miss a tap that landed a moment before. A brand
+  // with a write in flight ignores further taps, so a double tap cannot write
+  // the same intended state twice.
+  const [pending, setPending] = React.useState(0);
+  const pendingIds = React.useRef(new Set<string>());
 
   React.useEffect(() => {
     void (async () => {
@@ -112,17 +116,23 @@ export default function OnboardingBrandsPage() {
   const favoriteCount = favorites.length;
 
   const onToggle = async (brand: Brand) => {
+    if (pendingIds.current.has(brand.id)) return;
+    // Write the intended state (not a server-side toggle); local state mirrors it.
+    const next = !brand.isFavorite;
+    pendingIds.current.add(brand.id);
+    setPending((n) => n + 1);
     try {
       setError(null);
-      await toggleFavorite(brand.id);
+      await setFavorite(brand.id, next);
       setBrands((rows) =>
-        rows.map((row) =>
-          row.id === brand.id ? { ...row, isFavorite: !row.isFavorite } : row,
-        ),
+        rows.map((row) => (row.id === brand.id ? { ...row, isFavorite: next } : row)),
       );
       setLastToggled({ id: brand.id, t: Date.now() });
     } catch (e) {
       setError(toSafeErrorMessage(e, 'dependency_failure'));
+    } finally {
+      pendingIds.current.delete(brand.id);
+      setPending((n) => n - 1);
     }
   };
 
@@ -130,20 +140,7 @@ export default function OnboardingBrandsPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const now = new Date().toISOString();
-      await Promise.all([
-        updateProfile({ onboardedAt: now }),
-        setSetting('consent.onboardingCompletedAt', now),
-      ]);
-      await setOnboardingStep('done');
-      // Audit is compliance bookkeeping, not a gate: a transient audit failure
-      // must never strand the user on the final onboarding step. Record it
-      // best-effort and proceed regardless.
-      try {
-        await recordAuditEvent('onboarding_completed', 'compliance', {});
-      } catch (auditErr) {
-        console.warn('[onboarding] onboarding_completed audit failed', auditErr);
-      }
+      await finishOnboarding();
       await Promise.all([refreshBrands(), refreshProfile()]);
       router.replace('/onboarding/done');
     } catch (e) {
@@ -394,7 +391,7 @@ export default function OnboardingBrandsPage() {
         primary={{
           label: submitting ? 'Finishing…' : 'Finish setup →',
           onPress: onFinish,
-          disabled: favoriteCount === 0 || submitting,
+          disabled: favoriteCount === 0 || submitting || pending > 0,
           loading: submitting,
         }}
       />

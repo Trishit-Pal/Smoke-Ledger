@@ -1,12 +1,19 @@
 import type { AllowedEmailOtpType } from '@/lib/emailOtpType';
+import {
+  hasRequiredConsents,
+  resumeOnboardingRoute,
+  resumeProfileFromRow,
+} from '@/lib/onboardingSteps';
+import type { OnboardingStep } from '@/types';
 import { CALLBACK_ONBOARDING_PATHS } from '@web/lib/auth/callbackNextPath';
 
 /** The profile columns the post-sign-in routing reads. */
 export const POST_AUTH_PROFILE_COLUMNS =
-  'onboarded_at, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at';
+  'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at';
 
 export interface PostAuthProfile {
   onboarded_at?: string | null;
+  onboarding_step?: OnboardingStep | string | null;
   age_confirmed_at?: string | null;
   terms_version?: string | null;
   privacy_version?: string | null;
@@ -39,21 +46,18 @@ export function postAuthDestination(
   // Recovery always wins so the user can finish setting a new password.
   if (nextPathname === '/reset-password') return nextPath!;
 
-  const hasRequiredConsents = Boolean(
-    profile?.age_confirmed_at &&
-      profile?.terms_version &&
-      profile?.privacy_version &&
-      profile?.health_disclaimer_version &&
-      profile?.data_processing_consent_at,
-  );
-  if (!hasRequiredConsents) {
+  const steps = resumeProfileFromRow(profile);
+  if (!hasRequiredConsents(steps)) {
     // A first-time signup confirmation fires the account-created celebration;
     // carried in the URL so it works cross-device.
     return type === 'signup' ? '/onboarding/privacy?welcome=1' : '/onboarding/privacy';
   }
 
   if (!profile?.onboarded_at) {
-    return nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname) ? nextPath! : '/onboarding/privacy';
+    // Mid-wizard sign-in resumes at the saved step, not at consent again.
+    return nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname)
+      ? nextPath!
+      : resumeOnboardingRoute(steps);
   }
 
   return nextPath ?? '/dashboard';

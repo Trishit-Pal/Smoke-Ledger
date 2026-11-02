@@ -8,7 +8,7 @@ sources:
   - web/lib/supabase/admin.ts
   - web/app/auth/callback/route.ts
   - docs/security/**
-last_verified_commit: 6268c8d
+last_verified_commit: e1a652d
 status: current
 ---
 
@@ -54,6 +54,8 @@ No function inherits the caller's search_path. This matters because a SECURITY D
 The user-facing RPCs that `authenticated` may call are: `create_log_with_rate_limit`, `erase_account_data`, `export_account_data`, `get_daily_summary`, `get_health_milestones`, `get_random_facts`, `list_logs_page`, `mark_fact_seen`, `refresh_seed_prices_from_catalog`, `seed_default_brands_if_empty`, `sync_default_brand_catalog`.
 
 The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `purge_rate_limit_counters` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. The former `auth_email_exists` email-existence oracle is dropped by the hardening migration.
+
+Trigger helpers that are `SECURITY INVOKER` need the opposite care. `keep_onboarding_step_monotonic()` (`20261101120000_onboarding_step_monotonic.sql`) runs as the writing role and calls `onboarding_step_rank(text)`, so that helper is explicitly granted to `authenticated` and `service_role` (and revoked from `PUBLIC` and `anon`); revoking it from `authenticated` would make every onboarding step write fail with `42501`. The trigger function itself is revoked from everyone — Postgres checks EXECUTE on a trigger function at `CREATE TRIGGER`, not when it fires. Neither function reads a table, so neither is a tenant-isolation boundary; RLS still decides which rows a user can update.
 
 ### The DPDP export and erase RPCs
 
@@ -101,7 +103,7 @@ The following are reachable only with the service-role key and are never handed 
 - `consume_rate_limit` RPC — backs the Edge Function rate limiter; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260523092236_add_rate_limit_counters.sql:62–63`).
 - `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers. Emails, phone numbers and IPs are stored only as keyed hashes: edge functions use `hashWithPepper(value, AUDIT_PEPPER)` (`_shared/hash.ts`), the web limiter an HMAC keyed on the service-role key. Per-user buckets in `audit-record` and `delete-account` still key on the raw user UUID (`user:<id>`). The hardening migration deletes every pre-hashing row once, enables `pg_cron` (guarded) and schedules `purge_rate_limit_counters()` daily at 03:17 to drop rows older than 2 days. The migration only warns if pg_cron cannot be enabled; `scripts/sql/smoke.sql` fails if pg_cron is installed but the job is missing. Verify production after deploy with `select * from cron.job`.
 - `record_audit_event` RPC — `EXECUTE` revoked from `authenticated` in `supabase/migrations/20260521000000_audit_export_ops.sql:295–297`; re-granted only to `service_role`. The `audit-record` Edge Function verifies the caller's JWT with the anon client first, then writes through the service-role client.
-- `auth.admin.deleteUser` — called only by `delete-account/index.ts:198`; requires `SUPABASE_SERVICE_ROLE_KEY`, which is an Edge Function secret and a server-side Vercel env var, never a `NEXT_PUBLIC_*` value.
+- `auth.admin.deleteUser` — called only by `delete-account/index.ts:203`; requires `SUPABASE_SERVICE_ROLE_KEY`, which is an Edge Function secret and a server-side Vercel env var, never a `NEXT_PUBLIC_*` value.
 
 The `audit-record` Edge Function (`supabase/functions/audit-record/index.ts`) validates the incoming bearer token via `supabase.auth.getUser()` on the anon client before touching the service-role client, which means a request without a valid JWT is rejected at line 69 before any write happens. The allowlist of valid event types and categories lives in `supabase/functions/_shared/auditAllowlist.ts:3–28`. Props are redacted through a PII denylist (email, phone, Aadhaar, PAN, OTP, tokens, etc.) in `redactAuditProps` (`supabase/functions/_shared/auditAllowlist.ts:74–101`) and the parallel `_redact_audit_props` SQL function (`supabase/migrations/20260520000000_security_correctness.sql:149–188`).
 
@@ -114,6 +116,8 @@ Edge Functions check `req.headers.get('origin')` against an allowlist in `supaba
 `delete-account/index.ts` calls `hasRecentSignIn` (`supabase/functions/_shared/recentAuth.ts`), which reads the presenting access token's own `amr` claim and requires a real sign-in (password, OTP, magic link, recovery, signup) within the configured window (default 15 minutes, tunable via `REAUTH_WINDOW_MIN`). `token_refresh` and `anonymous` never count, and a malformed claim fails closed. The check is bound to the session making the request: the earlier gate read the account-wide `last_sign_in_at`, so a stale stolen session passed whenever the owner had signed in on any other device (security scan F2, 2026-10-30).
 
 On `reauth_required`, web sends the user to `/login?next=/settings?action=delete&reason=reauth` and mobile to `/login?reason=reauth` while they are still signed in. `isReauthRequest` (`src/lib/reauth.ts`) lets exactly that route through web middleware and the mobile `(auth)` layout, which otherwise redirect every signed-in visitor away from `/login`; without it the fresh sign-in the gate demands could never happen and deletion was unreachable.
+
+The detour must then finish the job, or say plainly that it did not. Until 2026-11-02 the mobile login screen ignored `reason`, signed the user in and went Home: the account was never deleted, nothing said so, and the same email and password kept working, which read as "deletion didn't stick". Both platforms now follow one contract from `src/lib/reauth.ts`: the login screen explains why it is asking ("Confirm it's you to finish deleting your account."), mobile hides the email-link mode during re-auth because only a password sign-in refreshes this session's `amr`, and after sign-in both return to `DELETE_RESUME_PATH` (`/settings?action=delete`). Settings consumes that param and opens a second, distinct confirmation, "Signed in again. Delete your account now?"; cancelling shows "Your account has not been deleted." A sign-in alone never deletes anything, so a crafted resume link only ever shows a prompt. The resume confirmation never redirects on a further `reauth_required`, it shows the error, so the flow cannot loop silently. The first confirmation warns "You may be asked to sign in again before anything is deleted." Web detects its own redirect by a flag rather than by swallowing every `authentication_error`, so a real "not signed in" failure is shown. After success web lands on `/?deleted=1` and mobile on `/login?deleted=1`, each with a one-time "Your account and all its data have been deleted." notice (`ACCOUNT_DELETED_PARAM`). Guarded by `src/tests/reauth-route.test.ts`, `src/tests/deleteUserAccount.test.ts` and `web/e2e/account-deletion.spec.ts` (opt-in via `E2E_ALLOW_ACCOUNT_DELETION=1`, throwaway accounts only).
 
 The Edge Function also applies dual rate limiting: per-IP (hashed with SHA-256) and per-user, both capped at 5 requests per 10 minutes. Both use `consume_rate_limit` via the service-role client and fail closed — if the Postgres call fails, the function returns 429 rather than silently disabling the gate.
 
@@ -131,13 +135,17 @@ These rules must not break:
 
 5. `compliance.delete` rows in `error_events` must have `user_id = null`. The CHECK constraint `error_events_compliance_delete_null_user_check` enforces this at the DB level. Do not drop this constraint.
 
-6. `erase_account_data` must be called before `auth.admin.deleteUser`. If the erase fails, deletion must abort. The ordering in `delete-account/index.ts:183–198` enforces this.
+6. `erase_account_data` must be called before `auth.admin.deleteUser`. If the erase fails, deletion must abort. The ordering in `delete-account/index.ts:186–213` enforces this.
+
+8. A sign-in never deletes an account. The re-auth detour returns to a confirmation (`DELETE_RESUME_PATH`), and only that confirmation's button calls `deleteUserAccount`. Cancelling it must state that nothing was deleted.
 
 7. `AUDIT_PEPPER` must never appear in source code, logs, or environment variables accessible to client bundles. It lives only in the Edge Function secrets dashboard and in the `app.audit_pepper` GUC (which is set per `docs/runbooks/audit-pepper-rotation.md`).
 
 8. The `v_daily_summary_user` view must have `security_invoker = true` so that RLS on the underlying `cigarette_logs` table applies when authenticated users query it directly. Set in `supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql:57`.
 
 ## Edge cases and gotchas
+
+**Marketing consent is locked empty.** `marketing_consent_at` is never written by the app and a CHECK keeps it NULL for every role, because the row-wide `user_profiles` UPDATE policy would otherwise let any client set it. Stamps the old mobile screen wrote from the analytics checkbox were cleared with a per-user, server-only `marketing_consent_cleared` audit row (ADR `docs/architecture/marketing-consent.md`). Shipping a real opt-in means dropping the constraint in the same migration.
 
 **Erase vs delete are different operations.** "Erase data" wipes product tables and anonymizes audit rows but keeps the auth identity — the user can log back in and re-onboard. "Delete account" removes the auth identity entirely. Callers that conflate the two will produce confusing UI; the distinction is documented in `docs/deployment/production-ops-checklist.md:200–204`.
 

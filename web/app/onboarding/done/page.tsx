@@ -52,7 +52,7 @@ export default async function OnboardingDonePage() {
       favorites={favorites}
       goal={
         activeGoal
-          ? { type: activeGoal.type, targetValue: activeGoal.targetValue }
+          ? { type: activeGoal.type, targetValue: activeGoal.targetValue, meta: activeGoal.meta }
           : null
       }
       country={profile?.country ?? null}

@@ -4,7 +4,8 @@ import { Redirect } from 'expo-router';
 import { useSession } from '@/store/session';
 import { useAuth } from '@/store/auth';
 import { useTheme } from '@/hooks/useTheme';
-import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
+import { isOnboarded } from '@/lib/compliance';
+import { resumeOnboardingRoute } from '@/lib/onboardingSteps';
 
 export default function IndexRedirect() {
   const session = useAuth((s) => s.session);
@@ -33,7 +34,7 @@ export default function IndexRedirect() {
     );
   }
 
-  if (!hasRequiredConsents(profile)) return <Redirect href="/onboarding/privacy" />;
-  if (!isOnboarded(profile)) return <Redirect href="/onboarding/welcome" />;
+  // Mid-wizard sign-in resumes at the saved step (privacy until consented).
+  if (!isOnboarded(profile)) return <Redirect href={resumeOnboardingRoute(profile)} />;
   return <Redirect href="/(tabs)" />;
 }

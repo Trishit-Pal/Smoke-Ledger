@@ -1,15 +1,8 @@
 import type { UserProfile } from '@/types';
 
-/** Mirrors web middleware consent gate. */
-export function hasRequiredConsents(profile: UserProfile | null | undefined): boolean {
-  return Boolean(
-    profile?.ageConfirmedAt &&
-      profile?.termsVersion &&
-      profile?.privacyVersion &&
-      profile?.healthDisclaimerVersion &&
-      profile?.dataProcessingConsentAt,
-  );
-}
+// One consent gate for every surface (web middleware, post-auth routing, the
+// Expo layouts and redirects) — see src/lib/onboardingSteps.ts.
+export { hasRequiredConsents } from '@/lib/onboardingSteps';
 
 export function isOnboarded(profile: UserProfile | null | undefined): boolean {
   return Boolean(profile?.onboardedAt);

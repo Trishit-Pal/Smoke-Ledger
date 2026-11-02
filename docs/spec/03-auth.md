@@ -34,7 +34,9 @@ sources:
   - DB: public.handle_new_user (trigger)
   - DB: public.enforce_profile_identity_rules (trigger)
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
-last_verified_commit: e52ffac
+  - web/lib/auth/postAuthDestination.ts
+  - src/lib/onboardingSteps.ts
+last_verified_commit: e1a652d
 status: current
 ---
 
@@ -70,7 +72,7 @@ A second trigger, `enforce_profile_identity_rules`, fires on updates to `user_pr
 
 ### Login (password)
 
-**Mobile** (`app/(auth)/login.tsx`). Calls `supabase.auth.signInWithPassword`. On success, if the user has neither `email_confirmed_at` nor `phone_confirmed_at`, the app signs them out immediately and shows "Please confirm your email before signing in." On failure, `toAuthErrorMessage` (`src/lib/auth-errors.ts`) maps Supabase error codes and message fragments to human-readable copy.
+**Mobile** (`app/(auth)/login.tsx`). Calls `supabase.auth.signInWithPassword`. On success, if the user has neither `email_confirmed_at` nor `phone_confirmed_at`, the app signs them out immediately and shows "Please confirm your email before signing in." On failure, `toAuthErrorMessage` (`src/lib/auth-errors.ts`) maps Supabase error codes and message fragments to human-readable copy. Two query params change the screen: `reason=reauth` (a signed-in user confirming a credential before account deletion) shows why, hides the email-link mode, and returns to `DELETE_RESUME_PATH` after sign-in instead of Home; `deleted=1` shows the one-time "account deleted" notice (both from `src/lib/reauth.ts`; see the security section's re-authentication gate).
 
 **Web** (`web/app/(auth)/login/actions.ts`). The password form posts to a Next.js server action (`signInWithPasswordAction`). The action validates input with Zod, runs three DB-backed rate-limit checks from `loginRateLimitKeys` (10 attempts/10 min per IP; 5 attempts/15 min per email+IP pair, so a stranger cannot burn a victim's attempts; 30 attempts/hour per email, which caps guessing spread across many IPs because GoTrue's own per-IP limits only see Vercel's server IPs), calls `supabase.auth.signInWithPassword` inside a `withTimeout` wrapper (10–20 second deadline), and then calls Next.js `redirect()` outside the try/catch so the redirect signal is never swallowed. GoTrue returns the same `invalid_credentials` error for an unknown email and a wrong password, and the action passes it through unchanged — there is no existence lookup (the former `auth_email_exists` oracle is dropped by `20261030000000_security_hardening.sql`). Rate-limit keys reach the counters table only as an HMAC (`hashBucketKey` in `web/lib/auth/rateLimit.ts`). If `email_not_confirmed` comes back, the login page shows a "Resend confirmation email" button that calls the same `precheckResendAction` + `supabase.auth.resend` flow as signup.
 
@@ -102,8 +104,10 @@ Every email link is first classified by `readAuthLink` (`src/lib/authLink.ts`), 
 - `/reset-password` if `type=recovery` or `next=/reset-password`
 - `/onboarding/privacy?welcome=1` if this is a `type=signup` link and consent columns are not yet filled
 - `/onboarding/privacy` if consent is incomplete for any reason
-- The appropriate onboarding step if `onboarded_at` is null
+- If `onboarded_at` is null: an allowlisted onboarding `next` if one was given, otherwise the user's **saved step** (`resumeOnboardingRoute` in `src/lib/onboardingSteps.ts`, read from `onboarding_step`). Someone who signed out halfway through the wizard lands back on the step they had reached, never on the consent page again. A consented row with no saved step resumes at usage.
 - `nextPath` (if in the allowlist) or `/dashboard` for a returning user
+
+The middleware uses the same helpers for its own redirects, so a password sign-in (which goes to `/dashboard` and gets bounced) resumes at the same place a magic-link sign-in does.
 
 The `next` parameter is sanitized by `sanitizeCallbackNextPath` before any redirect is issued. The allowlist is explicit: shared post-auth paths (`/dashboard`, `/log`, `/log/new`, `/history`, `/trends`, `/settings`) plus callback-only paths (`/reset-password`) plus an explicit enumeration of the seven onboarding routes. Anything else — absolute URLs, path traversal, embedded newlines — is rejected and the user goes to `/dashboard`. Referrer leakage of the recovery token is suppressed with `Referrer-Policy: no-referrer` on every redirect response.
 

@@ -34,7 +34,10 @@ describe('onboarding keeps the saved country', () => {
 
   it('starts from the saved profile country, not a hard-coded India', () => {
     expect(page).not.toMatch(/useState\('IN'\)/);
-    expect(page).toContain('getProfile()');
+    // The saved profile arrives via the shared step loader (one read also seeds
+    // the baseline draft); the country must be taken from it.
+    expect(page).toContain('loadUsageStep()');
+    expect(page).toMatch(/setSavedCountry\(profile\.country/);
   });
 
   it('only calls setRegion when the country actually changes', () => {

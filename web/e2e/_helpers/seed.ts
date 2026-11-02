@@ -160,6 +160,47 @@ export async function markOnboarded(
   if (error) throw new Error(`seed: markOnboarded failed: ${error.message}`);
 }
 
+/** The saved onboarding step pointer (what the middleware gates on). */
+export async function readOnboardingStep(userId: string): Promise<string | null> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { data, error } = await a
+    .from('user_profiles')
+    .select('onboarding_step')
+    .eq('id', userId)
+    .single();
+  if (error) throw new Error(`seed: readOnboardingStep failed: ${error.message}`);
+  return (data as { onboarding_step: string | null }).onboarding_step;
+}
+
+/** Goals by status, newest first — to assert "exactly one active" after re-entry. */
+export async function listGoalStatuses(
+  userId: string,
+): Promise<{ type: string; status: string }[]> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { data, error } = await a
+    .from('goals')
+    .select('type,status')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`seed: listGoalStatuses failed: ${error.message}`);
+  return (data ?? []) as { type: string; status: string }[];
+}
+
+/** How many audit rows of one type the user has (consent must be recorded once per version). */
+export async function countAuditEvents(userId: string, eventType: string): Promise<number> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { count, error } = await a
+    .from('audit_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('event_type', eventType);
+  if (error) throw new Error(`seed: countAuditEvents failed: ${error.message}`);
+  return count ?? 0;
+}
+
 /** Favorite the user's first default brand (the wizard's Finish is disabled at 0). Returns its name. */
 export async function seedFavoriteBrand(userId: string): Promise<string | null> {
   const a = getAdmin();

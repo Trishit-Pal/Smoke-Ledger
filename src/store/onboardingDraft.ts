@@ -50,6 +50,15 @@ const EMPTY: Omit<
   goalTarget: '',
 };
 
+/**
+ * True when the usage step holds no un-saved input. Read at resolve time by the
+ * usage pages so a server load never overwrites an edit made while it was in flight.
+ */
+export function isUsageDraftEmpty(): boolean {
+  const d = useOnboardingDraft.getState();
+  return d.perDay == null && d.windowDays == null && d.purchasePref == null;
+}
+
 export const useOnboardingDraft = create<OnboardingDraftState>((set) => ({
   ...EMPTY,
 

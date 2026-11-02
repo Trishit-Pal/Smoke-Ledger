@@ -15,7 +15,7 @@ sources:
   - supabase/migrations/20260524050357_add_daily_summary.sql
   - supabase/migrations/20260602000000_perf_rls_initplan_indexes.sql
   - src/tests/calculations.test.ts
-last_verified_commit: 6268c8d
+last_verified_commit: e1a652d
 status: current
 ---
 
@@ -224,8 +224,10 @@ Indian and international brands from `smoke_seed.brand_catalog`. The initial
 seed includes Gold Flake, Classic, Marlboro, Benson & Hedges, Dunhill, Insignia,
 and others, with default pack sizes and average prices. Users can add their own
 brands (`createBrand` in `src/db/repositories/brands.ts:100`) and toggle
-favourites (`toggleFavorite` at line 127). Favourites float to the top of every
-brand list.
+favourites. `setFavorite(id, isFavorite)` writes the intended state in one
+UPDATE — the onboarding picker uses it so two quick taps cannot both read the
+same pre-state — and `toggleFavorite` is a read-then-`setFavorite` for callers
+that only know "flip it". Favourites float to the top of every brand list.
 
 Variants can be created or updated via `upsertVariant`
 (`src/db/repositories/brands.ts:166`). When a price is provided on upsert, the

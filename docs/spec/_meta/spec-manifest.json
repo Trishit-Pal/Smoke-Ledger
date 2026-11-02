@@ -30,7 +30,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "6268c8d",
+      "last_verified_commit": "e1a652d",
       "status": "current"
     },
     {
@@ -46,9 +46,10 @@
         "web/app/(auth)/**",
         "web/lib/auth/**",
         "src/lib/auth-errors.ts",
-        "src/lib/emailOtpType.ts"
+        "src/lib/emailOtpType.ts",
+        "src/lib/onboardingSteps.ts"
       ],
-      "last_verified_commit": "e52ffac",
+      "last_verified_commit": "e1a652d",
       "status": "current"
     },
     {
@@ -63,9 +64,15 @@
         "app/(tabs)/settings.tsx",
         "web/app/(app)/settings/**",
         "src/components/ui/ThemedSelect.tsx",
-        "web/components/ui/ThemedSelect.tsx"
+        "web/components/ui/ThemedSelect.tsx",
+        "src/services/onboarding.ts",
+        "src/lib/onboardingSteps.ts",
+        "src/store/onboardingDraft.ts",
+        "web/middleware.ts",
+        "web/app/onboarding/**",
+        "app/onboarding/**"
       ],
-      "last_verified_commit": "e52ffac",
+      "last_verified_commit": "e1a652d",
       "status": "current"
     },
     {
@@ -77,7 +84,7 @@
         "src/db/repositories/brands.ts",
         "app/(tabs)/log.tsx"
       ],
-      "last_verified_commit": "6268c8d",
+      "last_verified_commit": "e1a652d",
       "status": "current"
     },
     {
@@ -119,7 +126,7 @@
         "web/lib/server/auth.ts",
         "docs/security/**"
       ],
-      "last_verified_commit": "6268c8d",
+      "last_verified_commit": "e1a652d",
       "status": "current"
     },
     {

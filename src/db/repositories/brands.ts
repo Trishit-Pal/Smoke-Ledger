@@ -125,6 +125,23 @@ export async function createBrand(
   return rowToBrand(data as BrandRow);
 }
 
+/**
+ * Explicit write — callers that know the state they want (the onboarding
+ * favorites picker) use this so two quick taps cannot both read the same
+ * pre-state and land on the wrong value.
+ */
+export async function setFavorite(id: string, isFavorite: boolean): Promise<void> {
+  parseOrThrow(IdSchema, id, 'brand_id');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { error } = await supabase
+    .from('brands')
+    .update({ is_favorite: isFavorite, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id);
+  if (error) throw mapDbError(error);
+}
+
 export async function toggleFavorite(id: string): Promise<void> {
   parseOrThrow(IdSchema, id, 'brand_id');
   const supabase = getSupabase();
@@ -136,13 +153,7 @@ export async function toggleFavorite(id: string): Promise<void> {
     .eq('id', id)
     .single();
   if (fetchErr) throw mapDbError(fetchErr);
-  const next = !(row as { is_favorite: boolean }).is_favorite;
-  const { error } = await supabase
-    .from('brands')
-    .update({ is_favorite: next, updated_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .eq('id', id);
-  if (error) throw mapDbError(error);
+  await setFavorite(id, !(row as { is_favorite: boolean }).is_favorite);
 }
 
 export async function listVariants(brandId: string): Promise<BrandVariant[]> {

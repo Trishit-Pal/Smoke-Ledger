@@ -1,4 +1,4 @@
-import { useOnboardingDraft } from '@/store/onboardingDraft';
+import { isUsageDraftEmpty, useOnboardingDraft } from '@/store/onboardingDraft';
 
 const reset = () => useOnboardingDraft.getState().clear();
 
@@ -49,5 +49,21 @@ describe('onboardingDraft store', () => {
     expect(s.consents).toEqual({});
     expect(s.goalType).toBeNull();
     expect(s.goalTarget).toBe('');
+  });
+});
+
+describe('isUsageDraftEmpty', () => {
+  beforeEach(() => useOnboardingDraft.getState().clear());
+
+  it('is true for a fresh draft and false once any usage field is set', () => {
+    expect(isUsageDraftEmpty()).toBe(true);
+    useOnboardingDraft.getState().setUsage({ purchasePref: 'pack' });
+    expect(isUsageDraftEmpty()).toBe(false);
+  });
+
+  it('ignores consent and goal fields (they do not block usage hydration)', () => {
+    useOnboardingDraft.getState().setConsent('age', true);
+    useOnboardingDraft.getState().setGoal({ goalType: 'daily_cap' });
+    expect(isUsageDraftEmpty()).toBe(true);
   });
 });

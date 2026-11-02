@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: 6268c8d
+last_verified_commit: e1a652d
 status: current
 ---
 
@@ -57,7 +57,7 @@ One row per authenticated user, created automatically by the `on_auth_user_creat
 | `privacy_version` | text | NULL | — | — |
 | `health_disclaimer_version` | text | NULL | — | — |
 | `data_processing_consent_at` | timestamptz | NULL | — | — |
-| `marketing_consent_at` | timestamptz | NULL | — | — |
+| `marketing_consent_at` | timestamptz | NULL | — | CHECK `IS NULL` (`user_profiles_marketing_consent_unused`). Unused: no marketing opt-in exists. Old mobile builds stamped it from the analytics checkbox; `20261102120000_clear_marketing_consent.sql` cleared those with one `marketing_consent_cleared` audit row each. See `docs/architecture/marketing-consent.md`. |
 | `deleted_at` | timestamptz | NULL | — | Set to now() by `erase_account_data()` to force re-onboarding |
 | `full_name` | text | NULL | — | CHECK: NULL or 1–80 chars |
 | `date_of_birth` | date | NULL | — | CHECK: NULL or > 1900-01-01 (upper/18+ bound is in the trigger, not here) |
@@ -409,6 +409,10 @@ Calls `public.enforce_profile_identity_rules()`. This trigger has three jobs:
 2. **First-set 18+ recheck** — when `date_of_birth` transitions from NULL to a value (the legacy/admin profile-completion path), the trigger re-validates that the date is ≥ 18 years ago.
 3. **Mobile number rate limit** — a user can change `mobile_e164` at most once per 30 days. The trigger enforces this and sets `mobile_changed_at = now()` server-side when a change occurs, so the client cannot forge an old timestamp to bypass the window.
 
+**`trg_user_profiles_onboarding_step_monotonic`** (BEFORE UPDATE OF `onboarding_step` on `public.user_profiles`)
+
+Calls `public.keep_onboarding_step_monotonic()` (`supabase/migrations/20261101120000_onboarding_step_monotonic.sql`). `onboarding_step` means "the next onboarding page to show", and every step writes the following step as it saves. Going Back and pressing Continue again used to rewrite an earlier value, after which the middleware bounced the user away from pages they had already finished. The trigger ranks both values with `public.onboarding_step_rank(text)` (privacy 0 · usage/setup/baseline 1 · goal 2 · brands 3 · done 4) and silently keeps the higher one. A NULL on either side passes through, so `erase_account_data()` can still reset the step and a fresh row can take its first value. An unknown value ranks NULL, so the comparison is NULL, nothing is swapped, and the CHECK constraint rejects it as before. Both functions are `SECURITY INVOKER` with `search_path = ''`; the rank helper is granted to `authenticated` and `service_role` because the trigger runs as the writing role. Widen the rank function together with the CHECK and with `ONBOARDING_STEP_INDEX` in `src/lib/onboardingSteps.ts`.
+
 ---
 
 ### RPCs
@@ -526,7 +530,7 @@ These rules must never break:
 
 **Realtime is active**. `cigarette_logs`, `goals`, `user_profiles`, `brands`, and `brand_variants` are in the `supabase_realtime` publication — the first three via `20260620130000_realtime_enable.sql`, the brand tables via `20260622000000_realtime_brands.sql` (so a brand added on mobile appears in the web quick-log strip without a reload). `cigarette_logs`, `goals`, `brands`, and `brand_variants` are `REPLICA IDENTITY FULL` so DELETE events carry `user_id` for the client filter. Both clients subscribe via `RealtimeRefresher` (web `router.refresh()`, mobile `useSession.refresh*`).
 
-**`onboarding_step` was widened post-launch**. The original constraint in `20260520000000` omitted `'usage'`. The app's first onboarding step writes that value, so every new signup rejected with `23514` until `20260523081444_align_onboarding_step_constraint.sql` widened the CHECK. The TS source of truth is `OnboardingStep` in `src/types/index.ts:95`.
+**`onboarding_step` was widened post-launch**. The original constraint in `20260520000000` omitted `'usage'`. The app's first onboarding step writes that value, so every new signup rejected with `23514` until `20260523081444_align_onboarding_step_constraint.sql` widened the CHECK. The TS source of truth is `OnboardingStep` in `src/types/index.ts:95`. Since `20261101120000` the column only moves forward (see the monotonic trigger above); a client that wants to rewind must write NULL first, which only the erase RPC does. Clients write the step in the same UPDATE as the step's own data (`updateProfile({ …, onboardingStep })`, `saveComplianceConsents({ …, onboardingStep })` in `src/db/repositories/profile.ts`), so "save + advance" is one row update.
 
 ## Tests
 

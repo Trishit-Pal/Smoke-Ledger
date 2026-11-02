@@ -16,7 +16,8 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useLayout } from '@/hooks/useLayout';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
-import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
+import { isOnboarded } from '@/lib/compliance';
+import { resumeOnboardingRoute } from '@/lib/onboardingSteps';
 
 // Derive the tab-bar prop type from expo-router's own Tabs so it always matches
 // expo-router's vendored react-navigation types (avoids cross-package type drift).
@@ -205,8 +206,8 @@ export default function TabsLayout() {
   }
 
   if (!session) return <Redirect href="/login" />;
-  if (!hasRequiredConsents(profile)) return <Redirect href="/onboarding/privacy" />;
-  if (!isOnboarded(profile)) return <Redirect href="/onboarding/welcome" />;
+  // Mid-wizard sign-in resumes at the saved step (privacy until consented).
+  if (!isOnboarded(profile)) return <Redirect href={resumeOnboardingRoute(profile)} />;
 
   return (
     <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>

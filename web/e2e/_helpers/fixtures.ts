@@ -87,6 +87,8 @@ export async function completeOnboarding(page: Page, opts: { baseline?: string }
 
   await expect(page).toHaveURL(/\/onboarding\/usage/);
   await page.getByLabel('Sticks per day').fill(opts.baseline ?? '8');
+  // Continue stays disabled until a purchase preference is chosen.
+  await page.getByRole('button', { name: 'Mostly packs' }).click();
   await page.getByRole('button', { name: /Continue/ }).click();
 
   await expect(page).toHaveURL(/\/onboarding\/goal/);

@@ -4,8 +4,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSession } from '@/store/session';
 import {
   canAccessOnboardingStep,
-  earliestOnboardingRoute,
+  effectiveOnboardingStep,
   hasRequiredConsents,
+  resumeOnboardingRoute,
 } from '@/lib/onboardingSteps';
 
 export default function OnboardingLayout() {
@@ -42,11 +43,13 @@ export default function OnboardingLayout() {
       return;
     }
 
+    // Same derived step for "may I see this" and "where do I resume", so the
+    // two can never disagree (a legacy consented row has no saved step).
     if (
       hasRequiredConsents(profile) &&
-      !canAccessOnboardingStep(profile.onboardingStep, path)
+      !canAccessOnboardingStep(effectiveOnboardingStep(profile), path)
     ) {
-      router.replace(earliestOnboardingRoute(profile.onboardingStep));
+      router.replace(resumeOnboardingRoute(profile));
     }
   }, [checked, profile, pathname, router]);
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -10,6 +10,7 @@ import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { getSupabase } from '@/lib/supabase';
 import { isUnknownEmailError, toAuthErrorMessage } from '@/lib/auth-errors';
+import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
 
 type Mode = 'password' | 'magic-link';
 
@@ -20,7 +21,19 @@ function isLikelyEmail(value: string): boolean {
 export default function LoginScreen() {
   const theme = useTheme();
   const router = useRouter();
+  // reason=reauth: a signed-in user sent here to confirm a credential before
+  // account deletion; after sign-in return to Settings to re-confirm (a sign-in
+  // alone never deletes). deleted=1: the account was just deleted.
+  const params = useLocalSearchParams<{ reason?: string; [ACCOUNT_DELETED_PARAM]?: string }>();
+  const reason = params.reason;
+  // Derived from the live param, not a useState initialiser: sign-out mounts
+  // this screen (tabs guard → /login) before the ?deleted=1 replace arrives.
+  const [deletedDismissed, setDeletedDismissed] = useState(false);
+  const deletedNotice = params[ACCOUNT_DELETED_PARAM] === '1' && !deletedDismissed;
+  // Only a password sign-in refreshes this session's `amr` claim and returns
+  // here; the email link comes back through the auth callback to Home.
   const [mode, setMode] = useState<Mode>('password');
+  const reauth = reason === 'reauth';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -61,7 +74,7 @@ export default function LoginScreen() {
         setErr('Please confirm your email before signing in.');
         return;
       }
-      router.replace('/');
+      router.replace(reason === 'reauth' ? DELETE_RESUME_PATH : '/');
     } finally {
       setLoading(false);
     }
@@ -108,6 +121,24 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingTop: spacing.xl, gap: spacing.lg }}
         >
+          {deletedNotice ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+              onPress={() => setDeletedDismissed(true)}
+              style={{
+                borderTopWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: theme.rule,
+                paddingVertical: spacing.md,
+              }}
+            >
+              <Text variant="small" style={{ fontStyle: 'italic' }}>
+                Your account and all its data have been deleted. You’re welcome back anytime.
+              </Text>
+            </Pressable>
+          ) : null}
+
           {/* Masthead */}
           <View style={{ gap: spacing.xs }}>
             <Text variant="caption" muted>
@@ -119,9 +150,19 @@ export default function LoginScreen() {
                 ? 'Use the email and password you registered with.'
                 : 'We will email you a one-tap sign-in link. Open it on any device.'}
             </Text>
+            {reauth ? (
+              // Concern, not a positive state: terracotta, never the teal accent.
+              <Text variant="small" color={theme.warnEarth} style={{ fontStyle: 'italic' }}>
+                Confirm it’s you to finish deleting your account. You’ll be asked once more
+                before anything is deleted. No password? Delete from the web app instead.
+              </Text>
+            ) : null}
           </View>
 
-          {/* Mode toggle — editorial underlined choices */}
+          {/* Mode toggle — editorial underlined choices. Not rendered during
+              re-auth (not just hidden, so it leaves the accessibility tree too):
+              only a password sign-in can finish the deletion on this device. */}
+          {reauth ? null : (
           <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
             <Pressable
               accessibilityRole="button"
@@ -163,6 +204,7 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
           </View>
+          )}
 
           {/* Form */}
           <View style={{ gap: spacing.md }}>

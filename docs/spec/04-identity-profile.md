@@ -10,7 +10,13 @@ sources:
   - web/app/(app)/settings/**
   - src/components/ui/ThemedSelect.tsx
   - web/components/ui/ThemedSelect.tsx
-last_verified_commit: e52ffac
+  - src/services/onboarding.ts
+  - src/lib/onboardingSteps.ts
+  - src/store/onboardingDraft.ts
+  - web/middleware.ts
+  - web/app/onboarding/**
+  - app/onboarding/**
+last_verified_commit: e1a652d
 status: current
 ---
 
@@ -170,6 +176,48 @@ These must never break.
 
 **Country.** Settings (web) has a country picker (`web/components/settings/CountryField.tsx`) behind `NEXT_PUBLIC_REGION_PICKER`. The country fixes the ledger's currency and calendar: India is INR and IST, EU countries are EUR in their own zone. Six EU members that do not use the euro (CZ, DK, HU, PL, RO, SE) are not offered (`regionOptions` in `src/lib/regions.ts`) until their currencies are supported. Changing to a country with a different currency while the ledger has data raises `region_change_requires_reset`; Settings then offers "Reset the ledger and switch", and changing the country again clears that prompt. A reset that would not change the currency is refused server-side (`region_reset_not_needed`), and the repository treats it as a plain country save, so a double tap cannot show a false error.
 
-**Onboarding** (`web/app/onboarding/usage/page.tsx`) starts from the saved country and calls `setRegion` only when the pick changes it (`regionChangeNeeded`), so going Back never silently switches the account. Native screens read the country from the session store: `ledgerTimeZone()` / `ledgerToday()` and `ledgerMoney()` / `ledgerCurrency()` (`src/lib/ledgerMoney.ts`); Home insights, spend-cap goals and the mood/trigger matrix format in the profile currency. The native price editor shows the ledger currency, keeps euro cents and accepts a comma decimal (`parseDecimal`). A country can only be chosen on web; native onboarding is the India ledger.
+**Onboarding** (`web/app/onboarding/usage/page.tsx`) starts from the saved country (read through `loadUsageStep`) and calls `setRegion` only when the pick changes it (`regionChangeNeeded`), so going Back never silently switches the account. Native screens read the country from the session store: `ledgerTimeZone()` / `ledgerToday()` and `ledgerMoney()` / `ledgerCurrency()` (`src/lib/ledgerMoney.ts`); Home insights, spend-cap goals and the mood/trigger matrix format in the profile currency. The native price editor shows the ledger currency, keeps euro cents and accepts a comma decimal (`parseDecimal`). A country can only be chosen on web; native onboarding is the India ledger.
 
 **Erase** clears the identity fields too: `full_name`, `date_of_birth`, `gender`, `mobile_e164` and `place`. They are otherwise immutable; `erase_account_data` sets a transaction-local `app.erasing` flag that the identity trigger honours, and records `prior_identity_erased` on its audit row.
+
+## Onboarding: saving, going back, and coming back (2026-11)
+
+A new account walks privacy → usage (the baseline) → goal → brands → done. Every step saves on **Continue**, and the person can move backwards and forwards freely, close the tab, or sign out halfway, without losing what was saved or being asked for it again.
+
+### What the user experiences
+
+Going Back to a step shows what was saved there: the baseline slider sits on the saved number with the purchase preference selected, and the goal card the user chose is pre-selected with its target. Pressing Continue again simply confirms; changing the value updates it. On the goal step, a saved goal is edited in place rather than duplicated, and the secondary button reads **Keep and continue** instead of **Skip for now** when a goal already exists. The privacy step is the one exception: its boxes always start empty, because consent is a fresh decision each time it is asked (`docs/interview/guide.md` §11.6). Re-ticking them changes nothing in the record except the optional analytics preference.
+
+Signing out mid-wizard and signing back in, on either platform, lands on the step the user had reached. Typing a later step's URL redirects to the step that still needs saving.
+
+### How it works
+
+The step writes live in one shared module, `src/services/onboarding.ts`, used by the web pages (`web/app/onboarding/*`) and the Expo screens (`app/onboarding/*`), so re-entry behaves identically on both:
+
+- `submitConsentStep({ alreadyConsented, analyticsOptIn })` records the five consents and the legal versions, with `onboarding_step = 'usage'` in the same UPDATE. When `alreadyConsented` is true — computed by `consentsCurrent(profile)` on the web server (`web/app/onboarding/privacy/page.tsx`) or from `useSession` on mobile, so the client never receives the whole profile — only the step and the `consent.*` settings are written and no audit row is added. On a fresh consent the `consent_accepted` audit is recorded **before** the profile write: a duplicate row on retry is acceptable, a consent with no audit row is not. It never writes `marketing_consent_at`; the analytics opt-in is not marketing consent (the mobile screen used to conflate the two).
+- `loadUsageStep()` returns the profile plus the saved baseline (`onboarding.typicalDaily` setting, falling back to `baseline_per_day`, window, purchase preference) or `draft: null` if the step was never saved. `submitUsageStep` validates with `OnboardingUsageSchema` (`src/lib/validation.ts`) and writes baseline + `onboarding_step = 'goal'` in one UPDATE.
+- `loadGoalStep()` finds the newest active goal of the three offered types and seeds the draft from it via `goalToFormState`. `submitGoalStep(form, existing)` updates the target when the type is unchanged, otherwise creates the new goal; either way it then abandons every other active goal of the offered types (create-first, so a failed create leaves the live goal untouched, and a retry after any half-failure heals to one active goal; the clients re-read the saved goal on failure), so there is never more than one active onboarding goal (the one-active-per-type rule in `createGoal` used to throw `conflict` here). `skipGoalStep` only advances the step and throws on failure instead of navigating anyway.
+- `finishOnboarding()` writes `onboarded_at` and `onboarding_step = 'done'` together; the `onboarding_completed` audit stays best-effort.
+
+The in-memory draft (`src/store/onboardingDraft.ts`) is still never persisted. Each step seeds it from the loader only when it is empty, so un-saved edits survive Back/forward within a session and are lost on refresh by design, while saved values always come back from the server.
+
+Step order has one source: `src/lib/onboardingSteps.ts`. `canAccessOnboardingStep` allows pages at or before the saved step (`<=`, not the old `<= current + 1`, which let a deep link skip the unsaved step). `effectiveOnboardingStep` derives the step to gate on — privacy until consented, then the saved step, defaulting to usage for consented rows with no step — and `resumeOnboardingRoute` turns it into a route. The web middleware, `postAuthDestination`, the Expo layout and the Expo index/tabs redirects all go through these two, so "may I see this page" and "where do I resume" can never disagree (a resume target the gate then rejects would be a redirect loop). Because the Expo layout gates on the in-memory profile, each mobile screen calls `refreshProfile()` before navigating.
+
+The DB keeps `onboarding_step` from moving backwards (`trg_user_profiles_onboarding_step_monotonic`, see the data model), so re-submitting an earlier step is harmless from any client.
+
+Brand favourites are written with the intended state (`setFavorite(id, isFavorite)` in `src/db/repositories/brands.ts`) rather than a read-then-toggle, and Finish is disabled while a favourite write is still in flight.
+
+### Invariants
+
+- Re-submitting a saved step never moves `onboarding_step` backwards, never duplicates a goal, and never records a second `consent_accepted` for the same legal versions.
+- A consent audit row exists for every recorded consent (audit before write).
+- Consent boxes are never pre-filled from saved data.
+- The resume route is always reachable under the same derived step.
+
+### Tests
+
+`src/tests/onboardingService.test.ts` (service semantics with mocked repositories), `src/tests/onboardingSteps.test.ts` (gate boundaries, resume, the no-loop property), `src/tests/web-post-auth-destination.test.ts` (sign-in resumes at the saved step), and `web/e2e/onboarding.spec.ts` (Back through every step, refresh, re-login, deep links, goal type change — against a seeded account, so they need the e2e service-role env).
+
+### Open gaps
+
+The gate columns (`onboarded_at`, `onboarding_step`, the consent columns) are still client-writable under the wide `user_profiles` RLS policy; the trigger stops rewinds, not forward jumps. Re-consent after a legal-version bump only reaches users still in the wizard. Changing the country on the usage step after picking favourites re-seeds the brand catalogue (intended region behaviour).

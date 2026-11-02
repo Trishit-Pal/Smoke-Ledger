@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Pressable, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -8,10 +8,8 @@ import { Divider } from '@/components/ui/Divider';
 import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { listBrands, toggleFavorite } from '@/db/repositories/brands';
-import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
-import { setSetting } from '@/db/repositories/settings';
-import { recordAuditEvent } from '@/services/audit';
+import { listBrands, setFavorite } from '@/db/repositories/brands';
+import { finishOnboarding } from '@/services/onboarding';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { useSession } from '@/store/session';
 import type { Brand } from '@/types';
@@ -42,6 +40,11 @@ export default function BrandsPick() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Favourite writes still in flight; Finish waits for them so the summary
+  // never misses a tap that landed a moment before. A brand with a write in
+  // flight ignores further taps, so a double tap cannot write the same state twice.
+  const [pending, setPending] = useState(0);
+  const pendingIds = useRef(new Set<string>());
 
   useEffect(() => {
     void (async () => {
@@ -76,16 +79,22 @@ export default function BrandsPick() {
   const favorites = useMemo(() => brands.filter((b) => b.isFavorite), [brands]);
 
   const onToggle = async (brand: Brand) => {
+    if (pendingIds.current.has(brand.id)) return;
+    // Write the intended state (not a server-side toggle); local state mirrors it.
+    const next = !brand.isFavorite;
+    pendingIds.current.add(brand.id);
+    setPending((n) => n + 1);
     try {
       setErrorMsg(null);
-      await toggleFavorite(brand.id);
+      await setFavorite(brand.id, next);
       setBrands((rows) =>
-        rows.map((row) =>
-          row.id === brand.id ? { ...row, isFavorite: !row.isFavorite } : row,
-        ),
+        rows.map((row) => (row.id === brand.id ? { ...row, isFavorite: next } : row)),
       );
     } catch (e) {
       setErrorMsg(toSafeErrorMessage(e, 'dependency_failure'));
+    } finally {
+      pendingIds.current.delete(brand.id);
+      setPending((n) => n - 1);
     }
   };
 
@@ -93,18 +102,7 @@ export default function BrandsPick() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      const now = new Date().toISOString();
-      await Promise.all([
-        updateProfile({ onboardedAt: now }),
-        setSetting('consent.onboardingCompletedAt', now),
-      ]);
-      await setOnboardingStep('done');
-      try {
-        await recordAuditEvent('onboarding_completed', 'compliance', {});
-      } catch (auditErr) {
-        // Audit is non-gating — proceed regardless
-        console.warn('[onboarding] onboarding_completed audit failed', auditErr);
-      }
+      await finishOnboarding();
       await Promise.all([refreshBrands(), refreshProfile()]);
       router.replace('/onboarding/done');
     } catch (e) {
@@ -336,7 +334,7 @@ export default function BrandsPick() {
           <Button
             title={submitting ? 'Finishing…' : 'Finish setup →'}
             loading={submitting}
-            disabled={favorites.length === 0 || submitting}
+            disabled={favorites.length === 0 || submitting || pending > 0}
             style={{ flex: 2 }}
             onPress={onFinish}
           />

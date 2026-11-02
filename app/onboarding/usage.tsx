@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -11,9 +11,9 @@ import { FadeSlideIn } from '@/components/anim/FadeSlideIn';
 import { Reveal } from '@/components/anim/Reveal';
 import { spacing, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { setSetting } from '@/db/repositories/settings';
-import { updateProfile, setOnboardingStep } from '@/db/repositories/profile';
-import { useOnboardingDraft } from '@/store/onboardingDraft';
+import { loadUsageStep, submitUsageStep } from '@/services/onboarding';
+import { isUsageDraftEmpty, useOnboardingDraft } from '@/store/onboardingDraft';
+import { useSession } from '@/store/session';
 import { toSafeErrorMessage } from '@/lib/errors';
 
 const PRICE_PER_STICK = 18;
@@ -56,6 +56,34 @@ export default function Usage() {
   const windowDays = draftWindow ?? 30;
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const refreshProfile = useSession((s) => s.refreshProfile);
+
+  // Server is the source of truth: when the draft is empty (app relaunch,
+  // re-login, Back after saving) seed it from what was saved. Un-saved edits win.
+  const draftEmpty = draftPerDay == null && draftWindow == null && pref == null;
+  useEffect(() => {
+    if (!draftEmpty) return;
+    let cancelled = false;
+    loadUsageStep()
+      .then(({ draft }) => {
+        // Re-check at resolve time: an edit made while the load was in
+        // flight must win over the server values.
+        if (cancelled || !draft || !isUsageDraftEmpty()) return;
+        setUsage({
+          perDay: draft.perDay,
+          windowDays: draft.windowDays,
+          ...(draft.purchasePref ? { purchasePref: draft.purchasePref } : {}),
+        });
+      })
+      .catch(() => {
+        // Keep the defaults; Continue will still save whatever the user picks.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: hydrate once; later edits live in the draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const n = Math.max(0, Math.min(MAX_STICKS, perDay));
   const dailySpend = n * PRICE_PER_STICK;
@@ -69,12 +97,10 @@ export default function Usage() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      await Promise.all([
-        setSetting('onboarding.typicalDaily', n),
-        setSetting('onboarding.purchasePref', pref),
-        updateProfile({ baselinePerDay: n, baselineWindowDays: windowDays }),
-      ]);
-      await setOnboardingStep('goal');
+      // Baseline + step advance land in one profile update (see submitUsageStep).
+      await submitUsageStep({ perDay: n, windowDays, purchasePref: pref });
+      // The onboarding layout gates on the in-memory profile.
+      await refreshProfile();
       router.push('/onboarding/goal');
     } catch (e) {
       setErrorMsg(toSafeErrorMessage(e, 'dependency_failure'));

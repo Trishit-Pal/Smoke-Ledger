@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { ACCOUNT_DELETED_PARAM } from '@/lib/reauth';
 import { Figure } from '@web/components/character/Figure';
 
 /**
@@ -18,7 +19,7 @@ export function AccountDeletedNotice() {
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('deleted') === '1') {
+    if (params.get(ACCOUNT_DELETED_PARAM) === '1') {
       setVisible(true);
       // Drop the param without a navigation/refetch so the static page is kept
       // and the banner doesn't reappear on reload.
