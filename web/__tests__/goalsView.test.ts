@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyGoalForm, proposalToForm, type GoalFormState } from '@/domain/goalForm';
 import type { Proposal } from '@/domain/goalProposals';
-import { isFromProposal, offersStartProposal, parseTypeParam, periodUnitLabel } from '../app/(app)/goals/goalsView';
+import { isFromProposal, offersStartProposal, proposalButtonLabel, parseTypeParam, periodUnitLabel } from '../app/(app)/goals/goalsView';
 
 const proposal: Proposal = { kind: 'start', type: 'daily_cap', value: 6, unit: 'sticks', basisAvg: 7.2 };
 const seeded = (): GoalFormState => ({ ...emptyGoalForm('daily_cap'), ...proposalToForm(proposal) });
@@ -51,5 +51,14 @@ describe('offersStartProposal', () => {
     expect(offersStartProposal('no_smoke_window')).toBe(false);
     expect(offersStartProposal('daily_cap')).toBe(true);
     expect(offersStartProposal('quit_date')).toBe(true);
+  });
+});
+
+describe('proposalButtonLabel', () => {
+  it('names the value when it is visible', () => {
+    expect(proposalButtonLabel('6 / day', false)).toBe('Use 6 / day');
+  });
+  it('never echoes a masked value', () => {
+    expect(proposalButtonLabel('—', true)).toBe('Use the suggestion');
   });
 });

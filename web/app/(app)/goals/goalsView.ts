@@ -29,3 +29,8 @@ export function periodUnitLabel(currency: CurrencyCode, period: SpendPeriod): st
 export function offersStartProposal(type: GoalType): boolean {
   return type !== 'no_smoke_window';
 }
+
+/** Button text for accepting a proposal; under discreet mode the (masked) value is not echoed. */
+export function proposalButtonLabel(valueLabel: string, hidden: boolean): string {
+  return hidden ? 'Use the suggestion' : `Use ${valueLabel}`;
+}

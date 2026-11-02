@@ -105,11 +105,12 @@ function GoalForm({
         : proposeStart(form.type, logs, today, { currency: profile.currency, period: form.period }),
     [isEdit, form.type, form.period, logs, today, profile.currency],
   );
+  const hideMoney = isDiscreetMode(profile) && form.type === 'spend_cap_daily';
   const copy = proposal
     ? describeProposal(proposal, {
         formatMoney: (n) => formatMoney(n, profile.currency, { locale: localeForCountry(profile.country) }),
         formatDate: formatIndianDate,
-        hideMoney: isDiscreetMode(profile) && form.type === 'spend_cap_daily',
+        hideMoney,
       })
     : null;
   const offered = !isEdit && !proposalDecided && proposal && copy ? { proposal, copy } : null;
@@ -160,6 +161,7 @@ function GoalForm({
           proposal={offered.proposal}
           copy={offered.copy}
           busy={busy}
+          hidden={hideMoney}
           onUse={() => onUseProposal(proposalToForm(offered.proposal))}
           onChooseOwn={onChooseOwn}
         />
