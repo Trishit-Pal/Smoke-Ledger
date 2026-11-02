@@ -15,8 +15,9 @@ import { cleanEnvValue } from '@web/lib/supabase/env';
 
 // Two model calls plus four parallel reads fit well inside this; Hobby allows 300s.
 export const maxDuration = 30;
-// Production Supabase is in us-east-2; keep the tool queries next to it.
-export const preferredRegion = 'iad1';
+// Production Supabase is in AWS us-east-2 (Ohio); cle1 (Cleveland) is the Vercel
+// region next to it, so the tool queries stay in-region.
+export const preferredRegion = 'cle1';
 export const dynamic = 'force-dynamic';
 
 const CONSENT_KEY = 'consent.ledgerChatOptIn';
@@ -64,17 +65,19 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (consentError || consent?.value_json !== true) return fail('consent_required', 403);
 
+    // The middleware carve-out skipped the age, consent and onboarded gates for
+    // this route; re-apply them here, before a daily token is spent and before
+    // any ledger data is loaded or sent.
+    const profile = await loadProfile(db, userId);
+    if (!profile) return fail('unauthorized', 401);
+    if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return fail('forbidden', 403);
+
     const allowed = await checkRateLimits([
       { kind: 'ledger_chat_user', key: userId, max: envInt('LEDGER_CHAT_DAILY_CAP_USER', DEFAULT_USER_CAP), windowSec: DAY_SECONDS },
       { kind: 'ledger_chat_global', key: 'all', max: envInt('LEDGER_CHAT_DAILY_CAP_GLOBAL', DEFAULT_GLOBAL_CAP), windowSec: DAY_SECONDS },
     ]);
     if (!allowed) return fail('rate_limited', 429);
 
-    const profile = await loadProfile(db, userId);
-    if (!profile) return fail('unauthorized', 401);
-    // The middleware carve-out skipped the age, consent and onboarded gates for
-    // this route; re-apply them here, before any ledger data is loaded or sent.
-    if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return fail('forbidden', 403);
     const zone = timezoneForCountry(profile.country);
     const today = todayInZone(zone);
     // Floor the summary at onboarding, exactly as the dashboard does.

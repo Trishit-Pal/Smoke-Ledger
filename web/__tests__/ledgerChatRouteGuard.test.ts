@@ -7,6 +7,8 @@ import { describe, expect, test } from 'vitest';
 const route = readFileSync(join(__dirname, '..', 'app', 'api', 'ledger-chat', 'route.ts'), 'utf8');
 const turn = readFileSync(join(__dirname, '..', 'lib', 'server', 'ledgerChat', 'turn.ts'), 'utf8');
 const prompt = readFileSync(join(__dirname, '..', 'lib', 'server', 'ledgerChat', 'prompt.ts'), 'utf8');
+const auth = readFileSync(join(__dirname, '..', 'lib', 'server', 'ledgerChat', 'auth.ts'), 'utf8');
+const middleware = readFileSync(join(__dirname, '..', 'middleware.ts'), 'utf8');
 
 describe('ledger-chat route guards', () => {
   test('resolves the caller before reading the body', () => {
@@ -17,24 +19,32 @@ describe('ledger-chat route guards', () => {
     expect(caller).toBeLessThan(body);
   });
 
-  test('checks the kill switch, consent, and limits before loading any data', () => {
+  test('gate order: kill switch, consent key, profile gates, then limits, then the ledger loads', () => {
     const killSwitch = route.indexOf('isLedgerChatEnabled()');
     const consent = route.indexOf(".from('settings_kv')");
+    const profile = route.indexOf('loadProfile(');
+    const consents = route.indexOf('hasRequiredConsents(');
     const limits = route.indexOf('checkRateLimits(');
-    const loads = route.indexOf('loadProfile(');
+    const logs = route.indexOf('loadLogsPage(');
     expect(route).toContain("'consent.ledgerChatOptIn'");
     expect(killSwitch).toBeGreaterThan(-1);
     expect(consent).toBeGreaterThan(killSwitch);
-    expect(limits).toBeGreaterThan(consent);
-    expect(loads).toBeGreaterThan(limits);
+    // The profile gates run before a daily token is spent, so a reader without
+    // consents is refused without losing one of their asks.
+    expect(profile).toBeGreaterThan(consent);
+    expect(consents).toBeGreaterThan(profile);
+    expect(limits).toBeGreaterThan(consents);
+    expect(logs).toBeGreaterThan(limits);
   });
 
-  test('re-checks the onboarding consents the middleware carve-out skipped, before loading the ledger', () => {
-    const profile = route.indexOf('loadProfile(');
-    const consents = route.indexOf('hasRequiredConsents(');
-    const logs = route.indexOf('loadLogsPage(');
-    expect(consents).toBeGreaterThan(profile);
-    expect(consents).toBeLessThan(logs);
+  test('the confirmed-email rule is the shared one, not a copy', () => {
+    expect(auth).toContain("isEmailConfirmed } from '@/lib/compliance'");
+    expect(middleware).toContain('isEmailConfirmed(');
+    expect(auth).not.toMatch(/function isConfirmed/);
+  });
+
+  test('the region is the one next to the Ohio database', () => {
+    expect(route).toContain("export const preferredRegion = 'cle1'");
   });
 
   test('never calls the cookie-path getServer* loaders (they redirect)', () => {

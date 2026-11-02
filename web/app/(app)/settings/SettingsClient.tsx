@@ -374,6 +374,8 @@ export function SettingsClient({
     setError(null);
     try {
       await updateProfile({ discreetMode: value });
+      // A transcript saved before discreet mode holds real brand names; drop it.
+      if (value) clearTranscript();
       await revalidateAppViews();
       router.refresh();
       if (value) {

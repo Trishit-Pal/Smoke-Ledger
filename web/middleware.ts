@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isEmailConfirmed } from '@/lib/compliance';
 import { isReauthRequest } from '@/lib/reauth';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
 import {
@@ -160,7 +161,7 @@ export async function middleware(request: NextRequest) {
 
   // Email confirmation gate: if Supabase project requires confirmation but the
   // user is somehow signed in without `email_confirmed_at`, bounce them out.
-  if (user.email && !user.email_confirmed_at && !user.phone_confirmed_at) {
+  if (!isEmailConfirmed(user)) {
     await supabase.auth.signOut();
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('error', 'email_not_confirmed');

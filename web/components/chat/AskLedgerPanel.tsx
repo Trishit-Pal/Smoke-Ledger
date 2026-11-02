@@ -27,7 +27,7 @@ import {
   type ChatResponse,
   type Row,
 } from '@/domain/ledgerChat/types';
-import { isHomeTotalsHidden } from '@/lib/discreet';
+import { isHomeTotalsHidden, maskCount, maskInr, maskNumbers } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { localeForCountry } from '@/lib/regions';
@@ -82,9 +82,10 @@ function historyFor(turns: readonly TranscriptTurn[]): ChatHistoryTurn[] {
   ]);
 }
 
+/** Same helpers Home uses, so the mask glyph and rules stay in one place. */
 function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): string {
-  if (masked && (row.unit === 'money' || row.unit === 'sticks')) return '•••';
-  if (row.unit === 'money') return typeof row.value === 'number' ? money(row.value) : String(row.value);
+  if (row.unit === 'money') return typeof row.value === 'number' ? maskInr(row.value, masked, money) : String(row.value);
+  if (row.unit === 'sticks') return maskCount(row.value, masked);
   if (row.unit === 'percent') return `${row.value}%`;
   return String(row.value);
 }
@@ -252,7 +253,17 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               <p className="rule-hair-strong mt-lg pt-md text-small text-text-muted">{COPY.empty}</p>
             )}
 
-            {turns.map((turn) => (
+            {turns.map((turn) => {
+              // The narration is a render site too: a verified figure the model
+              // repeats is masked exactly like the row beside it, tap to reveal.
+              const proseKey = `${turn.id}:answer`;
+              const proseMasked = hidden && !revealed.has(proseKey);
+              const paragraphs = turn.answer.split(/\n+/).map((paragraph, i) => (
+                <p key={i} className="text-body text-text">
+                  {maskNumbers(paragraph, proseMasked)}
+                </p>
+              ));
+              return (
               <article key={turn.id} className="rule-hair mt-md flex flex-col gap-sm pt-md">
                 <p className="editorial-pullquote text-[clamp(1rem,2vw,1.125rem)] text-text">{turn.question}</p>
                 {turn.rows.length > 0 ? (
@@ -276,13 +287,21 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                     })}
                   </dl>
                 ) : null}
-                {turn.answer.split(/\n+/).map((paragraph, i) => (
-                  <p key={i} className="text-body text-text">
-                    {paragraph}
-                  </p>
-                ))}
+                {proseMasked ? (
+                  <button
+                    type="button"
+                    onClick={() => reveal(proseKey)}
+                    aria-label="Answer with figures hidden, tap to reveal"
+                    className="flex flex-col gap-sm rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  >
+                    {paragraphs}
+                  </button>
+                ) : (
+                  paragraphs
+                )}
               </article>
-            ))}
+              );
+            })}
 
             <div aria-live="polite" className="flex flex-col gap-sm">
               {pending && status !== 'idle' ? (

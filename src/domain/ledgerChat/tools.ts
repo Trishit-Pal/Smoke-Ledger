@@ -11,13 +11,13 @@ import {
   dowDistribution,
   forecastMonthlySpend,
   hourDistribution,
-  rollingAvgSpend,
   round2,
 } from '@/domain/calc';
 import { moodTriggerMatrix } from '@/domain/correlations';
+import { goalTypeLabel } from '@/domain/goalForm';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
-import { periodWithTrend, savedAllTime, weightedAvgUnitPrice } from '@/domain/periodSummary';
+import { periodWithTrend, savedAllTime, totalsForWindow, weightedAvgUnitPrice } from '@/domain/periodSummary';
 import { hourBucketLabel } from '@/lib/date';
 import { formatMoney } from '@/lib/format';
 
@@ -250,15 +250,18 @@ function savings(_input: unknown, ctx: ToolContext): ToolOutcome {
 }
 
 function spendOutlook(_input: unknown, ctx: ToolContext): ToolOutcome {
-  // ponytail: annualised = rolling 30-day daily average × 365 (the spec's "annualised helper"), inline.
-  const perDay = round2(rollingAvgSpend(ctx.logs, ctx.today, 30));
+  // The daily rate comes from the daily summary (uncapped, the screens' source of
+  // truth), never from the 200-row log page, which a heavy logger fills in under
+  // a month. ponytail: annualised = 30-day daily average × 365, inline.
+  const perDay = round2(totalsForWindow(ctx.rows, 30, ctx.today).spendInr / 30);
   const perMonth = round2(perDay * 30);
   const perYear = round2(perDay * 365);
+  // Month-to-date forecast stays on the same function Home shows.
   const forecast = forecastMonthlySpend(ctx.logs, ctx.today);
   return {
     ok: true,
     data: {
-      basis: 'rolling 30-day average of logged spend',
+      basis: 'average daily spend over the last 30 days of the daily summary',
       perDay,
       perMonth,
       perYear,
@@ -320,14 +323,15 @@ function goalUnit(unit: 'sticks' | 'inr' | 'days' | 'percent'): RowUnit {
 
 function goalStatus(_input: unknown, ctx: ToolContext): ToolOutcome {
   const money = { currency: ctx.currency, locale: ctx.locale };
-  const progress = ctx.goals
-    .filter((g) => g.status === 'active')
-    .map((g) => evaluateGoal(g, ctx.logs, ctx.today, money));
+  const active = ctx.goals.filter((g) => g.status === 'active');
+  const progress = active.map((g) => evaluateGoal(g, ctx.logs, ctx.today, money));
   return {
     ok: true,
     data: { goals: progress.map(({ goalId: _goalId, ...rest }) => rest) },
+    // The row label is the goal's type, never evaluateGoal's label, which embeds
+    // the target ("Daily spend cap: ₹500") and would print it past the mask.
     rows: progress.map((p, i) =>
-      row(`goal.${i}`, p.label, p.valueCurrent, goalUnit(p.unit), p.isOnTrack ? 'accent' : 'warn'),
+      row(`goal.${i}`, goalTypeLabel(active[i].type), p.valueCurrent, goalUnit(p.unit), p.isOnTrack ? 'accent' : 'warn'),
     ),
   };
 }

@@ -23,6 +23,15 @@ export const chatRequestSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    // The Messages API requires the first turn to be the user's.
+    if (value.history.length > 0 && value.history[0].role !== 'user') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'history must start with a user turn',
+        path: ['history', 0, 'role'],
+      });
+      return;
+    }
     for (let i = 1; i < value.history.length; i++) {
       if (value.history[i].role === value.history[i - 1].role) {
         ctx.addIssue({

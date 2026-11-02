@@ -57,4 +57,10 @@ describe('transcriptStore', () => {
     store.setItem('ledger-chat:v1:u1', '{not json');
     expect(loadTranscript('u1', store)).toEqual([]);
   });
+
+  test('drops entries that do not have the turn shape, keeping the valid ones', () => {
+    const store = fakeStorage();
+    store.setItem('ledger-chat:v1:u1', JSON.stringify([{}, { id: 1 }, turn(7), { ...turn(8), rows: 'nope' }]));
+    expect(loadTranscript('u1', store)).toEqual([turn(7)]);
+  });
 });

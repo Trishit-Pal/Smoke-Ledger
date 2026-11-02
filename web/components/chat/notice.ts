@@ -4,7 +4,7 @@
 
 export const LEDGER_CHAT_NOTICE = {
   lead: 'Answers come from an AI model run by Anthropic in the United States.',
-  sent: 'If you turn this on, each question and the figures needed to answer it are sent to Anthropic: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger counts, your daily baseline and goal targets, and your country-level currency and time zone. When a question needs them, so are your recent entries from the last 30 days: dates, times, quantities, triggers, moods, cravings, the situation you tagged, brand names, and your own notes.',
+  sent: 'If you turn this on, each question and the figures needed to answer it are sent to Anthropic: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger counts, goal progress and targets, your daily baseline, the app’s rules-based insights, and your country-level currency and time zone. When a question needs them, so are your recent entries from the last 30 days: dates, times, quantities, triggers, moods, cravings, the situation you tagged, brand names, and your own notes.',
   discreet:
     'In discreet mode, brand names are replaced with aliases and notes are not sent. A brand name you type into a question is sent as you typed it.',
   retention:

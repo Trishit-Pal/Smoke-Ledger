@@ -14,10 +14,14 @@ const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
-  test('renders figures through MetricRow and masks at the render site', () => {
+  test('renders figures through MetricRow and masks at the render site with the shared helpers', () => {
     expect(panel).toMatch(/import \{[^}]*MetricRow[^}]*\} from '@web\/components\/visual'/);
     expect(panel).toContain('isHomeTotalsHidden(');
-    expect(panel).toContain("'•••'");
+    // Rows and prose both pass through src/lib/discreet; no local '•••' re-implementation.
+    expect(panel).toContain('maskInr(');
+    expect(panel).toContain('maskCount(');
+    expect(panel).toContain('maskNumbers(');
+    expect(panel).not.toContain("return '•••'");
   });
 
   test('is a Radix dialog with a live answer region and the shared 16px input style', () => {
@@ -73,9 +77,13 @@ describe('AskLedgerLauncher and its mount points', () => {
 });
 
 describe('Settings integration', () => {
-  test('has the off switch and clears the device transcript on sign-out, erase, and delete', () => {
+  test('has the off switch and clears the device transcript on sign-out, erase, delete, and entering discreet mode', () => {
     expect(settings).toContain("setSetting('consent.ledgerChatOptIn'");
-    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    const discreet = settings.indexOf('await updateProfile({ discreetMode: value })');
+    const discreetClear = settings.indexOf('clearTranscript()', discreet);
+    expect(discreet).toBeGreaterThan(-1);
+    expect(discreetClear - discreet).toBeLessThan(300);
     // Erase and delete both promise that everything goes; the device transcript is part of everything.
     const erase = settings.indexOf('await eraseAllUserData()');
     const eraseClear = settings.indexOf('clearTranscript()', erase);

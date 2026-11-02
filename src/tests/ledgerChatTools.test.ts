@@ -1,7 +1,9 @@
 import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context';
 import { TOOL_DEFS, runTool } from '@/domain/ledgerChat/tools';
 import { chatRequestSchema } from '@/domain/ledgerChat/types';
-import { periodWithTrend, savedAllTime, type DailySummaryRow } from '@/domain/periodSummary';
+import { goalTypeLabel } from '@/domain/goalForm';
+import { round2 } from '@/domain/calc';
+import { periodWithTrend, savedAllTime, totalsForWindow, type DailySummaryRow } from '@/domain/periodSummary';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 
 const TODAY = '2026-06-21';
@@ -181,12 +183,30 @@ describe('brand_mix', () => {
   });
 });
 
+describe('spend_outlook', () => {
+  it('derives the daily rate from the uncapped daily summary, not the 200-row log page', () => {
+    const data = okData('spend_outlook', {}) as { perDay: number; perYear: number };
+    const expected = round2(totalsForWindow(rows, 30, TODAY).spendInr / 30);
+    expect(data.perDay).toBe(expected);
+    expect(data.perYear).toBe(round2(expected * 365));
+  });
+});
+
 describe('goal_status and insights', () => {
   it('goal_status strips goal ids', () => {
     const data = okData('goal_status', {}) as { goals: Record<string, unknown>[] };
     expect(data.goals.length).toBe(1);
     expect(data.goals[0]).not.toHaveProperty('goalId');
     expect(typeof data.goals[0].label).toBe('string');
+  });
+
+  it('goal rows carry a type label with no figure in it, so masking the value masks the row', () => {
+    const spendGoal: Goal = { ...goals[0], id: 'g2', type: 'spend_cap_daily', targetValue: 500 };
+    const r = runTool('goal_status', {}, ctx({ goals: [spendGoal] }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rows[0].label).toBe(goalTypeLabel('spend_cap_daily'));
+    expect(String(r.rows[0].label)).not.toMatch(/[₹€\d]/);
   });
 
   it('insights strips ids and timestamps', () => {
@@ -230,6 +250,11 @@ describe('chatRequestSchema', () => {
       text: 't',
     }));
     expect(chatRequestSchema.safeParse({ question: 'q', history }).success).toBe(false);
+  });
+
+  it('rejects history that starts with an assistant turn (the API requires a user turn first)', () => {
+    const r = chatRequestSchema.safeParse({ question: 'q', history: [{ role: 'assistant', text: 'a' }] });
+    expect(r.success).toBe(false);
   });
 
   it('rejects history whose roles do not alternate', () => {

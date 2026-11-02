@@ -28,13 +28,26 @@ function keyFor(userId: string): string {
   return `${KEY_PREFIX}${userId}`;
 }
 
+/** Only entries with the full turn shape are trusted; anything else is dropped, never thrown on. */
+function isTurn(value: unknown): value is TranscriptTurn {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === 'string' &&
+    typeof v.question === 'string' &&
+    typeof v.answer === 'string' &&
+    Array.isArray(v.rows) &&
+    typeof v.at === 'string'
+  );
+}
+
 export function loadTranscript(userId: string, store: Storage | null = defaultStorage()): TranscriptTurn[] {
   if (!store) return [];
   try {
     const raw = store.getItem(keyFor(userId));
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as TranscriptTurn[]) : [];
+    return Array.isArray(parsed) ? parsed.filter(isTurn) : [];
   } catch {
     return [];
   }
