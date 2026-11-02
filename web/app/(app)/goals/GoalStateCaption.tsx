@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { stateCaption, type GoalState } from '@/domain/goalAdherence';
-import { stateColor } from './goalsView';
+import { stateColor } from '@web/lib/goals/goalCardModel';
 
 export interface GoalStateCaptionProps {
   state: GoalState;

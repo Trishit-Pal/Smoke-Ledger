@@ -15,7 +15,8 @@ import { Button } from '@web/components/ui/Button';
 import { ProgressRing } from '@web/components/ui/ProgressRing';
 import { MetricRow } from '@web/components/visual';
 import { GoalStateCaption } from './GoalStateCaption';
-import { doneLabel, stateColor, proposalRowLabel, type ProposalCopy } from './goalsView';
+import { stateColor, type ProposalCopy } from '@web/lib/goals/goalCardModel';
+import { doneLabel, proposalRowLabel } from './goalsView';
 
 export interface GoalCardProps {
   goal: Goal;

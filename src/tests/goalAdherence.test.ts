@@ -1,6 +1,6 @@
 import type { CigaretteLog, Goal } from '@/types';
 import { dayShift } from '@/domain/calc';
-import { dailyAdherence, goalState, holdStatus, stateCaption } from '@/domain/goalAdherence';
+import { dailyAdherence, goalState, holdStatus, homeGoalLine, stateCaption } from '@/domain/goalAdherence';
 
 const TODAY = '2025-05-31'; // a Saturday; the week starts Monday 2025-05-26
 
@@ -222,5 +222,37 @@ describe('stateCaption', () => {
 
   it('reports the days a met goal has been held', () => {
     expect(stateCaption('met', 0, 16)).toBe('Met · held 16 days');
+  });
+});
+
+describe('homeGoalLine', () => {
+  it('says nothing for an on-track goal', () => {
+    expect(homeGoalLine('on_track', 0, 0, false)).toBeNull();
+  });
+
+  it('points a met goal at the goals page', () => {
+    expect(homeGoalLine('met', 0, 16, true)).toBe('Held for 16 days. A next step is waiting on the goals page.');
+  });
+
+  it('does not promise a next step when none is waiting', () => {
+    expect(homeGoalLine('met', 0, 16, false)).toBe('Held for 16 days.');
+  });
+
+  it('says a re-anchor is waiting when an off-track goal has a proposal', () => {
+    expect(homeGoalLine('off_track', 4, 0, true)).toBe('Over the cap on 4 of the last 7 days. A re-anchor is waiting.');
+  });
+
+  it('states the over days alone when there is no proposal', () => {
+    expect(homeGoalLine('off_track', 4, 0, false)).toBe('Over the cap on 4 of the last 7 days.');
+  });
+
+  it('does not claim zero over days for an off-track goal without a daily record', () => {
+    expect(homeGoalLine('off_track', 0, 0, false)).toBe('Over the cap.');
+  });
+
+  it('counts the over days of an at-risk goal over a rolling window', () => {
+    expect(homeGoalLine('at_risk', 1, 0, false)).toBe('Over once in the last 7 days.');
+    expect(homeGoalLine('at_risk', 2, 0, false)).toBe('Over 2 times in the last 7 days.');
+    expect(homeGoalLine('at_risk', 0, 0, false)).toBe('Close to the cap.');
   });
 });

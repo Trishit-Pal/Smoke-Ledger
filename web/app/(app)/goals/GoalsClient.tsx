@@ -30,8 +30,8 @@ import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { GoalCard } from './GoalCard';
 import { GoalProposal } from './GoalProposal';
+import { goalCardModel } from '@web/lib/goals/goalCardModel';
 import {
-  goalCardModel,
   isFromProposal,
   offersStartProposal,
   parseTypeParam,

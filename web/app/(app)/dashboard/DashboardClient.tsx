@@ -29,6 +29,9 @@ import {
 } from '@/domain/periodSummary';
 import { evaluateGoal } from '@/domain/goals';
 import { goalTypeLabel } from '@/domain/goalForm';
+import { homeGoalLine } from '@/domain/goalAdherence';
+import { loggedDays, proposeStart } from '@/domain/goalProposals';
+import { PROPOSAL_DATA_WINDOW_DAYS } from '@/domain/goalMeta';
 import { generateInsights } from '@/domain/insights';
 import { todayInZone, daysAgoInZone, dayOfWeekShort, formatIndianDate } from '@/lib/date';
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
@@ -51,6 +54,12 @@ import { CharacterCompanion } from '@web/components/character/CharacterCompanion
 import { FloatingOrb } from '@web/components/visual/FloatingOrb';
 import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
 import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
+import { Button } from '@web/components/ui/Button';
+import { getSupabase } from '@web/lib/supabase/client';
+import { useGoalReconcile } from '@web/lib/goals/useGoalReconcile';
+import { goalCardModel, stateColor } from '@web/lib/goals/goalCardModel';
+import { firstSuggestionSentence, shouldShowFirstSuggestion } from '@web/lib/goals/firstSuggestion';
+import { dismissFirstSuggestion, isFirstSuggestionDismissed } from '@web/lib/goals/firstSuggestionStore';
 import {
   dispatchMood,
   dispatchMilestone,
@@ -242,7 +251,9 @@ export function DashboardClient({
     [logs, hidden],
   );
 
-  const activeGoal = goals.find((g) => g.status === 'active') ?? null;
+  // Due goal transitions (met, auto-complete) are written once on mount; render the result.
+  const { view: goalView, failedNotice } = useGoalReconcile(goals, logs, today);
+  const activeGoal = goalView.find((g) => g.status === 'active') ?? null;
   const goalProgress = React.useMemo(
     () => (activeGoal ? evaluateGoal(activeGoal, logs, today, {
       currency: profile.currency,
@@ -250,20 +261,58 @@ export function DashboardClient({
     }) : null),
     [activeGoal, logs, today, profile.currency, profile.country],
   );
-  const goalToneColor = goalProgress
-    ? goalProgress.atRisk
-      ? 'var(--warn-earth)'
-      : goalProgress.isOnTrack
-        ? 'var(--accent)'
-        : 'var(--text-muted)'
-    : 'var(--text-muted)';
+  const goalCard = React.useMemo(
+    () =>
+      activeGoal
+        ? goalCardModel(activeGoal, logs, today, {
+            currency: profile.currency,
+            formatMoney: (n) => formatMoney(n, profile.currency, { locale: localeForCountry(profile.country) }),
+            formatDate: formatIndianDate,
+            hideMoney: isDiscreetMode(profile) && activeGoal.type === 'spend_cap_daily',
+          })
+        : null,
+    [activeGoal, logs, today, profile],
+  );
+  const goalToneColor = goalCard ? stateColor(goalCard.state) : 'var(--text-muted)';
+  // Every figure in the line is a count of days; hidden Home totals show no line at all.
+  const goalLine =
+    goalCard && !hidden
+      ? homeGoalLine(goalCard.state, goalCard.overDays, goalCard.heldDays, goalCard.proposal !== null)
+      : null;
+
+  // First-goal suggestion: only with no active goal and enough history. "Not now" is per user,
+  // on this device; the user id comes from the local session (no network round-trip).
+  const [suggestionUser, setSuggestionUser] = React.useState<{ id: string; dismissed: boolean } | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    void getSupabase()
+      .auth.getSession()
+      .then(({ data }) => {
+        const id = data.session?.user.id;
+        if (cancelled || !id) return;
+        setSuggestionUser({ id, dismissed: isFirstSuggestionDismissed(id, today) });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+  const firstProposal = React.useMemo(
+    () => (activeGoal ? null : proposeStart('daily_cap', logs, today, { currency: profile.currency })),
+    [activeGoal, logs, today, profile.currency],
+  );
+  const showFirstSuggestion = shouldShowFirstSuggestion({
+    hasActiveGoal: activeGoal !== null,
+    proposal: firstProposal,
+    dismissed: suggestionUser?.dismissed ?? false,
+    userKnown: suggestionUser !== null,
+  });
   // Spend caps embed ₹ in evaluateGoal().label — show a money-free label under discreet mode.
   const goalHeading =
     activeGoal?.type === 'spend_cap_daily' && isDiscreetMode(profile)
       ? goalTypeLabel(activeGoal.type)
       : goalProgress?.label ?? null;
   // `goals` here is the active-only set from getServerGoals; >1 means others aren't shown.
-  const hasMoreGoals = goals.length > 1;
+  const hasMoreGoals = goalView.filter((g) => g.status === 'active').length > 1;
 
   // CHARACTER: soft greet on first render only.
   React.useEffect(() => {
@@ -631,6 +680,43 @@ export function DashboardClient({
                   strokeWidth={4}
                 />
               </div>
+            </div>
+            {goalLine ? (
+              <Link href="/goals" className="inline-flex items-center min-h-11 self-start">
+                <p className="text-small text-text-muted">{goalLine}</p>
+              </Link>
+            ) : null}
+            {failedNotice ? <p role="status" className="text-small text-danger">{failedNotice}</p> : null}
+          </section>
+        ) : null}
+
+        {/* ─────────────── First goal · a quiet suggestion, only when there is none ─────────────── */}
+        {showFirstSuggestion && firstProposal && suggestionUser ? (
+          <section style={idx(5)} aria-labelledby="first-goal-heading" className="flex flex-col subsection-gap">
+            <SectionLabel id="first-goal-heading">A first goal</SectionLabel>
+            <p className="text-body text-text-muted max-w-[40ch]">
+              {firstSuggestionSentence(
+                firstProposal,
+                loggedDays(logs, daysAgoInZone(PROPOSAL_DATA_WINDOW_DAYS - 1, zone), today),
+                hidden,
+              )}
+            </p>
+            <div className="flex items-center gap-md">
+              <Link
+                href="/goals?type=daily_cap"
+                className="inline-flex items-center min-h-11 text-small font-medium text-text underline underline-offset-4 decoration-1 hover:text-accent-ink"
+              >
+                See the suggestion
+              </Link>
+              <Button
+                title="Not now"
+                variant="ghost"
+                size="sm"
+                onPress={() => {
+                  dismissFirstSuggestion(suggestionUser.id, today);
+                  setSuggestionUser({ ...suggestionUser, dismissed: true });
+                }}
+              />
             </div>
           </section>
         ) : null}

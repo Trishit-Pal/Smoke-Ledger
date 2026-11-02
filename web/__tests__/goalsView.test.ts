@@ -4,16 +4,15 @@ import type { Proposal } from '@/domain/goalProposals';
 import type { CigaretteLog, Goal } from '@/types';
 import {
   doneLabel,
-  goalCardModel,
   isFromProposal,
   offersStartProposal,
   parseTypeParam,
   periodUnitLabel,
   proposalButtonLabel,
   proposalRowLabel,
-  stateColor,
   unseenActiveTypes,
 } from '../app/(app)/goals/goalsView';
+import { goalCardModel, stateColor } from '../lib/goals/goalCardModel';
 
 const proposal: Proposal = { kind: 'start', type: 'daily_cap', value: 6, unit: 'sticks', basisAvg: 7.2 };
 const seeded = (): GoalFormState => ({ ...emptyGoalForm('daily_cap'), ...proposalToForm(proposal) });

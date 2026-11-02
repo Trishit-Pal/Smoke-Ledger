@@ -108,3 +108,30 @@ export function stateCaption(state: GoalState, overDays: number, heldDays: numbe
       return `Met · held ${heldDays} days`;
   }
 }
+
+/** The one quiet sentence Home shows under the goal verse, or null when there is nothing to say. */
+export function homeGoalLine(
+  state: GoalState,
+  overDays: number,
+  heldDays: number,
+  hasProposal: boolean,
+): string | null {
+  switch (state) {
+    case 'on_track':
+      return null;
+    case 'met':
+      return hasProposal
+        ? `Held for ${heldDays} days. A next step is waiting on the goals page.`
+        : `Held for ${heldDays} days.`; // snoozed or at the floor: nothing is waiting
+    case 'off_track':
+      if (overDays === 0) return 'Over the cap.'; // no daily record (weekly cap): no count to give
+      return hasProposal
+        ? `Over the cap on ${overDays} of the last ${LOOKBACK_DAYS} days. A re-anchor is waiting.`
+        : `Over the cap on ${overDays} of the last ${LOOKBACK_DAYS} days.`;
+    case 'at_risk':
+      if (overDays === 0) return 'Close to the cap.';
+      return overDays === 1
+        ? `Over once in the last ${LOOKBACK_DAYS} days.`
+        : `Over ${overDays} times in the last ${LOOKBACK_DAYS} days.`;
+  }
+}
