@@ -294,4 +294,4 @@ Manual checks: dark and light themes AA on the panel (tokens only); keyboard: Ta
 | 2 Route, auth, turn engine, middleware | done (914038a); live probe 2.5 pending a key |
 | 3 Panel, launcher, consent, settings, e2e | done (6082336); e2e spec runs only with .env.e2e |
 | 4 Legal, spec, docs | done (020192b, 3086f28) |
-| 5 Review gates, operator actions, PR | in progress |
+| 5 Review gates, operator actions, PR | done — PR #103 (gates green; operator steps and live probe pending a key) |
