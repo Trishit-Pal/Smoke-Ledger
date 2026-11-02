@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: 020192b
+last_verified_commit: fbd177e
 status: current
 ---
 

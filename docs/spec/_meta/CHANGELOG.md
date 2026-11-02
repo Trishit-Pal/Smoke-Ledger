@@ -4,6 +4,11 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — fbd177e
+- security-privacy: gate order now lists the profile gates before the limits; summary-based figures named; re-stamped after the review fix passes (masked narration, shared confirmed-email rule in src/lib/compliance, exact-match carve-out, abort budget).
+- infra-ops: region corrected to cle1 (Cleveland, next to us-east-2); re-stamped.
+- architecture: re-stamped — loaders unchanged since 020192b apart from the chat route wiring already described.
+
 ## 2026-11-02 — 020192b
 - glossary: the "Insight" entry keeps "never an LLM" for insights and points at the new "Ledger Chat" entry (opt-in, separate, every figure from a tool, device-only transcript).
 - goals-insights: Ledger Chat reads these functions through read-only tools and changes nothing here; new invariant that insights never call a model and tool outputs equal direct calls.
