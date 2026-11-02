@@ -1,6 +1,6 @@
 # Smoke Ledger Privacy Policy
 
-Effective date: 2026-05-19
+Effective date: 2026-11-02
 
 ## Summary
 - Smoke Ledger is a smoking reduction and cessation support app.
@@ -25,7 +25,8 @@ Effective date: 2026-05-19
 - Security/audit data is retained for abuse prevention and incident response windows per operational policy.
 
 ## Sharing
-- Data is processed by hosting providers required to run the service.
+- Data is processed by hosting providers required to run the service (Supabase for auth and database, Vercel for web hosting, Cloudflare Turnstile for sign-in abuse checks when enabled, an SMS provider for phone sign-in codes). The database is hosted in the United States (AWS us-east-2).
+- **Ask the ledger** (optional, off by default) answers questions about your own ledger using an AI model operated by Anthropic, PBC (United States). If you turn it on, each question and the figures needed to answer it (totals, trends, time-of-day and weekday patterns, mood and trigger counts, goal progress, rules-based insights) are sent to Anthropic; when a question needs them, so are your recent entries from the last 30 days (times, quantities, triggers, moods, cravings, brand names, your own notes). In discreet mode, brand names are aliased and notes are not sent. Anthropic does not train on this data and deletes it after a limited retention period (currently up to 30 days) unless it must be kept longer for safety or legal reasons. We store no questions, replies, or conversations on our servers; the conversation lives on your device until you sign out or turn the feature off.
 - No data sharing with ad networks or data brokers.
 
 ## User Rights
