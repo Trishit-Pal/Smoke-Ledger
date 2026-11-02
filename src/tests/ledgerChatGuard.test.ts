@@ -25,6 +25,10 @@ describe('findUnverifiedNumbers', () => {
     expect(findUnverifiedNumbers('Down 21.3% on last week, and 21% rounded.', allowed)).toEqual([]);
   });
 
+  it('rejects a decimal that only rounds to a figure in the data', () => {
+    expect(findUnverifiedNumbers('About 7.6 sticks a day.', allowed)).toEqual(['7.6']);
+  });
+
   it('accepts digits that appear inside tool strings and row values', () => {
     expect(findUnverifiedNumbers('Peak between 18:00 and 19:00; ₹345.50 saved.', allowed)).toEqual([]);
   });

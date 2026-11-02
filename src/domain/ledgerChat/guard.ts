@@ -76,9 +76,9 @@ export function findUnverifiedNumbers(text: string, allowed: ReadonlySet<string>
     const raw = m[0];
     if (raw.includes(':')) continue;
     const norm = normalizeToken(raw);
+    // A decimal passes only if it is itself a tool figure or one of its 1- or
+    // 2-place roundings (both in the allowed set); never because it rounds to one.
     if (allowed.has(norm)) continue;
-    const rounded = String(Math.round(Number(norm)));
-    if (norm.includes('.') && allowed.has(rounded)) continue;
     if (isDurationLike(norm, text.slice(m.index + raw.length))) continue;
     out.push(raw);
   }
