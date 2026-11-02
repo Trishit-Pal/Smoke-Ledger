@@ -52,7 +52,7 @@ import {
 import { todayInZone, daysAgoInZone, dateRange } from '@/lib/date';
 import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
-import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
+import { isDiscreetMode, maskBrandAt, maskCount, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, Donut } from '@web/components/charts/dynamic';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
@@ -67,6 +67,7 @@ import { goalTypeLabel } from '@/domain/goalForm';
 import { hasCapLine, pickCapGoal, withCapLine } from '@web/lib/goals/capLine';
 import type { CigaretteLog, DailyStat, Goal, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
+import { brandRows } from '@web/lib/trends/brandRows';
 
 type WindowDays = 1 | 7 | 30 | 365;
 
@@ -258,6 +259,8 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
       })),
     [brandMix],
   );
+
+  const brandList = React.useMemo(() => brandRows(brandMix, discreet), [brandMix, discreet]);
 
   const totalSpend = React.useMemo(
     () => brandMix.reduce((acc, b) => acc + b.spendInr, 0),
@@ -488,7 +491,12 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <Heatmap logs={logs} startYmd={startYmd} endYmd={today} />
+                <Heatmap
+                  logs={logs}
+                  startYmd={startYmd}
+                  endYmd={today}
+                  formatCount={(n) => maskCount(n, discreet)}
+                />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 The grid reads top-down by weekday, left-right by hour. Dark
@@ -512,7 +520,12 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart title="Sticks by hour of day" data={hourBars} height={160} />
+                <BarChart
+                  title="Sticks by hour of day"
+                  data={hourBars}
+                  height={160}
+                  formatY={(v) => maskCount(v, discreet)}
+                />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 Mornings and evenings tend to spike. Quiet hours are the ones
@@ -536,7 +549,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart3D data={dowBars} />
+                <BarChart3D data={dowBars} formatValue={(v) => maskCount(v, discreet)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 The shape of your week. Weekends and weekdays rarely match.
@@ -601,6 +614,8 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                         title="Spend by brand"
                         slices={donutSlices}
                         size={160}
+                        formatValue={(v) => maskInr(v, discreet, (n) => money(n, { compact: true }))}
+                        formatLabel={(l, i) => maskBrandAt(l, i, discreet)}
                         centerLabel="TOTAL"
                         centerValue={maskInr(totalSpend, discreet, (n) =>
                           money(n, { compact: true }),
@@ -609,7 +624,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                       <ul className="flex-1 w-full flex flex-col">
                         {brandMix.map((b, i) => (
                           <li
-                            key={b.brand}
+                            key={brandList[i]!.key}
                             className="flex items-center justify-between py-sm"
                             style={{
                               borderTop: i === 0 ? 'none' : '1px solid var(--ink-surface-rule)',
@@ -627,7 +642,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                                 className="text-small truncate"
                                 style={{ color: 'var(--ink-surface-text)' }}
                               >
-                                {b.brand}
+                                {brandList[i]!.name}
                               </span>
                             </div>
                             <span
@@ -638,7 +653,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEna
                                 money(n, { compact: true }),
                               )}
                               <span style={{ color: 'var(--ink-surface-muted)' }}> · </span>
-                              {Math.round(b.share * 100)}%
+                              {brandList[i]!.shareText}
                             </span>
                           </li>
                         ))}

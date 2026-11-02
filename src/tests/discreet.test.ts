@@ -18,6 +18,11 @@ describe('maskBrandAt', () => {
     expect(maskBrandAt('Marlboro', 0, false)).toBe('Marlboro');
   });
 
+  it('never renders "undefined" for a negative index', () => {
+    expect(brandAlias(-1)).toBe('Brand hidden');
+    expect(maskBrandAt('Marlboro', -1, true)).toBe('Brand hidden');
+  });
+
   it('shows a dash for an empty name when not discreet', () => {
     expect(maskBrandAt(null, 0, false)).toBe('—');
     expect(maskBrandAt('', 0, false)).toBe('—');

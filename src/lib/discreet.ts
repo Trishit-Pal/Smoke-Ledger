@@ -30,6 +30,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /** Distinct stand-in for the nth brand: "Brand A".."Brand Z", then "Brand 27"… */
 export function brandAlias(index: number): string {
+  if (!Number.isInteger(index) || index < 0) return 'Brand hidden';
   return index < ALPHABET.length ? `Brand ${ALPHABET[index]}` : `Brand ${index + 1}`;
 }
 
