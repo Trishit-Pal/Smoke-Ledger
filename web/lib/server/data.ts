@@ -163,7 +163,7 @@ export const getServerProfile = cache(async (): Promise<UserProfile> => {
 /** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
 const SERVER_LOGS_PAGE_SIZE = 200;
 /** Row limit for goal-consuming loaders (adherence, holds, proposals); see getDashboardData. */
-const GOAL_WINDOW_LOG_LIMIT = 2000;
+export const GOAL_WINDOW_LOG_LIMIT = 2000;
 
 export interface LogCursor {
   ts: string;

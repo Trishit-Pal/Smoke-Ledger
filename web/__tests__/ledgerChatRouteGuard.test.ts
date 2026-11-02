@@ -70,3 +70,11 @@ describe('ledger-chat route guards', () => {
     }
   });
 });
+
+describe('ledger-chat log window', () => {
+  test('reads the same 2000-row goal window as Home, not a private 200 cap', () => {
+    expect(route).toMatch(/import \{[^}]*GOAL_WINDOW_LOG_LIMIT[^}]*\} from '@web\/lib\/server\/data'/);
+    expect(route).toContain('limit: GOAL_WINDOW_LOG_LIMIT');
+    expect(route).not.toMatch(/LOG_ROW_CAP|limit:\s*200/);
+  });
+});

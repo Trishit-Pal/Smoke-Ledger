@@ -254,8 +254,8 @@ function savings(_input: unknown, ctx: ToolContext): ToolOutcome {
 
 function spendOutlook(_input: unknown, ctx: ToolContext): ToolOutcome {
   // The daily rate comes from the daily summary (uncapped, the screens' source of
-  // truth), never from the 200-row log page, which a heavy logger fills in under
-  // a month. ponytail: annualised = 30-day daily average × 365, inline.
+  // truth), never from the capped log page (2000 rows, which a heavy logger can
+  // fill within the window). ponytail: annualised = 30-day daily average × 365, inline.
   const perDay = round2(totalsForWindow(ctx.rows, 30, ctx.today).spendInr / 30);
   const perMonth = round2(perDay * 30);
   const perYear = round2(perDay * 365);

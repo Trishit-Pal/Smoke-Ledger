@@ -172,6 +172,12 @@ describe('recent_entries', () => {
     }
   });
 
+  it('slices to 200 rows however many logs the route loads, so the model input does not grow', () => {
+    const many = Array.from({ length: 450 }, () => log({ localDate: '2026-06-21' }));
+    const data = okData('recent_entries', { days: 30 }, ctx({ logs: many })) as { entries: unknown[] };
+    expect(data.entries.length).toBe(200);
+  });
+
   it('rejects a window outside 1..30 days', () => {
     expect(runTool('recent_entries', { days: 99 }, ctx()).ok).toBe(false);
   });
