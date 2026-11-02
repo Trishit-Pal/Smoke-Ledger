@@ -168,8 +168,10 @@ a single day holds ≥22% of sticks over 30 days (minimum 7 total sticks).
 
 Only `insights[0]` is shown on the home screen as the "From your week"
 blockquote. All insights are available for a future dedicated insights panel.
-The chat's `insights` tool returns the full list (minus ids and timestamps) as
-data the model may paraphrase; it adds no rows of its own.
+Ledger Chat does not expose insights: an `insights` tool was removed on
+2026-11-02 because its figures could reach the reader only through prose the
+chat's prompt forbids. Its patterns are covered by `when_and_why`,
+`compare_periods` and `brand_mix`.
 
 ### Mood × trigger correlations
 
