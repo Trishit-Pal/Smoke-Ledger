@@ -4,6 +4,11 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-03 — 798a45b
+- security-privacy: corrected the chat-alias claim (only the alias format is shared with Trends; the chat aliases by first appearance in its log page, Trends by spend rank); chart formatter wording now covers each chart's own channels (Line/Bar are aria-hidden); chartMasking covers every chart except the mood x trigger matrix and not the Line/Bar tooltips; BarChart `showYAxis` keeps the hour chart's axis hidden; donut tooltip and table show compact money with discreet off; Home last-entry label drops the variant under discreet (`lastEntryLabel`); heatmap titles read "1 log" with discreet off.
+- celebrations: re-stamped; the diff touched mobile Home's last-entry label only, no celebration behavior changed.
+- DESIGN.md: masking rule updated to match.
+
 ## 2026-11-02 — 13fe5cf
 - celebrations: full re-verify against the code. Fixed stale line references, the "only test is age.test.ts" claim (now also achievements and milestone-overlay-styles tests), the web modal's scrolling overlay, onboarding burst counts and goal summary wording, and the mobile login's deleted-account notice; sources now list every file the section describes (mobile login, web MilestoneCelebration). Re-stamped current.
 - security-privacy: new "Discreet mode: masking at the render site" subsection and invariant (sr-only tables, aria-labels, SVG titles, tooltips, brand aliases via `src/lib/discreet.ts`); chat log window is now one page of up to 2000 rows (model's `recent_entries` still 200); panel session lookup never rejects; open gaps record the visible heatmap peak hour, digit-free mobile captions, untested mobile chart wiring and the CI-only discreet e2e. Sources add `src/lib/discreet.ts` and `web/components/charts/**`.
