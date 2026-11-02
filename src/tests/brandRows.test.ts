@@ -1,5 +1,4 @@
-import { describe, expect, it } from 'vitest';
-import { brandRows } from '@web/lib/trends/brandRows';
+import { brandRows } from '@/domain/brandRows';
 
 const mix = [
   { brand: 'Marlboro', spendInr: 120, sticks: 12, share: 0.6 },

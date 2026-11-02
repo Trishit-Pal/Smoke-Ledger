@@ -54,6 +54,8 @@ import {
 import { formatDelta } from '@/lib/format';
 import { ledgerMoney } from '@/lib/ledgerMoney';
 import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
+import { brandRows } from '@/domain/brandRows';
+import { avgLine, headlineDeck } from '@/domain/trendsCopy';
 import type { DailyStat } from '@/types';
 import { getDailySummary, type DailySummaryRow } from '@/db/repositories/summary';
 
@@ -277,9 +279,10 @@ export default function Trends() {
     () => brandSpendMix(logs, startYmd, today).slice(0, 5),
     [logs, startYmd, today],
   );
+  const brandList = useMemo(() => brandRows(brandMix, discreet), [brandMix, discreet]);
   const donutSlices = useMemo(
-    () => brandMix.map((b) => ({ label: b.brand, value: Math.round(b.spendInr) })),
-    [brandMix],
+    () => brandMix.map((b, i) => ({ label: brandList[i].name, value: Math.round(b.spendInr) })),
+    [brandMix, brandList],
   );
 
   // Summary headline pair + delta
@@ -482,13 +485,13 @@ export default function Trends() {
 
             {/* Deck */}
             <Text variant="body" muted>
-              {summary.sticks === 0
-                ? windowDays === 1
-                  ? 'Nothing logged today.'
-                  : `Nothing logged across the last ${windowDays} days.`
-                : windowDays === 1
-                ? `${summary.sticks} ${summary.sticks === 1 ? 'cigarette' : 'cigarettes'} today, ${formatDelta(summary.stickDeltaPct)} vs the day before.`
-                : `${summary.sticks} ${summary.sticks === 1 ? 'cigarette' : 'cigarettes'} across ${windowDays} days. Average ${summary.avgSticksPerDay.toFixed(1)} per day, ${formatDelta(summary.stickDeltaPct)} vs the period before.`}
+              {headlineDeck({
+                sticks: summary.sticks,
+                windowDays,
+                avg: summary.avgSticksPerDay,
+                deltaPct: summary.stickDeltaPct,
+                discreet,
+              })}
             </Text>
 
             {isYear && !yearLoading && !yearError ? (
@@ -514,11 +517,7 @@ export default function Trends() {
               />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
-              {summary.sticks === 0
-                ? 'A flat line. Nothing logged in this window.'
-                : summary.avgSticksPerDay < 1
-                ? 'A sparse window — most days quiet.'
-                : `Around ${summary.avgSticksPerDay.toFixed(1)} a day, on average.`}
+              {avgLine({ sticks: summary.sticks, avg: summary.avgSticksPerDay, discreet })}
             </Text>
             {capGoal && hasCapLine(sticksLine) ? (
               <Text variant="caption" faint style={{ fontStyle: 'italic' }}>
@@ -567,7 +566,7 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Time of day" right="24-hour distribution" />
             <Reveal dependencyKey={dependencyKey}>
-              <BarChart data={hourBars} height={160} />
+              <BarChart data={hourBars} height={160} formatY={(v) => maskCount(v, discreet)} />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               Mornings and evenings tend to spike. Quiet hours are the ones worth keeping.
@@ -579,7 +578,7 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Day of week" right="Mon — Sun" />
             <Reveal dependencyKey={dependencyKey}>
-              <BarChart data={dowBars} height={160} />
+              <BarChart data={dowBars} height={160} formatY={(v) => maskCount(v, discreet)} />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               The shape of your week. Weekends and weekdays rarely match.
@@ -593,7 +592,11 @@ export default function Trends() {
           <View style={{ gap: spacing.md }}>
             <SectionHeader caption="Mood × trigger" right="Where it tends to start" />
             <Reveal dependencyKey={dependencyKey}>
-              <MoodTriggerMatrixView logs={logs} money={(n) => maskInr(n, discreet, ledgerMoney)} />
+              <MoodTriggerMatrixView
+                logs={logs}
+                money={(n) => maskInr(n, discreet, ledgerMoney)}
+                formatCount={(n) => maskCount(n, discreet)}
+              />
             </Reveal>
             <Text variant="small" muted style={{ fontStyle: 'italic' }}>
               A grid of feelings against situations. The dense cells are the pattern.
@@ -642,9 +645,9 @@ export default function Trends() {
                     />
                   </View>
                   <View>
-                    {brandMix.map((b, idx) => (
+                    {brandList.map((b, idx) => (
                       <View
-                        key={b.brand}
+                        key={b.key}
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
@@ -669,13 +672,13 @@ export default function Trends() {
                             style={{ color: theme.inkSurfaceText, flexShrink: 1 }}
                             numberOfLines={1}
                           >
-                            {b.brand}
+                            {b.name}
                           </Text>
                         </View>
                         <Text variant="small" style={{ color: theme.inkSurfaceMuted }}>
-                          {fmtSpend(b.spendInr, true)}
+                          {fmtSpend(brandMix[idx].spendInr, true)}
                           {' · '}
-                          {discreet ? '••' : `${Math.round(b.share * 100)}%`}
+                          {b.shareText}
                         </Text>
                       </View>
                     ))}
