@@ -7,6 +7,7 @@ import { describe, expect, test } from 'vitest';
 // review would otherwise have to re-check by hand.
 const chat = join(__dirname, '..', 'components', 'chat');
 const panel = readFileSync(join(chat, 'AskLedgerPanel.tsx'), 'utf8');
+const announce = readFileSync(join(chat, 'announce.ts'), 'utf8');
 const launcher = readFileSync(join(chat, 'AskLedgerLauncher.tsx'), 'utf8');
 const dashboard = readFileSync(join(__dirname, '..', 'app', '(app)', 'dashboard', 'DashboardClient.tsx'), 'utf8');
 const trends = readFileSync(join(__dirname, '..', 'app', '(app)', 'trends', 'TrendsClient.tsx'), 'utf8');
@@ -18,15 +19,22 @@ describe('AskLedgerPanel', () => {
     expect(panel).toMatch(/import \{[^}]*MetricRow[^}]*\} from '@web\/components\/visual'/);
     expect(panel).toContain('isHomeTotalsHidden(');
     // Rows and prose both pass through src/lib/discreet; no local '•••' re-implementation.
-    expect(panel).toContain('maskInr(');
-    expect(panel).toContain('maskCount(');
+    // Row display lives in announce.ts, shared by the rows and the screen-reader announcement.
+    expect(announce).toContain('maskInr(');
+    expect(announce).toContain('maskCount(');
+    expect(panel).toContain("from '@web/components/chat/announce'");
     expect(panel).toContain('maskNumbers(');
     expect(panel).not.toContain("return '•••'");
+    expect(announce).not.toContain("return '•••'");
   });
 
   test('is a Radix dialog with a live answer region and the shared 16px input style', () => {
     expect(panel).toContain("from '@radix-ui/react-dialog'");
     expect(panel).toContain('aria-live="polite"');
+    // The finished answer is announced from inside the live region; the turn
+    // list itself sits outside it so opening the panel does not read the history.
+    expect(panel).toMatch(/aria-live="polite"[^>]*>\s*\{announcement \? <p className="sr-only">\{announcement\}<\/p> : null\}/);
+    expect(panel).toContain('setAnnouncement(announcementFor(');
     // INPUT_STYLE carries fontSize 16, which keeps iOS from zooming the composer.
     expect(panel).toContain("from '@web/lib/auth/inputStyle'");
     expect(panel).toContain('style={INPUT_STYLE}');

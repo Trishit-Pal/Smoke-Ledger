@@ -53,9 +53,11 @@ test.describe('ask the ledger', () => {
     await expect(dialog.getByRole('button', { name: 'Turn on and ask' })).toBeVisible();
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
 
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    // exact: the screen-reader announcement repeats the answer and the figures.
+    await expect(dialog.getByText(ANSWER.answer, { exact: true })).toBeVisible();
     await expect(dialog.getByRole('definition').filter({ hasText: /^8$/ })).toBeVisible();
-    await expect(dialog.getByText('₹160')).toBeVisible();
+    await expect(dialog.getByText('₹160', { exact: true })).toBeVisible();
+    await expect(dialog.locator('[aria-live="polite"]')).toContainText('Spend, this week ₹160');
 
     // Consent persisted as the settings key the route checks.
     const admin = getAdmin();
@@ -86,12 +88,14 @@ test.describe('ask the ledger', () => {
     await page.getByRole('button', { name: /^Ask the ledger/ }).click();
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
     await dialog.getByRole('button', { name: 'What does my ledger say so far?' }).click();
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.getByText(ANSWER.answer, { exact: true })).toBeVisible();
 
     // Money and stick rows are masked at the render site; the percent row is not.
+    // Not exact on purpose: no element, the announcement included, may show ₹160.
     await expect(dialog.getByLabel('Spend, this week hidden, tap to reveal')).toBeVisible();
     await expect(dialog.getByText('₹160')).toHaveCount(0);
-    await expect(dialog.getByText('-33.3%')).toBeVisible();
+    await expect(dialog.getByText('-33.3%', { exact: true })).toBeVisible();
+    await expect(dialog.locator('[aria-live="polite"]')).toContainText('Spend, this week hidden');
 
     const fits = await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);

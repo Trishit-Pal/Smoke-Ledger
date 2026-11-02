@@ -25,9 +25,8 @@ import {
   type ChatErrorCode,
   type ChatHistoryTurn,
   type ChatResponse,
-  type Row,
 } from '@/domain/ledgerChat/types';
-import { isHomeTotalsHidden, maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { isHomeTotalsHidden, maskNumbers } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { localeForCountry } from '@/lib/regions';
@@ -38,6 +37,7 @@ import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
+import { announcementFor, rowDisplay, rowMaskable } from '@web/components/chat/announce';
 import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
 import {
   loadTranscript,
@@ -82,14 +82,6 @@ function historyFor(turns: readonly TranscriptTurn[]): ChatHistoryTurn[] {
   ]);
 }
 
-/** Same helpers Home uses, so the mask glyph and rules stay in one place. */
-function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): string {
-  if (row.unit === 'money') return typeof row.value === 'number' ? maskInr(row.value, masked, money) : String(row.value);
-  if (row.unit === 'sticks') return maskCount(row.value, masked);
-  if (row.unit === 'percent') return `${row.value}%`;
-  return String(row.value);
-}
-
 export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLedgerPanelProps) {
   const inputId = React.useId();
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -98,6 +90,9 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
   const [pending, setPending] = React.useState<Pending | null>(null);
   const [draft, setDraft] = React.useState('');
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(() => new Set());
+  // What the live region says when an answer arrives. Only the newest answer is
+  // announced; the saved transcript renders outside the live region.
+  const [announcement, setAnnouncement] = React.useState('');
 
   const hidden = isHomeTotalsHidden(profile);
   const money = React.useCallback(
@@ -110,6 +105,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
   // getSession() reads the local session; no network round-trip.
   React.useEffect(() => {
     if (!open) return;
+    setAnnouncement('');
     let cancelled = false;
     void getSupabase()
       .auth.getSession()
@@ -128,6 +124,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
     async (question: string, starter: boolean) => {
       const q = question.trim();
       if (!q) return;
+      setAnnouncement('');
       setPending({ question: q, starter });
       setStatus('loading');
       try {
@@ -147,6 +144,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
           };
           const next = [...turns, turn];
           setTurns(userId ? saveTranscript(userId, next) : next);
+          setAnnouncement(announcementFor(body, { masked: hidden, money }));
           setPending(null);
           setDraft('');
           setStatus('idle');
@@ -167,7 +165,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         setStatus('error');
       }
     },
-    [turns, userId],
+    [turns, userId, hidden, money],
   );
 
   const onTurnOnAndAsk = async () => {
@@ -270,8 +268,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                   <dl className="flex flex-col">
                     {turn.rows.map((row, i) => {
                       const key = `${turn.id}:${row.id}`;
-                      const maskable = row.unit === 'money' || row.unit === 'sticks';
-                      const masked = hidden && maskable && !revealed.has(key);
+                      const masked = hidden && rowMaskable(row) && !revealed.has(key);
                       const display = rowDisplay(row, masked, money);
                       return (
                         <MetricRow
@@ -304,6 +301,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
             })}
 
             <div aria-live="polite" className="flex flex-col gap-sm">
+              {announcement ? <p className="sr-only">{announcement}</p> : null}
               {pending && status !== 'idle' ? (
                 <p className="editorial-pullquote mt-md text-[clamp(1rem,2vw,1.125rem)] text-text">{pending.question}</p>
               ) : null}
