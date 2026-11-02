@@ -139,7 +139,9 @@ export const TOOL_DEFS: readonly ToolDef[] = [
     description:
       'Individual entries from the last N days (1 to 30): date, hour, quantity, trigger, moods, craving, context, brand, and the user\'s own note. Use only when a question needs the detail of single entries, such as "why" questions about particular days.',
     strict: true,
-    input_schema: schema({ days: { type: 'integer', minimum: 1, maximum: RECENT_MAX_DAYS } }, ['days']),
+    // Strict mode accepts no numeric constraints; the 1–30 range is enforced by
+    // recentEntriesInput (zod) and stated in the description.
+    input_schema: schema({ days: { type: 'integer', description: `Days to include, 1 to ${RECENT_MAX_DAYS}` } }, ['days']),
   },
 ];
 

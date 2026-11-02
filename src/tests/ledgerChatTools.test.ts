@@ -96,6 +96,18 @@ describe('TOOL_DEFS', () => {
       expect(t.input_schema.additionalProperties).toBe(false);
     }
   });
+
+  it('uses only schema keywords strict mode accepts (ranges are enforced by zod, not the schema)', () => {
+    const banned = new Set(['minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'format']);
+    const walk = (node: unknown, path: string): void => {
+      if (!node || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+        expect(banned.has(key) ? `${path}.${key}` : '').toBe('');
+        walk(value, `${path}.${key}`);
+      }
+    };
+    for (const t of TOOL_DEFS) walk(t.input_schema, t.name);
+  });
 });
 
 describe('compare_periods', () => {

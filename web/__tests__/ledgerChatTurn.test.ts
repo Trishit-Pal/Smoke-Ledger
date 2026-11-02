@@ -35,6 +35,7 @@ const logs: CigaretteLog[] = [];
 const ctx = buildToolContext({ profile, logs, rows, goals: [], today: TODAY, summarySinceYmd: '2025-06-22' });
 
 type Call = Anthropic.MessageCreateParamsNonStreaming;
+type CallOptions = { signal?: AbortSignal } | undefined;
 
 function message(content: Anthropic.ContentBlock[], stop: Anthropic.StopReason): Anthropic.Message {
   return {
@@ -54,25 +55,27 @@ const text = (t: string) => ({ type: 'text', text: t, citations: null }) as unkn
 const toolUse = (name: string, input: unknown) =>
   ({ type: 'tool_use', id: `tu-${name}`, name, input, caller: { type: 'direct' } }) as unknown as Anthropic.ContentBlock;
 
-/** A scripted model: each call pops the next reply; records every request. */
-function fakeClient(replies: Anthropic.Message[]): { client: ChatModelClient; calls: Call[] } {
+/** A scripted model: each call pops the next reply; records every request and its options. */
+function fakeClient(replies: Anthropic.Message[]): { client: ChatModelClient; calls: Call[]; options: CallOptions[] } {
   const calls: Call[] = [];
+  const options: CallOptions[] = [];
   const queue = [...replies];
   const client: ChatModelClient = {
     messages: {
-      create: async (params) => {
+      create: async (params, opts) => {
         calls.push(params);
+        options.push(opts);
         const next = queue.shift();
         if (!next) throw new Error('fake client: no reply scripted');
         return next;
       },
     },
   };
-  return { client, calls };
+  return { client, calls, options };
 }
 
-function run(client: ChatModelClient, question = 'How did this week compare to last?') {
-  return runLedgerChatTurn({ anthropic: client, model: 'fake', ctx, history: [], question });
+function run(client: ChatModelClient, question = 'How did this week compare to last?', signal?: AbortSignal) {
+  return runLedgerChatTurn({ anthropic: client, model: 'fake', ctx, history: [], question, signal });
 }
 
 describe('runLedgerChatTurn', () => {
@@ -129,6 +132,19 @@ describe('runLedgerChatTurn', () => {
 
     expect(calls).toHaveLength(MAX_MODEL_CALLS);
     expect(result.answer).toBe(FALLBACK_ANSWER);
+  });
+
+  test('passes one turn-wide abort signal to every model call so a slow upstream cannot outlive the function', async () => {
+    const { client, options } = fakeClient([
+      message([toolUse('compare_periods', { window: 'week' })], 'tool_use'),
+      message([text('Fewer than last week.')], 'end_turn'),
+    ]);
+    const signal = AbortSignal.timeout(60_000);
+
+    await run(client, 'How did this week compare to last?', signal);
+
+    expect(options).toHaveLength(2);
+    for (const o of options) expect(o?.signal).toBe(signal);
   });
 
   test('an unknown tool becomes an error result the model can read, never a throw', async () => {

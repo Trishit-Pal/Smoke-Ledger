@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import { buildToolContext } from '@/domain/ledgerChat/context';
 import { starterQuestions } from '@/domain/ledgerChat/starters';
 import type { DailySummaryRow } from '@/domain/periodSummary';
@@ -8,7 +9,13 @@ import { daysAgoInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import { cn } from '@web/components/ui/cn';
-import { AskLedgerPanel } from '@web/components/chat/AskLedgerPanel';
+
+// The panel (Radix dialog, settings and audit calls) loads only when the
+// launcher renders, so pages carry none of it while the feature is off.
+const AskLedgerPanel = dynamic(
+  () => import('@web/components/chat/AskLedgerPanel').then((m) => m.AskLedgerPanel),
+  { ssr: false },
+);
 
 export interface AskLedgerLauncherProps {
   /** Server flag: the feature is off until the operator turns it on. */

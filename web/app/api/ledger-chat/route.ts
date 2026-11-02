@@ -29,6 +29,8 @@ const LOG_WINDOW_DAYS = 90;
 const LOG_ROW_CAP = 200;
 const SUMMARY_WINDOW_DAYS = 365;
 const UPSTREAM_TIMEOUT_MS = 20_000;
+/** Whole-turn budget, inside maxDuration so a slow upstream yields a calm 502, not a platform 504. */
+const TURN_BUDGET_MS = 25_000;
 
 function fail(error: ChatErrorCode, status: number) {
   return NextResponse.json({ error }, { status });
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       summarySinceYmd,
     });
 
-    const anthropic = new Anthropic({ apiKey, timeout: UPSTREAM_TIMEOUT_MS, maxRetries: 1 });
+    const anthropic = new Anthropic({ apiKey, timeout: UPSTREAM_TIMEOUT_MS, maxRetries: 0 });
     const model = cleanEnvValue(process.env.LEDGER_CHAT_MODEL) || DEFAULT_MODEL;
     const result = await runLedgerChatTurn({
       anthropic,
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
       ctx,
       history: parsed.data.history,
       question: parsed.data.question,
+      signal: AbortSignal.timeout(TURN_BUDGET_MS),
     });
 
     // Counts and names only: never the question, the answer, or who asked.

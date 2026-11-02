@@ -20,7 +20,10 @@ export const REFUSAL_ANSWER =
 
 export interface ChatModelClient {
   messages: {
-    create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message>;
+    create(
+      params: Anthropic.MessageCreateParamsNonStreaming,
+      options?: { signal?: AbortSignal },
+    ): Promise<Anthropic.Message>;
   };
 }
 
@@ -30,6 +33,8 @@ export interface TurnInput {
   ctx: ToolContext;
   history: ChatHistoryTurn[];
   question: string;
+  /** One budget for the whole turn, so several slow calls cannot outlive the function. */
+  signal?: AbortSignal;
 }
 
 export interface TurnUsage {
@@ -80,17 +85,20 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   ];
 
   const call = async (): Promise<Anthropic.Message> => {
-    const res = await anthropic.messages.create({
-      model,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: [
-        { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: contextBlock },
-      ],
-      tools: TOOLS,
-      output_config: { effort: 'low' },
-      messages,
-    });
+    const res = await anthropic.messages.create(
+      {
+        model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        system: [
+          { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: contextBlock },
+        ],
+        tools: TOOLS,
+        output_config: { effort: 'low' },
+        messages,
+      },
+      { signal: input.signal },
+    );
     usage.modelCalls += 1;
     usage.inputTokens += res.usage.input_tokens;
     usage.outputTokens += res.usage.output_tokens;
