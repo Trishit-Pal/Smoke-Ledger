@@ -164,6 +164,10 @@ export function buildGoalPayload(
       };
     }
 
+    case 'taper':
+      // Tapers are created from proposals, not the manual form.
+      return { ok: false, error: 'Taper goals are not editable here.' };
+
     case 'quit_date': {
       if (!form.quitDate) return { ok: false, error: 'Pick a quit date.' };
       const days = daysUntil(today, form.quitDate);

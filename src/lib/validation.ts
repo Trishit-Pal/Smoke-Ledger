@@ -78,6 +78,7 @@ export const GoalTypeSchema = z.enum([
   'reduction_target',
   'weekly_target',
   'quit_date',
+  'taper',
 ]);
 export const GoalStatusSchema = z.enum(['active', 'paused', 'completed', 'abandoned']);
 export const ReminderKindSchema = z.enum(['daily_summary', 'craving_check', 'goal_nudge', 'quit_streak']);
@@ -323,6 +324,7 @@ export const ImportGoalSchema = z
     status: GoalStatusSchema,
     meta: z.record(z.unknown()).nullable(),
     createdAt: IsoUtcSchema,
+    completedAt: IsoUtcSchema.nullable().optional(),
   })
   .strict();
 

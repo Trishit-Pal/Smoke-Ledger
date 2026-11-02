@@ -24,6 +24,7 @@ type Row = {
   status: Goal['status'];
   meta_json: Record<string, unknown> | string | null;
   created_at: string;
+  completed_at: string | null;
 };
 
 function rowToGoal(r: Row): Goal {
@@ -50,6 +51,7 @@ function rowToGoal(r: Row): Goal {
     status: r.status,
     meta,
     createdAt: r.created_at,
+    completedAt: r.completed_at ?? null,
   };
 }
 

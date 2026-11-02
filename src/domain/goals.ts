@@ -46,6 +46,8 @@ export function evaluateGoal(
   money?: EvaluateGoalMoney,
 ): GoalProgress {
   switch (goal.type) {
+    // ponytail: a taper's current step cap lives in targetValue, so it evaluates like a daily cap until the taper tasks add step-aware logic.
+    case 'taper':
     case 'daily_cap': {
       const used = sticksOn(logs, today);
       const target = goal.targetValue;

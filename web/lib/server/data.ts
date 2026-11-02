@@ -52,6 +52,7 @@ type GoalRow = {
   status: Goal['status'];
   meta_json: Record<string, unknown> | string | null;
   created_at: string;
+  completed_at: string | null;
 };
 
 type BrandRow = {
@@ -124,6 +125,7 @@ function mapGoal(row: GoalRow): Goal {
     status: row.status,
     meta,
     createdAt: row.created_at,
+    completedAt: row.completed_at ?? null,
   };
 }
 

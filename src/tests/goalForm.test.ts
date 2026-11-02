@@ -152,6 +152,7 @@ function mkGoal(overrides: Partial<Goal>): Goal {
     status: overrides.status ?? 'active',
     meta: overrides.meta ?? null,
     createdAt: overrides.createdAt ?? '2025-03-01T00:00:00.000Z',
+    completedAt: overrides.completedAt ?? null,
   };
 }
 

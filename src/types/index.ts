@@ -78,7 +78,8 @@ export type GoalType =
   | 'no_smoke_window'
   | 'reduction_target'
   | 'weekly_target'
-  | 'quit_date';
+  | 'quit_date'
+  | 'taper';
 
 export interface Goal {
   id: string;
@@ -90,6 +91,7 @@ export interface Goal {
   status: 'active' | 'paused' | 'completed' | 'abandoned';
   meta: Record<string, unknown> | null; // e.g., window start/end hours
   createdAt: string;
+  completedAt: string | null; // set by the DB when status becomes completed/abandoned
 }
 
 export type OnboardingStep = 'privacy' | 'usage' | 'setup' | 'baseline' | 'brands' | 'goal' | 'done';

@@ -12,6 +12,7 @@ const baseGoal = (overrides: Partial<Goal>): Goal => ({
   status: 'active',
   meta: null,
   createdAt: '2025-04-01T00:00:00.000Z',
+  completedAt: null,
   ...overrides,
 });
 

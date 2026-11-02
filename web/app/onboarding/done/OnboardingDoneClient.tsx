@@ -48,6 +48,7 @@ const GOAL_DISPLAY: Record<GoalType, GoalDisplay> = {
   no_smoke_window: { label: 'No-smoke window', unit: 'hours protected' },
   weekly_target: { label: 'Weekly target', unit: 'sticks / week' },
   quit_date: { label: 'Quit date', unit: '' },
+  taper: { label: 'Gradual taper', unit: 'sticks / day' },
 };
 
 const PURCHASE_PREF_LABEL: Record<'single' | 'pack' | 'mixed', string> = {
