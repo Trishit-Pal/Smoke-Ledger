@@ -47,6 +47,8 @@ export interface ChartTooltipProps {
   payload?: TooltipEntry[];
   /** Optional value formatter (e.g. INR / minutes). */
   formatValue?: (v: number) => string;
+  /** Prefix each row with its series name (used when a chart carries a second series). */
+  showNames?: boolean;
 }
 
 /**
@@ -54,7 +56,7 @@ export interface ChartTooltipProps {
  * series value with a colour swatch and tabular figures. Pass to recharts via
  * `content={<ChartTooltip formatValue={fmt} />}`.
  */
-export function ChartTooltip({ active, label, payload, formatValue }: ChartTooltipProps) {
+export function ChartTooltip({ active, label, payload, formatValue, showNames }: ChartTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div
@@ -88,7 +90,9 @@ export function ChartTooltip({ active, label, payload, formatValue }: ChartToolt
                 display: 'inline-block',
               }}
             />
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{text}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {showNames && entry.name != null ? `${entry.name} ${text}` : text}
+            </span>
           </div>
         );
       })}

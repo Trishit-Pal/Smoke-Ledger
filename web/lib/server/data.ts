@@ -518,11 +518,12 @@ export async function getTrendsPageData() {
   const fromDate90 = daysAgoInZone(90, zone);
   const fromDate365 = daysAgoInZone(365, zone);
   const today = todayInZone(zone);
-  const [logs, dailySummary] = await Promise.all([
+  const [logs, dailySummary, goals] = await Promise.all([
     getServerLogs({ fromDate: fromDate90 }),    // raw logs, 90-day capped at 200 — for hour/dow/brand/mood charts
     getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
+    getServerGoals(),                           // active goals (request-cached) — the cap line
   ]);
-  return { profile, logs, dailySummary, ledgerChatEnabled: isLedgerChatEnabled() };
+  return { profile, logs, dailySummary, goals, ledgerChatEnabled: isLedgerChatEnabled() };
 }
 
 export async function getNewLogPageData() {
