@@ -3,15 +3,14 @@
 // Pure, dependency-free, no lookbehind (Hermes-safe). Over-redacting a
 // diagnostic is acceptable; storing personal data is not.
 
-// Every quantifier is bounded and the input is capped first: unbounded runs made
+// The input is capped first (MAX_INPUT) and the rest are bounded where a bound loses nothing: unbounded runs made
 // these patterns quadratic (100 KB of 'a-' took ~46 s).
-const EMAIL =
-  /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/g;
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/g;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const BEARER = /\bBearer\s{1,8}[A-Za-z0-9._~+/=-]{1,2048}/gi;
 const JWT = /\b[A-Za-z0-9_-]{10,2048}\.[A-Za-z0-9_-]{10,2048}\.[A-Za-z0-9_-]{10,2048}/g;
 // 24+ char secret-looking run that contains a digit (keeps long plain words).
-const SECRET = /\b(?=[A-Za-z0-9_-]{0,255}\d)[A-Za-z0-9_-]{24,256}\b/g;
+const SECRET = /\b(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{24,}\b/g;
 // Digits with optional single spaces/dashes/parentheses between; kept only if it has 10+ digits.
 const PHONE_RUN = /\+?\(?\d[\d ()-]{8,40}\d/g;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}/; // timestamps are not phones

@@ -18,6 +18,8 @@ describe('redactText', () => {
     ['Authorization: Bearer abc.def-123_xyz', 'Authorization: Bearer [token]'],
     ['key 5f4dcc3b5aa765d61d8327deb882cf99ab12 leaked', 'key [token] leaked'],
     ['order 4829175 not found', 'order [n] not found'],
+    [`secret ${'Ab1'.repeat(100)} end`, 'secret [token] end'],
+    [`${'q'.repeat(100)}@example.com`, '[email]'],
   ])('redacts %s', (input, expected) => {
     expect(redactText(input)).toBe(expected);
   });
@@ -47,15 +49,19 @@ describe('redactText', () => {
 });
 
 describe('redaction cost', () => {
-  it.each([['a-'.repeat(50000)], ['a.'.repeat(50000)], ['a'.repeat(100000)], ['1 '.repeat(50000)]])(
-    'stays linear on pathological input (%#)',
-    (input) => {
-      const t0 = performance.now();
-      redactText(input, 500);
-      redactRoute(`/${input}`);
-      expect(performance.now() - t0).toBeLessThan(200);
-    },
-  );
+  it.each([
+    ['a-'.repeat(50000)],
+    ['a@'.repeat(50000)],
+    ['a1'.repeat(50000)],
+    ['a.'.repeat(50000)],
+    ['a'.repeat(100000)],
+    ['1 '.repeat(50000)],
+  ])('stays linear on pathological input (%#)', (input) => {
+    const t0 = performance.now();
+    redactText(input, 500);
+    redactRoute(`/${input}`);
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
 });
 
 describe('redactRoute', () => {
