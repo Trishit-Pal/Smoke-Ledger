@@ -13,13 +13,15 @@ import {
   goalToFormState,
   buildGoalPayload,
   buildGoalPatch,
+  acceptProposalPatch,
+  dismissProposalPatch,
   blockingSameTypeGoal,
   goalTypeLabel,
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
-import { describeProposal, proposeStart } from '@/domain/goalProposals';
-import type { SpendPeriod } from '@/domain/goalMeta';
+import { describeProposal, proposeStart, type Proposal } from '@/domain/goalProposals';
+import type { DismissKind, SpendPeriod } from '@/domain/goalMeta';
 import { formatMoney } from '@/lib/format';
 import { localeForCountry } from '@/lib/regions';
 import { formatIndianDate } from '@/lib/date';
@@ -28,7 +30,15 @@ import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { GoalCard } from './GoalCard';
 import { GoalProposal } from './GoalProposal';
-import { isFromProposal, offersStartProposal, parseTypeParam, periodUnitLabel } from './goalsView';
+import {
+  goalCardModel,
+  isFromProposal,
+  offersStartProposal,
+  parseTypeParam,
+  periodUnitLabel,
+  unseenActiveTypes,
+} from './goalsView';
+import { useGoalReconcile } from '@web/lib/goals/useGoalReconcile';
 import { Button } from '@web/components/ui/Button';
 import { Input } from '@web/components/ui/Input';
 import { ConfirmDialog } from '@web/components/ui/ConfirmDialog';
@@ -90,6 +100,7 @@ function GoalForm({
   onCancel,
 }: GoalFormProps) {
   const meta = GOAL_TYPE_META.find((m) => m.type === form.type)!;
+  const firstFieldRef = React.useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const isSpend = form.type === 'spend_cap_daily';
   const targetUnit = isSpend ? periodUnitLabel(profile.currency, form.period) : meta.targetUnit;
   const derivedBaseline = deriveReductionBaseline(logs, today);
@@ -117,6 +128,11 @@ function GoalForm({
   const showInputs = isEdit || !offered;
   const showNoProposal = !isEdit && offersStartProposal(form.type) && proposal === null;
 
+  // Use / Choose my own unmount the buttons that held focus; land it on the first field instead.
+  React.useEffect(() => {
+    if (proposalDecided && !isEdit) firstFieldRef.current?.focus();
+  }, [proposalDecided, isEdit]);
+
   return (
     <div className="border border-border rounded-lg p-lg flex flex-col gap-md bg-card">
       <SectionLabel spacing="sm">{isEdit ? 'Edit goal' : 'New goal'}</SectionLabel>
@@ -130,7 +146,7 @@ function GoalForm({
             value={form.type}
             allowClear={false}
             onSelect={(t) => {
-              if (t && !busy) onFormChange({ type: t, target: '', baseline: '', quitDate: '', finalTarget: '', period: 'day' });
+              if (t && !busy && t !== form.type) onFormChange({ type: t, target: '', baseline: '', quitDate: '', finalTarget: '', period: 'day' });
             }}
           />
           <p className="text-small text-text-muted">{meta.blurb}</p>
@@ -146,7 +162,7 @@ function GoalForm({
           value={form.period}
           allowClear={false}
           onSelect={(period) => {
-            if (period && !busy) onFormChange({ period, target: '' });
+            if (period && !busy && period !== form.period) onFormChange({ period, target: '' });
           }}
         />
       ) : null}
@@ -170,6 +186,7 @@ function GoalForm({
 
       {showInputs && (form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') && (
         <Input
+          ref={firstFieldRef}
           label={`Target (${targetUnit})`}
           type="number"
           min="0.01"
@@ -184,6 +201,7 @@ function GoalForm({
       {showInputs && form.type === 'taper' && (
         <>
           <Input
+            ref={firstFieldRef}
             label="Starting cap (sticks/day)"
             type="number"
             min="0.01"
@@ -210,6 +228,7 @@ function GoalForm({
       {showInputs && form.type === 'reduction_target' && (
         <>
           <Input
+            ref={firstFieldRef}
             label={`Target (${targetUnit})`}
             type="number"
             min="0.01"
@@ -263,6 +282,7 @@ function GoalForm({
       {showInputs && form.type === 'quit_date' && (
         <>
           <Input
+            ref={firstFieldRef}
             label="Quit date"
             type="date"
             min={today}
@@ -287,7 +307,7 @@ function GoalForm({
       {error ? <p className="text-small text-danger">{error}</p> : null}
 
       <div className="flex gap-sm mt-sm">
-        <Button title={isEdit ? 'Save' : 'Create goal'} onPress={onSubmit} loading={busy} />
+        <Button title={isEdit ? 'Save' : 'Create goal'} onPress={onSubmit} loading={busy} disabled={offered !== null} />
         <Button title="Cancel" variant="ghost" onPress={onCancel} disabled={busy} />
       </div>
     </div>
@@ -310,9 +330,37 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   const searchParams = useSearchParams();
   const typeParam = parseTypeParam(searchParams.get('type'));
 
-  const active = goals.filter((g) => g.status === 'active');
-  const paused = goals.filter((g) => g.status === 'paused');
-  const done = goals.filter((g) => g.status === 'completed' || g.status === 'abandoned');
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const { view, failedNotice } = useGoalReconcile(goals, logs, today);
+
+  const active = view.filter((g) => g.status === 'active');
+  const paused = view.filter((g) => g.status === 'paused');
+  const done = view.filter((g) => g.status === 'completed' || g.status === 'abandoned');
+  const pageNotice = [notice, failedNotice].filter(Boolean).join(' ') || null;
+
+  const cardModels = React.useMemo(() => {
+    const fmtMoney = (n: number) => formatMoney(n, profile.currency, { locale: localeForCountry(profile.country) });
+    return new Map(
+      view.map((g) => [
+        g.id,
+        goalCardModel(g, logs, today, {
+          currency: profile.currency,
+          formatMoney: fmtMoney,
+          formatDate: formatIndianDate,
+          hideMoney: isDiscreetMode(profile) && g.type === 'spend_cap_daily',
+        }),
+      ]),
+    );
+  }, [view, logs, today, profile]);
+
+  // One progress-viewed event per goal type per mount.
+  const viewedTypes = React.useRef(new Set<Goal['type']>());
+  React.useEffect(() => {
+    for (const type of unseenActiveTypes(view, viewedTypes.current)) {
+      viewedTypes.current.add(type);
+      void track(AnalyticsEvents.GOAL_PROGRESS_VIEWED, { goal_type: type });
+    }
+  }, [view]);
 
   function openCreate(type?: GoalFormState['type']) {
     setEditing(null);
@@ -332,9 +380,10 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
   }, []);
 
-  function openEdit(goal: Goal) {
+  function openEdit(goal: Goal, targetPrefill?: string) {
     setEditing(goal);
-    setFormState(goalToFormState(goal));
+    const base = goalToFormState(goal);
+    setFormState(targetPrefill === undefined ? base : { ...base, target: targetPrefill });
     setFormError(null);
     setShowForm(true);
   }
@@ -379,7 +428,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         setBusy(null);
       }
     } else {
-      const blocker = blockingSameTypeGoal(formState.type, goals);
+      const blocker = blockingSameTypeGoal(formState.type, view);
       if (blocker) {
         setFormError(
           `You already have a ${goalTypeLabel(formState.type).toLowerCase()} goal. Complete it before adding another.`,
@@ -406,9 +455,23 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
     }
   }
 
-  async function handleStatus(goal: Goal, status: Goal['status']) {
-    setBusy(goal.id);
+  // Runs a card action: busy while it runs, a quiet page notice if it fails, never swallowed.
+  async function runGoalAction(id: string, action: () => Promise<void>) {
+    setNotice(null);
+    setBusy(id);
     try {
+      await action();
+      await revalidateAppViews();
+      router.refresh();
+    } catch (err) {
+      setNotice(toSafeErrorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const handleStatus = (goal: Goal, status: Goal['status']) =>
+    runGoalAction(goal.id, async () => {
       await setGoalStatus(goal.id, status);
       if (status === 'completed') {
         dispatchGoalCompletion({
@@ -416,21 +479,13 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
           body: `You stayed true to your ${goalTypeLabel(goal.type).toLowerCase()}. That counts.`,
         });
       }
-      await revalidateAppViews();
-      router.refresh();
-    } catch {
-      // status change failure is non-critical; just unblock
-    } finally {
-      setBusy(null);
-    }
-  }
+    });
 
   async function handleDelete() {
     if (!deleteTarget) return;
     const { id, status } = deleteTarget;
     setDeleteTarget(null);
-    setBusy(id);
-    try {
+    await runGoalAction(id, async () => {
       await deleteGoal(id);
       // Sentiment only when an unaccomplished goal is let go — not a completed/abandoned one.
       if (status === 'active' || status === 'paused') {
@@ -439,16 +494,45 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
           body: 'Every attempt teaches you something.',
         });
       }
-      await revalidateAppViews();
-      router.refresh();
-    } catch {
-      // deletion failure is non-critical; page will re-render fresh
-    } finally {
-      setBusy(null);
-    }
+    });
   }
 
+  const handleAccept = (goal: Goal, p: Proposal) =>
+    runGoalAction(goal.id, async () => {
+      await updateGoal(goal.id, acceptProposalPatch(goal, p, today));
+      void track(AnalyticsEvents.GOAL_PROPOSAL_ACCEPTED, { type: goal.type, kind: p.kind });
+    });
+
+  const handleDismiss = (goal: Goal, kind: DismissKind) =>
+    runGoalAction(goal.id, async () => {
+      await updateGoal(goal.id, dismissProposalPatch(goal, kind, today));
+      void track(AnalyticsEvents.GOAL_PROPOSAL_DISMISSED, { type: goal.type, kind });
+    });
+
   const cardBusy = busy !== null && busy !== 'submit';
+  const renderCard = (g: Goal) => {
+    const m = cardModels.get(g.id)!;
+    return (
+      <GoalCard
+        key={g.id}
+        goal={g}
+        logs={logs}
+        today={today}
+        profile={profile}
+        busy={cardBusy && busy === g.id}
+        state={m.state}
+        overDays={m.overDays}
+        heldDays={m.heldDays}
+        proposal={m.proposal}
+        proposalCopy={m.copy}
+        onEdit={openEdit}
+        onStatus={handleStatus}
+        onDelete={setDeleteTarget}
+        onAccept={handleAccept}
+        onDismiss={handleDismiss}
+      />
+    );
+  };
   const idx = (n: number): React.CSSProperties => ({ ['--ed-index' as string]: n } as React.CSSProperties);
 
   return (
@@ -458,12 +542,18 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         <EditorialMasthead
           caption="the ledger"
           title="Goals"
-          subtitle="Set a cap, a window, or a quit date. Reviewed quietly."
+          subtitle="The ledger suggests; you decide. Reviewed quietly."
         />
         {!showForm ? (
           <Button title="New goal" variant="secondary" size="sm" onPress={() => openCreate()} />
         ) : null}
       </div>
+
+      {pageNotice ? (
+        <p role="alert" className="text-small text-danger">
+          {pageNotice}
+        </p>
+      ) : null}
 
       {/* Create / edit form */}
       {showForm ? (
@@ -487,7 +577,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
       ) : null}
 
       {/* Empty state */}
-      {goals.length === 0 && !showForm ? (
+      {view.length === 0 && !showForm ? (
         <div style={idx(1)}>
           <EmptyState
             title="No goals yet"
@@ -503,19 +593,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         <section style={idx(2)} aria-labelledby="goals-active">
           <SectionLabel id="goals-active">Active</SectionLabel>
           <div className="flex flex-col">
-            {active.map((g) => (
-              <GoalCard
-                key={g.id}
-                goal={g}
-                logs={logs}
-                today={today}
-                profile={profile}
-                busy={cardBusy && busy === g.id}
-                onEdit={openEdit}
-                onStatus={handleStatus}
-                onDelete={setDeleteTarget}
-              />
-            ))}
+            {active.map(renderCard)}
           </div>
         </section>
       ) : null}
@@ -525,19 +603,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         <section style={idx(3)} aria-labelledby="goals-paused">
           <SectionLabel id="goals-paused">Paused</SectionLabel>
           <div className="flex flex-col">
-            {paused.map((g) => (
-              <GoalCard
-                key={g.id}
-                goal={g}
-                logs={logs}
-                today={today}
-                profile={profile}
-                busy={cardBusy && busy === g.id}
-                onEdit={openEdit}
-                onStatus={handleStatus}
-                onDelete={setDeleteTarget}
-              />
-            ))}
+            {paused.map(renderCard)}
           </div>
         </section>
       ) : null}
@@ -547,19 +613,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         <section style={idx(4)} aria-labelledby="goals-done">
           <SectionLabel id="goals-done">Completed &amp; abandoned</SectionLabel>
           <div className="flex flex-col">
-            {done.map((g) => (
-              <GoalCard
-                key={g.id}
-                goal={g}
-                logs={logs}
-                today={today}
-                profile={profile}
-                busy={cardBusy && busy === g.id}
-                onEdit={openEdit}
-                onStatus={handleStatus}
-                onDelete={setDeleteTarget}
-              />
-            ))}
+            {done.map(renderCard)}
           </div>
         </section>
       ) : null}

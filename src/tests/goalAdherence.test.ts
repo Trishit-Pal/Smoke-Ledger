@@ -1,6 +1,6 @@
 import type { CigaretteLog, Goal } from '@/types';
 import { dayShift } from '@/domain/calc';
-import { dailyAdherence, goalState, holdStatus } from '@/domain/goalAdherence';
+import { dailyAdherence, goalState, holdStatus, stateCaption } from '@/domain/goalAdherence';
 
 const TODAY = '2025-05-31'; // a Saturday; the week starts Monday 2025-05-26
 
@@ -195,5 +195,32 @@ describe('holdStatus', () => {
   it('returns zero for goals that are not daily-cap-like', () => {
     const goal = mkGoal({ type: 'weekly_target', targetValue: 30 });
     expect(holdStatus(goal, run(14, 2), TODAY)).toEqual({ runDays: 0, isHeld: false });
+  });
+});
+
+describe('stateCaption', () => {
+  it('names an on-track goal plainly', () => {
+    expect(stateCaption('on_track', 0, 0)).toBe('On track');
+  });
+
+  it('says how often an at-risk goal went over this week', () => {
+    expect(stateCaption('at_risk', 1, 0)).toBe('At risk · over once this week');
+    expect(stateCaption('at_risk', 2, 0)).toBe('At risk · over 2 times this week');
+  });
+
+  it('says the cap is close when an at-risk goal has not gone over', () => {
+    expect(stateCaption('at_risk', 0, 0)).toBe('At risk · close to the cap today');
+  });
+
+  it('counts the over days of an off-track goal', () => {
+    expect(stateCaption('off_track', 4, 0)).toBe('Off track · over 4 of the last 7 days');
+  });
+
+  it('does not claim zero over days for an off-track goal without a daily record', () => {
+    expect(stateCaption('off_track', 0, 0)).toBe('Off track');
+  });
+
+  it('reports the days a met goal has been held', () => {
+    expect(stateCaption('met', 0, 16)).toBe('Met · held 16 days');
   });
 });

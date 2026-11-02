@@ -90,3 +90,19 @@ export function goalState(goal: Goal, logs: CigaretteLog[], today: string): Goal
   if (!p.isOnTrack) return 'off_track';
   return p.atRisk ? 'at_risk' : 'on_track';
 }
+
+/** The one-line, money-free caption for a goal's state; shared by web and mobile. */
+export function stateCaption(state: GoalState, overDays: number, heldDays: number): string {
+  switch (state) {
+    case 'on_track':
+      return 'On track';
+    case 'at_risk':
+      if (overDays === 0) return 'At risk · close to the cap today';
+      return overDays === 1 ? 'At risk · over once this week' : `At risk · over ${overDays} times this week`;
+    case 'off_track':
+      // ponytail: goals without a daily record (weekly cap) report 0 over days; say so plainly.
+      return overDays === 0 ? 'Off track' : `Off track · over ${overDays} of the last ${LOOKBACK_DAYS} days`;
+    case 'met':
+      return `Met · held ${heldDays} days`;
+  }
+}
