@@ -75,6 +75,7 @@ const goals: Goal[] = [
     status: 'active',
     meta: null,
     createdAt: '',
+    completedAt: null,
   },
 ];
 

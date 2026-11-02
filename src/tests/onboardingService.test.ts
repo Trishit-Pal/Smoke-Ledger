@@ -74,6 +74,7 @@ const goal = (over: Partial<Goal>): Goal => ({
   status: 'active',
   meta: null,
   createdAt: '2026-11-01T00:00:00.000Z',
+  completedAt: null,
   ...over,
 });
 

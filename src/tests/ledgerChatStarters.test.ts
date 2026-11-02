@@ -60,6 +60,7 @@ const goal: Goal = {
   status: 'active',
   meta: null,
   createdAt: '',
+  completedAt: null,
 };
 
 function starters(input: { rows: DailySummaryRow[]; logs?: CigaretteLog[]; goals?: Goal[] }) {
