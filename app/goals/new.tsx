@@ -84,7 +84,7 @@ export default function GoalNewScreen() {
     if (!existingGoal) return emptyGoalForm(parseTypeParam(typeParam ?? null) ?? undefined);
     const base = goalToFormState(existingGoal);
     // "Edit" on a card proposal arrives with the proposed target.
-    return targetParam ? { ...base, target: targetParam } : base;
+    return Number(targetParam) > 0 ? { ...base, target: targetParam! } : base;
   });
   // The form as seeded by "Use" (null until then) and whether the reader took "Choose my own".
   const [seeded, setSeeded] = useState<GoalFormState | null>(null);
@@ -267,9 +267,12 @@ export default function GoalNewScreen() {
           {/* Ledger-derived starting value, offered before the inputs */}
           {offered ? (
             <View style={{ gap: spacing.sm }}>
-              <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                Your last 14 days
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Your last 14 days
+                </Text>
+                <Text variant="bodyStrong">{offered.copy.valueLabel}</Text>
+              </View>
               <Text variant="bodyStrong">{offered.copy.headline}</Text>
               <Text variant="small" muted>{offered.copy.basis}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>

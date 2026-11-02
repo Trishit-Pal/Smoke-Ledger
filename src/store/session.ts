@@ -51,11 +51,11 @@ interface Reconciled {
 /**
  * Writes any goal transition that has come due and returns the goals as they now stand.
  * Idempotent (the planner returns nothing once a write has landed) and never throws, so
- * boot cannot be blocked by it; a failed write leaves the goal as stored and sets `failed`.
+ * boot cannot be blocked by it; `today` is the reader's ledger date; a failed write leaves the goal as stored and sets `failed`.
  */
-async function reconcileLoaded(goals: Goal[], logs: CigaretteLog[]): Promise<Reconciled> {
+async function reconcileLoaded(goals: Goal[], logs: CigaretteLog[], today: string): Promise<Reconciled> {
   try {
-    const r = await reconcileGoals(goals, logs, ledgerToday(), {
+    const r = await reconcileGoals(goals, logs, today, {
       setGoalStatus: goalsRepo.setGoalStatus,
       updateGoal: goalsRepo.updateGoal,
     });
@@ -165,7 +165,9 @@ export const useSession = create<SessionState>((set, get) => ({
       goalsRepo.listAllGoals(),
       fetchSummary(),
     ]);
-    const reconciled = await reconcileLoaded(goals, logs);
+    // The store's profile is not set yet at boot, so read the zone from the profile just loaded.
+    const today = todayInZone(timezoneForCountry(profile?.country));
+    const reconciled = await reconcileLoaded(goals, logs, today);
     set((s) => ({
       booted: true,
       profile,
@@ -192,7 +194,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   refreshGoals: async () => {
     const loaded = await goalsRepo.listAllGoals();
-    const reconciled = await reconcileLoaded(loaded, get().logs);
+    const reconciled = await reconcileLoaded(loaded, get().logs, ledgerToday());
     set((s) => ({
       goals: reconciled.goals,
       pendingGoalMoments: withMoments(s.pendingGoalMoments, reconciled.applied),

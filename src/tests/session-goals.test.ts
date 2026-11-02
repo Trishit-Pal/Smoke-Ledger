@@ -17,11 +17,13 @@ jest.mock('@/lib/catalogStorageNative', () => ({ makeNativeCatalogStorage: jest.
 jest.mock('@/services/analytics', () => ({ track: jest.fn() }));
 
 import * as goalsRepo from '@/db/repositories/goals';
+import * as profileRepo from '@/db/repositories/profile';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { useSession } from '@/store/session';
-import type { Goal } from '@/types';
+import type { Goal, UserProfile } from '@/types';
 
+const getProfile = profileRepo.getProfile as jest.Mock;
 const listAllGoals = goalsRepo.listAllGoals as jest.Mock;
 const setGoalStatus = goalsRepo.setGoalStatus as jest.Mock;
 const createGoal = goalsRepo.createGoal as jest.Mock;
@@ -88,6 +90,25 @@ describe('session goals reconcile', () => {
     expect(useSession.getState().goalsReconcileFailed).toBe(true);
     await useSession.getState().refreshGoals();
     expect(useSession.getState().goalsReconcileFailed).toBe(false);
+  });
+});
+
+describe('boot reconcile uses the loaded profile zone', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    getProfile.mockResolvedValue(null);
+  });
+
+  // 20:00Z on 31 Oct is already 1 Nov in India but still 31 Oct (21:00) in Paris.
+  it('does not complete a quit date that is still tomorrow for a French reader', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-10-31T20:00:00Z'));
+    jest.clearAllMocks();
+    useSession.getState().reset();
+    getProfile.mockResolvedValue({ country: 'FR' } as UserProfile);
+    listAllGoals.mockResolvedValue([{ ...dueGoal(), endDate: '2026-11-01' }]);
+    await useSession.getState().boot();
+    expect(setGoalStatus).not.toHaveBeenCalled();
+    expect(useSession.getState().goals[0].status).toBe('active');
   });
 });
 

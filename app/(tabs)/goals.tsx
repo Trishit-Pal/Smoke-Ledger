@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
   ScrollView,
   View,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
@@ -97,20 +97,22 @@ export default function GoalsTab() {
 
   useRefreshOnFocus(refreshGoals);
 
-  // Announce goals the ledger completed on its own (boot or the refresh above queued them).
-  useFocusEffect(
-    useCallback(() => {
-      for (const t of consumeGoalMoments()) {
-        const moment = completionMoment(t);
-        if (!moment || t.kind !== 'auto_complete') continue;
-        dispatchGoalCompletion(moment);
-        void track(AnalyticsEvents.GOAL_AUTO_COMPLETED, {
-          type: t.reason === 'quit_date' ? 'quit_date' : 'taper',
-          reason: t.reason,
-        });
-      }
-    }, [consumeGoalMoments]),
-  );
+  // Announce goals the ledger completed on its own. Reacts to the queue, so moments queued
+  // by the focus refresh above (or a realtime refresh) are announced while the tab is open.
+  const isFocused = useIsFocused();
+  const queuedMoments = useSession((s) => s.pendingGoalMoments.length);
+  useEffect(() => {
+    if (!isFocused || queuedMoments === 0) return;
+    for (const t of consumeGoalMoments()) {
+      const moment = completionMoment(t);
+      if (!moment || t.kind !== 'auto_complete') continue;
+      dispatchGoalCompletion(moment);
+      void track(AnalyticsEvents.GOAL_AUTO_COMPLETED, {
+        type: t.reason === 'quit_date' ? 'quit_date' : 'taper',
+        reason: t.reason,
+      });
+    }
+  }, [isFocused, queuedMoments, consumeGoalMoments]);
 
   const discreet = isDiscreetMode(profile);
 
@@ -250,7 +252,7 @@ export default function GoalsTab() {
 
         {!isDone ? (
           <>
-            <ProgressBar value={pct} tone={state === 'on_track' || state === 'met' ? 'success' : 'warn'} />
+            <ProgressBar value={pct} tone={state === 'on_track' || state === 'met' ? 'success' : 'warnEarth'} />
             <Text variant="small" muted>{explanation}</Text>
           </>
         ) : (
@@ -259,9 +261,12 @@ export default function GoalsTab() {
 
         {proposal && copy && dismissKind ? (
           <View style={{ gap: spacing.xs, marginTop: spacing.xs }}>
-            <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-              {proposalRowLabel(proposal.kind)}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                {proposalRowLabel(proposal.kind)}
+              </Text>
+              <Text variant="bodyStrong">{copy.valueLabel}</Text>
+            </View>
             <Text variant="bodyStrong">{copy.headline}</Text>
             <Text variant="small" muted>{copy.basis}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs }}>
