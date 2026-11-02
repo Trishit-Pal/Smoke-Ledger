@@ -2,7 +2,9 @@ import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context'
 import { TOOL_DEFS, runTool } from '@/domain/ledgerChat/tools';
 import { chatRequestSchema } from '@/domain/ledgerChat/types';
 import { goalTypeLabel } from '@/domain/goalForm';
-import { round2 } from '@/domain/calc';
+import { dayShift, round2 } from '@/domain/calc';
+import { dailyAdherence, goalState, holdStatus } from '@/domain/goalAdherence';
+import { proposalFor } from '@/domain/goalProposals';
 import { periodWithTrend, savedAllTime, totalsForWindow, type DailySummaryRow } from '@/domain/periodSummary';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 
@@ -208,6 +210,66 @@ describe('goal_status and insights', () => {
     if (!r.ok) return;
     expect(r.rows[0].label).toBe(goalTypeLabel('spend_cap_daily'));
     expect(String(r.rows[0].label)).not.toMatch(/[₹€\d]/);
+  });
+
+  describe('goal state and suggested next step', () => {
+    const daysBack = (n: number): string => dayShift(TODAY, -n);
+    const dailyLogs = (perDay: number, days: number): CigaretteLog[] =>
+      Array.from({ length: days }, (_, i) => log({ localDate: daysBack(i), quantity: perDay }));
+    const capGoal = (meta: Goal['meta']): Goal => ({ ...goals[0], startDate: '2026-05-01', meta });
+    type GoalData = { state: string; overDaysLast7: number; heldDays: number; proposal: { kind: string; value: number } | null };
+
+    it('a met goal reports state, held days and a next-step proposal equal to the domain calls', () => {
+      const goal = capGoal({ metOn: daysBack(10) });
+      const goalLogs = dailyLogs(1, 30);
+      const r = runTool('goal_status', {}, ctx({ goals: [goal], logs: goalLogs }));
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const g = (r.data.goals as GoalData[])[0];
+      const state = goalState(goal, goalLogs, TODAY);
+      const proposal = proposalFor(goal, goalLogs, TODAY, state, { currency: 'INR' });
+      expect(state).toBe('met');
+      expect(g.state).toBe(state);
+      expect(g.heldDays).toBe(holdStatus(goal, goalLogs, TODAY).runDays);
+      expect(g.overDaysLast7).toBe(0);
+      expect(proposal).not.toBeNull();
+      expect(g.proposal).toEqual({ kind: proposal!.kind, value: proposal!.value });
+      expect(r.rows[0].tone).toBe('accent');
+      const row = r.rows.find((x) => x.id === 'goal.0.proposal');
+      expect(row).toMatchObject({ label: 'Suggested next cap', value: proposal!.value, unit: 'sticks' });
+      expect(String(row!.label)).not.toMatch(/[₹€\d]/);
+    });
+
+    it('an off-track goal reports its over days and a re-anchor proposal, with a warn tone', () => {
+      const goal = capGoal(null);
+      const goalLogs = dailyLogs(9, 30);
+      const r = runTool('goal_status', {}, ctx({ goals: [goal], logs: goalLogs }));
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const g = (r.data.goals as GoalData[])[0];
+      expect(g.state).toBe('off_track');
+      expect(g.overDaysLast7).toBe(dailyAdherence(goal, goalLogs, TODAY).filter((d) => d.over).length);
+      expect(g.proposal?.kind).toBe('reanchor');
+      expect(r.rows[0].tone).toBe('warn');
+      const row = r.rows.find((x) => x.id === 'goal.0.proposal');
+      expect(row).toMatchObject({ label: 'Suggested re-anchor', value: g.proposal?.value });
+      expect(String(row!.label)).not.toMatch(/[₹€\d]/);
+    });
+
+    it('a goal with nothing to suggest has a null proposal and no proposal row', () => {
+      const r = runTool('goal_status', {}, ctx());
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect((r.data.goals as GoalData[])[0].proposal).toBeNull();
+      expect(r.rows.some((x) => x.id.endsWith('.proposal'))).toBe(false);
+    });
+
+    it('describes goal_status with the four states', () => {
+      const def = TOOL_DEFS.find((t) => t.name === 'goal_status');
+      expect(def?.description).toBe(
+        'Progress and state (on track, at risk, off track, met) on each active goal, plus any suggested next step. Use for "how am I doing on my goal".',
+      );
+    });
   });
 
   it('insights strips ids and timestamps', () => {

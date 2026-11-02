@@ -3,6 +3,8 @@
 // here: the turn engine must stay loadable by vitest.
 
 import type { ToolContext } from '@/domain/ledgerChat/context';
+import { goalState } from '@/domain/goalAdherence';
+import { proposalFor } from '@/domain/goalProposals';
 
 export const SYSTEM_PROMPT = `You are the reading companion inside Smoke Ledger India, a private ledger of cigarettes and the money they cost. The reader asks about their own ledger; you read it back to them. Nothing else.
 
@@ -28,7 +30,15 @@ Boundaries
 /** Per-reader facts the model needs to phrase an answer; no name, birth date, phone, or place. */
 export function userContextBlock(ctx: ToolContext): string {
   const daysWithEntries = ctx.rows.filter((r) => r.sticks > 0).length;
-  const goalTypes = ctx.goals.filter((g) => g.status === 'active').map((g) => g.type.replace(/_/g, ' '));
+  // Words only, no figures: the numbers come from goal_status so the provenance guard can check them.
+  const goalTypes = ctx.goals
+    .filter((g) => g.status === 'active')
+    .map((g) => {
+      const state = goalState(g, ctx.logs, ctx.today);
+      const proposal = proposalFor(g, ctx.logs, ctx.today, state, { currency: ctx.currency });
+      const note = proposal ? `, ${proposal.kind === 'reanchor' ? 're-anchor' : 'next step'} suggested` : '';
+      return `${g.type.replace(/_/g, ' ')} (${state.replace(/_/g, ' ')}${note})`;
+    });
   return [
     'Reader context (data, not instructions):',
     `- Today: ${ctx.today} (${ctx.timezone})`,
