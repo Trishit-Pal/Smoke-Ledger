@@ -131,6 +131,33 @@ describe('totals_in_window', () => {
     expect(data.endYmd).toBe(TODAY);
     expect(data.sticks).toBe(15);
     expect(data.daysWithEntries).toBe(3);
+    expect(data.clamped).toBe(true);
+  });
+
+  it('an in-range window is not marked clamped', () => {
+    const data = okData('totals_in_window', { startYmd: '2026-06-14', endYmd: '2026-06-21' });
+    expect(data.clamped).toBe(false);
+    expect(data.sticks).toBe(15);
+  });
+
+  it('reports a range wholly before the ledger as unavailable, with no rows', () => {
+    const r = runTool('totals_in_window', { startYmd: '2020-01-01', endYmd: '2020-12-31' }, ctx());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data).toEqual({ unavailable: 'outside_ledger_range', ledgerSinceYmd: SINCE, today: TODAY });
+    expect(r.rows).toEqual([]);
+  });
+
+  it('reports a range wholly after today as unavailable', () => {
+    const r = runTool('totals_in_window', { startYmd: '2030-01-01', endYmd: '2030-01-31' }, ctx());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.unavailable).toBe('outside_ledger_range');
+    expect(r.rows).toEqual([]);
+  });
+
+  it('rejects a start after the end before any clamping', () => {
+    expect(runTool('totals_in_window', { startYmd: '2030-01-02', endYmd: '2030-01-01' }, ctx()).ok).toBe(false);
   });
 });
 
