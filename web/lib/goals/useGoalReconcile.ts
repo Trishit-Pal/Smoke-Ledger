@@ -4,16 +4,16 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
 import { setGoalStatus, updateGoal } from '@/db/repositories/goals';
-import { applyGoalTransitions, planGoalTransitions } from '@/domain/goalTransitions';
+import { planGoalTransitions } from '@/domain/goalTransitions';
 import { completionMoment, reconcileGoals } from '@/services/goalReconcile';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { dispatchGoalCompletion } from '@web/lib/character/mood';
-import { RECONCILE_FAILED_NOTICE, reconcileKey } from '@web/app/(app)/goals/goalsView';
+import { RECONCILE_FAILED_NOTICE, reconcileKey, renderedGoals } from './reconcileView';
 import type { CigaretteLog, Goal } from '@/types';
 
 export interface GoalReconcile {
-  /** The goals with any due transition already applied, so the page never shows a stale state. */
+  /** The goals with each due transition applied, except any whose write failed. */
   view: Goal[];
   /** Set when a due update could not be saved; null otherwise. */
   failedNotice: string | null;
@@ -30,9 +30,11 @@ export function useGoalReconcile(goals: Goal[], logs: CigaretteLog[], today: str
   const router = useRouter();
   const [failedNotice, setFailedNotice] = React.useState<string | null>(null);
   const planned = React.useMemo(() => planGoalTransitions(goals, logs, today), [goals, logs, today]);
+  // Goals whose write failed: the database still holds the old state, so the view must too.
+  const [failedIds, setFailedIds] = React.useState<ReadonlySet<string>>(() => new Set());
   const view = React.useMemo(
-    () => applyGoalTransitions(goals, planned, new Date().toISOString()),
-    [goals, planned],
+    () => renderedGoals(goals, planned, failedIds, new Date().toISOString()),
+    [goals, planned, failedIds],
   );
 
   // Keyed by ids+statuses (not by array identity) so strict-mode's double effect and a
@@ -45,6 +47,7 @@ export function useGoalReconcile(goals: Goal[], logs: CigaretteLog[], today: str
     if (planned.length === 0) return;
     void (async () => {
       const { applied, failed } = await reconcileGoals(goals, logs, today, WRITER);
+      setFailedIds(new Set(failed.map((f) => f.transition.goalId)));
       setFailedNotice(failed.length > 0 ? RECONCILE_FAILED_NOTICE : null);
       for (const t of applied) {
         const moment = completionMoment(t);

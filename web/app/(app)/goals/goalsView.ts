@@ -37,9 +37,6 @@ export function proposalButtonLabel(valueLabel: string, hidden: boolean): string
   return hidden ? 'Use the suggestion' : `Use ${valueLabel}`;
 }
 
-/** Page-level notice when a due goal update could not be written. */
-export const RECONCILE_FAILED_NOTICE = 'Some goal updates could not be saved. They will be retried next time.';
-
 /** Teal only for a goal that is on track or met; terracotta for any concern. */
 export function stateColor(state: GoalState): string {
   return state === 'on_track' || state === 'met' ? 'var(--accent)' : 'var(--warn-earth)';
@@ -58,14 +55,6 @@ export function doneLabel(
 ): string {
   const word = status === 'abandoned' ? 'Set aside' : 'Completed';
   return completedAt ? `${word} ${formatDate(completedAt)}` : word;
-}
-
-/** Identity of a goals snapshot as far as reconcile cares: which goals, in which status. */
-export function reconcileKey(goals: readonly Goal[]): string {
-  return goals
-    .map((g) => `${g.id}:${g.status}`)
-    .sort()
-    .join('|');
 }
 
 /** Active goal types not yet reported, each once (a type has at most one live goal, but stay safe). */

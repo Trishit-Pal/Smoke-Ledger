@@ -11,7 +11,6 @@ import {
   periodUnitLabel,
   proposalButtonLabel,
   proposalRowLabel,
-  reconcileKey,
   stateColor,
   unseenActiveTypes,
 } from '../app/(app)/goals/goalsView';
@@ -150,20 +149,6 @@ describe('proposalRowLabel', () => {
   });
 });
 
-describe('reconcileKey', () => {
-  it('changes with ids and statuses but not with order-insensitive noise', () => {
-    const a = mkGoal({ id: 'a' });
-    const b = mkGoal({ id: 'b' });
-    expect(reconcileKey([a, b])).toBe(reconcileKey([b, a]));
-    expect(reconcileKey([a])).not.toBe(reconcileKey([a, b]));
-    expect(reconcileKey([a])).not.toBe(reconcileKey([{ ...a, status: 'completed' }]));
-  });
-  it('ignores fields that do not move a goal between states', () => {
-    const a = mkGoal();
-    expect(reconcileKey([a])).toBe(reconcileKey([{ ...a, targetValue: 9 }]));
-  });
-});
-
 describe('unseenActiveTypes', () => {
   it('lists each active type once and skips ones already seen', () => {
     const goals = [
@@ -216,5 +201,16 @@ describe('goalCardModel', () => {
     expect(m.proposal?.kind).toBe('reanchor');
     expect(m.copy?.valueLabel).toBe('—');
     expect(JSON.stringify(m.copy)).not.toMatch(/\d{3}/);
+  });
+});
+
+describe('goalCardModel under discreet mode (next proposal)', () => {
+  it('masks the amounts of a spend next-step proposal', () => {
+    const logs = everyDay(30, 1).map((l) => ({ ...l, totalPriceInr: 40 }));
+    const goal = mkGoal({ type: 'spend_cap_daily', targetValue: 100, meta: { metOn: dayBefore(1) } });
+    const m = goalCardModel(goal, logs, TODAY, { ...ctx, hideMoney: true });
+    expect(m.proposal?.kind).toBe('next');
+    expect(m.copy?.valueLabel).toBe('—');
+    expect(`${m.copy?.headline} ${m.copy?.basis}`).not.toMatch(/\d/);
   });
 });

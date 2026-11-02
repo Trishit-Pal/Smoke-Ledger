@@ -204,12 +204,12 @@ describe('stateCaption', () => {
   });
 
   it('says how often an at-risk goal went over this week', () => {
-    expect(stateCaption('at_risk', 1, 0)).toBe('At risk · over once this week');
-    expect(stateCaption('at_risk', 2, 0)).toBe('At risk · over 2 times this week');
+    expect(stateCaption('at_risk', 1, 0)).toBe('At risk · over once in the last 7 days');
+    expect(stateCaption('at_risk', 2, 0)).toBe('At risk · over 2 times in the last 7 days');
   });
 
   it('says the cap is close when an at-risk goal has not gone over', () => {
-    expect(stateCaption('at_risk', 0, 0)).toBe('At risk · close to the cap today');
+    expect(stateCaption('at_risk', 0, 0)).toBe('At risk · close to the cap');
   });
 
   it('counts the over days of an off-track goal', () => {

@@ -428,7 +428,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         setBusy(null);
       }
     } else {
-      const blocker = blockingSameTypeGoal(formState.type, view);
+      const blocker = blockingSameTypeGoal(formState.type, goals);
       if (blocker) {
         setFormError(
           `You already have a ${goalTypeLabel(formState.type).toLowerCase()} goal. Complete it before adding another.`,
