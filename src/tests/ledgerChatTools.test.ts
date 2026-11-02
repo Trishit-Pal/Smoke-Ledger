@@ -159,6 +159,16 @@ describe('totals_in_window', () => {
   it('rejects a start after the end before any clamping', () => {
     expect(runTool('totals_in_window', { startYmd: '2030-01-02', endYmd: '2030-01-01' }, ctx()).ok).toBe(false);
   });
+
+  it('totals ids and labels carry the range, so two windows never collide', () => {
+    const a = runTool('totals_in_window', { startYmd: '2026-06-14', endYmd: '2026-06-20' }, ctx());
+    const b = runTool('totals_in_window', { startYmd: '2026-06-21', endYmd: '2026-06-21' }, ctx());
+    if (!a.ok || !b.ok) throw new Error('expected ok outcomes');
+    const bIds = new Set(b.rows.map((r) => r.id));
+    const bLabels = new Set(b.rows.map((r) => r.label));
+    expect(a.rows.filter((r) => bIds.has(r.id))).toEqual([]);
+    expect(a.rows.filter((r) => bLabels.has(r.label))).toEqual([]);
+  });
 });
 
 describe('savings', () => {

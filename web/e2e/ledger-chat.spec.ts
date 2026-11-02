@@ -10,10 +10,10 @@ const CHAT_ROUTE = '**/api/ledger-chat';
 const ANSWER = {
   answer: 'Fewer than the week before, and the spend followed.',
   rows: [
-    { id: 'compare.current.sticks', label: 'This week', value: 8, unit: 'sticks' },
-    { id: 'compare.previous.sticks', label: 'Last week', value: 12, unit: 'sticks' },
-    { id: 'compare.delta', label: 'Change', value: -33.3, unit: 'percent', tone: 'accent' },
-    { id: 'compare.current.spend', label: 'Spend, this week', value: 160, unit: 'money' },
+    { id: 'compare.week.current.sticks', label: 'This week', value: 8, unit: 'sticks' },
+    { id: 'compare.week.previous.sticks', label: 'Last week', value: 12, unit: 'sticks' },
+    { id: 'compare.week.delta', label: 'Change, this week', value: -33.3, unit: 'percent', tone: 'accent' },
+    { id: 'compare.week.current.spend', label: 'Spend, this week', value: 160, unit: 'money' },
   ],
   toolsUsed: ['compare_periods'],
 };

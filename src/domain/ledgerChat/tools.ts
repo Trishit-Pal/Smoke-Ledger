@@ -186,12 +186,14 @@ function comparePeriods(input: z.infer<typeof comparePeriodsInput>, ctx: ToolCon
       stickDeltaPct,
       spendDeltaPct,
     },
+    // Ids and labels carry the window, so a week and a month comparison in one
+    // turn both reach the reader instead of the second being de-duplicated away.
     rows: [
-      row('compare.current.sticks', thisLabel, trend.current.sticks, 'sticks'),
-      row('compare.previous.sticks', lastLabel, trend.previous.sticks, 'sticks'),
-      row('compare.delta', 'Change', stickDeltaPct, 'percent', deltaTone(stickDeltaPct)),
-      row('compare.current.spend', `Spend, ${thisLabel.toLowerCase()}`, trend.current.spendInr, 'money'),
-      row('compare.previous.spend', `Spend, ${lastLabel.toLowerCase()}`, trend.previous.spendInr, 'money'),
+      row(`compare.${input.window}.current.sticks`, thisLabel, trend.current.sticks, 'sticks'),
+      row(`compare.${input.window}.previous.sticks`, lastLabel, trend.previous.sticks, 'sticks'),
+      row(`compare.${input.window}.delta`, `Change, ${thisLabel.toLowerCase()}`, stickDeltaPct, 'percent', deltaTone(stickDeltaPct)),
+      row(`compare.${input.window}.current.spend`, `Spend, ${thisLabel.toLowerCase()}`, trend.current.spendInr, 'money'),
+      row(`compare.${input.window}.previous.spend`, `Spend, ${lastLabel.toLowerCase()}`, trend.previous.spendInr, 'money'),
     ],
   };
 }
@@ -223,10 +225,11 @@ function totalsInWindow(input: z.infer<typeof totalsInWindowInput>, ctx: ToolCon
   return {
     ok: true,
     data: { startYmd, endYmd, clamped, sticks, spendInr, daysWithEntries },
+    // Ids and labels carry the (clamped) range, so two ranges in one turn never collide.
     rows: [
-      row('totals.sticks', `Sticks, ${startYmd} to ${endYmd}`, sticks, 'sticks'),
-      row('totals.spend', 'Spend', spendInr, 'money'),
-      row('totals.days', 'Days with entries', daysWithEntries, 'days'),
+      row(`totals.${startYmd}.${endYmd}.sticks`, `Sticks, ${startYmd} to ${endYmd}`, sticks, 'sticks'),
+      row(`totals.${startYmd}.${endYmd}.spend`, `Spend, ${startYmd} to ${endYmd}`, spendInr, 'money'),
+      row(`totals.${startYmd}.${endYmd}.days`, `Days with entries, ${startYmd} to ${endYmd}`, daysWithEntries, 'days'),
     ],
   };
 }

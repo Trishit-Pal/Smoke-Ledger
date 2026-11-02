@@ -86,7 +86,7 @@ describe('runLedgerChatTurn', () => {
     const result = await run(client);
 
     expect(result.toolsUsed).toEqual(['compare_periods']);
-    expect(result.rows.some((r) => r.id === 'compare.current.sticks' && r.value === 8)).toBe(true);
+    expect(result.rows.some((r) => r.id === 'compare.week.current.sticks' && r.value === 8)).toBe(true);
     expect(result.answer).toBe('This week came to 8 sticks.');
     expect(result.usage.guardRetries).toBe(0);
     expect(calls).toHaveLength(2);
@@ -132,6 +132,22 @@ describe('runLedgerChatTurn', () => {
 
     expect(calls).toHaveLength(MAX_MODEL_CALLS);
     expect(result.answer).toBe(FALLBACK_ANSWER);
+  });
+
+  test('keeps every call\'s rows when one tool runs twice with different inputs', async () => {
+    const { client } = fakeClient([
+      message([toolUse('compare_periods', { window: 'week' })], 'tool_use'),
+      message([toolUse('compare_periods', { window: 'month' })], 'tool_use'),
+      message([text('Fewer than before.')], 'end_turn'),
+    ]);
+
+    const result = await run(client);
+
+    const ids = result.rows.map((r) => r.id);
+    expect(ids).toContain('compare.week.current.sticks');
+    expect(ids).toContain('compare.month.current.sticks');
+    expect(result.rows).toHaveLength(10);
+    expect(new Set(result.rows.map((r) => r.label)).size).toBe(result.rows.length);
   });
 
   test('passes one turn-wide abort signal to every model call so a slow upstream cannot outlive the function', async () => {
