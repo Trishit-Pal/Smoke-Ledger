@@ -56,6 +56,7 @@ import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
 import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
 import { Button } from '@web/components/ui/Button';
 import { getSupabase } from '@web/lib/supabase/client';
+import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { useGoalReconcile } from '@web/lib/goals/useGoalReconcile';
 import { goalCardModel, stateColor } from '@web/lib/goals/goalCardModel';
 import { firstSuggestionSentence, shouldShowFirstSuggestion } from '@web/lib/goals/firstSuggestion';
@@ -285,13 +286,11 @@ export function DashboardClient({
   const [suggestionUser, setSuggestionUser] = React.useState<{ id: string; dismissed: boolean } | null>(null);
   React.useEffect(() => {
     let cancelled = false;
-    void getSupabase()
-      .auth.getSession()
-      .then(({ data }) => {
-        const id = data.session?.user.id;
-        if (cancelled || !id) return;
-        setSuggestionUser({ id, dismissed: isFirstSuggestionDismissed(id, today) });
-      });
+    // On any failure the id is null and the suggestion simply stays hidden.
+    void sessionUserId(() => getSupabase().auth.getSession()).then((id) => {
+      if (cancelled || !id) return;
+      setSuggestionUser({ id, dismissed: isFirstSuggestionDismissed(id, today) });
+    });
     return () => {
       cancelled = true;
     };

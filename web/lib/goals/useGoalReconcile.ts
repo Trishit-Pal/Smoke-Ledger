@@ -22,6 +22,10 @@ export interface GoalReconcile {
 const WRITER = { setGoalStatus, updateGoal };
 
 /**
+ * Safe to mount on two pages at once (Home and Goals): the writes are idempotent (a fixed
+ * status, the same metOn), the single GoalMoment instance replaces its state, and at worst
+ * analytics double-counts a completion in that narrow race.
+ *
  * Writes the goal transitions that have come due (met, auto-complete) once per distinct
  * goals snapshot, announces completions, then refreshes the page. After the write the
  * planner is empty, so the refreshed render plans nothing and the loop ends.
