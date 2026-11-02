@@ -265,7 +265,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   async function handleSubmit() {
     setFormError(null);
     if (editing) {
-      const result = buildGoalPatch(formState, logs, today);
+      const result = buildGoalPatch(formState, logs, today, editing);
       if (!result.ok) { setFormError(result.error); return; }
       setBusy('submit');
       try {

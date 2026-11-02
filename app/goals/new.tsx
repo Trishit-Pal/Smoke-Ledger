@@ -73,7 +73,7 @@ export default function GoalNewScreen() {
   async function handleSubmit() {
     setError(null);
     if (isEdit && existingGoal) {
-      const result = buildGoalPatch(form, logs, today);
+      const result = buildGoalPatch(form, logs, today, existingGoal);
       if (!result.ok) { setError(result.error); return; }
       setBusy(true);
       try {
