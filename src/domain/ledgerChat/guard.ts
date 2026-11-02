@@ -3,11 +3,17 @@
 // result, or be a time or a short duration, or it is unverified.
 
 import type { ToolOutcome } from './tools';
+import { FIGURE_SOURCE, toAsciiDigits } from '@/lib/digits';
 
 export const NARRATION_MAX_CHARS = 800;
 
-/** A clock time, or a number with optional grouping (1,200 · 1,00,000 · 1 200) and decimals. */
-const NUMBER_TOKEN = /\d{1,2}:\d{2}|\d+(?:[,   ]\d{2,3})*(?:\.\d+)?/g;
+/**
+ * A clock time, or a figure in any script (the same pattern the discreet mask
+ * uses). Text is mapped to ASCII digits before scanning; a digit from a script
+ * that cannot be mapped stays non-ASCII, never parses, and is reported.
+ */
+const NUMBER_TOKEN_SOURCE = String.raw`\d{1,2}:\d{2}|` + FIGURE_SOURCE;
+const NUMBER_TOKEN = new RegExp(NUMBER_TOKEN_SOURCE, 'gu');
 /** What may follow a small integer for it to read as a time or a duration, not a figure. */
 const DURATION_CONTEXT =
   /^\s*(?::\d{2}|(?:am|pm|a\.m\.|p\.m\.|o'clock|days?|weeks?|months?|years?|hours?|hrs?|minutes?|mins?)\b)/i;
@@ -33,7 +39,7 @@ function harvest(set: Set<string>, value: unknown): void {
   if (typeof value === 'number') {
     if (Number.isFinite(value)) addNumber(set, value);
   } else if (typeof value === 'string') {
-    for (const m of value.match(NUMBER_TOKEN) ?? []) {
+    for (const m of toAsciiDigits(value).match(NUMBER_TOKEN) ?? []) {
       if (m.includes(':')) continue;
       const n = Number(normalizeToken(m));
       if (Number.isFinite(n)) addNumber(set, n);
@@ -70,17 +76,20 @@ function isDurationLike(norm: string, rest: string): boolean {
 /** Digit-runs in `text` that are neither tool figures nor times or durations. */
 export function findUnverifiedNumbers(text: string, allowed: ReadonlySet<string>): string[] {
   const out: string[] = [];
-  const re = new RegExp(NUMBER_TOKEN.source, 'g');
+  // Mapping to ASCII is one character for one, so positions in `ascii` are
+  // positions in `text`: the reader's own digits are what gets reported.
+  const ascii = toAsciiDigits(text);
+  const re = new RegExp(NUMBER_TOKEN_SOURCE, 'gu');
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const raw = m[0];
-    if (raw.includes(':')) continue;
-    const norm = normalizeToken(raw);
+  while ((m = re.exec(ascii)) !== null) {
+    const token = m[0];
+    if (token.includes(':')) continue;
+    const norm = normalizeToken(token);
     // A decimal passes only if it is itself a tool figure or one of its 1- or
     // 2-place roundings (both in the allowed set); never because it rounds to one.
     if (allowed.has(norm)) continue;
-    if (isDurationLike(norm, text.slice(m.index + raw.length))) continue;
-    out.push(raw);
+    if (isDurationLike(norm, ascii.slice(m.index + token.length))) continue;
+    out.push(text.slice(m.index, m.index + token.length));
   }
   return out;
 }

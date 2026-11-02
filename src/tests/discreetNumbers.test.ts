@@ -14,6 +14,11 @@ describe('maskNumbers', () => {
     expect(maskNumbers(text, false)).toBe(text);
   });
 
+  it("masks figures written in any script's digits", () => {
+    expect(maskNumbers('इस हफ़्ते ८ सिगरेट, ₹१,२०० खर्च।', true)).toBe('इस हफ़्ते ••• सिगरेट, ₹••• खर्च।');
+    expect(maskNumbers('Thai ๘', true)).toBe('Thai •••');
+  });
+
   it('passes through empty and null-ish text', () => {
     expect(maskNumbers('', true)).toBe('');
   });

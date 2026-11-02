@@ -1,4 +1,5 @@
 import type { UserProfile } from '@/types';
+import { FIGURE_SOURCE } from '@/lib/digits';
 
 /** Home dashboard totals hidden (explicit toggle or full discreet mode). */
 export function isHomeTotalsHidden(profile: UserProfile | null | undefined): boolean {
@@ -31,8 +32,11 @@ export function maskNotes(notes: string | null | undefined, discreet: boolean): 
   return discreet ? 'Hidden in discreet mode' : notes;
 }
 
-/** Figures inside prose (grouped, decimal, or plain) become '•••'; words and currency marks stay. */
-const PROSE_NUMBER = /\d+(?:[,   ]\d{2,3})*(?:\.\d+)?/g;
+/**
+ * Figures inside prose (grouped, decimal, or plain, in any script's digits)
+ * become '•••'; words and currency marks stay. Same pattern the narration guard checks.
+ */
+const PROSE_NUMBER = new RegExp(FIGURE_SOURCE, 'gu');
 
 export function maskNumbers(text: string, discreet: boolean): string {
   if (!discreet || !text) return text;
