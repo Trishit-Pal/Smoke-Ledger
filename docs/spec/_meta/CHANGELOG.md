@@ -7,7 +7,7 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 ## 2026-11-02 — 9d24456
 - architecture: the session store reconciles goals on boot and refresh in the reader's zone and holds `pendingGoalMoments` / `goalsReconcileFailed`; web reconciles through `useGoalReconcile` on Home and /goals; `getTrendsPageData` loads active goals; goal engine in `src/domain`, `src/services` in the layout; `goals` table row updated.
 - identity-profile: the goal step's fourth card "Suggest one later" (default while no goal type is chosen, hidden once a goal exists, Continue skips, done page wording).
-- celebrations: GoalMoment now also fires on automatic completion ("Quit day." / "Tapered."), once, from reconcile's applied list.
+- celebrations: only the GoalMoment passage was updated (it now also fires on automatic completion, "Quit day." / "Tapered.", once, from reconcile's applied list). The rest of the section was not re-verified (login page, AccountDeletedNotice, MilestoneCelebration, OnboardingDoneClient and the non-goal parts of Home changed since 1a40fb0), so it stays at 1a40fb0, status drifting, and needs a full re-verify.
 - security-privacy: export carries `completedAt` per goal; chat reader-context lists goal state words; grant note for `goals_stamp_completed_at`. Re-verified and re-stamped.
 - infra-ops: `goals.spec.ts` joins the authenticated e2e suite note. Re-verified and re-stamped.
 

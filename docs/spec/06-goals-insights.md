@@ -289,9 +289,12 @@ its original baseline and its step history.
 each kind: a headline ("Next: 4 a day?"), a basis ("Fourteen days under 5."), and
 a short value label for the row. Callers must pass `currentCap` (the cap in force
 today) for a next step, or the basis cannot name it. Under discreet mode
-(`isDiscreetMode(profile)`) any proposal that carries money uses masked wording
-("Next: a little lower?", "Amounts are hidden in discreet mode.", value label
-"—"), and the accept button reads "Use the suggestion" instead of echoing a masked
+(`isDiscreetMode(profile)`) any proposal that carries money uses masked wording,
+with the value label "—" in every kind: a start reads "Start a little under your
+recent spend?" with the basis "Amounts are hidden in discreet mode."; a next step
+reads "Next: a little lower?" with "Fourteen days under your current cap."; a
+re-anchor reads "Re-anchor to where you are now?" with only the day count ("Over
+on N of the last 7 days."). The accept button reads "Use the suggestion" instead of echoing a masked
 value. Stick counts are not masked here; only spend amounts are. The create form's
 prefilled target input is the one place the amount can show, because the existing
 form never masked what the reader types.
@@ -385,7 +388,7 @@ no-op that returns the current row.
 - **The goals page** (web `/goals`, mobile goals tab) lists every goal in
   Active, Paused and Completed & abandoned groups. Each active card carries its
   state caption, its ring or bar in the state colour, any next-step or re-anchor
-  proposal (Accept / Edit / Not now), and Pause, Resume, Mark complete and Delete.
+  proposal (Accept / Edit / Not now), and Pause, Mark complete and Delete; a paused card offers Resume instead of Pause.
 - **Trends** draws the cap as a dashed line over "Daily sticks"
   (`pickCapGoal`, `withCapLine`, `src/domain/capLine.ts`, re-exported for web in
   `web/lib/goals/capLine.ts`). The goal is the first active `daily_cap` or
