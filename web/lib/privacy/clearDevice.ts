@@ -1,7 +1,7 @@
 // Web half of the lifecycle registry (src/lib/privacy/lifecycle.ts): one clearer per web store id,
 // run together for an event. Never throws; the ids that failed come back for the caller to log.
 
-import { runLifecycleClearers, type Clearer, type LifecycleEvent } from '@/lib/privacy/lifecycle';
+import { reportFailedClears, runLifecycleClearers, type Clearer, type LifecycleEvent } from '@/lib/privacy/lifecycle';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
 import { clearFirstSuggestionDismissals } from '@web/lib/goals/firstSuggestionStore';
 import { setRememberMePreference } from '@web/lib/auth/rememberMe';
@@ -51,5 +51,7 @@ export async function clearWebDevice(
   event: LifecycleEvent,
   store: Storage | null = defaultStorage(),
 ): Promise<string[]> {
-  return runLifecycleClearers('web', event, webClearers(store));
+  const failed = await runLifecycleClearers('web', event, webClearers(store));
+  await reportFailedClears('web', event, failed);
+  return failed;
 }

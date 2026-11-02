@@ -98,3 +98,22 @@ export async function runLifecycleClearers(
   );
   return ids.filter((_, i) => results[i].status === 'rejected');
 }
+
+/** Logs which stores failed to clear (ids only, no personal data). Never throws. */
+export async function reportFailedClears(
+  platform: LifecyclePlatform,
+  event: LifecycleEvent,
+  failed: readonly string[],
+): Promise<void> {
+  if (failed.length === 0) return;
+  try {
+    // Loaded on demand: the logger pulls in the Supabase client.
+    const { logClientError } = await import('@/lib/logger');
+    await logClientError(new Error(`device clear failed: ${failed.join(',')}`), {
+      category: 'client.lifecycle',
+      route: `${platform}:${event}`,
+    });
+  } catch {
+    // Reporting is best-effort.
+  }
+}

@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_event, session) => {
+    } = sb.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session) {
         void maybeSyncDefaultBrandCatalog().catch(() => {});
@@ -41,7 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // every way a session ends: sign-out, expiry, deletion, reset-password.
         reset();
         invalidateAnalyticsConsentCache();
-        void clearWebDevice('signOut');
+        // Only an explicit SIGNED_OUT clears device stores: INITIAL_SESSION also arrives with
+        // a null session on a cold or offline start, and wiping the auth cookies then would
+        // sign the reader out for good.
+        if (event === 'SIGNED_OUT') void clearWebDevice('signOut');
       }
     });
     return () => subscription.unsubscribe();

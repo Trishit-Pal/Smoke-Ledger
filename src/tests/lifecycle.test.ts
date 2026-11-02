@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   STORES,
+  reportFailedClears,
   runLifecycleClearers,
   storesToClear,
   type LifecycleEvent,
@@ -111,6 +112,12 @@ describe('runLifecycleClearers', () => {
   });
 });
 
+describe('reportFailedClears', () => {
+  it('does nothing when every clear succeeded', async () => {
+    await expect(reportFailedClears('web', 'signOut', [])).resolves.toBeUndefined();
+  });
+});
+
 describe('edge rate-limit keys', () => {
   it.each(['audit-record', 'delete-account'])('%s never keys a counter by a raw user id', (fn) => {
     const src = read('supabase', 'functions', fn, 'index.ts');
@@ -123,8 +130,13 @@ describe('mobile wiring', () => {
   const settings = read('app', '(tabs)', 'settings.tsx');
   const layout = read('app', '_layout.tsx');
 
-  it('clears the device on every sign-out through the auth listener', () => {
-    expect(layout).toMatch(/SIGNED_OUT[\s\S]{0,200}clearNativeDevice\('signOut'\)/);
+  it('clears the device only on an explicit SIGNED_OUT, never on a null INITIAL_SESSION', () => {
+    expect(layout).toMatch(/if \(event === 'SIGNED_OUT'\) void clearNativeDevice\('signOut'\)/);
+    const authProvider = read('web', 'components', 'providers', 'AuthProvider.tsx');
+    expect(authProvider).toMatch(/if \(event === 'SIGNED_OUT'\) void clearWebDevice\('signOut'\)/);
+    // The only call sites sit behind that guard.
+    expect(layout.match(/clearNativeDevice\('signOut'\)/g)).toHaveLength(1);
+    expect(authProvider.match(/clearWebDevice\('signOut'\)/g)).toHaveLength(1);
   });
 
   it('erase and delete run the registry clearers instead of ad-hoc wipes', () => {

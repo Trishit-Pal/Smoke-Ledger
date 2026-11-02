@@ -2,7 +2,7 @@
 // store id, run together for an event. Never throws; the ids that failed come back to log.
 // Native modules load on demand so the id list stays importable from tests.
 
-import { runLifecycleClearers, type Clearer, type LifecycleEvent } from '@/lib/privacy/lifecycle';
+import { reportFailedClears, runLifecycleClearers, type Clearer, type LifecycleEvent } from '@/lib/privacy/lifecycle';
 import { SESSION_STORAGE_KEY, deleteKeyFromAllStores, wipeSecureStore } from '@/lib/secureStore';
 import { clearFirstSuggestionDismissals } from '@/lib/goals/firstSuggestionStore';
 
@@ -47,6 +47,8 @@ const nativeClearers: Record<string, Clearer> = {
 /** Ids this module can clear; a test pins them to the registry. */
 export const NATIVE_CLEARER_IDS: readonly string[] = Object.keys(nativeClearers);
 
-export function clearNativeDevice(event: LifecycleEvent): Promise<string[]> {
-  return runLifecycleClearers('mobile', event, nativeClearers);
+export async function clearNativeDevice(event: LifecycleEvent): Promise<string[]> {
+  const failed = await runLifecycleClearers('mobile', event, nativeClearers);
+  await reportFailedClears('mobile', event, failed);
+  return failed;
 }
