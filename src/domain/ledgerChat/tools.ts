@@ -95,7 +95,7 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'totals_in_window',
     description:
-      'Sticks, spend, and days with entries between two dates (inclusive, YYYY-MM-DD, at most a year). Use for any question about a specific date range.',
+      'Sticks, spend, and days with entries between two dates (inclusive, YYYY-MM-DD, at most a year). Use for any question about a specific date range. A range partly outside the ledger is cut to it (clamped: true); a range wholly outside it returns unavailable.',
     strict: true,
     input_schema: schema(
       { startYmd: { type: 'string' }, endYmd: { type: 'string' } },
@@ -227,9 +227,19 @@ function comparePeriods(input: z.infer<typeof comparePeriodsInput>, ctx: ToolCon
 }
 
 function totalsInWindow(input: z.infer<typeof totalsInWindowInput>, ctx: ToolContext): ToolOutcome {
+  if (input.startYmd > input.endYmd) return { ok: false, error: 'start date is after end date' };
+  // A range the ledger does not cover at all has no answer; clamping it would
+  // collapse it onto one boundary day and report that day's totals instead.
+  if (input.endYmd < ctx.summarySinceYmd || input.startYmd > ctx.today) {
+    return {
+      ok: true,
+      data: { unavailable: 'outside_ledger_range', ledgerSinceYmd: ctx.summarySinceYmd, today: ctx.today },
+      rows: [],
+    };
+  }
   const startYmd = clampYmd(input.startYmd, ctx.summarySinceYmd, ctx.today);
   const endYmd = clampYmd(input.endYmd, ctx.summarySinceYmd, ctx.today);
-  if (startYmd > endYmd) return { ok: false, error: 'start date is after end date' };
+  const clamped = startYmd !== input.startYmd || endYmd !== input.endYmd;
   let sticks = 0;
   let spendInr = 0;
   let daysWithEntries = 0;
@@ -242,7 +252,7 @@ function totalsInWindow(input: z.infer<typeof totalsInWindowInput>, ctx: ToolCon
   spendInr = round2(spendInr);
   return {
     ok: true,
-    data: { startYmd, endYmd, sticks, spendInr, daysWithEntries },
+    data: { startYmd, endYmd, clamped, sticks, spendInr, daysWithEntries },
     rows: [
       row('totals.sticks', `Sticks, ${startYmd} to ${endYmd}`, sticks, 'sticks'),
       // Every label names its window: addRow drops rows equal in label + value, so
