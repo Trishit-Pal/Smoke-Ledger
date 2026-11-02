@@ -11,6 +11,7 @@ jest.mock('@/db/repositories/goals', () => ({}));
 jest.mock('@/db/repositories/profile', () => ({}));
 jest.mock('@/lib/catalogSync', () => ({ maybeSyncDefaultBrandCatalog: jest.fn() }));
 jest.mock('@/lib/catalogStorageNative', () => ({ makeNativeCatalogStorage: jest.fn() }));
+jest.mock('@/services/analytics', () => ({ track: jest.fn() }));
 
 import * as logsRepo from '@/db/repositories/logs';
 import { useSession, ledgerToday, ledgerDaysAgo } from '@/store/session';

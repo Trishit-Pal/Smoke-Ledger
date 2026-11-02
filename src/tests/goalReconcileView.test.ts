@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { planGoalTransitions } from '@/domain/goalTransitions';
 import type { Goal } from '@/types';
-import { reconcileKey, renderedGoals } from '../lib/goals/reconcileView';
+import { reconcileKey, renderedGoals } from '@/domain/goalReconcileView';
 
 const TODAY = '2026-11-02';
 const mkGoal = (o: Partial<Goal> = {}): Goal => ({

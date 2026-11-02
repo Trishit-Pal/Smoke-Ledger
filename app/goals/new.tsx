@@ -16,8 +16,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { useSession, ledgerToday } from '@/store/session';
 import {
   GOAL_TYPE_META,
+  creatableGoalTypes,
   emptyGoalForm,
   goalToFormState,
+  proposalToForm,
   buildGoalPayload,
   buildGoalPatch,
   blockingSameTypeGoal,
@@ -25,7 +27,28 @@ import {
   deriveReductionBaseline,
   type GoalFormState,
 } from '@/domain/goalForm';
+import { describeProposal, proposeStart } from '@/domain/goalProposals';
+import type { SpendPeriod } from '@/domain/goalMeta';
+import {
+  isFromProposal,
+  offersStartProposal,
+  parseTypeParam,
+  periodUnitLabel,
+  proposalButtonLabel,
+} from '@/domain/goalFormView';
+import { formatMoney } from '@/lib/format';
+import { formatIndianDate } from '@/lib/date';
+import { isDiscreetMode } from '@/lib/discreet';
+import { localeForCountry } from '@/lib/regions';
 import type { Goal } from '@/types';
+
+const PILL_MIN_HEIGHT = 44;
+const PERIOD_OPTIONS: readonly { value: SpendPeriod; label: string }[] = [
+  { value: 'day', label: 'Per day' },
+  { value: 'week', label: 'Per week' },
+  { value: 'month', label: 'Per month' },
+];
+const NO_PROPOSAL_LINE = 'Not enough days logged to suggest one yet — enter a number.';
 
 /** Clamp a typed hour string into the valid 0–23 range (mirrors the web min/max). */
 function clampHour(v: string): number {
@@ -38,10 +61,15 @@ export default function GoalNewScreen() {
   const router = useRouter();
   const theme = useTheme();
   const today = ledgerToday();
-  const { goalId } = useLocalSearchParams<{ goalId?: string }>();
+  const { goalId, type: typeParam, target: targetParam } = useLocalSearchParams<{
+    goalId?: string;
+    type?: string;
+    target?: string;
+  }>();
 
   const goals = useSession((s) => s.goals);
   const logs = useSession((s) => s.logs);
+  const profile = useSession((s) => s.profile);
   const addGoal = useSession((s) => s.addGoal);
   const updateGoal = useSession((s) => s.updateGoal);
 
@@ -52,19 +80,58 @@ export default function GoalNewScreen() {
 
   const isEdit = existingGoal !== null;
 
-  const [form, setForm] = useState<GoalFormState>(() =>
-    existingGoal ? goalToFormState(existingGoal) : emptyGoalForm(),
-  );
+  const [form, setForm] = useState<GoalFormState>(() => {
+    if (!existingGoal) return emptyGoalForm(parseTypeParam(typeParam ?? null) ?? undefined);
+    const base = goalToFormState(existingGoal);
+    // "Edit" on a card proposal arrives with the proposed target.
+    return targetParam ? { ...base, target: targetParam } : base;
+  });
+  // The form as seeded by "Use" (null until then) and whether the reader took "Choose my own".
+  const [seeded, setSeeded] = useState<GoalFormState | null>(null);
+  const [choseOwn, setChoseOwn] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function patch(updates: Partial<GoalFormState>) {
     setForm((prev) => ({ ...prev, ...updates }));
+    // A new type or period means a new proposal: offer it afresh.
+    if (updates.type !== undefined || updates.period !== undefined) {
+      setSeeded(null);
+      setChoseOwn(false);
+    }
+    setError(null);
+  }
+
+  function takeProposal(updates: Partial<GoalFormState>) {
+    const next = { ...form, ...updates };
+    setForm(next);
+    setSeeded(next);
     setError(null);
   }
 
   const meta = GOAL_TYPE_META.find((m) => m.type === form.type)!;
+  const currency = profile?.currency ?? 'INR';
+  const isSpend = form.type === 'spend_cap_daily';
+  const targetUnit = isSpend ? periodUnitLabel(currency, form.period) : meta.targetUnit;
+  const hideMoney = isSpend && isDiscreetMode(profile);
+  const proposal = useMemo(
+    () =>
+      isEdit || !offersStartProposal(form.type)
+        ? null
+        : proposeStart(form.type, logs, today, { currency, period: form.period }),
+    [isEdit, form.type, form.period, logs, today, currency],
+  );
+  const copy = proposal
+    ? describeProposal(proposal, {
+        formatMoney: (n) => formatMoney(n, currency, { locale: localeForCountry(profile?.country) }),
+        formatDate: formatIndianDate,
+        hideMoney,
+      })
+    : null;
+  const offered = !isEdit && seeded === null && !choseOwn && proposal && copy ? { proposal, copy } : null;
+  const showInputs = isEdit || !offered;
+  const showNoProposal = !isEdit && offersStartProposal(form.type) && proposal === null;
   const derivedBaseline = deriveReductionBaseline(logs, today);
   const baselineHint = derivedBaseline > 0
     ? `Your 30-day avg is ${derivedBaseline} sticks/day — leave blank to use this.`
@@ -96,7 +163,7 @@ export default function GoalNewScreen() {
       if (!result.ok) { setError(result.error); return; }
       setBusy(true);
       try {
-        await addGoal(result.payload);
+        await addGoal(result.payload, { fromProposal: isFromProposal(form, seeded) });
         router.back();
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Could not create goal.');
@@ -108,7 +175,8 @@ export default function GoalNewScreen() {
 
   const pillStyle = (active: boolean) => ({
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    minHeight: PILL_MIN_HEIGHT,
+    justifyContent: 'center' as const,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: active ? theme.accent : theme.border,
@@ -147,10 +215,13 @@ export default function GoalNewScreen() {
                 Type
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                {GOAL_TYPE_META.map((m) => (
+                {creatableGoalTypes().map((m) => (
                   <Pressable
                     key={m.type}
-                    onPress={() => patch({ type: m.type, target: '', baseline: '', quitDate: '' })}
+                    onPress={() => {
+                      if (m.type === form.type) return;
+                      patch({ type: m.type, target: '', baseline: '', quitDate: '', finalTarget: '', period: 'day' });
+                    }}
                     style={pillStyle(form.type === m.type)}
                     accessibilityRole="button"
                     accessibilityState={{ selected: form.type === m.type }}
@@ -167,10 +238,70 @@ export default function GoalNewScreen() {
             </View>
           ) : null}
 
+          {/* Spend period: chosen on create, fixed afterwards */}
+          {isSpend && !isEdit ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {PERIOD_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.value}
+                  onPress={() => {
+                    if (o.value !== form.period) patch({ period: o.value, target: '' });
+                  }}
+                  style={pillStyle(form.period === o.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: form.period === o.value }}
+                  accessibilityLabel={o.label}
+                  disabled={busy}
+                >
+                  <Text variant="small" style={pillTextStyle(form.period === o.value)}>{o.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          {isSpend && isEdit ? (
+            <Text variant="small" muted>
+              {PERIOD_OPTIONS.find((o) => o.value === form.period)?.label}, fixed when the goal was created.
+            </Text>
+          ) : null}
+
+          {/* Ledger-derived starting value, offered before the inputs */}
+          {offered ? (
+            <View style={{ gap: spacing.sm }}>
+              <Text variant="caption" muted style={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                Your last 14 days
+              </Text>
+              <Text variant="bodyStrong">{offered.copy.headline}</Text>
+              <Text variant="small" muted>{offered.copy.basis}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                <Pressable
+                  onPress={() => takeProposal(proposalToForm(offered.proposal))}
+                  style={pillStyle(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={proposalButtonLabel(offered.copy.valueLabel, hideMoney)}
+                  disabled={busy}
+                >
+                  <Text variant="small" style={pillTextStyle(true)}>
+                    {proposalButtonLabel(offered.copy.valueLabel, hideMoney)}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setChoseOwn(true)}
+                  style={pillStyle(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose my own"
+                  disabled={busy}
+                >
+                  <Text variant="small" style={pillTextStyle(false)}>Choose my own</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+          {showNoProposal ? <Text variant="small" muted>{NO_PROPOSAL_LINE}</Text> : null}
+
           {/* Numeric target */}
-          {(form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') ? (
+          {showInputs && (form.type === 'daily_cap' || form.type === 'weekly_target' || form.type === 'spend_cap_daily') ? (
             <Input
-              label={`Target (${meta.targetUnit})`}
+              label={`Target (${targetUnit})`}
               keyboardType="decimal-pad"
               value={form.target}
               onChangeText={(v) => patch({ target: v })}
@@ -179,8 +310,31 @@ export default function GoalNewScreen() {
             />
           ) : null}
 
+          {/* Taper: starting cap and where it ends */}
+          {showInputs && form.type === 'taper' ? (
+            <>
+              <Input
+                label="Starting cap (sticks/day)"
+                keyboardType="decimal-pad"
+                value={form.target}
+                onChangeText={(v) => patch({ target: v })}
+                editable={!busy}
+                placeholder="e.g. 8"
+              />
+              <Input
+                label="Final target (sticks/day)"
+                keyboardType="decimal-pad"
+                value={form.finalTarget}
+                onChangeText={(v) => patch({ finalTarget: v })}
+                editable={!busy}
+                placeholder="e.g. 2"
+              />
+              <Text variant="small" muted>Steps down every 14 days, each one offered first.</Text>
+            </>
+          ) : null}
+
           {/* Reduction target */}
-          {form.type === 'reduction_target' ? (
+          {showInputs && form.type === 'reduction_target' ? (
             <>
               <Input
                 label={`Target (${meta.targetUnit})`}
@@ -203,7 +357,7 @@ export default function GoalNewScreen() {
           ) : null}
 
           {/* No-smoke window */}
-          {form.type === 'no_smoke_window' ? (
+          {showInputs && form.type === 'no_smoke_window' ? (
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <View style={{ flex: 1 }}>
                 <Input
@@ -229,7 +383,7 @@ export default function GoalNewScreen() {
           ) : null}
 
           {/* Quit date */}
-          {form.type === 'quit_date' ? (
+          {showInputs && form.type === 'quit_date' ? (
             <>
               <Input
                 label="Quit date (YYYY-MM-DD)"
@@ -254,7 +408,7 @@ export default function GoalNewScreen() {
 
           {/* Error */}
           {error ? (
-            <Text variant="small" style={{ color: theme.danger }}>{error}</Text>
+            <Text variant="small" accessibilityRole="alert" style={{ color: theme.warnEarth }}>{error}</Text>
           ) : null}
 
           {/* Actions */}
@@ -264,6 +418,7 @@ export default function GoalNewScreen() {
                 title={isEdit ? 'Save' : 'Create goal'}
                 onPress={handleSubmit}
                 loading={busy}
+                disabled={offered !== null}
               />
             </View>
             <View style={{ flex: 1 }}>
