@@ -83,24 +83,26 @@ describe('AskLedgerLauncher and its mount points', () => {
 });
 
 describe('Settings integration', () => {
-  test('has the off switch and clears the device transcript on sign-out, erase, delete, and entering discreet mode', () => {
+  test('has the off switch, and clears the device transcript on discreet-on and through the lifecycle registry on sign-out, erase and delete', () => {
     expect(settings).toContain("setSetting('consent.ledgerChatOptIn'");
-    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    // Discreet-on and consent-off keep their direct call; the other events go through the registry.
+    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     const discreet = settings.indexOf('await updateProfile({ discreetMode: value })');
     const discreetClear = settings.indexOf('clearTranscript()', discreet);
     expect(discreet).toBeGreaterThan(-1);
     expect(discreetClear - discreet).toBeLessThan(300);
     // Erase and delete both promise that everything goes; the device transcript is part of everything.
     const erase = settings.indexOf('await eraseAllUserData()');
-    const eraseClear = settings.indexOf('clearTranscript()', erase);
+    const eraseClear = settings.indexOf("clearWebDevice('erase')", erase);
     const del = settings.indexOf('await deleteUserAccount(');
-    const delClear = settings.indexOf('clearTranscript()', del);
+    const delClear = settings.indexOf("clearWebDevice('delete')", del);
     expect(erase).toBeGreaterThan(-1);
     expect(eraseClear).toBeGreaterThan(erase);
-    expect(eraseClear - erase).toBeLessThan(200);
+    expect(eraseClear - erase).toBeLessThan(400);
     expect(del).toBeGreaterThan(-1);
     expect(delClear).toBeGreaterThan(del);
     expect(delClear - del).toBeLessThan(700);
+    expect(settings.match(/clearWebDevice\('signOut'\)/g)?.length ?? 0).toBe(2);
   });
 
   test('turning the switch on shows the same notice as the panel before saving', () => {
@@ -109,7 +111,7 @@ describe('Settings integration', () => {
   });
 
   test('any sign-out event clears the device transcript, including session expiry and deletion', () => {
-    expect(authProvider).toContain("from '@web/components/chat/transcriptStore'");
-    expect(authProvider).toContain('clearTranscript()');
+    expect(authProvider).toContain("from '@web/lib/privacy/clearDevice'");
+    expect(authProvider).toContain("clearWebDevice('signOut')");
   });
 });

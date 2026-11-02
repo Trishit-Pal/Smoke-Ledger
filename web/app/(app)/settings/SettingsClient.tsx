@@ -53,12 +53,12 @@ import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
-import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
+import { clearWebDevice } from '@web/lib/privacy/clearDevice';
 import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
 import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
@@ -596,8 +596,9 @@ export function SettingsClient({
         dispatchFarewell();
         await new Promise((r) => setTimeout(r, 1600));
       }
-      clearTranscript();
+      // Sign out first: it revokes the session using the auth cookies the cleanup then expires.
       await getSupabase().auth.signOut();
+      await clearWebDevice('signOut');
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
     } finally {
@@ -613,8 +614,9 @@ export function SettingsClient({
     setBusy('return-home');
     setError(null);
     try {
-      clearTranscript();
+      // Sign out first: it revokes the session using the auth cookies the cleanup then expires.
       await getSupabase().auth.signOut();
+      await clearWebDevice('signOut');
       router.replace('/');
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
@@ -687,8 +689,11 @@ export function SettingsClient({
     setError(null);
     setCountryError(null);
     try {
-      if (reset) await resetLedgerForRegion(country);
-      else await setRegion(country);
+      if (reset) {
+        await resetLedgerForRegion(country);
+        // The reset empties the brand list; drop the per-user cached copy too.
+        await revalidateBrands();
+      } else await setRegion(country);
       setConfirmRegionReset(false);
       flashToast(reset ? 'Ledger reset for the new country.' : 'Country saved.');
       await revalidateAppViews();
@@ -710,9 +715,9 @@ export function SettingsClient({
     setError(null);
     try {
       await eraseAllUserData();
-      // "Everything" includes the on-device chat transcript.
-      clearTranscript();
-      await wipeSecureStore();
+      // "Everything" includes the on-device chat transcript, first-suggestion stamp,
+      // lock state and the cached brand list (the lifecycle registry's erase row).
+      await clearWebDevice('erase');
       router.replace('/onboarding/privacy');
     } catch (e) {
       setError(describeError(e, 'dependency_failure'));
@@ -733,6 +738,9 @@ export function SettingsClient({
     // keeps the dialog open so there is no flash before navigation lands.
     let isReauthRedirect = false;
     try {
+      // The brand cache is tagged by the signed-in user, so flush it while the session still
+      // exists; after the account is gone the server action can no longer tell whose it is.
+      await revalidateBrands();
       await deleteUserAccount({
         onReauthRequired: resume
           ? undefined
@@ -746,8 +754,7 @@ export function SettingsClient({
       // Best-effort local cleanup; the account is already gone server-side, so
       // never block the homepage redirect on it.
       try {
-        clearTranscript();
-        await wipeSecureStore();
+        await clearWebDevice('delete');
       } catch {
         // Ignore — deletion already succeeded; the redirect must still happen.
       }

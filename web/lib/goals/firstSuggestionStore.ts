@@ -2,7 +2,11 @@
 // per user, the date it was dismissed. Same storage-injection pattern as the chat transcript store.
 // Key and snooze rule are shared with mobile: src/lib/goals/firstSuggestionDismissal.ts.
 
-import { firstSuggestionKey, isDismissalStampActive } from '@/lib/goals/firstSuggestionDismissal';
+import {
+  FIRST_SUGGESTION_KEY_PREFIX,
+  firstSuggestionKey,
+  isDismissalStampActive,
+} from '@/lib/goals/firstSuggestionDismissal';
 
 function defaultStorage(): Storage | null {
   try {
@@ -34,5 +38,20 @@ export function dismissFirstSuggestion(
     store?.setItem(firstSuggestionKey(userId), today);
   } catch {
     // Quota or private mode: the suggestion simply returns on the next visit.
+  }
+}
+
+/** Sign-out, erase and delete: every user's dismissal stamp on this device. Never throws. */
+export function clearFirstSuggestionDismissals(store: Storage | null = defaultStorage()): void {
+  if (!store) return;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (k && k.startsWith(FIRST_SUGGESTION_KEY_PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => store.removeItem(k));
+  } catch {
+    // Storage blocked: nothing more can be done from here.
   }
 }

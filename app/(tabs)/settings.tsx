@@ -29,9 +29,8 @@ import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/reposi
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
-import { wipeSecureStore } from '@/lib/secureStore';
 import { getSupabase } from '@/lib/supabase';
-import { cancelAll } from '@/services/notifications';
+import { EXPORT_FILE_PREFIX, clearNativeDevice, deleteExportFile } from '@/lib/privacy/clearDeviceNative';
 import {
   invalidateAnalyticsConsentCache,
   primeAnalyticsConsentCache,
@@ -647,14 +646,19 @@ export default function Settings() {
     try {
       const payload = await exportAccountData();
       const json = JSON.stringify(payload, null, 2);
-      const path = `${FileSystem.cacheDirectory}smoke-ledger-export-${new Date().toISOString().slice(0, 10)}.json`;
+      const path = `${FileSystem.cacheDirectory}${EXPORT_FILE_PREFIX}${new Date().toISOString().slice(0, 10)}.json`;
       await FileSystem.writeAsStringAsync(path, json, { encoding: FileSystem.EncodingType.UTF8 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(path, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export Smoke Ledger data',
-        });
+        try {
+          await Sharing.shareAsync(path, {
+            mimeType: 'application/json',
+            dialogTitle: 'Export Smoke Ledger data',
+          });
+        } finally {
+          // The copy has been handed to the share target; do not leave the full export in the cache.
+          await deleteExportFile(path).catch(() => {});
+        }
       } else {
         Alert.alert(
           'Export ready',
@@ -843,7 +847,7 @@ export default function Settings() {
               });
               // Best-effort local cleanup; never block the redirect on it.
               try {
-                await wipeSecureStore();
+                await clearNativeDevice('delete');
               } catch {
                 // Ignore — deletion already succeeded.
               }
@@ -892,9 +896,9 @@ export default function Settings() {
             setBusy('erase-all');
             setError(null);
             try {
-              await cancelAll();
               await eraseAllUserData();
-              await wipeSecureStore();
+              // Notifications, export file, lock state and first-suggestion stamp (registry's erase row).
+              await clearNativeDevice('erase');
               await boot();
               router.replace('/onboarding/welcome');
             } catch (e) {

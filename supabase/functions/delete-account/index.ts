@@ -131,7 +131,7 @@ serve(async (req) => {
     // their own quota from many IPs.
     const userRate = await checkRateLimit({
       kind: 'delete-account',
-      key: `user:${userId}`,
+      key: `user:${await hashWithPepper(userId, pepper)}`,
       max: RATE_LIMIT_MAX,
       windowSec: RATE_LIMIT_WINDOW_SEC,
     });

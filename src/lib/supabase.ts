@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+import { SESSION_STORAGE_KEY } from '@/lib/secureStore';
 
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl as string | undefined;
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined;
@@ -18,7 +19,7 @@ if (
   );
 }
 
-const storeKey = 'sl.supabase.auth';
+const storeKey = SESSION_STORAGE_KEY;
 
 const storageAdapter = Platform.OS === 'web'
   ? {

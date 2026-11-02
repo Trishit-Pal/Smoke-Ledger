@@ -72,14 +72,17 @@ serve(async (req) => {
       return json({ error: 'unauthorized', request_id: requestId }, 401, origin);
     }
 
+    // The counter key is hashed like the delete-account IP key, so rate_limit_counters never
+    // holds a raw user id.
+    const pepper = Deno.env.get('AUDIT_PEPPER') ?? '';
     const { ok: allowed } = await checkRateLimit({
       kind: 'audit-record',
-      key: `user:${user.id}`,
+      key: `user:${await hashWithPepper(user.id, pepper)}`,
       max: RATE_LIMIT_MAX,
       windowSec: RATE_LIMIT_WINDOW_SEC,
     });
     if (!allowed) {
-      const userIdHash = await hashWithPepper(user.id, Deno.env.get('AUDIT_PEPPER') ?? '');
+      const userIdHash = await hashWithPepper(user.id, pepper);
       log.warn('rate_limit_exceeded', {
         user_id_hash: userIdHash,
         request_id: requestId,
