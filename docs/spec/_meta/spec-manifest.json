@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "fbd177e",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {
@@ -30,7 +30,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "e1a652d",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {
@@ -49,7 +49,7 @@
         "src/lib/emailOtpType.ts",
         "src/lib/onboardingSteps.ts"
       ],
-      "last_verified_commit": "e1a652d",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {
@@ -72,7 +72,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "e1a652d",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {
@@ -84,7 +84,7 @@
         "src/db/repositories/brands.ts",
         "app/(tabs)/log.tsx"
       ],
-      "last_verified_commit": "e1a652d",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {
@@ -132,7 +132,7 @@
         "src/domain/ledgerChat/**",
         "docs/security/**"
       ],
-      "last_verified_commit": "e1a652d",
+      "last_verified_commit": "b9ac848",
       "status": "current"
     },
     {

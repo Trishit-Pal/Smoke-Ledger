@@ -4,6 +4,9 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-02 — b9ac848
+- architecture, data-model, auth, identity-profile, logging, security-privacy: re-stamped after merging main (Ask the ledger, PR #103) into the onboarding re-entry branch; the security-privacy invariants now run 1–12 (the re-auth invariant is 12, the chat invariants keep 9–11). Settings gained the chat consent switch beside the analytics one (documented under security-privacy); no behaviour the other sections describe changed. celebrations stays drifting: its files come from the chat branch and were not re-verified.
+
 ## 2026-11-02 — e1a652d
 - data-model, security-privacy: `marketing_consent_at` cleared (per-user audit) and locked by CHECK; ADR `docs/architecture/marketing-consent.md`.
 - identity-profile: goal step abandons every stray onboarding goal after save; usage saves the country before advancing; consent retries never re-audit.

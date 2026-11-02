@@ -11,7 +11,7 @@ sources:
   - web/lib/server/ledgerChat/**
   - src/domain/ledgerChat/**
   - docs/security/**
-last_verified_commit: e1a652d
+last_verified_commit: b9ac848
 status: current
 ---
 

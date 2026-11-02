@@ -36,7 +36,7 @@ sources:
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
   - web/lib/auth/postAuthDestination.ts
   - src/lib/onboardingSteps.ts
-last_verified_commit: e1a652d
+last_verified_commit: b9ac848
 status: current
 ---
 

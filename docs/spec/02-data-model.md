@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: e1a652d
+last_verified_commit: b9ac848
 status: current
 ---
 
