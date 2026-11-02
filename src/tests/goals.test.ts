@@ -173,4 +173,84 @@ describe('evaluateGoal', () => {
     expect(eur.explanation).not.toContain('₹');
     expect(evaluateGoal(goal, [], '2025-04-18').label).toContain('₹');
   });
+
+  describe('spend periods and taper', () => {
+    const spendLog = (date: string, price: number) => ({
+      id: `s-${date}`,
+      tsUtc: `${date}T10:00:00.000Z`,
+      localDate: date,
+      localHour: 10,
+      brandId: null,
+      brandNameSnap: null,
+      variantSnap: null,
+      quantity: 1,
+      purchaseMode: 'single' as const,
+      packSize: null,
+      totalPriceInr: price,
+      unitPriceInr: price,
+      priceSource: 'exact' as const,
+      triggerTag: null,
+      moodBefore: null,
+      moodAfter: null,
+      craving: null,
+      contextTag: null,
+      notes: null,
+      createdAt: '',
+      updatedAt: '',
+    });
+    // 2025-04-18 is a Friday: week starts Mon 2025-04-14, month starts 2025-04-01.
+    const logs = [
+      spendLog('2025-03-31', 1000),
+      spendLog('2025-04-01', 100),
+      spendLog('2025-04-13', 200),
+      spendLog('2025-04-14', 10),
+      spendLog('2025-04-17', 20),
+      spendLog('2025-04-18', 30),
+    ];
+    const inr = (n: number) => formatMoney(n, 'INR');
+
+    it('weekly spend sums Monday..today only', () => {
+      const g = baseGoal({ type: 'spend_cap_daily', targetValue: 500, meta: { period: 'week' } });
+      const p = evaluateGoal(g, logs, '2025-04-18');
+      expect(p.valueCurrent).toBe(60);
+      expect(p.label).toBe(`Weekly spend cap: ${inr(500)}`);
+      expect(p.explanation).toBe(`You have spent ${inr(60)} of ${inr(500)} this week.`);
+    });
+
+    it('monthly spend sums 1st..today', () => {
+      const g = baseGoal({ type: 'spend_cap_daily', targetValue: 500, meta: { period: 'month' } });
+      const p = evaluateGoal(g, logs, '2025-04-18');
+      expect(p.valueCurrent).toBe(360);
+      expect(p.label).toBe(`Monthly spend cap: ${inr(500)}`);
+      expect(p.explanation).toBe(`You have spent ${inr(360)} of ${inr(500)} this month.`);
+    });
+
+    it('a spend goal without a period is still daily', () => {
+      const g = baseGoal({ type: 'spend_cap_daily', targetValue: 50 });
+      const p = evaluateGoal(g, logs, '2025-04-18');
+      expect(p.valueCurrent).toBe(30);
+      expect(p.label).toBe(`Daily spend cap: ${inr(50)}`);
+      expect(p.explanation).toBe(`You have spent ${inr(30)} of ${inr(50)} today.`);
+    });
+
+    it('taper labels the step cap and final target', () => {
+      const g = baseGoal({ type: 'taper', targetValue: 8, meta: { finalTarget: 3 } });
+      const p = evaluateGoal(g, [], '2025-04-18');
+      expect(p.label).toBe('Taper: 8/day → 3');
+      expect(p.explanation).toBe('Step 1: 0 of 8 today.');
+      expect(p.valueTarget).toBe(8);
+      expect(p.unit).toBe('sticks');
+    });
+
+    it('taper omits the arrow without a final target and counts steps', () => {
+      const steps = [
+        { cap: 10, from: '2025-04-01', reason: 'start' as const },
+        { cap: 8, from: '2025-04-10', reason: 'next' as const },
+      ];
+      const g = baseGoal({ type: 'taper', targetValue: 8, meta: { steps } });
+      const p = evaluateGoal(g, [], '2025-04-18');
+      expect(p.label).toBe('Taper: 8/day');
+      expect(p.explanation).toBe('Step 2: 0 of 8 today.');
+    });
+  });
 });
