@@ -35,6 +35,7 @@ import { track } from '@/services/analytics';
 import { recordAuditEvent } from '@/services/audit';
 import type { UserProfile } from '@/types';
 import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
+import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
@@ -111,14 +112,11 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
   React.useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void getSupabase()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (cancelled) return;
-        const id = data.session?.user.id ?? null;
-        setUserId(id);
-        setTurns(id ? loadTranscript(id) : []);
-      });
+    void sessionUserId(() => getSupabase().auth.getSession()).then((id) => {
+      if (cancelled) return;
+      setUserId(id);
+      setTurns(id ? loadTranscript(id) : []);
+    });
     return () => {
       cancelled = true;
     };

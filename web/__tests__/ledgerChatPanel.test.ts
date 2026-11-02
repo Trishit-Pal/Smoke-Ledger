@@ -14,6 +14,12 @@ const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
+  test('reads the signed-in user through sessionUserId, never an unguarded getSession chain', () => {
+    expect(panel).toContain('sessionUserId(');
+    expect(panel).not.toMatch(/getSession\(\)\s*\.then\(/);
+    expect(panel).not.toMatch(/auth\.getSession\(\)\s*\.then\(/);
+  });
+
   test('renders figures through MetricRow and masks at the render site with the shared helpers', () => {
     expect(panel).toMatch(/import \{[^}]*MetricRow[^}]*\} from '@web\/components\/visual'/);
     expect(panel).toContain('isHomeTotalsHidden(');
