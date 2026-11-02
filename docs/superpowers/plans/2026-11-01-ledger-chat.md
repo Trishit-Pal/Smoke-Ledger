@@ -289,9 +289,9 @@ Manual checks: dark and light themes AA on the panel (tokens only); keyboard: Ta
 
 | Phase | Status |
 |---|---|
-| 0 Branch and groundwork | pending |
-| 1 Domain tools, starters, guards | pending |
-| 2 Route, auth, turn engine, middleware | pending |
-| 3 Panel, launcher, consent, settings, e2e | pending |
-| 4 Legal, spec, docs | pending |
-| 5 Review gates, operator actions, PR | pending |
+| 0 Branch and groundwork | done (32c3ae0) |
+| 1 Domain tools, starters, guards | done (ec3fa7f) |
+| 2 Route, auth, turn engine, middleware | done (914038a); live probe 2.5 pending a key |
+| 3 Panel, launcher, consent, settings, e2e | done (6082336); e2e spec runs only with .env.e2e |
+| 4 Legal, spec, docs | done (020192b, 3086f28) |
+| 5 Review gates, operator actions, PR | in progress |

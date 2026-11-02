@@ -90,8 +90,9 @@ export interface AuditEventPropsMap {
   app_lock_disabled: Record<string, never>;
   reminder_enabled: { kind: string };
   reminder_disabled: { kind: string };
-  // Consent to send ledger figures to the AI processor (Ask the ledger).
-  ledger_chat_consent_toggled: { enabled: boolean };
+  // Consent to send ledger figures to the AI processor (Ask the ledger), with
+  // the privacy-policy version the notice was based on.
+  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string };
 }
 
 function isPrimitive(value: unknown): value is string | number | boolean | null {

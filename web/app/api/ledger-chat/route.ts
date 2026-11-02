@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildToolContext } from '@/domain/ledgerChat/context';
 import { chatRequestSchema, type ChatErrorCode, type ChatResponse } from '@/domain/ledgerChat/types';
+import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 import { checkRateLimits } from '@web/lib/auth/rateLimit';
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
 
     const profile = await loadProfile(db, userId);
     if (!profile) return fail('unauthorized', 401);
+    // The middleware carve-out skipped the age, consent and onboarded gates for
+    // this route; re-apply them here, before any ledger data is loaded or sent.
+    if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return fail('forbidden', 403);
     const zone = timezoneForCountry(profile.country);
     const today = todayInZone(zone);
     // Floor the summary at onboarding, exactly as the dashboard does.

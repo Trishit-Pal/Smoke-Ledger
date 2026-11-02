@@ -11,6 +11,7 @@ const launcher = readFileSync(join(chat, 'AskLedgerLauncher.tsx'), 'utf8');
 const dashboard = readFileSync(join(__dirname, '..', 'app', '(app)', 'dashboard', 'DashboardClient.tsx'), 'utf8');
 const trends = readFileSync(join(__dirname, '..', 'app', '(app)', 'trends', 'TrendsClient.tsx'), 'utf8');
 const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'SettingsClient.tsx'), 'utf8');
+const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
   test('renders figures through MetricRow and masks at the render site', () => {
@@ -45,6 +46,12 @@ describe('AskLedgerPanel', () => {
     expect(panel).toContain("from '@web/components/chat/transcriptStore'");
     expect(panel).toContain('auth.getSession()');
   });
+
+  test('the consent card uses the shared notice, links the policy, and records the notice version', () => {
+    expect(panel).toContain("from '@web/components/chat/notice'");
+    expect(panel).toContain('href="/privacy"');
+    expect(panel).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: true,\s*privacyVersion: LEGAL_VERSIONS\.privacy/);
+  });
 });
 
 describe('AskLedgerLauncher and its mount points', () => {
@@ -66,8 +73,29 @@ describe('AskLedgerLauncher and its mount points', () => {
 });
 
 describe('Settings integration', () => {
-  test('has the off switch and clears the device transcript on sign-out', () => {
+  test('has the off switch and clears the device transcript on sign-out, erase, and delete', () => {
     expect(settings).toContain("setSetting('consent.ledgerChatOptIn'");
-    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    // Erase and delete both promise that everything goes; the device transcript is part of everything.
+    const erase = settings.indexOf('await eraseAllUserData()');
+    const eraseClear = settings.indexOf('clearTranscript()', erase);
+    const del = settings.indexOf('await deleteUserAccount(');
+    const delClear = settings.indexOf('clearTranscript()', del);
+    expect(erase).toBeGreaterThan(-1);
+    expect(eraseClear).toBeGreaterThan(erase);
+    expect(eraseClear - erase).toBeLessThan(200);
+    expect(del).toBeGreaterThan(-1);
+    expect(delClear).toBeGreaterThan(del);
+    expect(delClear - del).toBeLessThan(700);
+  });
+
+  test('turning the switch on shows the same notice as the panel before saving', () => {
+    expect(settings).toContain("from '@web/components/chat/notice'");
+    expect(settings).toMatch(/<ConfirmDialog[\s\S]*confirmLabel="Turn on"/);
+  });
+
+  test('any sign-out event clears the device transcript, including session expiry and deletion', () => {
+    expect(authProvider).toContain("from '@web/components/chat/transcriptStore'");
+    expect(authProvider).toContain('clearTranscript()');
   });
 });

@@ -29,6 +29,7 @@ import {
 } from '@/domain/ledgerChat/types';
 import { isHomeTotalsHidden } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
+import { LEGAL_VERSIONS } from '@/lib/legal';
 import { localeForCountry } from '@/lib/regions';
 import { track } from '@/services/analytics';
 import { recordAuditEvent } from '@/services/audit';
@@ -37,6 +38,7 @@ import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
+import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
 import {
   loadTranscript,
   saveTranscript,
@@ -58,17 +60,14 @@ interface Pending {
 }
 
 const COPY = {
-  description: "Answers are written by an AI model from your ledger's own figures. Kept only on this device.",
+  description:
+    "Answers are written by an AI model from your ledger's own figures. Your conversation is kept only on this device.",
   empty: 'Log a few days first; then ask how your week compares.',
   loading: 'Reading the ledger…',
   rateLimited: "You've reached today's limit. The ledger is still here tomorrow.",
   disabled: 'Ask the ledger is resting for now.',
   error: "The ledger couldn't be read just now. The charts behind this panel still can.",
   footnote: 'Not medical advice. A daily limit applies.',
-  consentLead: 'Answers come from an AI model run by Anthropic in the United States.',
-  consentBody:
-    'Your question and the figures needed to answer it are sent; when a question needs them, so are your recent entries, including notes and brand names. Nothing is stored on our servers, and this stays off until you turn it on.',
-  consentAfter: 'You can turn it off again in Settings › Privacy.',
 } as const;
 
 const LINK_BUTTON =
@@ -181,7 +180,10 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
       return;
     }
     try {
-      await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', { enabled: true });
+      await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+        enabled: true,
+        privacyVersion: LEGAL_VERSIONS.privacy,
+      });
     } catch {
       // Consent is already saved. The audit row is best-effort here: the edge
       // allowlist may lag a deploy, and that must never block the answer.
@@ -295,13 +297,26 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               {status === 'consent' ? (
                 <section className="rule-hair-strong flex flex-col gap-sm pt-md">
                   <SectionLabel spacing="none">Before the first answer</SectionLabel>
-                  <p className="text-body text-text">{COPY.consentLead}</p>
-                  <p className="max-w-[48ch] text-small text-text-muted">{COPY.consentBody}</p>
+                  <p className="text-body text-text">{LEDGER_CHAT_NOTICE.lead}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.sent}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.discreet}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.retention}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">
+                    {LEDGER_CHAT_NOTICE.device}{' '}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline decoration-1 underline-offset-4 text-text hover:text-text-muted"
+                      style={{ textDecorationColor: 'var(--rule-strong)' }}
+                    >
+                      Privacy policy
+                    </a>
+                  </p>
                   <div className="flex flex-wrap gap-md pt-xs">
                     <Button title="Turn on and ask" onPress={() => void onTurnOnAndAsk()} />
                     <Button title="Not now" variant="ghost" onPress={onNotNow} />
                   </div>
-                  <p className="text-caption italic text-text-faint">{COPY.consentAfter}</p>
                 </section>
               ) : null}
               {status === 'rate_limited' ? <p className="text-small text-text-muted">{COPY.rateLimited}</p> : null}

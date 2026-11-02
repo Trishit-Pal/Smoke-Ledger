@@ -57,7 +57,9 @@ import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
+import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
+import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
@@ -254,6 +256,7 @@ export function SettingsClient({
   // Ask the ledger consent: a settings key, like analytics; re-synced from the
   // server prop after router.refresh() so another tab's change shows here.
   const [ledgerChatOptIn, setLedgerChatOptIn] = React.useState(initialLedgerChatOptIn);
+  const [confirmLedgerChat, setConfirmLedgerChat] = React.useState(false);
   React.useEffect(() => {
     setLedgerChatOptIn(initialLedgerChatOptIn);
   }, [initialLedgerChatOptIn]);
@@ -418,7 +421,7 @@ export function SettingsClient({
     }
   };
 
-  const onToggleLedgerChat = async (value: boolean) => {
+  const saveLedgerChat = async (value: boolean) => {
     setBusy('toggle-ledger-chat');
     setError(null);
     try {
@@ -426,7 +429,10 @@ export function SettingsClient({
       if (!value) clearTranscript();
       setLedgerChatOptIn(value);
       try {
-        await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', { enabled: value });
+        await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+          enabled: value,
+          privacyVersion: LEGAL_VERSIONS.privacy,
+        });
       } catch {
         // The consent itself is saved; the audit row is best-effort here.
       }
@@ -434,7 +440,18 @@ export function SettingsClient({
       setError(describeError(e));
     } finally {
       setBusy(null);
+      setConfirmLedgerChat(false);
     }
+  };
+
+  // Turning it on from here must show the same notice the panel shows, so the
+  // consent rests on the same words wherever it is given. Turning it off is direct.
+  const onToggleLedgerChat = (value: boolean) => {
+    if (value) {
+      setConfirmLedgerChat(true);
+      return;
+    }
+    void saveLedgerChat(false);
   };
 
   const onExportJson = async () => {
@@ -686,6 +703,8 @@ export function SettingsClient({
     setError(null);
     try {
       await eraseAllUserData();
+      // "Everything" includes the on-device chat transcript.
+      clearTranscript();
       await wipeSecureStore();
       router.replace('/onboarding/privacy');
     } catch (e) {
@@ -712,6 +731,7 @@ export function SettingsClient({
       // Best-effort local cleanup; the account is already gone server-side, so
       // never block the homepage redirect on it.
       try {
+        clearTranscript();
         await wipeSecureStore();
       } catch {
         // Ignore — deletion already succeeded; the redirect must still happen.
@@ -1090,17 +1110,29 @@ export function SettingsClient({
             />
             <PrefRow
               label="Ask the ledger"
-              sublabel="Sends your ledger's figures, and on request recent entries, to Anthropic's AI model to answer your questions. Off by default; turning it off clears the conversation on this device."
+              sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
               control={
                 <EditorialSwitch
                   checked={ledgerChatOptIn}
-                  onChange={(value) => void onToggleLedgerChat(value)}
+                  onChange={onToggleLedgerChat}
                   disabled={busy != null}
                   ariaLabel="Ask the ledger"
                 />
               }
             />
           </dl>
+          <ConfirmDialog
+            open={confirmLedgerChat}
+            title="Turn on Ask the ledger"
+            description={LEDGER_CHAT_NOTICE_TEXT}
+            confirmLabel="Turn on"
+            cancelLabel="Not now"
+            loading={busy === 'toggle-ledger-chat'}
+            onConfirm={() => void saveLedgerChat(true)}
+            onOpenChange={(open) => {
+              if (!open) setConfirmLedgerChat(false);
+            }}
+          />
         </section>
 
         {/* ─────────────── Brand catalog ─────────────── */}

@@ -19,6 +19,11 @@ export type ChatCallerResult =
 
 const BEARER = /^Bearer\s+(\S+)$/i;
 
+/** Same rule as the middleware's email-confirmation gate, which this route bypasses. */
+function isConfirmed(user: { email?: string; email_confirmed_at?: string; phone_confirmed_at?: string }): boolean {
+  return !user.email || Boolean(user.email_confirmed_at) || Boolean(user.phone_confirmed_at);
+}
+
 export async function resolveChatCaller(request: Request): Promise<ChatCallerResult> {
   const authorization = request.headers.get('authorization');
   const bearer = authorization ? BEARER.exec(authorization) : null;
@@ -32,13 +37,13 @@ export async function resolveChatCaller(request: Request): Promise<ChatCallerRes
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data, error } = await db.auth.getUser(bearer[1]);
-    if (error || !data.user) return { ok: false, status: 401, error: 'unauthorized' };
+    if (error || !data.user || !isConfirmed(data.user)) return { ok: false, status: 401, error: 'unauthorized' };
     return { ok: true, caller: { userId: data.user.id, db } };
   }
 
   if (!requireSameOrigin(request)) return { ok: false, status: 403, error: 'forbidden' };
   const db = await createClient();
   const { data, error } = await db.auth.getUser();
-  if (error || !data.user) return { ok: false, status: 401, error: 'unauthorized' };
+  if (error || !data.user || !isConfirmed(data.user)) return { ok: false, status: 401, error: 'unauthorized' };
   return { ok: true, caller: { userId: data.user.id, db } };
 }

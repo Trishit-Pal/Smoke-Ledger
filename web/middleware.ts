@@ -94,8 +94,9 @@ export async function middleware(request: NextRequest) {
   // The chat route does its own auth: a cookie session plus same-origin, or a
   // native Bearer token with no cookie at all. Every gate below would redirect
   // that native request to /login before the route ran, so it leaves here with
-  // only the security headers. No other API path is carved out.
-  if (pathname.startsWith('/api/ledger-chat')) {
+  // only the security headers. Exact match: no other path is carved out, and
+  // the route re-applies the confirmed-email, consent and onboarded gates itself.
+  if (pathname === '/api/ledger-chat') {
     return response;
   }
 

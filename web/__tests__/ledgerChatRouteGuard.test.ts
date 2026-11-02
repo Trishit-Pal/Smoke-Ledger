@@ -29,6 +29,14 @@ describe('ledger-chat route guards', () => {
     expect(loads).toBeGreaterThan(limits);
   });
 
+  test('re-checks the onboarding consents the middleware carve-out skipped, before loading the ledger', () => {
+    const profile = route.indexOf('loadProfile(');
+    const consents = route.indexOf('hasRequiredConsents(');
+    const logs = route.indexOf('loadLogsPage(');
+    expect(consents).toBeGreaterThan(profile);
+    expect(consents).toBeLessThan(logs);
+  });
+
   test('never calls the cookie-path getServer* loaders (they redirect)', () => {
     expect(route).not.toMatch(/getServer[A-Z]\w*\(/);
   });

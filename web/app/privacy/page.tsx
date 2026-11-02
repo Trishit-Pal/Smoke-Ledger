@@ -20,6 +20,7 @@ const sections = [
       'Account data: email address, authentication metadata, and account lifecycle events.',
       'Product data: cigarette logs, trigger and mood selections, goals, reminders, onboarding preferences, and profile settings.',
       'Operational data: security and audit events, sanitized error diagnostics, and abuse-prevention telemetry.',
+      'Questions you type into Ask the ledger, if you turn that feature on. We pass them to the AI processor described below and do not store them.',
     ],
   },
   {
@@ -35,6 +36,7 @@ const sections = [
       'To provide account access, sync your data across devices, generate trends and progress views, and process your deletion/export requests.',
       'To secure the service through rate limits, abuse checks, and incident response logs.',
       'To improve product reliability using redacted diagnostics and optional first-party analytics signals (opt-in).',
+      'To answer your questions about your own ledger through an AI model, only if you turn Ask the ledger on (opt-in).',
     ],
   },
   {
@@ -51,7 +53,7 @@ const sections = [
     body: [
       'Core infrastructure providers process data strictly to host and secure the service. Supabase is the primary auth/database processor, Vercel hosts the web app, Cloudflare Turnstile checks sign-in forms for automated abuse when enabled, and an SMS provider delivers one-time codes if you choose phone sign-in.',
       'Our database is hosted in the United States (Supabase, AWS us-east-2), so your data is processed outside India and the European Economic Area. We rely on our processors’ data processing agreements and standard contractual safeguards for those transfers.',
-      'Ask the ledger is an optional feature, off by default, that answers questions about your own ledger using an AI model operated by Anthropic, PBC in the United States. If you turn it on, each question you ask and the figures needed to answer it (totals, trends, time-of-day and weekday patterns, mood and trigger counts, goal progress, and the app’s rules-based insights) are sent to Anthropic, and when a question needs them, so are your recent entries from the last 30 days, including times, quantities, triggers, moods, cravings, brand names, and your own notes. In discreet mode, brand names are replaced with aliases and notes are not sent. Anthropic does not use this data to train its models and deletes it after a limited retention period, currently up to 30 days, unless it must be kept longer for safety or legal reasons. We do not store your questions, the replies, or any conversation on our servers; the conversation is kept only on your device until you sign out or turn the feature off in Settings.',
+      'Ask the ledger is an optional feature, off by default, that answers questions about your own ledger using an AI model operated by Anthropic, PBC in the United States. If you turn it on, each question you ask and the figures needed to answer it are sent to Anthropic: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger counts, goal progress and targets, your daily baseline, the app’s rules-based insights, and your country-level currency and time zone. When a question needs them, so are your recent entries from the last 30 days: dates, times, quantities, triggers, moods, cravings, the situation you tagged, brand names, and your own notes. In discreet mode, brand names are replaced with aliases and notes are not sent; a brand name you type into a question is sent as typed. Anthropic does not use this data to train its models and deletes it after a limited retention period, currently up to 30 days, unless it must be kept longer for safety or legal reasons. We do not store your questions, the replies, or any conversation on our servers; the conversation is kept only on the device you used until you sign out, erase your data, delete your account, or turn the feature off in Settings.',
       'We do not share raw product logs with advertisers or data brokers.',
       `Support requests are handled by our team at ${LEGAL_COPY.supportEmail}.`,
     ],
