@@ -10,6 +10,8 @@ export interface HeatmapProps {
   height?: number;
   /** Formats a cell count (titles + aria-label), e.g. discreet masking. Default: String. */
   formatCount?: (n: number) => string;
+  /** Initial container width in px (before the first measurement). Default 0. */
+  initialWidth?: number;
 }
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -50,9 +52,10 @@ function heatmapSummary(grid: number[][], max: number, formatCount: (n: number) 
   return 'Smoking activity heatmap.';
 }
 
-export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount = String }: HeatmapProps) {
+export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount, initialWidth = 0 }: HeatmapProps) {
+  const fmt = formatCount ?? String;
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = React.useState(0);
+  const [width, setWidth] = React.useState(initialWidth);
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -91,7 +94,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount = St
     // drawWidth > width) adds its own height below the SVG instead of clipping it.
     <div ref={containerRef} className="w-full overflow-x-auto overflow-y-hidden" style={{ minHeight: height }}>
       {width > 0 ? (
-        <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max, formatCount)}>
+        <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max, fmt)}>
           {DAY_LABELS.map((label, row) => (
             <text
               key={`day-${row}`}
@@ -119,7 +122,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount = St
                   fill={count > 0 ? 'var(--chart-series-1)' : 'var(--chart-grid)'}
                   fillOpacity={count > 0 ? opacity : 0.5}
                 >
-                  <title>{`${formatCount(count)} log${count === 1 ? '' : 's'} — ${DAY_LABELS[r]} ${c}:00`}</title>
+                  <title>{`${fmt(count)} log${formatCount || count !== 1 ? 's' : ''} — ${DAY_LABELS[r]} ${c}:00`}</title>
                 </rect>
               );
             }),

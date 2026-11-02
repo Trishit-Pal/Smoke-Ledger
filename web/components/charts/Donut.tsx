@@ -25,6 +25,23 @@ export interface DonutProps {
   formatLabel?: (label: string, index: number) => string;
 }
 
+/** Recharts tooltip formatter for the donut. Reads the slice index stamped on each
+ *  datum (`sliceIndex`) so duplicate labels get their own alias; when a label
+ *  formatter is given but the index is missing, it fails closed (never the raw name). */
+export function donutTooltipFormatter(
+  formatValue?: (v: number) => string,
+  formatLabel?: (label: string, index: number) => string,
+) {
+  return (value: unknown, name: unknown, item?: { payload?: { sliceIndex?: number } }): [string, string] => {
+    const label = String(name);
+    const index = item?.payload?.sliceIndex;
+    return [
+      formatValue ? formatValue(Number(value)) : String(value),
+      formatLabel ? formatLabel(label, typeof index === 'number' ? index : -1) : label,
+    ];
+  };
+}
+
 export function Donut({
   slices,
   size = 140,
@@ -45,7 +62,7 @@ export function Donut({
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={safeSlices}
+            data={safeSlices.map((s, sliceIndex) => ({ ...s, sliceIndex }))}
             dataKey="value"
             nameKey="label"
             innerRadius={inner / 2}
@@ -62,13 +79,7 @@ export function Donut({
           </Pie>
           <Tooltip
             contentStyle={chartTooltipStyle}
-            formatter={(value, name) => {
-              const i = safeSlices.findIndex((s) => s.label === name);
-              return [
-                formatValue ? formatValue(Number(value)) : value,
-                formatLabel && i >= 0 ? formatLabel(String(name), i) : name,
-              ];
-            }}
+            formatter={donutTooltipFormatter(formatValue, formatLabel)}
           />
         </PieChart>
       </ResponsiveContainer>
