@@ -36,6 +36,7 @@ import { createLogger } from '../_shared/log.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { corsHeaders, originAllowed } from '../_shared/cors.ts';
 import { hasRecentSignIn } from '../_shared/recentAuth.ts';
+import { redactText } from '../_shared/redact.ts';
 
 const log = createLogger('delete-account');
 
@@ -167,7 +168,7 @@ serve(async (req) => {
       await supabaseAdmin.from('error_events').insert({
         user_id: null,
         category: 'compliance.delete',
-        message: 'account_deleted',
+        message: redactText('account_deleted'),
         details_json: { request_id: requestId, hashed_user_id: hashedUserId },
       });
     } catch (auditErr) {
