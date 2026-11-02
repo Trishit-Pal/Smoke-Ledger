@@ -14,7 +14,7 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test e2e/auth-smoke.spec.ts e2e/security.spec.ts e2e/security-extra.spec.ts",
     "test:e2e:responsive": "playwright test e2e/responsive.spec.ts --workers=1 --retries=0",
-    "test:e2e:authed": "playwright test e2e/authenticated-flows.spec.ts e2e/onboarding.spec.ts e2e/dashboard-timeframe.spec.ts e2e/log-entry.spec.ts e2e/realtime-sync.spec.ts e2e/auth-session.spec.ts e2e/ledger-chat.spec.ts"
+    "test:e2e:authed": "playwright test e2e/authenticated-flows.spec.ts e2e/onboarding.spec.ts e2e/dashboard-timeframe.spec.ts e2e/log-entry.spec.ts e2e/realtime-sync.spec.ts e2e/auth-session.spec.ts e2e/ledger-chat.spec.ts e2e/goals.spec.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

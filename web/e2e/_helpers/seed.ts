@@ -122,6 +122,36 @@ export async function seedLogs(userId: string, specs: LogSpec[]): Promise<void> 
   if (error) throw new Error(`seed: insert logs failed: ${error.message}`);
 }
 
+export interface GoalSpec {
+  type: string;
+  targetValue: number;
+  /** YYYY-MM-DD. */
+  startDate: string;
+  endDate?: string;
+  meta?: Record<string, unknown>;
+  status?: 'active' | 'paused' | 'completed' | 'abandoned';
+}
+
+/** Insert one goal directly (service role). Returns its id. */
+export async function seedGoal(userId: string, spec: GoalSpec): Promise<string> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const id = `gol_${randomUUID().slice(0, 12)}`;
+  const { error } = await a.from('goals').insert({
+    id,
+    user_id: userId,
+    type: spec.type,
+    target_value: spec.targetValue,
+    start_date: spec.startDate,
+    end_date: spec.endDate ?? null,
+    status: spec.status ?? 'active',
+    meta_json: spec.meta ?? null,
+    created_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`seed: insert goal failed: ${error.message}`);
+  return id;
+}
+
 /** The IST calendar date `n` days ago as YYYY-MM-DD (matches the app's todayIst bucketing). */
 export function istYmdDaysAgo(n: number): string {
   const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
