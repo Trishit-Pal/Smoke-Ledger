@@ -24,12 +24,13 @@ import {
   loadDailySummary,
   loadGoals,
   loadLogsPage,
+  loadPriceEntries,
   loadProfile,
   toDailySummaryRow,
 } from '@web/lib/server/data';
 import { cleanEnvValue } from '@web/lib/supabase/env';
 
-// Two model calls plus four parallel reads fit well inside this; Hobby allows 300s.
+// Two model calls plus five parallel reads fit well inside this; Hobby allows 300s.
 export const maxDuration = 30;
 // Production Supabase is in AWS us-east-2 (Ohio); cle1 (Cleveland) is the Vercel
 // region next to it, so the tool queries stay in-region.
@@ -178,17 +179,21 @@ async function loadLedgerContext(db: SupabaseClient, userId: string, profile: Us
 
   // ponytail: one page of up to GOAL_WINDOW_LOG_LIMIT (2000) rows, like Home; the 90-day window
   // holds ~22 entries a day under that ceiling. recent_entries still hands the model only 200.
-  const [logsPage, summary, goals] = await Promise.all([
+  // One goals read serves both goal_status (active) and goal_history (all).
+  const [logsPage, summary, allGoals, prices] = await Promise.all([
     loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: GOAL_WINDOW_LOG_LIMIT }),
     loadDailySummary(db, { from: summarySinceYmd, to: today }),
-    loadGoals(db, userId, { activeOnly: true }),
+    loadGoals(db, userId, { activeOnly: false }),
+    loadPriceEntries(db, userId, { sinceYmd: yearAgo }),
   ]);
 
   return buildToolContext({
     profile,
     logs: logsPage.logs,
     rows: summary.map(toDailySummaryRow),
-    goals,
+    goals: allGoals.filter((g) => g.status === 'active'),
+    goalHistory: allGoals,
+    prices,
     today,
     summarySinceYmd,
   });

@@ -83,6 +83,8 @@ beforeEach(() => {
   mocks.consentValue.value = true;
   mocks.resolveChatCaller.mockResolvedValue({ ok: true, caller: { userId: 'u1', db: fakeDb() } });
   mocks.loadProfile.mockResolvedValue(current);
+  mocks.loadGoals.mockResolvedValue([]);
+  mocks.loadDailySummary.mockResolvedValue([]);
   mocks.runLedgerChatTurn.mockResolvedValue({
     answer: 'Fewer than last week.',
     rows: [],
@@ -123,6 +125,25 @@ describe('POST /api/ledger-chat consent currency', () => {
 
     expect(res.status).toBe(200);
     expect(mocks.runLedgerChatTurn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ledger loads', () => {
+  test('one goals read covers active goals and history; price notes come from the last 365 days', async () => {
+    const goal = { id: 'g', type: 'daily_cap', targetValue: 5, currentBaseline: null, startDate: '2026-01-01', endDate: null, meta: null, createdAt: '', completedAt: null };
+    mocks.loadGoals.mockResolvedValue([
+      { ...goal, id: 'a', status: 'active' },
+      { ...goal, id: 'p', status: 'paused' },
+    ]);
+
+    await POST(post());
+
+    expect(mocks.loadGoals).toHaveBeenCalledTimes(1);
+    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: false });
+    expect(mocks.loadPriceEntries).toHaveBeenCalledWith(expect.anything(), 'u1', { sinceYmd: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+    const ctx = mocks.runLedgerChatTurn.mock.calls[0][0].ctx;
+    expect(ctx.goals.map((g: { id: string }) => g.id)).toEqual(['a']);
+    expect(ctx.goalHistory.map((g: { id: string }) => g.id)).toEqual(['a', 'p']);
   });
 });
 

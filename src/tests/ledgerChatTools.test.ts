@@ -94,7 +94,7 @@ function okData(name: string, input: unknown, c: ToolContext = ctx()): Record<st
 
 describe('TOOL_DEFS', () => {
   it('every tool is strict with a closed object schema', () => {
-    expect(TOOL_DEFS.length).toBe(9);
+    expect(TOOL_DEFS.length).toBe(12);
     for (const t of TOOL_DEFS) {
       expect(t.strict).toBe(true);
       expect(t.input_schema.type).toBe('object');
@@ -335,5 +335,87 @@ describe('chatRequestSchema', () => {
       ],
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe('goal_history', () => {
+  const history: Goal[] = [
+    goals[0],
+    { ...goals[0], id: 'g2', type: 'spend_cap_daily', targetValue: 300, status: 'paused', startDate: '2026-03-01' },
+    {
+      ...goals[0],
+      id: 'g3',
+      targetValue: 8,
+      status: 'completed',
+      startDate: '2026-02-01',
+      endDate: '2026-02-28',
+      completedAt: '2026-02-28T20:00:00.000Z',
+    },
+    { ...goals[0], id: 'g4', targetValue: 12, status: 'abandoned', startDate: '2026-01-05', completedAt: '2026-01-20T05:00:00.000Z' },
+  ];
+
+  it('lists every goal, whatever its status, with type, target, dates and outcome, and no ids', () => {
+    const data = okData('goal_history', {}, ctx({ goalHistory: history })) as { goals: Record<string, unknown>[] };
+    expect(data.goals.map((g) => g.status)).toEqual(['active', 'paused', 'completed', 'abandoned']);
+    expect(data.goals[2]).toEqual({
+      type: goalTypeLabel('daily_cap'),
+      target: 8,
+      startDate: '2026-02-01',
+      endDate: '2026-02-28',
+      completedDate: '2026-03-01',
+      status: 'completed',
+    });
+    for (const g of data.goals) expect(g).not.toHaveProperty('id');
+  });
+
+  it('reports nothing when the reader has no goals', () => {
+    const data = okData('goal_history', {}, ctx({ goalHistory: [] })) as { goals: unknown[] };
+    expect(data.goals).toEqual([]);
+  });
+});
+
+describe('price_history', () => {
+  const prices = [
+    { brandName: 'Marlboro', unitPriceInr: 22, packSize: 10, observedAt: '2026-06-10T04:00:00.000Z' },
+    { brandName: 'Gold Flake', unitPriceInr: 18.5, packSize: 20, observedAt: '2026-05-01T04:00:00.000Z' },
+    { brandName: 'Marlboro', unitPriceInr: 20, packSize: null, observedAt: '2025-01-01T04:00:00.000Z' },
+  ];
+
+  it('returns brand, unit price, pack size and observed date for the last 365 days', () => {
+    const data = okData('price_history', {}, ctx({ prices })) as { entries: Record<string, unknown>[] };
+    expect(data.entries).toEqual([
+      { brand: 'Marlboro', unitPrice: 22, packSize: 10, observedDate: '2026-06-10' },
+      { brand: 'Gold Flake', unitPrice: 18.5, packSize: 20, observedDate: '2026-05-01' },
+    ]);
+  });
+
+  it('aliases brands in discreet mode with the same aliases the entries use', () => {
+    const c = ctx({ profile: { ...profile, discreetMode: true }, prices });
+    const data = okData('price_history', {}, c) as { entries: { brand: string }[] };
+    const entryBrands = (okData('recent_entries', { days: 30 }, c) as { entries: { brand: string }[] }).entries;
+    // logs: Gold Flake first, then Marlboro.
+    expect(entryBrands.map((e) => e.brand)).toEqual(['Brand A', 'Brand B', 'Brand A']);
+    expect(data.entries.map((e) => e.brand)).toEqual(['Brand B', 'Brand A']);
+    expect(JSON.stringify(c.prices)).not.toMatch(/Marlboro|Gold Flake/);
+  });
+});
+
+describe('entry_edits', () => {
+  it('lists entries edited more than a minute after they were made, with dates only', () => {
+    const edited = [
+      log({
+        localDate: '2026-06-20',
+        localHour: 21,
+        quantity: 4,
+        createdAt: '2026-06-20T15:30:00.000Z',
+        updatedAt: '2026-06-21T03:00:00.000Z',
+      }),
+      log({ localDate: '2026-06-19', createdAt: '2026-06-19T03:30:00.000Z', updatedAt: '2026-06-19T03:30:45.000Z' }),
+      log({ localDate: '2026-06-18', createdAt: '', updatedAt: '' }),
+    ];
+    const data = okData('entry_edits', {}, ctx({ logs: edited })) as { edits: Record<string, unknown>[]; count: number };
+    expect(data.count).toBe(1);
+    expect(data.edits).toEqual([{ entryDate: '2026-06-20', entryHour: 21, editedOn: '2026-06-21' }]);
+    expect(JSON.stringify(data)).not.toContain('"quantity"');
   });
 });

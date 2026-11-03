@@ -80,7 +80,12 @@ const TOOL_INPUTS: Record<ToolName, unknown> = {
   goal_status: {},
   insights: {},
   recent_entries: { days: 30 },
+  goal_history: {},
+  price_history: {},
+  entry_edits: {},
 };
+
+const prices = [{ brandName: 'Gold Flake', unitPriceInr: 18, packSize: 10, observedAt: '2026-06-01T04:00:00.000Z' }];
 
 function payloads(discreet: boolean): string[] {
   const ctx = buildToolContext({
@@ -88,6 +93,8 @@ function payloads(discreet: boolean): string[] {
     logs,
     rows: [{ date: TODAY, sticks: 2, spendInr: 40, avgUnitPriceInr: 20 }],
     goals,
+    goalHistory: [...goals, { ...goals[0], id: 'g0', status: 'completed', completedAt: '2026-05-01T00:00:00.000Z' }],
+    prices,
     today: TODAY,
     summarySinceYmd: '2026-01-01',
   });
