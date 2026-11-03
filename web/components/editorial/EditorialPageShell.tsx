@@ -77,7 +77,7 @@ export function EditorialPageShell({
        * The max(1rem, …) floor stops it bleeding off-screen on small laptops.
        */}
       <div
-        className="hidden md:block"
+        className="shell-companion hidden md:block"
         style={{
           position: 'absolute',
           // ≥76px clears the fixed ThemeToggle (top 16px + 44px hit + gutter),

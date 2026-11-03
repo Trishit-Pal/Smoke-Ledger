@@ -252,6 +252,12 @@
     display: none;
   }
 
+  /* Sign-up shows the setup progress line; the stick figure stays the returning
+     reader's greeting on sign-in. Keyed off the line itself, like the rule above. */
+  body:has([data-setup-progress]) .shell-companion {
+    display: none;
+  }
+
   /* Page column — the one reading measure for every authenticated page, so the
      ultrawide cap lives in one place. Only width + horizontal padding: pages
      keep their own vertical rhythm (pt-*, pb-*). */
@@ -518,10 +524,10 @@
   }
 
   /* ───────── Onboarding editorial motion (new in 0.2.0 redesign) ─────────
-     pillarRise — Welcome screen TiltCards land from a rotated, depth-pushed
+     pillarRise — landing TiltCards land from a rotated, depth-pushed
      start. Stagger via inline animation-delay on each card.
      chipPopIn — Brands "selected pile" pills settle in (no overshoot).
-     driftSlow — Welcome page №.01 watermark gentle parallax loop. */
+     driftSlow — landing №.01 watermark gentle parallax loop. */
   @keyframes pillarRise {
     from {
       opacity: 0;

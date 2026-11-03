@@ -4,8 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@web/components/layout/ThemeToggle';
-
-export type OnboardingStepKey = 'welcome' | 'privacy' | 'usage' | 'goal' | 'brands' | 'done';
+import { ONBOARDING_STEPS as STEPS, type OnboardingStepKey } from '@web/components/onboarding/steps';
 
 function pathnameToStep(pathname: string | null): OnboardingStepKey {
   if (!pathname) return 'welcome';
@@ -22,22 +21,6 @@ function pathnameToStep(pathname: string | null): OnboardingStepKey {
   if (pathname.startsWith('/onboarding/done')) return 'done';
   return 'welcome';
 }
-
-interface StepEntry {
-  key: OnboardingStepKey;
-  index: string;
-  label: string;
-  href: string | null;
-}
-
-const STEPS: StepEntry[] = [
-  { key: 'welcome', index: '00', label: 'Welcome', href: '/onboarding' },
-  { key: 'privacy', index: '01', label: 'Privacy', href: '/onboarding/privacy' },
-  { key: 'usage', index: '02', label: 'Baseline', href: '/onboarding/usage' },
-  { key: 'goal', index: '03', label: 'Goal', href: '/onboarding/goal' },
-  { key: 'brands', index: '04', label: 'Brands', href: '/onboarding/brands' },
-  { key: 'done', index: '05', label: 'Done', href: null },
-];
 
 /**
  * Below md the rail is hidden, so phones get this instead: a single hairline

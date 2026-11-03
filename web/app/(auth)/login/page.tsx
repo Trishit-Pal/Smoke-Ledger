@@ -70,6 +70,15 @@ const COUNTRY_SELECT_STYLE: React.CSSProperties = {
   flexShrink: 0,
 };
 
+const QUIET_LINK_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-display)',
+  fontStyle: 'italic',
+  fontSize: 13,
+  color: 'var(--text-muted)',
+  textDecoration: 'underline',
+  textUnderlineOffset: 4,
+};
+
 function PasswordSubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   const isInactive = pending || disabled;
@@ -385,15 +394,7 @@ function LoginPageInner() {
 
   return (
     <>
-      <EditorialMasthead
-        caption="Account · Sign in"
-        title={
-          <>
-            Welcome <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>back</span>.
-          </>
-        }
-        subtitle="Your ledger, where you left it."
-      />
+      <EditorialMasthead title="Welcome back." subtitle="Your ledger, where you left it." />
 
       <EditorialModeSwitch
         options={MODE_OPTIONS}
@@ -695,30 +696,12 @@ function LoginPageInner() {
           paddingTop: 4,
         }}
       >
-        <Link
-          href="/signup"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 13,
-            color: 'var(--accent-ink)',
-            textDecoration: 'underline',
-            textUnderlineOffset: 4,
-          }}
-        >
-          Create an account →
-        </Link>
-        <Link
-          href="/reset"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 13,
-            color: 'var(--text-muted)',
-            textDecoration: 'none',
-          }}
-        >
+        {/* A returning reader's link comes first; sign-up stays, quietly. */}
+        <Link href="/reset" style={QUIET_LINK_STYLE}>
           Forgot password?
+        </Link>
+        <Link href="/signup" style={QUIET_LINK_STYLE}>
+          Create an account
         </Link>
       </div>
 
@@ -731,7 +714,7 @@ function LoginPageInner() {
         <Link href={LEGAL_LINKS.privacy} style={{ color: 'var(--accent-ink)' }}>
           Privacy Policy
         </Link>
-        . Quiet entry, quiet exit.
+        .
       </EditorialClosingSignet>
     </>
   );

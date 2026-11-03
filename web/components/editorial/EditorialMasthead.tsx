@@ -17,7 +17,9 @@ import * as React from 'react';
  */
 
 export interface EditorialMastheadProps {
-  caption: string;
+  /** Small-caps label above the title. Omit when the page already names itself
+   *  (the auth pages carry a wordmark, sign-up a progress line). */
+  caption?: string;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   effectiveDate?: string;
@@ -63,7 +65,7 @@ export function EditorialMasthead({
         </div>
       ) : null}
 
-      <span className="editorial-caption">{caption}</span>
+      {caption ? <span className="editorial-caption">{caption}</span> : null}
       <h1
         className="editorial-headline"
         style={{

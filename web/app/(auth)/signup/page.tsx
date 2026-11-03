@@ -26,11 +26,43 @@ import {
 import { emailZodStrict, useDebouncedEmailValidity } from '@web/lib/auth/email';
 import { withTimeout, DEFAULT_AUTH_TIMEOUT_MS } from '@web/lib/auth/withTimeout';
 import { precheckSignupAction, precheckResendAction } from '../_actions/authPrechecks';
-// CHARACTER (1): mood dispatcher.
-import { dispatchMood } from '@web/lib/character/mood';
+import { ONBOARDING_STEPS } from '@web/components/onboarding/steps';
 
 const SERVICE_UNAVAILABLE_MESSAGE =
   'Service is temporarily unavailable. Please try again in a moment.';
+
+// Sign-up is the first step of setup: the account, then the onboarding rail's own steps.
+const SETUP_PROGRESS = ['Account', ...ONBOARDING_STEPS.filter((s) => s.key !== 'welcome').map((s) => s.label)];
+
+/** The journey at a glance; ink, not accent, because progress isn't a win (as on the rail). */
+function SetupProgress() {
+  // Each segment keeps its label's width, so on a phone the run simply wraps.
+  return (
+    <ol
+      data-setup-progress
+      aria-label="Setup steps"
+      className="m-0 flex list-none flex-wrap gap-x-md gap-y-md p-0"
+    >
+      {SETUP_PROGRESS.map((label, i) => {
+        const current = i === 0;
+        return (
+          <li
+            key={label}
+            aria-current={current ? 'step' : undefined}
+            className="editorial-caption-tight flex-none pt-sm"
+            style={{
+              borderTop: `1px solid ${current ? 'var(--text)' : 'var(--rule)'}`,
+              color: current ? 'var(--text)' : 'var(--text-faint)',
+              fontWeight: current ? 600 : 500,
+            }}
+          >
+            {label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 const schema = z
   .object({
@@ -109,8 +141,8 @@ function SignupEmailSuccess({ email }: { email: string }) {
 
   return (
     <>
+      <SetupProgress />
       <EditorialMasthead
-        caption="Account · Pending"
         title={
           <>
             Check your <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>inbox</span>.
@@ -234,9 +266,6 @@ export default function SignupPage() {
   const emailValue = watch('email');
   const dobValue = watch('dateOfBirth');
   const genderValue = watch('gender');
-  const passwordValue = watch('password');
-  const confirmValue = watch('confirmPassword');
-  const acknowledgedValue = watch('acknowledged');
   const emailValidity = useDebouncedEmailValidity(emailValue);
   // Only surface live errors that are high-signal (disposable domain). Format
   // typos wait for submit so we don't nag while the user is still typing.
@@ -245,45 +274,8 @@ export default function SignupPage() {
       ? emailValidity.message
       : null;
 
-  // CHARACTER (2): greet on mount — figure waves as the form appears.
-  React.useEffect(() => {
-    const t = window.setTimeout(
-      () => dispatchMood('greet', { durationMs: 2000 }),
-      500,
-    );
-    return () => window.clearTimeout(t);
-  }, []);
-
-  // CHARACTER (3): thumb when all fields look correctly filled. Encouragement
-  // before the user clicks submit — "ready when you are."
-  const formLooksComplete =
-    (fullNameValue?.trim().length ?? 0) > 0 &&
-    emailValue?.includes('@') &&
-    isAdult(dobValue ?? '') &&
-    !!genderValue &&
-    (passwordValue?.length ?? 0) >= 8 &&
-    confirmValue === passwordValue &&
-    acknowledgedValue === true;
-
-  React.useEffect(() => {
-    if (formLooksComplete) {
-      dispatchMood('thumb', {
-        caption: 'Ready when you are.',
-        durationMs: 5000,
-      });
-    }
-  }, [formLooksComplete]);
-
-  // CHARACTER (4): applaud on successful account creation.
-  React.useEffect(() => {
-    if (successEmail) {
-      dispatchMood('applaud', {
-        caption: 'Welcome aboard.',
-        celebrate: true,
-        durationMs: 3200,
-      });
-    }
-  }, [successEmail]);
+  // No stick-figure moods here: sign-up shows the setup progress line instead,
+  // which hides the figure (globals.css, `[data-setup-progress]`).
 
   const onSubmit = async (values: FormValues) => {
     setSubmitError(null);
@@ -411,14 +403,10 @@ export default function SignupPage() {
 
   return (
     <>
+      <SetupProgress />
       <EditorialMasthead
-        caption="Account · Begin"
-        title={
-          <>
-            Open the <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>book</span>.
-          </>
-        }
-        subtitle="A few details. Ninety seconds."
+        title="Create your account."
+        subtitle="We’ll email you a link to confirm it. Then four short steps set up your ledger."
       />
 
       <form
@@ -594,7 +582,7 @@ export default function SignupPage() {
             cursor: isSubmitting || !captchaReady ? 'not-allowed' : 'pointer',
           }}
         >
-          {isSubmitting ? 'Creating account…' : 'Begin the ledger →'}
+          {isSubmitting ? 'Creating account…' : 'Create account →'}
         </button>
         <button
           type="button"
@@ -608,7 +596,7 @@ export default function SignupPage() {
             cursor: otpSignupLoading || !captchaReady ? 'not-allowed' : 'pointer',
           }}
         >
-          {otpSignupLoading ? 'Sending link…' : 'Sign up with email link instead'}
+          {otpSignupLoading ? 'Sending link…' : 'Use an email link instead'}
         </button>
 
         {otpSignupError ? (
