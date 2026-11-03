@@ -136,7 +136,7 @@ describe('review follow-ups', () => {
   it('the re-auth warning is terracotta on both platforms, never the positive accent', () => {
     expect(mobileLogin).toMatch(/color=\{theme\.warnEarth\}[^>]*>\s*Confirm it’s you/);
     expect(webLogin).toContain('<InlineInfo tone="warn" message="Confirm it');
-    expect(webLogin).toContain("tone === 'warn' ? 'var(--warn-earth)'");
+    expect(webLogin).toContain("tone === 'warn' ? 'var(--warn-earth-ink)'");
   });
 
   it('goal clients use describeError and re-read the goal after a failed submit', () => {
