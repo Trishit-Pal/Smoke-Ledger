@@ -37,6 +37,32 @@ export function takeWaitingQuestion(draft: string, alreadyTaken: boolean): strin
   return alreadyTaken || !q ? null : q;
 }
 
+/**
+ * The "already sent" guard after an ask comes back. A consent_required refusal
+ * means the waiting question never went out, so it must be sendable again after
+ * the next opt-in; the guard only exists to stop a double tap.
+ */
+export function waitingTakenAfter(taken: boolean, failure: ChatFailure | null): boolean {
+  return failure === 'consent_required' ? false : taken;
+}
+
+/**
+ * Where Close / "Not now" go. After a cold start from smokeledger://ask the
+ * modal is the only screen, so router.back() would do nothing.
+ */
+export function leaveTarget(canGoBack: boolean): 'back' | '/(tabs)' {
+  return canGoBack ? 'back' : '/(tabs)';
+}
+
+/**
+ * What a screen reader speaks for a new answer: the same masking the screen
+ * draws for an unrevealed answer, so discreet mode holds for speech too.
+ */
+export function answerAnnouncement(answer: string, hidden: boolean): string {
+  const paragraphs = answer.split(/\n+/).filter((p) => p.trim().length > 0);
+  return maskNumbers(paragraphs.join(' '), hidden);
+}
+
 /** Same helpers Home uses, so the mask glyph and rules stay in one place. */
 export function rowDisplay(
   row: Row,
