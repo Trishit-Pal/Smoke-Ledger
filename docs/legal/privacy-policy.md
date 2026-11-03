@@ -61,7 +61,7 @@ Each promise has a mechanism checker in `src/tests/privacy-promises.test.ts`.
 | Data | Kept |
 |---|---|
 | Ledger, profile, settings | Until you erase or delete. No deletion for inactivity. |
-| Security records (incl. the erasure/deletion record: hashed identifier and date only) | 12 months, then purged daily |
+| Security records (incl. the erasure/deletion record: hashed identifier, date and, while the account exists, a link to it) | 12 months, then purged daily |
 | Error reports | 90 days |
 | Usage events | 12 months, or until analytics is turned off |
 | Rate-limit counters | about 2 days |

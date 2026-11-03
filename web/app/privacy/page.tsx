@@ -2,7 +2,12 @@ import * as React from 'react';
 import { LegalDocument } from '@web/components/legal/LegalDocument';
 import { LEGAL_COPY, LEGAL_VERSIONS } from '@web/lib/legal';
 import { BRANDS_CACHE_TTL_SECONDS, GOAL_WINDOW_LOG_LIMIT } from '@web/lib/server/data';
-import { CHAT_HISTORY_MAX_TURNS } from '@/domain/ledgerChat/types';
+import {
+  CHAT_HISTORY_MAX_TURNS,
+  NOTE_MAX_CHARS,
+  RECENT_MAX_DAYS,
+  RECENT_MAX_ROWS,
+} from '@/domain/ledgerChat/types';
 import { EU_REPRESENTATIVE, euRepresentativeIsNamed, LEGAL_ENTITY } from '@/lib/legalEntity';
 import { DATA_PROMISES } from '@/lib/privacy/promises';
 import { RETENTION } from '@/lib/privacy/retention';
@@ -80,7 +85,7 @@ const sections = [
     title: 'How long we keep it',
     body: [
       'Your ledger, profile and settings: until you erase them or delete your account. We never delete an account for being inactive.',
-      `Security records: ${RETENTION.auditEventsMonths} months, then deleted by a daily job. This includes the record that you erased your data or deleted your account. That record holds a one-way hashed identifier and the date, not your name or your ledger, and it lets us show that your request was carried out.`,
+      `Security records: ${RETENTION.auditEventsMonths} months, then deleted by a daily job. This includes the record that you erased your data or deleted your account. That record holds a one-way hashed identifier, the date and, while your account exists, a link to it, but not your name or your ledger, and it lets us show that your request was carried out.`,
       `Error reports: ${RETENTION.errorEventsDays} days. Usage events: ${RETENTION.usageEventsMonths} months, or until you turn analytics off, which deletes them. Rate-limit counters: about ${RETENTION.rateLimitCountersDays} days.`,
       'The Ask the ledger conversation: in your browser until you clear it. Anthropic’s copy: as described in the AI section.',
       'Our database host may keep backup copies for a limited time under its own schedule, so erased data can remain in a backup until it expires. We do not use backups to bring back data you erased.',
@@ -122,7 +127,7 @@ const sections = [
       'Ask the ledger is on the web app only and off until you turn it on. It answers questions about your own ledger with an AI model run by Anthropic. Each answer is labelled “Written by AI”. It can be wrong, and it is not medical advice.',
       `When you ask a question, our server reads up to ${GOAL_WINDOW_LOG_LIMIT.toLocaleString('en-US')} of your entries from the last 90 days and your daily totals for up to the past year to work out the figures. Raw entries go to Anthropic only as described here.`,
       `Anthropic receives: your question; up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of the conversation, your questions and its replies, so it can follow on; a short context line with today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, the kind and state of your active goals, and whether discreet mode is on; and the results of the lookups it asks for. Those results are figures such as totals and comparisons, savings and spend outlook, peak hours and weekdays, pairings of mood and trigger, share of spend by brand, goal progress and targets, and the app’s rules-based insights.`,
-      'When a question needs the detail, it also receives up to 200 individual entries from the last 30 days: date, hour, quantity, trigger, mood before and after, craving, situation, brand, and the first 120 characters of your note.',
+      `When a question needs the detail, it also receives up to ${RECENT_MAX_ROWS} individual entries from the last ${RECENT_MAX_DAYS} days: date, hour, quantity, trigger, mood before and after, craving, situation, brand, and the first ${NOTE_MAX_CHARS} characters of your note.`,
       'In discreet mode, brand names are replaced with aliases and notes are not sent. A brand name you type into a question is sent as you typed it. Your name, date of birth, gender, email, phone number and place are never sent.',
       LEGAL_ENTITY.anthropicRetention,
       'The conversation is kept in your browser, under your Ask the ledger consent, until you choose Clear conversation, turn the feature off, sign out, erase your data, delete your account or turn discreet mode on.',

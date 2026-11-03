@@ -12,3 +12,6 @@ export const RETENTION = {
   usageEventsMonths: 12,
   rateLimitCountersDays: 2,
 } as const;
+
+/** Delete-account sublabel on web and mobile Settings; must agree with the privacy policy. */
+export const DELETE_ACCOUNT_NOTE = `Your logs, preferences and identity are erased and your account is removed. Security records are anonymised and kept for ${RETENTION.auditEventsMonths} months, including a record that the deletion happened. This is permanent.`;

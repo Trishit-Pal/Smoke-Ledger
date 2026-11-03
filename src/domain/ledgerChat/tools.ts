@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { ToolContext } from './context';
-import type { Row, RowUnit } from './types';
+import { NOTE_MAX_CHARS, RECENT_MAX_DAYS, RECENT_MAX_ROWS, type Row, type RowUnit } from './types';
 import {
   brandSpendMix,
   dayShift,
@@ -56,9 +56,6 @@ export type ToolOutcome =
 
 /** Raw-log window the Trends screen uses; tool numbers must match it. */
 const LOG_WINDOW_DAYS = 90;
-const RECENT_MAX_DAYS = 30;
-const RECENT_MAX_ROWS = 200;
-const NOTE_MAX_CHARS = 120;
 const BRAND_MIX_TOP = 5;
 const PEAK_HOURS = 3;
 const PEAK_WEEKDAYS = 2;

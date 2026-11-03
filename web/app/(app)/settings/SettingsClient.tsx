@@ -73,6 +73,7 @@ import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
+import { DELETE_ACCOUNT_NOTE } from '@/lib/privacy/retention';
 import { computeAge } from '@/domain/age';
 import {
   normalizeIndianMobile,
@@ -1514,7 +1515,7 @@ export function SettingsClient({
           <SectionHead
             id="account-heading"
             caption="Account"
-            deck="How the ledger looks, and how you leave it: appearance, return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
+            deck="How the ledger looks, and how you leave it: appearance, return to the home page, sign out of this device, or close the account entirely."
           />
           <dl className="flex flex-col">
             {/* The only theme control inside the app shell (the global fixed
@@ -1555,7 +1556,7 @@ export function SettingsClient({
             />
             <PrefRow
               label="Delete account permanently"
-              sublabel="All your logs, preferences, and audit history are erased. The audit-deletion record itself is retained per DPDP for compliance."
+              sublabel={DELETE_ACCOUNT_NOTE}
               control={
                 /* Accessible name "Delete account — permanent" carries the
                  * consequence for screen-reader users; the visible label

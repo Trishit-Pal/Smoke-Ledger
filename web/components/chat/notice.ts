@@ -1,16 +1,24 @@
 // The one notice shown wherever Ask the ledger can be turned on (the panel's
 // consent card and the Settings switch), so the two cannot drift. It must
-// match what the privacy policy discloses and what the tools actually send.
+// match what the privacy policy discloses and what the tools actually send:
+// the limits render from the same constants the route and tools use.
+
+import {
+  CHAT_HISTORY_MAX_TURNS,
+  NOTE_MAX_CHARS,
+  RECENT_MAX_DAYS,
+  RECENT_MAX_ROWS,
+} from '@/domain/ledgerChat/types';
+import { LEGAL_ENTITY } from '@/lib/legalEntity';
 
 export const LEDGER_CHAT_NOTICE = {
   lead: 'Answers come from an AI model run by Anthropic in the United States.',
-  sent: 'If you turn this on, each question and the figures needed to answer it are sent to Anthropic: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger counts, goal progress and targets, your daily baseline, the app’s rules-based insights, and your country-level currency and time zone. When a question needs them, so are your recent entries from the last 30 days: dates, times, quantities, triggers, moods, cravings, the situation you tagged, brand names, and your own notes.',
+  sent: `Each time you ask, Anthropic receives your question, up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of this conversation (your questions and its replies), and a short context line: today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, and the kind and state of your active goals. It also receives the figures needed to answer: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger pairings, goal progress and targets, and the app’s rules-based insights. When a question needs them, so are up to ${RECENT_MAX_ROWS} of your entries from the last ${RECENT_MAX_DAYS} days: date, hour, quantity, trigger, moods, craving, situation, brand, and the first ${NOTE_MAX_CHARS} characters of your note.`,
   discreet:
-    'In discreet mode, brand names are replaced with aliases and notes are not sent. A brand name you type into a question is sent as you typed it.',
-  retention:
-    'Anthropic does not use this data to train its models and deletes it after a limited period, currently up to 30 days, unless it must be kept longer for safety or legal reasons.',
+    'In discreet mode, brand names are replaced with aliases and notes are not sent. A brand name you type into a question is sent as you typed it. Your name, date of birth, gender, email, phone number and place are never sent.',
+  retention: LEGAL_ENTITY.anthropicRetention,
   device:
-    'We store no questions, replies, or conversations on our servers. The conversation stays on this device until you sign out, erase your data, delete your account, or turn this off in Settings › Privacy.',
+    'We store no questions or replies on our servers. The conversation stays in this browser until you choose Clear conversation, turn this off, turn discreet mode on, sign out, erase your data or delete your account.',
 } as const;
 
 export const LEDGER_CHAT_NOTICE_TEXT = Object.values(LEDGER_CHAT_NOTICE).join(' ');

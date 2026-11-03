@@ -78,3 +78,25 @@ Take this list to one short consultation. None of these blocks the release; the 
 
 - [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
 - [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.
+
+## 9. Runbook: a reader asks to correct their name, date of birth or gender
+
+The app locks these once they are set (decision O7). The privacy policy says a reader can write to us to correct them, so this is how.
+
+1. **Check it is the account holder.** Reply only to the email address on the account (`SELECT id, email FROM auth.users WHERE email = '<from address>';`). If the request came from another address, ask them to write from the account email. Never act on a phone call or a forwarded message.
+2. **Check a new date of birth still passes 18+.** If the corrected date makes the reader under 18, do not apply it. Delete the account and its data instead (the policy's "Adults only" rule), and tell them why.
+3. **Make the change in the Supabase SQL editor, in one transaction.** The identity trigger lets the update through only while `app.erasing` is on for this transaction. Change both places, so the profile and the sign-in record agree:
+   ```sql
+   BEGIN;
+   SET LOCAL app.erasing = 'on';
+   UPDATE public.user_profiles
+      SET full_name = '<name>', date_of_birth = '<YYYY-MM-DD>', gender = '<allowed value>'  -- only the fields asked for
+    WHERE id = '<user id>';
+   UPDATE auth.users
+      SET raw_user_meta_data = raw_user_meta_data
+          || jsonb_build_object('full_name', '<name>', 'date_of_birth', '<YYYY-MM-DD>', 'gender', '<allowed value>')  -- same fields
+    WHERE id = '<user id>';
+   COMMIT;
+   ```
+   `gender` must be one of the values allowed by `user_profiles_gender_check`.
+4. **Record it.** Add a row to your requests log: date received, date done, which fields changed (not the old values), and the reply sent. Reply within 30 days (the Grievance Officer commitment). The reader's new values reach their export straight away.

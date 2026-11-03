@@ -59,6 +59,7 @@ import {
 import { GENDER_LABELS } from '@/lib/profileLabels';
 import type { Brand, BrandVariant } from '@/types';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
+import { DELETE_ACCOUNT_NOTE } from '@/lib/privacy/retention';
 
 // Single source: app.config.js `version` (also drives EAS runtimeVersion).
 const APP_VERSION = Constants.expoConfig?.version ?? '';
@@ -1565,7 +1566,7 @@ export default function Settings() {
             />
             <PrefRow
               label="Delete account permanently"
-              sublabel="All your logs, preferences, and audit history are erased. This is permanent."
+              sublabel={DELETE_ACCOUNT_NOTE}
               control={
                 <TextLink
                   onPress={() => deleteAccount()}

@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { EU_REPRESENTATIVE, euRepresentativeIsNamed, LEGAL_ENTITY } from '@/lib/legalEntity';
+import { DELETE_ACCOUNT_NOTE, RETENTION } from '@/lib/privacy/retention';
 
 const read = (rel: string) =>
   fs.readFileSync(path.resolve(__dirname, '../..', rel), 'utf8').replace(/\r\n/g, '\n');
@@ -62,7 +63,7 @@ describe('privacy policy', () => {
     expect(page).toMatch(/earlier turns/);
     expect(page).toContain('CHAT_HISTORY_MAX_TURNS');
     expect(page).toContain('GOAL_WINDOW_LOG_LIMIT');
-    expect(page).toMatch(/up to 200/);
+    expect(page).toContain('RECENT_MAX_ROWS');
     expect(page).toContain('LEGAL_ENTITY.anthropicRetention');
   });
 
@@ -137,6 +138,18 @@ describe('docs/legal mirrors the pages', () => {
     const doc = read(docRel);
     for (const title of sectionTitles(read(pageRel))) {
       expect(doc).toContain(`## ${title}`);
+    }
+  });
+});
+
+describe('delete-account copy matches the policy', () => {
+  it('says audit history is anonymised and the deletion record is kept for the audit retention', () => {
+    expect(DELETE_ACCOUNT_NOTE).toContain(`anonymised and kept for ${RETENTION.auditEventsMonths} months`);
+    expect(DELETE_ACCOUNT_NOTE).toContain('a record that the deletion happened');
+    for (const rel of ['web/app/(app)/settings/SettingsClient.tsx', 'app/(tabs)/settings.tsx']) {
+      const source = read(rel);
+      expect(source).toContain('sublabel={DELETE_ACCOUNT_NOTE}');
+      expect(source).not.toMatch(/audit history (are|is) erased|retained per DPDP|deletion record is retained for compliance/);
     }
   });
 });
