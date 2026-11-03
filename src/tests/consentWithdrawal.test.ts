@@ -41,12 +41,14 @@ describe('recordConsentWithdrawal', () => {
  * cancelled or the network failed and nothing was actually removed.
  */
 describe('recordWithdrawalAfter', () => {
-  it.each(['erase', 'delete'] as const)('writes consent_revoked only after the %s succeeded', async (outcome) => {
+  // Erase only on mobile: the session survives it, so the write authenticates. Delete is
+  // recorded by the delete-account function itself (see deleteUserAccount.test.ts).
+  it('writes consent_revoked only after the erase succeeded', async () => {
     const action = jest.fn().mockResolvedValue(undefined);
-    await recordWithdrawalAfter(true, outcome, action);
+    await recordWithdrawalAfter(true, 'erase', action);
     expect(recordAuditEvent).toHaveBeenCalledTimes(1);
     expect(recordAuditEvent).toHaveBeenCalledWith('consent_revoked', 'compliance', {
-      reason: `health_data_withdrawn_then_${outcome}`,
+      reason: 'health_data_withdrawn_then_erase',
     });
     expect(action.mock.invocationCallOrder[0]).toBeLessThan(
       (recordAuditEvent as jest.Mock).mock.invocationCallOrder[0],
@@ -55,7 +57,7 @@ describe('recordWithdrawalAfter', () => {
 
   it('writes nothing when the action fails (cancel, re-auth redirect, network) and rethrows', async () => {
     const action = jest.fn().mockRejectedValue(new Error('reauth_required'));
-    await expect(recordWithdrawalAfter(true, 'delete', action)).rejects.toThrow('reauth_required');
+    await expect(recordWithdrawalAfter(true, 'erase', action)).rejects.toThrow('reauth_required');
     expect(recordAuditEvent).not.toHaveBeenCalled();
   });
 

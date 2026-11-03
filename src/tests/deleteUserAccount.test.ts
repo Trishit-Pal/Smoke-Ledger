@@ -3,6 +3,8 @@
  * fires the callback and throws WITHOUT signing out, a real "not signed in"
  * throws WITHOUT firing the callback, and only a clean 2xx clears the session.
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { useSession } from '@/store/session';
 import { invalidateAnalyticsConsentCache } from '@/services/analytics';
@@ -97,5 +99,57 @@ describe('deleteUserAccount', () => {
     });
     await expect(deleteUserAccount()).rejects.toThrow('Failed to fetch');
     expect(supabase.auth.signOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('withdrawal proof on delete', () => {
+  it('sends { withdraw } to the function when the caller says so (true or false)', async () => {
+    supabase.functions.invoke.mockResolvedValue({ data: { ok: true }, error: null });
+    await deleteUserAccount({ withdraw: true });
+    expect(supabase.functions.invoke).toHaveBeenLastCalledWith('delete-account', {
+      headers: { Authorization: 'Bearer tok' },
+      body: { withdraw: true },
+    });
+    await deleteUserAccount({ withdraw: false });
+    expect(supabase.functions.invoke).toHaveBeenLastCalledWith('delete-account', {
+      headers: { Authorization: 'Bearer tok' },
+      body: { withdraw: false },
+    });
+  });
+
+  it('sends no body when withdraw is omitted (web)', async () => {
+    supabase.functions.invoke.mockResolvedValue({ data: { ok: true }, error: null });
+    await deleteUserAccount();
+    expect(supabase.functions.invoke.mock.calls[0][1]).not.toHaveProperty('body');
+  });
+
+  describe('delete-account edge function source', () => {
+    const source = fs
+      .readFileSync(path.resolve(__dirname, '../../supabase/functions/delete-account/index.ts'), 'utf8')
+      .replace(/\r\n/g, '\n');
+    const at = (needle: string): number => {
+      const i = source.indexOf(needle);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+
+    it('writes consent_revoked after the re-auth gate and before the erase', () => {
+      const gate = at('if (!hasRecentSignIn(authHeader');
+      const revoked = at("event_type: 'consent_revoked'");
+      const erase = at("rpc('erase_account_data')");
+      expect(gate).toBeLessThan(revoked);
+      expect(revoked).toBeLessThan(erase);
+      // Only when asked, and through the shared allowlist redaction + source stamp.
+      expect(source).toMatch(/if \(withdraw\) \{[\s\S]*?event_type: 'consent_revoked'/);
+      expect(source).toContain('markClientReported(');
+      expect(source).toContain('redactAuditProps(');
+    });
+
+    it('reads the flag strictly: absent means false, a non-boolean is a 400', () => {
+      expect(source).toContain("typeof field !== 'boolean'");
+      expect(source).toContain("return json({ error: 'invalid_body'");
+      expect(source).toContain('withdraw = field === true;');
+      expect(source).toContain('let withdraw = false;');
+    });
   });
 });

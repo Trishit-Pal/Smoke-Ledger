@@ -24,7 +24,8 @@
 //    hashed id BEFORE the erase. The erase function itself writes a second
 //    `account_data_erased` row with the same hash. A tamper-evident copy lives
 //    in `error_events` (category compliance.delete) so the record survives the
-//    auth-row cascade.
+//    auth-row cascade. When the body says `{ withdraw: true }` a `consent_revoked`
+//    row is written in the same block (past the re-auth gate, before the erase).
 // 6. Erase fail-safe: if `erase_account_data()` fails the function aborts WITHOUT
 //    calling admin.deleteUser. The user's data and auth row stay intact and the
 //    user can retry. We never delete the auth row over an unverified purge.
@@ -37,6 +38,7 @@ import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { corsHeaders, originAllowed } from '../_shared/cors.ts';
 import { hasRecentSignIn } from '../_shared/recentAuth.ts';
 import { redactText } from '../_shared/redact.ts';
+import { markClientReported, redactAuditProps } from '../_shared/auditAllowlist.ts';
 
 const log = createLogger('delete-account');
 
@@ -150,6 +152,27 @@ serve(async (req) => {
       );
     }
 
+    // Optional body `{ withdraw: boolean }`: this deletion ends a consent withdrawal.
+    // Strict: absent/empty body means false; anything else must be exactly a boolean.
+    let withdraw = false;
+    const rawBody = (await req.text()).trim();
+    if (rawBody) {
+      let parsedBody: unknown;
+      try {
+        parsedBody = JSON.parse(rawBody);
+      } catch {
+        return json({ error: 'invalid_json', request_id: requestId }, 400, origin);
+      }
+      const field =
+        parsedBody && typeof parsedBody === 'object' && !Array.isArray(parsedBody)
+          ? (parsedBody as Record<string, unknown>).withdraw
+          : undefined;
+      if (field !== undefined && typeof field !== 'boolean') {
+        return json({ error: 'invalid_body', request_id: requestId }, 400, origin);
+      }
+      withdraw = field === true;
+    }
+
     const supabaseAdmin = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -171,6 +194,19 @@ serve(async (req) => {
         message: redactText('account_deleted'),
         details_json: { request_id: requestId, hashed_user_id: hashedUserId },
       });
+      // The withdrawal proof row. Only here, past the re-auth gate: a cancelled detour
+      // never reaches it. The client cannot write it after the delete (no account left to
+      // authenticate), and erase_account_data anonymises it like the rows above.
+      if (withdraw) {
+        await supabaseAdmin.from('audit_events').insert({
+          user_id: userId,
+          event_type: 'consent_revoked',
+          event_category: 'compliance',
+          props_json: markClientReported(
+            redactAuditProps({ reason: 'health_data_withdrawn_then_delete' }),
+          ),
+        });
+      }
     } catch (auditErr) {
       // Audit is best-effort; do not abort the user-requested deletion.
       log.warn('audit_insert_failed', {

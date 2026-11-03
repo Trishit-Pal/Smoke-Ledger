@@ -3,7 +3,12 @@
 // Native modules load on demand so the id list stays importable from tests.
 
 import { reportFailedClears, runLifecycleClearers, type Clearer, type LifecycleEvent } from '@/lib/privacy/lifecycle';
-import { SESSION_STORAGE_KEY, deleteKeyFromAllStores, wipeSecureStore } from '@/lib/secureStore';
+import {
+  SESSION_STORAGE_KEY,
+  deleteKeyFromAllStores,
+  removeDeleteIntent,
+  wipeSecureStore,
+} from '@/lib/secureStore';
 import { clearFirstSuggestionDismissals } from '@/lib/goals/firstSuggestionStore';
 
 /** Export files are written to the cache directory under this name (app/(tabs)/settings.tsx). */
@@ -37,6 +42,7 @@ const nativeClearers: Record<string, Clearer> = {
   'mobile.inMemoryLedger': resetInMemoryLedger,
   'mobile.firstSuggestion': () => clearFirstSuggestionDismissals(),
   'mobile.lockKeys': wipeSecureStore,
+  'mobile.deleteIntent': removeDeleteIntent,
   'mobile.notifications': async () => {
     const { cancelAll } = await import('@/services/notifications');
     await cancelAll();

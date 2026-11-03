@@ -88,8 +88,10 @@ export const SecureKeys = {
   LAST_LOCK_TIME: 'sl.lock.last',
   PIN_FAILED_ATTEMPTS: 'sl.pin.failed.v1',
   PIN_LOCKOUT_UNTIL: 'sl.pin.lockout.v1',
-  DELETE_INTENT: 'sl.delete.intent.v1',
 } as const;
+
+/** Not in SecureKeys: it has its own lifecycle row (mobile.deleteIntent), not the lock keys'. */
+const DELETE_INTENT_KEY = 'sl.delete.intent.v1';
 
 /* ---------- Availability ---------- */
 
@@ -296,15 +298,15 @@ export async function writeLastLockTime(epochMs: number): Promise<void> {
 // Sensitive = SecureStore only, no AsyncStorage fallback: a record that could
 // be planted in plain storage would not prove this device started the detour.
 export async function writeDeleteIntent(raw: string): Promise<void> {
-  await kvSet(SecureKeys.DELETE_INTENT, raw, true);
+  await kvSet(DELETE_INTENT_KEY, raw, true);
 }
 
 export async function readDeleteIntent(): Promise<string | null> {
-  return kvGet(SecureKeys.DELETE_INTENT, true);
+  return kvGet(DELETE_INTENT_KEY, true);
 }
 
 export async function removeDeleteIntent(): Promise<void> {
-  await kvDelete(SecureKeys.DELETE_INTENT, true);
+  await kvDelete(DELETE_INTENT_KEY, true);
 }
 
 /* ---------- Full erasure (used by privacy.eraseAllData) ---------- */

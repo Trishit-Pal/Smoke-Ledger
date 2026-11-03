@@ -30,12 +30,15 @@ export interface DeleteIntent {
   withdraw: boolean;
 }
 
-export function encodeDeleteIntent(withdraw: boolean, now: number): string {
-  return JSON.stringify({ expiresAt: now + DELETE_INTENT_TTL_MS, withdraw });
+export function encodeDeleteIntent(withdraw: boolean, userId: string, now: number): string {
+  return JSON.stringify({ expiresAt: now + DELETE_INTENT_TTL_MS, withdraw, userId });
 }
 
-/** null = not a valid, unexpired record. Malformed or far-future values are refused. */
-export function decodeDeleteIntent(raw: string | null, now: number): DeleteIntent | null {
+/**
+ * null = not a valid, unexpired record for this user. Malformed or far-future values are
+ * refused; a record written for another user (left over across a sign-out/sign-in) is too.
+ */
+export function decodeDeleteIntent(raw: string | null, userId: string, now: number): DeleteIntent | null {
   if (!raw) return null;
   let parsed: unknown;
   try {
@@ -44,8 +47,13 @@ export function decodeDeleteIntent(raw: string | null, now: number): DeleteInten
     return null;
   }
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const { expiresAt, withdraw } = parsed as { expiresAt?: unknown; withdraw?: unknown };
+  const { expiresAt, withdraw, userId: owner } = parsed as {
+    expiresAt?: unknown;
+    withdraw?: unknown;
+    userId?: unknown;
+  };
   if (typeof expiresAt !== 'number' || typeof withdraw !== 'boolean') return null;
+  if (!userId || owner !== userId) return null;
   if (!(expiresAt > now && expiresAt <= now + DELETE_INTENT_TTL_MS)) return null;
   return { withdraw };
 }

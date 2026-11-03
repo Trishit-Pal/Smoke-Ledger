@@ -17,8 +17,10 @@ import {
   isReauthRequest,
 } from '@/lib/reauth';
 import { beginDeleteDetour, takeDeleteResume } from '@/lib/deleteIntent';
+import { getSupabase } from '@/lib/supabase';
 import { readDeleteIntent, removeDeleteIntent, writeDeleteIntent } from '@/lib/secureStore';
 
+jest.mock('@/lib/supabase', () => ({ getSupabase: jest.fn() }));
 jest.mock('@/lib/secureStore', () => ({
   readDeleteIntent: jest.fn(),
   writeDeleteIntent: jest.fn(),
@@ -131,10 +133,19 @@ describe('the re-auth detour resumes the pending deletion on both platforms', ()
 describe('delete resume needs a detour this device started', () => {
   const NOW = 1_800_000_000_000;
   const store = { value: null as string | null };
+  const session = { userId: 'user-a' as string | null };
 
   beforeEach(() => {
     jest.clearAllMocks();
     store.value = null;
+    session.userId = 'user-a';
+    (getSupabase as jest.Mock).mockReturnValue({
+      auth: {
+        getSession: async () => ({
+          data: { session: session.userId ? { user: { id: session.userId } } : null },
+        }),
+      },
+    });
     (writeDeleteIntent as jest.Mock).mockImplementation(async (raw: string) => {
       store.value = raw;
     });
@@ -146,25 +157,35 @@ describe('delete resume needs a detour this device started', () => {
 
   describe('decodeDeleteIntent', () => {
     it('accepts a fresh record and carries the withdraw flag', () => {
-      expect(decodeDeleteIntent(encodeDeleteIntent(true, NOW), NOW + 1000)).toEqual({ withdraw: true });
-      expect(decodeDeleteIntent(encodeDeleteIntent(false, NOW), NOW + 1000)).toEqual({ withdraw: false });
+      expect(decodeDeleteIntent(encodeDeleteIntent(true, 'u', NOW), 'u', NOW + 1000)).toEqual({ withdraw: true });
+      expect(decodeDeleteIntent(encodeDeleteIntent(false, 'u', NOW), 'u', NOW + 1000)).toEqual({ withdraw: false });
     });
 
     it('rejects an expired record, at the boundary too', () => {
-      const raw = encodeDeleteIntent(false, NOW);
-      expect(decodeDeleteIntent(raw, NOW + DELETE_INTENT_TTL_MS - 1)).not.toBeNull();
-      expect(decodeDeleteIntent(raw, NOW + DELETE_INTENT_TTL_MS)).toBeNull();
+      const raw = encodeDeleteIntent(false, 'u', NOW);
+      expect(decodeDeleteIntent(raw, 'u', NOW + DELETE_INTENT_TTL_MS - 1)).not.toBeNull();
+      expect(decodeDeleteIntent(raw, 'u', NOW + DELETE_INTENT_TTL_MS)).toBeNull();
+    });
+
+    it('rejects a record written for another user, and an empty user id', () => {
+      const raw = encodeDeleteIntent(false, 'user-a', NOW);
+      expect(decodeDeleteIntent(raw, 'user-b', NOW)).toBeNull();
+      expect(decodeDeleteIntent(raw, '', NOW)).toBeNull();
     });
 
     it.each([
       ['nothing stored', null],
       ['not JSON', 'smokeledger'],
       ['wrong shape', '{"withdraw":true}'],
-      ['non-boolean withdraw', JSON.stringify({ expiresAt: NOW + 1000, withdraw: 'yes' })],
-      ['non-numeric expiry', JSON.stringify({ expiresAt: 'soon', withdraw: false })],
-      ['expiry far beyond the TTL', JSON.stringify({ expiresAt: NOW + DELETE_INTENT_TTL_MS * 10, withdraw: false })],
+      ['no user id', JSON.stringify({ expiresAt: NOW + 1000, withdraw: false })],
+      ['non-boolean withdraw', JSON.stringify({ expiresAt: NOW + 1000, withdraw: 'yes', userId: 'u' })],
+      ['non-numeric expiry', JSON.stringify({ expiresAt: 'soon', withdraw: false, userId: 'u' })],
+      [
+        'expiry far beyond the TTL',
+        JSON.stringify({ expiresAt: NOW + DELETE_INTENT_TTL_MS * 10, withdraw: false, userId: 'u' }),
+      ],
     ])('rejects %s', (_label, raw) => {
-      expect(decodeDeleteIntent(raw, NOW)).toBeNull();
+      expect(decodeDeleteIntent(raw, 'u', NOW)).toBeNull();
     });
   });
 
@@ -189,6 +210,21 @@ describe('delete resume needs a detour this device started', () => {
     await expect(takeDeleteResume(NOW + 5000)).resolves.toEqual({ withdraw: true });
   });
 
+  it("one reader's leftover record is not honoured for the next reader, and is consumed", async () => {
+    await beginDeleteDetour(true, NOW);
+    session.userId = 'user-b';
+    await expect(takeDeleteResume(NOW + 5000)).resolves.toBeNull();
+    expect(store.value).toBeNull();
+  });
+
+  it('no signed-in user: nothing is recorded and nothing resumes', async () => {
+    session.userId = null;
+    await expect(beginDeleteDetour(false, NOW)).resolves.toBe(false);
+    expect(writeDeleteIntent).not.toHaveBeenCalled();
+    store.value = encodeDeleteIntent(false, 'user-a', NOW);
+    await expect(takeDeleteResume(NOW)).resolves.toBeNull();
+  });
+
   it('a storage failure fails closed: no prompt on read, and beginning reports it', async () => {
     (readDeleteIntent as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
     await expect(takeDeleteResume(NOW)).resolves.toBeNull();
@@ -201,10 +237,14 @@ describe('delete resume needs a detour this device started', () => {
     const resume = settings.slice(settings.indexOf('const resumeHandled'), settings.indexOf('const eraseAll'));
     expect(resume).toContain('takeDeleteResume()');
     expect(resume).toContain("deleteAccount('resume', intent.withdraw)");
+    // No valid record: say so, like the cancel path, rather than staying silent.
+    expect(resume).toMatch(/else setError\('Your account has not been deleted\.'\)/);
     expect(settings).toMatch(/beginDeleteDetour\(withdraw\)[\s\S]{0,200}router\.replace\('\/login\?reason=reauth'\)/);
     // No withdrawal row is written ahead of the erase/delete it describes.
     expect(settings).not.toMatch(/await recordConsentWithdrawal\(/);
-    expect(settings).toContain("recordWithdrawalAfter(withdraw, 'delete'");
+    // Delete: the server writes the row (a client write after the delete cannot authenticate).
+    expect(settings).not.toContain("recordWithdrawalAfter(withdraw, 'delete'");
+    expect(settings).toMatch(/await deleteUserAccount\(\{[^}]*?withdraw,/);
     expect(settings).toContain("recordWithdrawalAfter(withdraw, 'erase'");
   });
 });

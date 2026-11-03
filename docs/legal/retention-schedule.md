@@ -42,6 +42,7 @@ From `src/lib/privacy/lifecycle.ts`. Events: sign-out (session ends for any caus
 | Lock keys | Web (localStorage), mobile (SecureStore) | Erase, delete, withdraw |
 | Brands cache | Web | Erase, delete, withdraw |
 | Session (SecureStore) | Mobile | Sign-out, delete |
+| Delete re-sign-in record (SecureStore, expires after 10 minutes, used once) | Mobile | Sign-out, erase, delete, withdraw |
 | In-memory ledger | Mobile | Sign-out, delete |
 | Scheduled notifications | Mobile | Erase, delete, withdraw |
 | Export file (cache) | Mobile | Erase, delete, withdraw |

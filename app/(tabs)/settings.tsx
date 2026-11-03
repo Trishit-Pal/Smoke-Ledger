@@ -824,7 +824,8 @@ export default function Settings() {
   // the user back here at DELETE_RESUME_PATH). A fresh sign-in alone must never
   // delete an account, and cancelling must say that nothing was deleted —
   // otherwise "it made me sign in again" reads as "it's done".
-  // `withdraw` marks the deletion as the end of a consent withdrawal (emits consent_revoked).
+  // `withdraw` marks the deletion as the end of a consent withdrawal: it is sent to the
+  // delete-account function, which writes consent_revoked after its re-auth gate.
   const deleteAccount = (variant: 'first' | 'resume' = 'first', withdraw = false) => {
     Alert.alert(
       variant === 'resume'
@@ -849,28 +850,29 @@ export default function Settings() {
             setError(null);
             let isReauthRedirect = false;
             try {
-              // consent_revoked is written only once the account is really gone, so a
-              // cancelled detour or a failed call leaves no row claiming a withdrawal.
-              // ponytail: the session is cleared by then, so audit-record rejects it
-              // (swallowed + logged); a durable row needs the server to take `withdraw`.
-              await recordWithdrawalAfter(withdraw, 'delete', () =>
-                deleteUserAccount({
-                  // After the detour a further reauth_required is shown as an
-                  // error, never another redirect: no silent login ↔ Settings loop.
-                  onReauthRequired:
-                    variant === 'resume'
-                      ? undefined
-                      : () => {
-                          // Mark the detour (and the withdraw intent) before leaving: the
-                          // resume honours ?action=delete only against this record.
-                          isReauthRedirect = true;
-                          void beginDeleteDetour(withdraw).then((started) => {
-                            if (started) router.replace('/login?reason=reauth');
-                            else setError('Could not start the sign-in step. Your account has not been deleted.');
-                          });
-                        },
-                }),
-              );
+              await deleteUserAccount({
+                // The server writes consent_revoked itself, past its re-auth gate: after the
+                // delete no session is left to authenticate a client-side audit write.
+                withdraw,
+                // After the detour a further reauth_required is shown as an
+                // error, never another redirect: no silent login ↔ Settings loop.
+                onReauthRequired:
+                  variant === 'resume'
+                    ? undefined
+                    : () => {
+                        // Mark the detour (and the withdraw intent) before leaving: the
+                        // resume honours ?action=delete only against this record.
+                        // ponytail: SecureStore unavailable => no detour => delete is blocked
+                        // here (fail closed). Delete is the erasure path, so a device with a
+                        // broken keystore cannot finish it; upgrade: carry the proof in the
+                        // login route param (or email the reader a link) if that bites.
+                        isReauthRedirect = true;
+                        void beginDeleteDetour(withdraw).then((started) => {
+                          if (started) router.replace('/login?reason=reauth');
+                          else setError('Could not start the sign-in step. Your account has not been deleted.');
+                        });
+                      },
+              });
               // Best-effort local cleanup; never block the redirect on it.
               try {
                 await clearNativeDevice('delete');
@@ -908,6 +910,7 @@ export default function Settings() {
     router.setParams({ action: '' });
     void takeDeleteResume().then((intent) => {
       if (intent) deleteAccount('resume', intent.withdraw);
+      else setError('Your account has not been deleted.');
     });
     // deleteAccount is a stable closure over state setters; run once per resume.
     // eslint-disable-next-line react-hooks/exhaustive-deps

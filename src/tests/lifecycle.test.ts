@@ -49,6 +49,7 @@ describe('lifecycle registry', () => {
 
   it('clears the mobile device on sign-out: session, in-memory ledger, first-suggestion key', () => {
     expect(ids('mobile', 'signOut')).toEqual([
+      'mobile.deleteIntent',
       'mobile.firstSuggestion',
       'mobile.inMemoryLedger',
       'mobile.session',
@@ -63,6 +64,7 @@ describe('lifecycle registry', () => {
       'web.lockKeys',
     ]);
     expect(ids('mobile', 'erase')).toEqual([
+      'mobile.deleteIntent',
       'mobile.exportFile',
       'mobile.firstSuggestion',
       'mobile.lockKeys',
