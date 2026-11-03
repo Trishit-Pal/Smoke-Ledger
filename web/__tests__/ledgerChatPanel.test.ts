@@ -64,6 +64,23 @@ describe('AskLedgerPanel', () => {
   });
 });
 
+describe('AI label and Clear conversation', () => {
+  test('each answer carries a Written by AI caption', () => {
+    expect(panel).toContain('Written by AI');
+  });
+
+  test('the header has a plain Clear conversation control that clears storage and in-memory turns', () => {
+    expect(panel).toContain('Clear conversation');
+    expect(panel).toMatch(/clearTranscript\(userId/);
+    expect(panel).toMatch(/setTurns\(\[\]\)/);
+    expect(panel).not.toMatch(/ConfirmDialog|window\.confirm/);
+  });
+
+  test('Settings Ask-the-ledger row offers the same control', () => {
+    expect(settings).toContain('Clear conversation');
+  });
+});
+
 describe('AskLedgerLauncher and its mount points', () => {
   test('renders nothing while the feature is off', () => {
     expect(launcher).toMatch(/if \(!enabled\) return null/);

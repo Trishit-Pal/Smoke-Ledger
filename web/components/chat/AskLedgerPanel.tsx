@@ -41,6 +41,7 @@ import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
 import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
 import {
+  clearTranscript,
   loadTranscript,
   saveTranscript,
   type TranscriptTurn,
@@ -200,6 +201,13 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
     void send(draft, false);
   };
 
+  // Plain and confirm-free: the only thing lost is something the reader can ask again.
+  const onClear = () => {
+    clearTranscript(userId ?? undefined);
+    setTurns([]);
+    setRevealed(new Set());
+  };
+
   const reveal = (key: string) => setRevealed((prev) => new Set(prev).add(key));
 
   return (
@@ -215,6 +223,16 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               <Dialog.Description asChild>
                 <p className="max-w-[40ch] text-small text-text-muted">{COPY.description}</p>
               </Dialog.Description>
+              {turns.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className={`${LINK_BUTTON} self-start text-small text-text-muted hover:text-text`}
+                  style={{ textDecorationColor: 'var(--rule-strong)' }}
+                >
+                  Clear conversation
+                </button>
+              ) : null}
             </div>
             <Dialog.Close asChild>
               <button
@@ -297,6 +315,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                 ) : (
                   paragraphs
                 )}
+                <p className="editorial-caption text-text-faint">Written by AI</p>
               </article>
               );
             })}

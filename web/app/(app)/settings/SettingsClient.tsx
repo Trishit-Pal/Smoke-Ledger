@@ -1151,12 +1151,17 @@ export function SettingsClient({
               label="Ask the ledger"
               sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
               control={
-                <EditorialSwitch
-                  checked={ledgerChatOptIn}
-                  onChange={onToggleLedgerChat}
-                  disabled={busy != null}
-                  ariaLabel="Ask the ledger"
-                />
+                <div className="flex items-center gap-md">
+                  <TextLink onClick={() => clearTranscript()} disabled={busy != null}>
+                    Clear conversation
+                  </TextLink>
+                  <EditorialSwitch
+                    checked={ledgerChatOptIn}
+                    onChange={onToggleLedgerChat}
+                    disabled={busy != null}
+                    ariaLabel="Ask the ledger"
+                  />
+                </div>
               }
             />
             <PrefRow
