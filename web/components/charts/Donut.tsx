@@ -42,6 +42,22 @@ export function donutTooltipFormatter(
   };
 }
 
+/** The slices Recharts draws. Recharts copies each slice name onto its SVG
+ *  `<path name="…">`, so the name must already be formatted (masked) here;
+ *  formatting only in the tooltip and table left a discreet reader's brand in the DOM. */
+export function donutPieData(
+  slices: readonly DonutSlice[],
+  formatLabel?: (label: string, index: number) => string,
+): Array<DonutSlice & { sliceIndex: number }> {
+  return slices
+    .filter((s) => s.value > 0)
+    .map((s, sliceIndex) => ({
+      ...s,
+      label: formatLabel ? formatLabel(s.label, sliceIndex) : s.label,
+      sliceIndex,
+    }));
+}
+
 export function Donut({
   slices,
   size = 140,
@@ -62,7 +78,7 @@ export function Donut({
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={safeSlices.map((s, sliceIndex) => ({ ...s, sliceIndex }))}
+            data={donutPieData(safeSlices, formatLabel)}
             dataKey="value"
             nameKey="label"
             innerRadius={inner / 2}
@@ -72,14 +88,15 @@ export function Donut({
           >
             {safeSlices.map((slice, idx) => (
               <Cell
-                key={`${slice.label}-${idx}`}
+                key={idx}
                 fill={slice.color ?? CHART_SERIES[idx % CHART_SERIES.length]}
               />
             ))}
           </Pie>
           <Tooltip
             contentStyle={chartTooltipStyle}
-            formatter={donutTooltipFormatter(formatValue, formatLabel)}
+            // Names arrive pre-formatted from donutPieData; only values need formatting here.
+            formatter={donutTooltipFormatter(formatValue)}
           />
         </PieChart>
       </ResponsiveContainer>

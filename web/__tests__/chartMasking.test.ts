@@ -5,7 +5,7 @@ import type { CigaretteLog } from '@/types';
 import { LineChart } from '@web/components/charts/LineChart';
 import { BarChart, isYAxisVisible } from '@web/components/charts/BarChart';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
-import { Donut, donutTooltipFormatter } from '@web/components/charts/Donut';
+import { Donut, donutPieData, donutTooltipFormatter } from '@web/components/charts/Donut';
 import { Heatmap } from '@web/components/charts/Heatmap';
 
 // Some chart files rely on the automatic JSX runtime; vitest uses the classic one.
@@ -146,5 +146,30 @@ describe('chart masking formatters', () => {
     it('passes raw value and name through with no formatters', () => {
       expect(donutTooltipFormatter()(37, 'Marlboro', item(0))).toEqual(['37', 'Marlboro']);
     });
+  });
+});
+
+describe('donutPieData', () => {
+  // Recharts copies each slice name onto its SVG <path name="…">, so the name it
+  // receives must already be masked, or a discreet reader's brand sits in the DOM.
+  it('hands Recharts the formatted name, never the raw label', () => {
+    const data = donutPieData(
+      [
+        { label: 'Gold Flake', value: 40 },
+        { label: 'Classic', value: 10 },
+      ],
+      (_l, i) => `Brand ${String.fromCharCode(65 + i)}`,
+    );
+    expect(data.map((d) => d.label)).toEqual(['Brand A', 'Brand B']);
+    expect(JSON.stringify(data)).not.toContain('Gold Flake');
+    expect(data.map((d) => d.sliceIndex)).toEqual([0, 1]);
+  });
+
+  it('keeps the label and drops empty slices when no formatter is given', () => {
+    const data = donutPieData([
+      { label: 'Gold Flake', value: 40 },
+      { label: 'None', value: 0 },
+    ]);
+    expect(data).toEqual([{ label: 'Gold Flake', value: 40, sliceIndex: 0 }]);
   });
 });
