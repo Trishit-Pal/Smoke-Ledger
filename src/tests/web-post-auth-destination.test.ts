@@ -66,6 +66,12 @@ describe('postAuthDestination re-consent', () => {
     );
   });
 
+  it('honours an exempt next (the /settings delete-resume) instead of detouring through /consent', () => {
+    const next = '/settings?resume=delete';
+    expect(postAuthDestination({ ...ONBOARDED, health_data_consent_at: null }, 'magiclink', next)).toBe(next);
+    expect(postAuthDestination({ ...ONBOARDED, terms_version: '2020-01-01' }, null, '/privacy')).toBe('/privacy');
+  });
+
   it('still lets recovery through, and leaves a mid-wizard user in the wizard', () => {
     expect(
       postAuthDestination({ ...ONBOARDED, health_data_consent_at: null }, null, '/reset-password'),

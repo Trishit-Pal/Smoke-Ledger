@@ -15,6 +15,7 @@
 import type { Goal, GoalType, UserProfile } from '@/types';
 import { AppError } from '@/lib/errors';
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { newerVersion, versionAtLeast } from '@/lib/onboardingSteps';
 import { OnboardingUsageSchema, parseOrThrow, type OnboardingUsageInput } from '@/lib/validation';
 import {
   getProfile,
@@ -32,14 +33,14 @@ import type { PurchasePref } from '@/store/onboardingDraft';
 
 /* ---------- Step 01 · consent ---------- */
 
-/** True when the profile already holds every required consent at the current legal versions. */
+/** True when the profile already holds every required consent at the current (or a newer) legal version. */
 export function consentsCurrent(profile: UserProfile | null | undefined): boolean {
   return Boolean(
     profile?.ageConfirmedAt &&
       profile?.dataProcessingConsentAt &&
-      profile?.termsVersion === LEGAL_VERSIONS.terms &&
-      profile?.privacyVersion === LEGAL_VERSIONS.privacy &&
-      profile?.healthDisclaimerVersion === LEGAL_VERSIONS.medicalDisclaimer,
+      versionAtLeast(profile?.termsVersion, LEGAL_VERSIONS.terms) &&
+      versionAtLeast(profile?.privacyVersion, LEGAL_VERSIONS.privacy) &&
+      versionAtLeast(profile?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer),
   );
 }
 
@@ -123,15 +124,21 @@ export async function acceptChangedTerms({
   if (needsHealthConsent && !healthDataConsent) {
     throw new AppError('validation_error', 'Validation failed: health-data consent is required');
   }
+  // Never stamp a version lower than the stored one: an older build (a store
+  // binary, a stale tab) accepting must not undo a newer build's acceptance.
+  const stored = await getProfile();
+  const versions = {
+    termsVersion: newerVersion(stored?.termsVersion, LEGAL_VERSIONS.terms),
+    privacyVersion: newerVersion(stored?.privacyVersion, LEGAL_VERSIONS.privacy),
+    healthDisclaimerVersion: newerVersion(stored?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer),
+  };
   await recordAuditEvent('consent_accepted', 'compliance', {
-    termsVersion: LEGAL_VERSIONS.terms,
-    privacyVersion: LEGAL_VERSIONS.privacy,
+    termsVersion: versions.termsVersion,
+    privacyVersion: versions.privacyVersion,
   });
   await Promise.all([
     saveComplianceConsents({
-      termsVersion: LEGAL_VERSIONS.terms,
-      privacyVersion: LEGAL_VERSIONS.privacy,
-      healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
+      ...versions,
       ...(needsHealthConsent ? { healthDataConsentAt: new Date().toISOString() } : {}),
     }),
     setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),

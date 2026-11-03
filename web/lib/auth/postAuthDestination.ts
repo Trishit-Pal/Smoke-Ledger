@@ -1,7 +1,6 @@
 import type { AllowedEmailOtpType } from '@/lib/emailOtpType';
 import {
-  CONSENT_ROUTE,
-  consentsOutdated,
+  consentGateRedirect,
   hasRequiredConsents,
   resumeOnboardingRoute,
   resumeProfileFromRow,
@@ -63,8 +62,7 @@ export function postAuthDestination(
       : resumeOnboardingRoute(steps);
   }
 
-  // Older consents ask again once, before the page they were heading to.
-  if (consentsOutdated(steps)) return CONSENT_ROUTE;
-
-  return nextPath ?? '/dashboard';
+  // Older consents ask again once, before the page they were heading to, unless
+  // that page is exempt from the gate (the /settings delete-resume, the legal pages).
+  return consentGateRedirect(nextPathname ?? '/dashboard', steps, true) ?? nextPath ?? '/dashboard';
 }

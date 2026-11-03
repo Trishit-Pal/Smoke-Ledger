@@ -154,19 +154,37 @@ export function resumeOnboardingRoute(profile: ResumeProfile | null | undefined)
 
 /**
  * Someone who consented before, but not to what is current: a stored version is
- * older than LEGAL_VERSIONS, or the explicit health-data consent was never given
+ * older than LEGAL_VERSIONS (see `versionAtLeast`), or the explicit health-data consent was never given
  * (every user from before it existed has it NULL). Never true for someone who has
  * not consented at all - onboarding asks them. Reads only consent columns, never
  * `onboarding_step`, so asking again cannot move the wizard.
  */
 export function consentsOutdated(profile: ConsentProfile | null | undefined): boolean {
   if (!hasRequiredConsents(profile)) return false;
-  return (
-    profile?.termsVersion !== LEGAL_VERSIONS.terms ||
-    profile?.privacyVersion !== LEGAL_VERSIONS.privacy ||
-    profile?.healthDisclaimerVersion !== LEGAL_VERSIONS.medicalDisclaimer ||
-    !profile?.healthDataConsentAt
+  return !(
+    versionAtLeast(profile?.termsVersion, LEGAL_VERSIONS.terms) &&
+    versionAtLeast(profile?.privacyVersion, LEGAL_VERSIONS.privacy) &&
+    versionAtLeast(profile?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer) &&
+    profile?.healthDataConsentAt
   );
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A stored legal version counts as current when it is the required one or newer.
+ * Versions are ISO dates, so string order is date order. `>=` rather than `===`
+ * because the web and a store-installed mobile build can carry different
+ * LEGAL_VERSIONS: with `===` each would ask again after the other stamped its own
+ * version, forever. Legacy non-date values (e.g. '1') are always outdated.
+ */
+export function versionAtLeast(stored: string | null | undefined, required: string): boolean {
+  return typeof stored === 'string' && ISO_DATE.test(stored) && stored >= required;
+}
+
+/** The version to stamp: never lower than what is stored (an older build must not downgrade it). */
+export function newerVersion(stored: string | null | undefined, client: string): string {
+  return versionAtLeast(stored, client) ? (stored as string) : client;
 }
 
 export const CONSENT_ROUTE = '/consent';

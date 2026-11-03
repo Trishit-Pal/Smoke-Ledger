@@ -144,6 +144,29 @@ describe('acceptChangedTerms (the /consent screen)', () => {
   });
 });
 
+describe('acceptChangedTerms never downgrades a stored version', () => {
+  it('keeps a newer stored version (an older build accepting) and writes the build version otherwise', async () => {
+    mocked(profileRepo.getProfile).mockResolvedValueOnce({
+      ...consentedProfile,
+      termsVersion: '2099-01-01',
+      privacyVersion: '2020-01-01',
+      healthDisclaimerVersion: '1',
+    });
+    await acceptChangedTerms({ needsHealthConsent: false, healthDataConsent: false });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(patch.termsVersion).toBe('2099-01-01');
+    expect(patch.privacyVersion).toBe(LEGAL_VERSIONS.privacy);
+    expect(patch.healthDisclaimerVersion).toBe(LEGAL_VERSIONS.medicalDisclaimer);
+  });
+});
+
+describe('consentsCurrent across version skew', () => {
+  it('counts a newer stored version as current, a legacy "1" as not', () => {
+    expect(consentsCurrent({ ...consentedProfile, privacyVersion: '2099-01-01' })).toBe(true);
+    expect(consentsCurrent({ ...consentedProfile, privacyVersion: '1' })).toBe(false);
+  });
+});
+
 describe('submitConsentStep', () => {
   it('records consents + step in one profile write and audits once for a fresh user', async () => {
     await submitConsentStep({ alreadyConsented: false, analyticsOptIn: true, healthDataConsent: true });

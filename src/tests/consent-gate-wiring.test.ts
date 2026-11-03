@@ -22,7 +22,7 @@ describe('re-consent gate wiring', () => {
   });
 
   it('post-auth routing and the Expo entry points use the same check', () => {
-    expect(read('web', 'lib', 'auth', 'postAuthDestination.ts')).toContain('consentsOutdated(steps)');
+    expect(read('web', 'lib', 'auth', 'postAuthDestination.ts')).toContain('consentGateRedirect(nextPathname');
     expect(read('app', 'index.tsx')).toContain('consentsOutdated(profile)');
     const tabs = read('app', '(tabs)', '_layout.tsx');
     expect(tabs).toContain('consentGateRedirect(pathname, profile, true)');

@@ -169,6 +169,22 @@ describe('consentsOutdated', () => {
     expect(consentsOutdated({ ...current, dataProcessingConsentAt: null })).toBe(false);
   });
 
+  it('is false when a stored version is newer than this build knows (web/mobile skew cannot loop)', () => {
+    expect(
+      consentsOutdated({
+        ...current,
+        termsVersion: '2099-01-01',
+        privacyVersion: '2099-01-01',
+        healthDisclaimerVersion: '2099-01-01',
+      }),
+    ).toBe(false);
+  });
+
+  it('treats a legacy non-date version such as "1" as outdated', () => {
+    expect(consentsOutdated({ ...current, termsVersion: '1' })).toBe(true);
+    expect(consentsOutdated({ ...current, privacyVersion: '9' })).toBe(true);
+  });
+
   it('resumeProfileFromRow carries health_data_consent_at into the check', () => {
     const row = {
       age_confirmed_at: 'a',
