@@ -36,7 +36,7 @@ sources:
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
   - web/lib/auth/postAuthDestination.ts
   - src/lib/onboardingSteps.ts
-last_verified_commit: b4d45ae
+last_verified_commit: 8398559
 status: current
 ---
 
@@ -105,7 +105,7 @@ Every email link is first classified by `readAuthLink` (`src/lib/authLink.ts`), 
 - `/onboarding/privacy?welcome=1` if this is a `type=signup` link and consent columns are not yet filled
 - `/onboarding/privacy` if consent is incomplete for any reason
 - If `onboarded_at` is null: an allowlisted onboarding `next` if one was given, otherwise the user's **saved step** (`resumeOnboardingRoute` in `src/lib/onboardingSteps.ts`, read from `onboarding_step`). Someone who signed out halfway through the wizard lands back on the step they had reached, never on the consent page again. A consented row with no saved step resumes at usage.
-- `/consent` if the user is onboarded but `consentsOutdated(profile)` (a stored legal version differs from `LEGAL_VERSIONS`, or the explicit health-data consent was never given): the re-consent screen comes before the page they were heading to
+- `/consent` if the user is onboarded but `consentsOutdated(profile)` (a stored legal version is older than `LEGAL_VERSIONS`, or the explicit health-data consent was never given): the re-consent screen comes before the page they were heading to, unless that page is exempt from the gate (`consentGateRedirect`), so the `/settings` delete-resume after an email-link reauth goes straight back to the delete
 - `nextPath` (if in the allowlist) or `/dashboard` for a returning user
 
 The middleware uses the same helpers for its own redirects, so a password sign-in (which goes to `/dashboard` and gets bounced) resumes at the same place a magic-link sign-in does. The re-consent decision is shared the same way: `consentGateRedirect` (`src/lib/onboardingSteps.ts`) answers for the middleware, `postAuthDestination` and the Expo layouts, and `/consent`, the legal pages, Settings, the auth routes and `/api` are exempt so an outdated reader can still read, export, withdraw or sign in without a loop. The full gate is described in Security and Privacy.

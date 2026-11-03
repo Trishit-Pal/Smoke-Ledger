@@ -4,6 +4,12 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-03 — 8398559
+- data-model: erase also clears `mobile_changed_at` and old `deleted_at` stamps (`20261104140000_erase_profile_leftovers.sql`); country and currency kept as regional settings; the unapplied-migrations gap now runs to 140000.
+- auth: post-auth routing honours an exempt next (the `/settings` delete-resume) when consents are outdated; "outdated" means older, not different.
+- identity-profile: erase clears the mobile-change lock and old erase stamps; `acceptChangedTerms` never writes a version lower than the stored one.
+- security-privacy: versions compare as ISO dates (same or newer is current) so web/mobile skew cannot loop; every null web session clears the localStorage stores while only `SIGNED_OUT` expires the auth cookies; erase leftovers; five unapplied migrations.
+
 ## 2026-11-03 — b4d45ae
 - security-privacy: privacy V3 recorded. New subsections for retention (daily `purge_expired_records`, the `RETENTION` numbers, the pg_cron checks), error-log redaction, the lifecycle registry that drives web and mobile device clears, and consent (health-data consent, the re-consent gate and why it cannot loop, withdrawal, analytics-off deleting usage events, `legalEntity.ts` and the promises list). Erase now removes the three identity keys from the sign-in record, deletes the user's own error reports, no longer sets `deleted_at`, clears `health_data_consent_at` and is followed by a session refresh; the export is version 3 with the account block and error reports; per-user rate-limit keys are hashed; the erasure-proof row and a post-erase export are described correctly (the old "empty auditEvents" claim was wrong). Chat gains "Written by AI" and Clear conversation. Five new invariants, the V3 tests, and honest open gaps (migrations unapplied, `LEGAL_VERSIONS` unbumped behind the EU-representative gate, `discreetOn` not routed through the registry, lawyer questions). Sources add the privacy, consent and logger files.
 - data-model: `health_data_consent_at`; `deleted_at` no longer set by erase; `delete_my_usage_events()` and `purge_expired_records()`; export version 3; retention notes on `audit_events`, `error_events` (redacted) and `usage_events`; hashed `rate_limit_counters` identities; audit rows survive erase for 12 months, not forever.
