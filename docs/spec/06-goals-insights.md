@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: 467615f
+last_verified_commit: 3d534c0
 status: current
 ---
 
@@ -163,7 +163,9 @@ which uses the same two numbers; a test keeps the constants and the SQL equal.
 The schema also enforces `endDate >= startDate` and validates `type` against the
 enum, which now includes `taper`; the database CHECK carries the same list. The
 create form says so before the schema does: `buildGoalPayload` returns "Enter a
-target no higher than N" past the type's limit. `ImportGoalSchema` accepts an
+target no higher than N" past the type's limit, with N grouped for the reader's
+locale (`1,00,000` for en-IN; `buildGoalPayload` and `buildGoalPatch` take the
+locale, default from `localeForCountry(null)`). `ImportGoalSchema` accepts an
 optional `completedAt` so an export round-trips.
 
 **Evaluation: `evaluateGoal` (`src/domain/goals.ts:54`).** A pure function that
@@ -251,7 +253,9 @@ count or a claim about a cap it may not have.
 **Colour.** Teal (`--accent` on web, `theme.accent` on mobile) appears only for
 `on_track` and `met`. Every concern, including at risk and off track, is the
 terracotta `--warn-earth` / `theme.warnEarth`, on the figure, the ring or bar, and
-the caption. Never red, never amber. The mobile `ProgressBar` gained a `warnEarth`
+the caption. On web, concern text (captions, notices, trend deltas) uses
+`--warn-earth-ink`, the AA-safe variant for text; `--warn-earth` stays for borders, bars
+and strokes. Never red, never amber. The mobile `ProgressBar` gained a `warnEarth`
 tone for this.
 
 **Proposals (`src/domain/goalProposals.ts`).** A proposal is a ledger-derived
@@ -347,9 +351,19 @@ every load is safe and a second tab or device doing the same write is harmless.
 **Where reconcile runs.** It is client-side, on load, in the reader's own date
 (never UTC). `reconcileGoals` (`src/services/goalReconcile.ts:37`) takes the
 repository writers as an argument so it imports no database code, writes each due
-transition in order, and returns `{ goals, applied, failed }`. One failed write
+transition in order, and returns `{ goals, applied, skipped, failed }`. One failed write
 never blocks the rest and never throws; it goes into `failed` and is simply
-planned again on the next load.
+planned again on the next load. The writes are conditional, because the plan is
+made from a snapshot that another device may have outdated. `completeGoalIfActive`
+(`src/db/repositories/goals.ts`) flips a goal to completed only while its status is
+still active and reports whether a row changed; `markGoalMet` re-reads the CURRENT
+row, merges `metOn` into its current meta (never a stale snapshot copy, which would
+resurrect steps and dismissals written since) and updates only if the goal is still
+active and its `target_value` is the one the plan used. When the server declines
+(the goal was set aside, deleted or re-anchored elsewhere) the transition lands in
+`skipped`: not an error, no "Quit day." moment, and the web hook keeps the card as
+stored and refreshes. A user's own status change (`setGoalStatus`) stays
+unconditional.
 
 - **Web.** The `useGoalReconcile(goals, logs, today)` hook
   (`web/lib/goals/useGoalReconcile.ts`) runs on `/goals` and on Home, once per
@@ -368,7 +382,7 @@ planned again on the next load.
 renders are the loaded goals with every due transition applied *except those whose
 write failed* (`renderedGoals`, `src/domain/goalReconcileView.ts`), so a goal the
 database still holds as active does not appear completed. The reader sees one
-quiet line in warn-earth: "Some goal updates could not be saved. They will be
+quiet line in warn-earth (`--warn-earth-ink` on web): "Some goal updates could not be saved. They will be
 retried next time." On web it is the page-level notice on `/goals` and under the
 goal on Home; on mobile the store keeps `goalsReconcileFailed` and the goals tab
 shows it.
@@ -387,7 +401,11 @@ goal moves into `completed` or `abandoned` from `active` or `paused`, and clears
 when a goal returns to `active` or `paused`. Goals that were already finished
 before the trigger existed keep a NULL, because the ledger does not invent dates.
 The Done section shows "Completed 03/11/2026" or "Set aside 03/11/2026" when a
-date exists and the bare word when it does not (`doneLabel`). The export carries
+date exists and the bare word when it does not (`doneLabel`). `completed_at` is a
+UTC instant, so `doneLabel(status, completedAt, zone)` reads the day in the
+reader's ledger zone (`ledgerTimeZone()` on mobile, the profile's zone on web), not
+the runtime's: a server render and the browser would otherwise name different days
+near midnight. The export carries
 `completedAt` per goal. The mobile store mirrors the stamp locally in
 `setGoalStatus` until the next load.
 
@@ -801,6 +819,9 @@ anchor).
   strengthened discreet e2e runs only in CI.
 - A failed reconcile write is retried only by the next load; there is no retry
   queue or backoff, and mobile shows the failure notice only on the goals tab.
+- `markGoalMet` reads the goal's meta and then writes it, so a meta-only write by
+  another device (a dismissal) inside that gap is lost. The target condition closes
+  the proposal-accept race; a jsonb merge in an RPC would close this one.
 - `no_smoke_window` still reads its hours straight from `goal.meta` rather than
   through `readGoalMeta`; the rule that all meta goes through the reader applies
   to new code and has not yet been back-applied there.

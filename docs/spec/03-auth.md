@@ -36,7 +36,7 @@ sources:
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
   - web/lib/auth/postAuthDestination.ts
   - src/lib/onboardingSteps.ts
-last_verified_commit: 8398559
+last_verified_commit: 3d534c0
 status: current
 ---
 
@@ -124,7 +124,7 @@ The `next` parameter is sanitized by `sanitizeCallbackNextPath` before any redir
 
 ### Auth layout guard (mobile)
 
-`app/(auth)/_layout.tsx` reads `session` and `initialized` from the auth store. While `initialized` is false it renders a spinner. Once initialized, if a session exists, it redirects to `/` — a logged-in user cannot land on login or signup screens. This prevents the flash of a login form after a session is restored from SecureStore.
+`app/(auth)/_layout.tsx` reads `session` and `initialized` from the auth store. While `initialized` is false it renders a spinner. Once initialized, if a session exists, it redirects to `/` — a logged-in user cannot land on login or signup screens. This prevents the flash of a login form after a session is restored from SecureStore. The other direction (signed out, or consent outdated, anywhere in the app) is not decided here but by the one root route guard (`routeGuardRedirect`, see Architecture), which leaves `/login`, `/signup`, `/reset` and `/auth` open to signed-in readers so the delete re-auth detour can reach the login screen.
 
 ### Error handling and rate limiting
 

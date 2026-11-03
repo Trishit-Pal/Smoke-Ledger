@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: 27c86cb
+last_verified_commit: 3d534c0
 status: current
 ---
 
@@ -60,7 +60,7 @@ From September to late October 2026 the workflow ran **zero jobs**: a `secrets.*
 
 **Weekly posture audit** (`.github/workflows/posture-audit.yml`, Mondays): a full-history redacted gitleaks scan that fails the run, plus `npm audit` reported to the job summary only. **Dependabot** (`.github/dependabot.yml`) proposes weekly updates for root npm, web npm and GitHub Actions, grouping minor and patch bumps.
 
-**`db-smoke`** starts a local Supabase database with `npx supabase db start`, applies all migrations via `npx supabase db reset --no-seed`, then runs `scripts/sql/smoke.sql` via `psql`. That SQL file asserts the existence of the critical RPCs (`export_account_data`, `create_log_with_rate_limit`, `record_audit_event`), the `audit_events` table, the `error_events_compliance_delete_null_user_check` constraint, the `error_events_insert` RLS policy, the absence of `error_events_delete` and `error_events_update` policies, the `idx_logs_brand` index, the `brand_variants` ON DELETE RESTRICT constraint, and the `v_daily_summary_user` view and `get_daily_summary` RPC. Later blocks assert that `anon` can execute no SECURITY DEFINER function and holds no table privilege, that the payload size caps exist, that the rate-limit purge is scheduled when pg_cron is installed, and that `authenticated` cannot INSERT into `cigarette_logs` directly.
+**`db-smoke`** starts a local Supabase database with `npx --yes supabase@<version> db start` (every Supabase call in CI, here and in `rls-integration` and `responsive-e2e`, goes through the workflow-level `SUPABASE_CLI_VERSION`, now `2.122.1`: an unpinned `npx supabase` resolves the latest release on each run, so a new major, 3.0.0 on 2026-11-02, would change CI with no commit; bump it deliberately), applies all migrations via `... db reset --no-seed`, then runs `scripts/sql/smoke.sql` via `psql`. That SQL file asserts the existence of the critical RPCs (`export_account_data`, `create_log_with_rate_limit`, `record_audit_event`), the `audit_events` table, the `error_events_compliance_delete_null_user_check` constraint, the `error_events_insert` RLS policy, the absence of `error_events_delete` and `error_events_update` policies, the `idx_logs_brand` index, the `brand_variants` ON DELETE RESTRICT constraint, and the `v_daily_summary_user` view and `get_daily_summary` RPC. Later blocks assert that `anon` can execute no SECURITY DEFINER function and holds no table privilege, that the payload size caps exist, that the rate-limit purge is scheduled when pg_cron is installed, that `authenticated` cannot INSERT into `cigarette_logs` directly, and that the triggers the clients rely on exist (`trg_user_profiles_onboarding_step_monotonic`, `goals_stamp_completed_at`, `trg_user_profiles_marketing_consent_null`, with the old marketing CHECK absent). The jobs that check out code (`db-smoke`, `rls-integration`, `responsive-e2e`) set `persist-credentials: false`, so the token is not left in the workspace for the CLI steps.
 
 **`responsive-e2e`** builds a throwaway local Supabase from the PR's migrations (no secrets, and the specs refuse any non-local URL) and runs the dev servers. The responsive sweep covers every page at every viewport and engine for overflow, target size and iOS input zoom. The job sets `LEDGER_CHAT_ENABLED: 'true'` (no Anthropic key: the specs mock `/api/ledger-chat`), so the sweep also checks that the Ask dock fits each viewport. A second step, "Functional E2E (chat, dock, consent, goals)", then runs `ledger-chat.spec.ts`, `ask-dock.spec.ts`, `consent.spec.ts` and `goals.spec.ts` on Chromium and fails if any spec was skipped or none ran, because those specs skip themselves without a seedable stack and a silent skip would be a false pass. Production keeps the flag off; the mobile flag `EXPO_PUBLIC_LEDGER_CHAT_ENABLED` is a build-time variable set per EAS profile (`.env.example`; `eas.json` carries a blank `EXPO_PUBLIC_WEB_BASE_URL` that must be filled in before the mobile chat can work).
 
@@ -152,7 +152,7 @@ The rules here that must not quietly break:
 
 **Sovereignty verification** (`npm run verify:sovereignty`): probes 13 tenant tables and 3 data-rights RPCs with an anon client. Point-in-time output is recorded in `docs/security/sovereignty-audit-2026-06.md`. Reproducing it requires only the public anon key.
 
-**Migration smoke** (`scripts/sql/smoke.sql`): a plain SQL `DO` block run via `psql` in the `db-smoke` CI job. Asserts 10 structural invariants on the Postgres schema, including the H1 tamper-resistance constraint and the F1a view.
+**Migration smoke** (`scripts/sql/smoke.sql`): a plain SQL `DO` block run via `psql` in the `db-smoke` CI job. Asserts the structural invariants on the Postgres schema, including the H1 tamper-resistance constraint and the F1a view.
 
 **DB-smoke job**: spins up a local Supabase instance, resets the schema with all migrations, runs the SQL smoke file, and tears down. This is the CI guard for migration correctness — it catches `CREATE FUNCTION`/`CREATE TABLE` failures before they reach a shared project.
 
