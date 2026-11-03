@@ -36,6 +36,8 @@ From `src/lib/privacy/lifecycle.ts`. Events: sign-out (session ends for any caus
 | Auth session cookie (`sb-*`) | Web | Sign-out, delete |
 | Remember-me cookie | Web | Delete |
 | Chat transcript (localStorage) | Web | Sign-out, erase, delete, withdraw, discreet on |
+| Chat dock minimised flag (`sl_chat_dock_minimised`, not personal) | Web | Kept; cleared only when the reader clears site data |
+| Chat transcript (memory only) | Mobile | Gone when the Ask screen closes; never written to storage |
 | First-suggestion key | Web, mobile | Sign-out, erase, delete, withdraw |
 | Lock keys | Web (localStorage), mobile (SecureStore) | Erase, delete, withdraw |
 | Brands cache | Web | Erase, delete, withdraw |

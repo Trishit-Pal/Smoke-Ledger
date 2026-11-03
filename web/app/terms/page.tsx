@@ -31,7 +31,7 @@ const sections = [
     title: 'What the service is',
     body: [
       'Smoke Ledger is a private ledger of the cigarettes you smoke and what they cost. It shows your trends, helps you set goals to cut down or stop, sends reminders if you ask for them, and lets you export, erase or delete your data at any time.',
-      'Ask the ledger, on the web app only, answers questions about your own ledger using an AI model run by Anthropic. It is off until you turn it on, each answer is labelled “Written by AI”, there is a daily limit on questions, and its answers can be wrong. Check anything that matters against your own entries.',
+      'Ask the ledger, in the web and mobile apps, answers questions about your own ledger using an AI model run by Anthropic. It is off until you turn it on, each answer is labelled “Written by AI”, there is a daily limit on questions, and its answers can be wrong. Check anything that matters against your own entries.',
       'We will keep improving Smoke Ledger, so features may change. The section on changes below sets out how.',
     ],
   },
