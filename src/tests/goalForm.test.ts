@@ -143,6 +143,17 @@ describe('buildGoalPayload', () => {
     });
   });
 
+  it('rejects a target above the per-unit max and accepts the max itself', () => {
+    expect(buildGoalPayload(form({ type: 'daily_cap', target: '1001' }), [], TODAY)).toEqual({
+      ok: false, error: 'Enter a target no higher than 1,000.',
+    });
+    expect(buildGoalPayload(form({ type: 'weekly_target', target: '1000' }), [], TODAY).ok).toBe(true);
+    expect(buildGoalPayload(form({ type: 'spend_cap_daily', target: '100001' }), [], TODAY)).toEqual({
+      ok: false, error: 'Enter a target no higher than 100,000.',
+    });
+    expect(buildGoalPayload(form({ type: 'spend_cap_daily', target: '100000' }), [], TODAY).ok).toBe(true);
+  });
+
   it('rejects a non-positive scalar target', () => {
     expect(buildGoalPayload(form({ type: 'daily_cap', target: '0' }), [], TODAY).ok).toBe(false);
     expect(buildGoalPayload(form({ type: 'daily_cap', target: 'abc' }), [], TODAY).ok).toBe(false);

@@ -13,7 +13,7 @@ import { CONTEXT_OPTIONS } from '@/constants/contexts';
 import { MOOD_OPTIONS } from '@/constants/moods';
 import { TRIGGER_OPTIONS } from '@/constants/triggers';
 import { ONBOARDING_STEP_INDEX } from '@/lib/onboardingSteps';
-import type { OnboardingStep } from '@/types';
+import type { GoalType, OnboardingStep } from '@/types';
 
 /* ---------- Primitive / shared ---------- */
 
@@ -148,10 +148,18 @@ export const CigaretteLogPatchSchema = CigaretteLogShape.partial().strict();
 
 /* ---------- Goals ---------- */
 
+// Sticks stay at 1,000; money (spend caps) is rupees/euros per day, week or month,
+// so a weekly cap legitimately passes 1,000. Mirrors goals_target_value_check in
+// supabase/migrations/20261105100000_goal_target_by_unit.sql (a test pins both).
+export const MAX_STICK_TARGET = 1_000;
+export const MAX_MONEY_TARGET = 100_000;
+export const maxTargetFor = (type: GoalType): number =>
+  type === 'spend_cap_daily' ? MAX_MONEY_TARGET : MAX_STICK_TARGET;
+
 export const GoalSchema = z
   .object({
     type: GoalTypeSchema,
-    targetValue: z.number().positive().max(1_000),
+    targetValue: z.number().positive().max(MAX_MONEY_TARGET),
     currentBaseline: z.number().min(0).max(1_000).nullable().optional(),
     startDate: YmdSchema,
     endDate: YmdSchema.nullable().optional(),
@@ -161,7 +169,11 @@ export const GoalSchema = z
   .refine(
     (g) => !g.endDate || g.endDate >= g.startDate,
     { message: 'endDate must be on or after startDate', path: ['endDate'] },
-  );
+  )
+  .refine((g) => g.targetValue <= maxTargetFor(g.type), {
+    message: 'targetValue is above the limit for this goal type',
+    path: ['targetValue'],
+  });
 
 export type GoalInput = z.infer<typeof GoalSchema>;
 
@@ -170,7 +182,8 @@ export type GoalInput = z.infer<typeof GoalSchema>;
  * (they anchor the goal's meaning and baseline), so they are not patchable.
  */
 export const GoalPatchSchema = z.object({
-  targetValue: z.number().positive().max(1_000).optional(),
+  // The patch carries no type; the per-type DB CHECK is the authority here.
+  targetValue: z.number().positive().max(MAX_MONEY_TARGET).optional(),
   currentBaseline: z.number().min(0).max(1_000).nullable().optional(),
   endDate: YmdSchema.nullable().optional(),
   meta: z.record(z.unknown()).nullable().optional(),
@@ -317,7 +330,7 @@ export const ImportGoalSchema = z
   .object({
     id: IdSchema,
     type: GoalTypeSchema,
-    targetValue: z.number().positive().max(1_000),
+    targetValue: z.number().positive().max(MAX_MONEY_TARGET), // the DB CHECK enforces the per-type limit
     currentBaseline: z.number().nullable(),
     startDate: YmdSchema,
     endDate: YmdSchema.nullable(),

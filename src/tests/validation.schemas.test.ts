@@ -1,4 +1,14 @@
-import { YmdSchema, IdSchema, GoalSchema, GoalTypeSchema, ImportGoalSchema } from '@/lib/validation';
+import {
+  YmdSchema,
+  IdSchema,
+  GoalSchema,
+  GoalPatchSchema,
+  GoalTypeSchema,
+  ImportGoalSchema,
+  MAX_MONEY_TARGET,
+  MAX_STICK_TARGET,
+  maxTargetFor,
+} from '@/lib/validation';
 
 describe('YmdSchema', () => {
   it('accepts valid calendar dates', () => {
@@ -35,6 +45,38 @@ describe('GoalSchema', () => {
         startDate: '2025-04-01',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('goal target limits per unit', () => {
+  const goal = (type: string, targetValue: number) =>
+    GoalSchema.safeParse({ type, targetValue, startDate: '2025-04-01' }).success;
+
+  it('sticks types stop at 1,000', () => {
+    expect(goal('daily_cap', 1000)).toBe(true);
+    expect(goal('daily_cap', 1001)).toBe(false);
+    expect(goal('weekly_target', 1001)).toBe(false);
+  });
+
+  it('spend caps accept up to 100,000', () => {
+    expect(goal('spend_cap_daily', 1260)).toBe(true);
+    expect(goal('spend_cap_daily', 100_000)).toBe(true);
+    expect(goal('spend_cap_daily', 100_001)).toBe(false);
+  });
+
+  it('maxTargetFor mirrors the constants', () => {
+    expect(maxTargetFor('spend_cap_daily')).toBe(MAX_MONEY_TARGET);
+    expect(maxTargetFor('taper')).toBe(MAX_STICK_TARGET);
+  });
+
+  it('patch and import allow the money ceiling (the DB CHECK is the per-type authority)', () => {
+    expect(GoalPatchSchema.safeParse({ targetValue: 100_000 }).success).toBe(true);
+    expect(GoalPatchSchema.safeParse({ targetValue: 100_001 }).success).toBe(false);
+    const imp = {
+      id: 'g', type: 'spend_cap_daily', targetValue: 5000, currentBaseline: null, startDate: '2025-04-01',
+      endDate: null, status: 'active', meta: null, createdAt: '2025-04-01T00:00:00.000Z',
+    };
+    expect(ImportGoalSchema.safeParse(imp).success).toBe(true);
   });
 });
 

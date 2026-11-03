@@ -1,6 +1,7 @@
 import type { CigaretteLog, Goal } from '@/types';
 import { dayShift } from '@/domain/calc';
 import { holdStatus } from '@/domain/goalAdherence';
+import { GoalSchema } from '@/lib/validation';
 import {
   describeProposal,
   hasEnoughHistory,
@@ -121,6 +122,21 @@ describe('proposeStart', () => {
     });
   });
 
+  it('a weekly cap above 1,000 is proposed and passes GoalSchema (200 a day -> 1,260)', () => {
+    const p = proposeStart('spend_cap_daily', run(14, 5, 200), TODAY, { ...INR, period: 'week' });
+    expect(p).toMatchObject({ value: 1260, period: 'week' });
+    expect(
+      GoalSchema.safeParse({ type: 'spend_cap_daily', targetValue: p?.value, startDate: TODAY }).success,
+    ).toBe(true);
+  });
+
+  it('start proposals above the per-unit max are null, never an unsaveable value', () => {
+    // 20,000 a day x 30 x 0.9 = 540,000 money; 200 sticks a day x 7 x 0.9 = 1,260 sticks
+    expect(proposeStart('spend_cap_daily', run(14, 5, 20_000), TODAY, { ...INR, period: 'month' })).toBeNull();
+    expect(proposeStart('weekly_target', run(14, 200), TODAY, INR)).toBeNull();
+    expect(proposeStart('daily_cap', run(14, 5000), TODAY, INR)).toBeNull();
+  });
+
   it('spend cap is null when nothing was spent', () => {
     expect(proposeStart('spend_cap_daily', run(14, 5), TODAY, INR)).toBeNull();
   });
@@ -239,8 +255,12 @@ describe('proposeReanchor', () => {
     expect(proposeReanchor(mkGoal(), run(14, 3, null, 0), TODAY, INR)).toBeNull();
   });
 
-  it('caps the value at 1000', () => {
-    expect(proposeReanchor(mkGoal(), run(14, 5000, null, 0), TODAY, INR)?.value).toBe(1000);
+  it('returns no proposal when the re-anchored value would exceed the per-unit max (D5)', () => {
+    expect(proposeReanchor(mkGoal(), run(14, 5000, null, 0), TODAY, INR)).toBeNull();
+    expect(proposeReanchor(mkGoal(), run(14, 1000, null, 0), TODAY, INR)?.value).toBe(1000);
+    const spend = mkGoal({ type: 'spend_cap_daily', targetValue: 100 });
+    expect(proposeReanchor(spend, run(14, 5, 110_000, 0), TODAY, INR)).toBeNull(); // 110,000 a day
+    expect(proposeReanchor(spend, run(14, 5, 100_000, 0), TODAY, INR)?.value).toBe(100_000);
   });
 
   it('spend rounds up to the unit', () => {
