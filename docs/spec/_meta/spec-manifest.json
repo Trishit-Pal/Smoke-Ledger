@@ -21,7 +21,7 @@
         "metro.config.js",
         "src/lib/routeGuard.ts"
       ],
-      "last_verified_commit": "3d534c0",
+      "last_verified_commit": "c0cc07b",
       "status": "current"
     },
     {
@@ -73,7 +73,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "3d534c0",
+      "last_verified_commit": "c0cc07b",
       "status": "current"
     },
     {

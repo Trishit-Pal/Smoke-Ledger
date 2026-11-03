@@ -7,6 +7,8 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 ## 2026-11-03 — e974a1e
 - security-privacy: Phase B final-review fixes. `delete-account` writes `consent_revoked` only after `deleteUser` succeeds (`user_id` null, props `{ hashed_user_id, reason: 'delete' }`), superseding the earlier "past the re-auth gate, before the erase" wording; spoken masks say "hidden" (`spokenMask`) on both the web live region and the mobile announcement; the discreet guard also counts "twice", "a couple of", "a dozen".
 - goals-insights: the mobile store reloads the goals once when a reconcile transition was skipped.
+- architecture: the route guard's cover is modal to VoiceOver and the content wrapper hides from TalkBack while it shows.
+- identity-profile: verified only; the diff touched a stale `--warn-earth` comment in `SettingsClient.tsx`.
 - Also updated outside the spec: `docs/legal/owner-actions.md` (step 3 note on when the withdrawal row is written).
 
 ## 2026-11-03 — 3d534c0
