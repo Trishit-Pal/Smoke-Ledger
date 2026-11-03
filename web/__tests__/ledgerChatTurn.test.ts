@@ -112,6 +112,33 @@ describe('runLedgerChatTurn', () => {
     expect(result.rows.length).toBeGreaterThan(0);
   });
 
+  test('a spelled-out figure gets the same single retry, then a clean rewrite is kept', async () => {
+    const { client, calls } = fakeClient([
+      message([toolUse('compare_periods', { window: 'week' })], 'tool_use'),
+      message([text('About fifteen sticks this week.')], 'end_turn'),
+      message([text('Fewer than last week.')], 'end_turn'),
+    ]);
+
+    const result = await run(client);
+
+    expect(calls).toHaveLength(3);
+    expect(result.usage.guardRetries).toBe(1);
+    expect(JSON.stringify(calls[2].messages.at(-1))).toContain('fifteen');
+    expect(result.answer).toBe('Fewer than last week.');
+  });
+
+  test('a number word that survives the retry falls back to the rows', async () => {
+    const { client } = fakeClient([
+      message([toolUse('compare_periods', { window: 'week' })], 'tool_use'),
+      message([text('Teen sticks aaj.')], 'end_turn'),
+      message([text('Still about a hundred rupees.')], 'end_turn'),
+    ]);
+
+    const result = await run(client);
+
+    expect(result.answer).toBe(FALLBACK_ANSWER);
+  });
+
   test('a refusal yields the calm fallback and runs no tools', async () => {
     const { client, calls } = fakeClient([message([], 'refusal')]);
 

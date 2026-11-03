@@ -85,6 +85,50 @@ export function findUnverifiedNumbers(text: string, allowed: ReadonlySet<string>
   return out;
 }
 
+// Number words (gap N2): a figure spelled out dodges the digit check above.
+// "one" and "two" are left alone; they are everyday English ("one of", "two
+// quiet days"). Hinglish words count only before a unit, because "do" is also
+// English ("do you").
+const TENS = 'twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
+const ONES = 'one|two|three|four|five|six|seven|eight|nine';
+const ENGLISH_WORDS =
+  `(?:${TENS})(?:-(?:${ONES}))?|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen` +
+  '|sixteen|seventeen|eighteen|nineteen|hundreds?|thousands?|lakhs?|crores?|millions?|percent|per\\s+cent';
+const HINGLISH_WORDS = 'ek|do|teen|char|chaar|paanch|panch|chhe|saat|aath|nau|das';
+const HINGLISH_UNIT = '(?=\\s+(?:sticks?|cigarettes?|cigs?|packs?|rupees?|rs|euros?|baar|din|ghante)\\b)';
+const NUMBER_WORD = new RegExp(`\\b(?:${ENGLISH_WORDS})\\b|\\b(?:${HINGLISH_WORDS})\\b${HINGLISH_UNIT}`, 'gi');
+const WORD_DURATION_CONTEXT =
+  /^[\s-]*(?:days?|weeks?|months?|years?|hours?|hrs?|minutes?|mins?|o['’]clock|am|pm|a\.m\.|p\.m\.|din|ghante)(?![a-z])/i;
+
+/**
+ * Spelled-out figures in `text`. Outside discreet mode a number word followed
+ * by a duration or time ("three days", "nine pm", "teen din") is allowed; in
+ * discreet mode every number word is unverified. "percent" right after digits
+ * is left to findUnverifiedNumbers, which checks the digits themselves.
+ */
+export function findUnverifiedNumberWords(text: string, opts: { discreet: boolean }): string[] {
+  const out: string[] = [];
+  const re = new RegExp(NUMBER_WORD.source, 'gi');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const word = m[0];
+    const before = text.slice(0, m.index);
+    if (/^per/i.test(word) && /\d\s*$/.test(before)) continue;
+    if (!opts.discreet && WORD_DURATION_CONTEXT.test(text.slice(m.index + word.length))) continue;
+    out.push(word);
+  }
+  return out;
+}
+
+/** Digits and number words together: what the turn engine checks before showing a reply. */
+export function findUnverifiedFigures(
+  text: string,
+  allowed: ReadonlySet<string>,
+  opts: { discreet: boolean },
+): string[] {
+  return [...findUnverifiedNumbers(text, allowed), ...findUnverifiedNumberWords(text, opts)];
+}
+
 /** Plain text only: no links, no markdown, no html, bounded length. */
 export function sanitizeNarration(text: string): string {
   const cleaned = text
