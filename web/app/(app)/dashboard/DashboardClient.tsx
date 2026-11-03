@@ -53,7 +53,6 @@ import { ActivityLog } from '@web/components/dashboard/ActivityLog';
 import { CharacterCompanion } from '@web/components/character/CharacterCompanion';
 import { FloatingOrb } from '@web/components/visual/FloatingOrb';
 import { SectionLabel, MetricRow, ChoiceRun } from '@web/components/visual';
-import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
 import { Button } from '@web/components/ui/Button';
 import { getSupabase } from '@web/lib/supabase/client';
 import { sessionUserId } from '@web/lib/goals/sessionUserId';
@@ -75,8 +74,6 @@ export interface DashboardClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
   summary: DailySummaryRow[];
   summarySinceYmd: string;
-  /** Server flag for Ask the ledger; the launcher stays hidden while false. */
-  ledgerChatEnabled: boolean;
 }
 
 type WindowDays = 1 | 7 | 30 | 365;
@@ -152,7 +149,6 @@ export function DashboardClient({
   brands,
   summary,
   summarySinceYmd,
-  ledgerChatEnabled,
 }: DashboardClientProps) {
   const router = useRouter();
   const [quickLogError, setQuickLogError] = React.useState<string | null>(null);
@@ -802,14 +798,6 @@ export function DashboardClient({
             >
               View full history →
             </button>
-            <AskLedgerLauncher
-              enabled={ledgerChatEnabled}
-              profile={profile}
-              logs={logs}
-              rows={summary}
-              goals={goals}
-              today={today}
-            />
           </div>
           <span className="text-caption text-text-faint italic">Quiet, on purpose.</span>
         </footer>

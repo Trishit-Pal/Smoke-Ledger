@@ -3,7 +3,6 @@ import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@web/lib/supabase/server';
 import { createAdminClient } from '@web/lib/supabase/admin';
-import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
@@ -450,7 +449,6 @@ export async function getDashboardData() {
     brands,
     summary: summary.map(toDailySummaryRow),
     summarySinceYmd,
-    ledgerChatEnabled: isLedgerChatEnabled(),
   };
 }
 
@@ -530,7 +528,7 @@ export async function getTrendsPageData() {
     getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
     getServerGoals(),                           // active goals (request-cached) — the cap line
   ]);
-  return { profile, logs, dailySummary, goals, ledgerChatEnabled: isLedgerChatEnabled() };
+  return { profile, logs, dailySummary, goals };
 }
 
 export async function getNewLogPageData() {

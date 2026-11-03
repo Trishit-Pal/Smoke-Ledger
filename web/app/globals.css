@@ -959,3 +959,12 @@
     animation: ask-sheet-fade 200ms ease-out both;
   }
 }
+/* The Ask dock / pill settles in once, slowly, like the page's own reveal. */
+.ask-dock {
+  animation: ask-sheet-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask-dock {
+    animation: ask-sheet-fade 200ms ease-out both;
+  }
+}

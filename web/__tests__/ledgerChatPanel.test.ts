@@ -2,14 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
-// Source-scan pins for the panel and launcher, in the repo's style for
+// Source-scan pins for the panel, in the repo's style for
 // components (no jsdom here). Each pin is a rule the design or privacy
 // review would otherwise have to re-check by hand.
 const chat = join(__dirname, '..', 'components', 'chat');
 const panel = readFileSync(join(chat, 'AskLedgerPanel.tsx'), 'utf8');
-const launcher = readFileSync(join(chat, 'AskLedgerLauncher.tsx'), 'utf8');
-const dashboard = readFileSync(join(__dirname, '..', 'app', '(app)', 'dashboard', 'DashboardClient.tsx'), 'utf8');
-const trends = readFileSync(join(__dirname, '..', 'app', '(app)', 'trends', 'TrendsClient.tsx'), 'utf8');
 const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'SettingsClient.tsx'), 'utf8');
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
@@ -22,7 +19,8 @@ describe('AskLedgerPanel', () => {
 
   test('renders figures through MetricRow and masks at the render site with the shared helpers', () => {
     expect(panel).toMatch(/import \{[^}]*MetricRow[^}]*\} from '@web\/components\/visual'/);
-    expect(panel).toContain('isHomeTotalsHidden(');
+    // Hidden comes from the GET state (discreet or hide-totals-on-home); unknown state masks.
+    expect(panel).toMatch(/const hidden = state \? state\.hideTotals : true;/);
     // Rows and prose both pass through src/lib/discreet; no local '•••' re-implementation.
     expect(panel).toContain('maskInr(');
     expect(panel).toContain('maskCount(');
@@ -91,21 +89,27 @@ describe('AI label and Clear conversation', () => {
   });
 });
 
-describe('AskLedgerLauncher and its mount points', () => {
-  test('renders nothing while the feature is off', () => {
-    expect(launcher).toMatch(/if \(!enabled\) return null/);
+describe('state from GET and the initial question', () => {
+  test('reads panel state from GET /api/ledger-chat once, not from page props', () => {
+    expect(panel).toMatch(/fetch\('\/api\/ledger-chat', \{ method: 'GET' \}\)/);
+    expect(panel).not.toMatch(/profile: UserProfile/);
+    expect(panel).toContain('fetchedRef.current');
   });
 
-  test('derives starters from the ledger state, not from analytics', () => {
-    expect(launcher).toContain("from '@/domain/ledgerChat/starters'");
-    expect(launcher).not.toContain('usage_events');
+  test('an initial question is sent once when consented, and waits behind the consent notice when not', () => {
+    expect(panel).toContain('initialQuestion');
+    expect(panel).toContain('consumedRef.current = true');
+    const effect = panel.slice(panel.indexOf('consumedRef.current = true'), panel.indexOf('consumedRef.current = true') + 500);
+    expect(effect).toMatch(/!state\.consented[\s\S]*setStatus\('consent'\)/);
+    expect(effect).toContain('void send(q, false)');
   });
 
-  test('is mounted on the dashboard footer and under the Trends end-mark, gated by the server flag', () => {
-    for (const src of [dashboard, trends]) {
-      expect(src).toContain('<AskLedgerLauncher');
-      expect(src).toContain('ledgerChatEnabled');
-    }
+  test('outdated agreements and a resting feature get calm copy; outdated links to /consent', () => {
+    expect(panel).toContain('Your agreements changed. Review them to keep asking.');
+    expect(panel).toContain('href="/consent"');
+    expect(panel).toContain("'consent_outdated'");
+    expect(panel).toContain('Ask the ledger is resting for now.');
+    expect(panel).not.toMatch(/text-danger|bg-danger|red-/);
   });
 });
 

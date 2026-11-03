@@ -2,8 +2,7 @@ import { getDashboardData } from '@web/lib/server/data';
 import { DashboardClient } from './DashboardClient';
 
 export default async function DashboardPage() {
-  const { profile, logs, goals, brands, summary, summarySinceYmd, ledgerChatEnabled } =
-    await getDashboardData();
+  const { profile, logs, goals, brands, summary, summarySinceYmd } = await getDashboardData();
   return (
     <DashboardClient
       profile={profile}
@@ -12,7 +11,6 @@ export default async function DashboardPage() {
       brands={brands}
       summary={summary}
       summarySinceYmd={summarySinceYmd}
-      ledgerChatEnabled={ledgerChatEnabled}
     />
   );
 }

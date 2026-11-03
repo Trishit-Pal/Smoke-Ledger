@@ -17,6 +17,10 @@ import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
 // covers dashboard/log/trends/history/goals/settings uniformly. Quiet tier
 // (dimmed, no bloom) so task-focused pages stay legible.
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
+// Ask the ledger on every reading page (hidden on Log). The layout passes the
+// server flag only; the dock reads its own state on first open.
+import { AskLedgerDock } from '@web/components/chat/AskLedgerDock';
+import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -47,6 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       {/* CHARACTER: event-driven overlays. Order doesn't matter — both portal
           to document.body and fire only on their respective custom events. */}
+      <AskLedgerDock enabled={isLedgerChatEnabled()} />
       <MilestoneCelebration />
       <LogoutFarewell />
       <GoalMoment />
