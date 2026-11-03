@@ -14,6 +14,7 @@ import {
   type ChatResponse,
   type ChatStateResponse,
 } from '@/domain/ledgerChat/types';
+import { LEDGER_CHAT_NOTICE_VERSION, chatOptInValue, isCurrentChatOptIn } from '@/domain/ledgerChat/notice';
 
 export const LEDGER_CHAT_OPT_IN_KEY = 'consent.ledgerChatOptIn';
 
@@ -114,8 +115,9 @@ export function askLedger(question: string, history: readonly ChatHistoryTurn[])
   return request({ method: 'POST', body: { question, history } }, isAnswer);
 }
 
+/** On only for the current notice version; the stored value is a version string or false. */
 export async function readLedgerChatOptIn(): Promise<boolean> {
-  return (await getSetting<boolean>(LEDGER_CHAT_OPT_IN_KEY)) === true;
+  return isCurrentChatOptIn(await getSetting<unknown>(LEDGER_CHAT_OPT_IN_KEY));
 }
 
 /**
@@ -124,11 +126,12 @@ export async function readLedgerChatOptIn(): Promise<boolean> {
  * consent itself is already saved and the edge allowlist can lag a deploy.
  */
 export async function setLedgerChatOptIn(enabled: boolean): Promise<void> {
-  await setSetting(LEDGER_CHAT_OPT_IN_KEY, enabled);
+  await setSetting(LEDGER_CHAT_OPT_IN_KEY, chatOptInValue(enabled));
   try {
     await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
       enabled,
       privacyVersion: LEGAL_VERSIONS.privacy,
+      noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
     });
   } catch {
     // Best effort, as on web.

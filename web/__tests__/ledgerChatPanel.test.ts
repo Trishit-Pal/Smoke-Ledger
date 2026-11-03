@@ -8,6 +8,9 @@ import { describe, expect, test } from 'vitest';
 const chat = join(__dirname, '..', 'components', 'chat');
 const panel = readFileSync(join(chat, 'AskLedgerPanel.tsx'), 'utf8');
 const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'SettingsClient.tsx'), 'utf8');
+const settingsPage = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'page.tsx'), 'utf8');
+const route = readFileSync(join(__dirname, '..', 'app', 'api', 'ledger-chat', 'route.ts'), 'utf8');
+const data = readFileSync(join(__dirname, '..', 'lib', 'server', 'data.ts'), 'utf8');
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
@@ -37,7 +40,7 @@ describe('AskLedgerPanel', () => {
   });
 
   test('consent is one tap, saved before the question is sent, and the audit call cannot block it', () => {
-    const consent = panel.indexOf("setSetting('consent.ledgerChatOptIn', true)");
+    const consent = panel.indexOf("setSetting('consent.ledgerChatOptIn', chatOptInValue(true))");
     const audit = panel.indexOf("recordAuditEvent('ledger_chat_consent_toggled'");
     expect(consent).toBeGreaterThan(-1);
     expect(audit).toBeGreaterThan(consent);
@@ -58,7 +61,7 @@ describe('AskLedgerPanel', () => {
   test('the consent card uses the shared notice, links the policy, and records the notice version', () => {
     expect(panel).toContain("from '@web/components/chat/notice'");
     expect(panel).toContain('href="/privacy"');
-    expect(panel).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: true,\s*privacyVersion: LEGAL_VERSIONS\.privacy/);
+    expect(panel).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: true,\s*privacyVersion: LEGAL_VERSIONS\.privacy,\s*noticeVersion: LEDGER_CHAT_NOTICE_VERSION,/);
   });
 });
 
@@ -155,6 +158,28 @@ describe('Settings integration', () => {
   test('turning the switch on shows the same notice as the panel before saving', () => {
     expect(settings).toContain("from '@web/components/chat/notice'");
     expect(settings).toMatch(/<ConfirmDialog[\s\S]*confirmLabel="Turn on"/);
+  });
+
+  test('the switch stores the notice version (or false) and audits both versions', () => {
+    expect(settings).toContain("setSetting('consent.ledgerChatOptIn', chatOptInValue(value))");
+    expect(settings).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: value,\s*privacyVersion: LEGAL_VERSIONS\.privacy,\s*noticeVersion: LEDGER_CHAT_NOTICE_VERSION,/);
+  });
+
+  test('with the chat flag off, neither the row nor its notice dialog renders', () => {
+    // The server flag (same gate as the dock and the route) reaches the client as a prop.
+    expect(settingsPage).toContain("import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled'");
+    expect(settingsPage).toContain('chatEnabled={isLedgerChatEnabled()}');
+    expect(settings.match(/label="Ask the ledger"/g)?.length).toBe(1);
+    expect(settings.match(/title="Turn on Ask the ledger"/g)?.length).toBe(1);
+    expect(settings).toMatch(/\{chatEnabled \? \(\s*<PrefRow\s+label="Ask the ledger"/);
+    expect(settings).toMatch(/\{chatEnabled \? \(\s*<ConfirmDialog\s+open=\{confirmLedgerChat\}\s+title="Turn on Ask the ledger"/);
+  });
+
+  test('every server reader counts only the current notice version, never a bare true', () => {
+    for (const src of [route, data]) {
+      expect(src).toContain('isCurrentChatOptIn(');
+      expect(src).not.toMatch(/value_json === true|ledgerChatOptIn === true/);
+    }
   });
 
   test('any sign-out event clears the device transcript, including session expiry and deletion', () => {

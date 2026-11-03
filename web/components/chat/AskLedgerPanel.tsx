@@ -42,7 +42,7 @@ import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
-import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
+import { LEDGER_CHAT_NOTICE, LEDGER_CHAT_NOTICE_VERSION, chatOptInValue } from '@web/components/chat/notice';
 import {
   clearTranscript,
   loadTranscript,
@@ -253,7 +253,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     if (!pending) return;
     setStatus('loading');
     try {
-      await setSetting('consent.ledgerChatOptIn', true);
+      // The notice version, not `true`: the consent covers only the words shown here.
+      await setSetting('consent.ledgerChatOptIn', chatOptInValue(true));
     } catch {
       setStatus('error');
       setPending(null);
@@ -263,6 +264,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
         enabled: true,
         privacyVersion: LEGAL_VERSIONS.privacy,
+        noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
       });
     } catch {
       // Consent is already saved. The audit row is best-effort here: the edge

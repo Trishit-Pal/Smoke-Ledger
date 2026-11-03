@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context';
+import { isCurrentChatOptIn } from '@/domain/ledgerChat/notice';
 import { starterQuestions } from '@/domain/ledgerChat/starters';
 import {
   chatRequestSchema,
@@ -164,7 +165,10 @@ export async function GET(request: Request) {
   }
 }
 
-/** The reader's own opt-in switch; any read error counts as off. */
+/**
+ * The reader's own opt-in switch; any read error counts as off. Only an opt-in to the current
+ * notice counts, so a pre-versioning `true` or an older notice asks again in the panel.
+ */
 async function readChatOptIn(db: SupabaseClient, userId: string): Promise<boolean> {
   const { data, error } = await db
     .from('settings_kv')
@@ -172,7 +176,7 @@ async function readChatOptIn(db: SupabaseClient, userId: string): Promise<boolea
     .eq('user_id', userId)
     .eq('key', CONSENT_KEY)
     .maybeSingle();
-  return !error && data?.value_json === true;
+  return !error && isCurrentChatOptIn(data?.value_json);
 }
 
 type ProfileGate = { ok: true; profile: UserProfile } | { ok: false; response: NextResponse };

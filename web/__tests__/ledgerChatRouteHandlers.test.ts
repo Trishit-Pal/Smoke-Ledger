@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { LEDGER_CHAT_NOTICE_VERSION } from '@/domain/ledgerChat/notice';
 import type { UserProfile } from '@/types';
 
 // Handler-level checks for the chat route with every I/O boundary mocked:
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   loadGoals: vi.fn(async () => [] as unknown[]),
   checkRateLimits: vi.fn(async () => true),
   runLedgerChatTurn: vi.fn(),
-  consentValue: { value: true as unknown },
+  consentValue: { value: null as unknown },
 }));
 
 vi.mock('@web/lib/server/ledgerChat/enabled', () => ({ isLedgerChatEnabled: mocks.enabled }));
@@ -78,7 +79,7 @@ function get(): Request {
 beforeEach(() => {
   vi.stubEnv('ANTHROPIC_API_KEY', 'test-key');
   mocks.enabled.mockReturnValue(true);
-  mocks.consentValue.value = true;
+  mocks.consentValue.value = LEDGER_CHAT_NOTICE_VERSION;
   mocks.resolveChatCaller.mockResolvedValue({ ok: true, caller: { userId: 'u1', db: fakeDb() } });
   mocks.loadProfile.mockResolvedValue(current);
   mocks.loadGoals.mockResolvedValue([]);
@@ -123,6 +124,16 @@ describe('POST /api/ledger-chat consent currency', () => {
 
     expect(res.status).toBe(200);
     expect(mocks.runLedgerChatTurn).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([true, '2026-11-02'])('an opt-in stored as %s (an older notice) is refused with consent_required', async (stale) => {
+    mocks.consentValue.value = stale;
+
+    const res = await POST(post());
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'consent_required' });
+    expect(mocks.runLedgerChatTurn).not.toHaveBeenCalled();
   });
 });
 
@@ -219,6 +230,16 @@ describe('GET /api/ledger-chat panel state', () => {
     });
     expect(mocks.loadProfile).toHaveBeenCalledTimes(1);
     for (const load of [mocks.loadLogsPage, mocks.loadDailySummary, mocks.loadGoals]) expect(load).not.toHaveBeenCalled();
+  });
+
+  test('a pre-versioning opt-in (stored true) reads as not consented', async () => {
+    mocks.consentValue.value = true;
+
+    const body = (await (await GET(get())).json()) as { consented: boolean; starters: string[] };
+
+    expect(body.consented).toBe(false);
+    expect(body.starters).toEqual([]);
+    expect(mocks.loadLogsPage).not.toHaveBeenCalled();
   });
 
   test('hide-totals-on-home alone still masks the panel figures', async () => {

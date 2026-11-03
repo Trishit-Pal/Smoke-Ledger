@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 import type { DailySummaryRow } from '@/domain/periodSummary';
+import { isCurrentChatOptIn } from '@/domain/ledgerChat/notice';
 import type {
   Brand,
   BrandVariant,
@@ -559,12 +560,13 @@ export async function getSettingsPageData() {
     getServerProfile(),
     getServerBrandsWithVariants(),
     getServerSetting<boolean>('consent.analyticsOptIn'),
-    getServerSetting<boolean>('consent.ledgerChatOptIn'),
+    getServerSetting<unknown>('consent.ledgerChatOptIn'),
   ]);
   return {
     profile,
     brands,
     analyticsOptIn: analyticsOptIn === true,
-    ledgerChatOptIn: ledgerChatOptIn === true,
+    // Stored as the notice version; an opt-in to an older notice shows as off, as the route reads it.
+    ledgerChatOptIn: isCurrentChatOptIn(ledgerChatOptIn),
   };
 }
