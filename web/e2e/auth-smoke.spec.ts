@@ -70,6 +70,7 @@ test('auth pages render expected fields', async ({ page }) => {
 test('legal and support pages are publicly reachable', async ({ page }) => {
   await page.goto('/privacy');
   await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Our data promises' })).toBeVisible();
 
   await page.goto('/terms', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Terms of Service' })).toBeVisible();

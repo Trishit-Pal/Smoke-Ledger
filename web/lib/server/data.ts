@@ -335,7 +335,7 @@ export function brandsCacheTag(userId: string): string {
 }
 
 /** Brand data changes rarely; cache it cross-request and let mutations bust the tag. */
-const BRANDS_CACHE_TTL_SECONDS = 600;
+export const BRANDS_CACHE_TTL_SECONDS = 600;
 
 async function loadBrandsWithVariants(
   supabase: SupabaseClient,
