@@ -132,10 +132,14 @@ describe('mobile wiring', () => {
 
   it('clears the device only on an explicit SIGNED_OUT, never on a null INITIAL_SESSION', () => {
     expect(layout).toMatch(/if \(event === 'SIGNED_OUT'\) void clearNativeDevice\('signOut'\)/);
-    const authProvider = read('web', 'components', 'providers', 'AuthProvider.tsx');
-    expect(authProvider).toMatch(/if \(event === 'SIGNED_OUT'\) void clearWebDevice\('signOut'\)/);
-    // The only call sites sit behind that guard.
+    // The only call site sits behind that guard.
     expect(layout.match(/clearNativeDevice\('signOut'\)/g)).toHaveLength(1);
+  });
+
+  it('web: every null session clears the localStorage stores; only SIGNED_OUT expires the auth cookies', () => {
+    const authProvider = read('web', 'components', 'providers', 'AuthProvider.tsx');
+    expect(authProvider).toMatch(/if \(event === 'SIGNED_OUT'\) void clearWebDevice\('signOut'\);\s*else void clearWebDevice\('signOut', undefined, \['web\.authCookie'\]\)/);
+    // The full clear (cookies included) has exactly one call site, behind the guard.
     expect(authProvider.match(/clearWebDevice\('signOut'\)/g)).toHaveLength(1);
   });
 

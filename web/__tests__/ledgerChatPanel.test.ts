@@ -149,6 +149,7 @@ describe('chat consent notice', () => {
     const { LEGAL_ENTITY } = await import('@/lib/legalEntity');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 10 earlier turns of this conversation (your questions and its replies)');
     expect(LEDGER_CHAT_NOTICE.sent).toMatch(/context line: today’s date, your time zone, currency and locale/);
+    expect(LEDGER_CHAT_NOTICE.sent).toContain('the kind and state of your active goals, and whether discreet mode is on.');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 200 of your entries from the last 30 days');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('first 120 characters of your note');
     expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.anthropicRetention);

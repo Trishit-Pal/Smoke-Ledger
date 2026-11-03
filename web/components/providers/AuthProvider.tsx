@@ -35,16 +35,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void maybeSyncDefaultBrandCatalog().catch(() => {});
       } else {
         // Clean account-switch isolation: drop in-memory session data, the
-        // (user-keyed) analytics-consent cache, and every on-device store the
+        // (user-keyed) analytics-consent cache, and the on-device stores the
         // lifecycle registry lists for sign-out (chat transcript, first-suggestion
-        // stamp, auth cookies) so nothing carries to the next user. This covers
-        // every way a session ends: sign-out, expiry, deletion, reset-password.
+        // stamp) on every null session, so nothing carries to the next user on a
+        // shared computer, e.g. a browser closed without Remember me.
         reset();
         invalidateAnalyticsConsentCache();
-        // Only an explicit SIGNED_OUT clears device stores: INITIAL_SESSION also arrives with
-        // a null session on a cold or offline start, and wiping the auth cookies then would
-        // sign the reader out for good.
+        // Only an explicit SIGNED_OUT also expires the auth cookies: INITIAL_SESSION arrives
+        // with a null session on a cold or offline start too, and wiping the cookies then
+        // would sign the reader out for good.
         if (event === 'SIGNED_OUT') void clearWebDevice('signOut');
+        else void clearWebDevice('signOut', undefined, ['web.authCookie']);
       }
     });
     return () => subscription.unsubscribe();

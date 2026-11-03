@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { STORES } from '@/lib/privacy/lifecycle';
 import { WEB_CLEARER_IDS, clearWebDevice } from '@web/lib/privacy/clearDevice';
 import { firstSuggestionKey } from '@/lib/goals/firstSuggestionDismissal';
@@ -47,5 +47,27 @@ describe('web device cleanup', () => {
     await clearWebDevice('discreetOn', store);
     expect(store.getItem('ledger-chat:v1:u1')).toBeNull();
     expect(store.getItem(firstSuggestionKey('u1'))).toBe('2026-11-01');
+  });
+});
+
+describe('keeping a store', () => {
+  const g = globalThis as { document?: { cookie: string } };
+  afterEach(() => {
+    delete g.document;
+  });
+
+  test('a kept id is skipped (auth cookie survives) while the rest still clear', async () => {
+    g.document = { cookie: 'sb-abc-auth-token=v' };
+    const store = fakeStorage({ 'ledger-chat:v1:u1': '[]' });
+    const failed = await clearWebDevice('signOut', store, ['web.authCookie']);
+    expect(g.document.cookie).toBe('sb-abc-auth-token=v');
+    expect(store.getItem('ledger-chat:v1:u1')).toBeNull();
+    expect(failed).toEqual([]);
+  });
+
+  test('without keep, sign-out expires the auth cookie', async () => {
+    g.document = { cookie: 'sb-abc-auth-token=v' };
+    await clearWebDevice('signOut', fakeStorage());
+    expect(g.document.cookie).toContain('max-age=0');
   });
 });

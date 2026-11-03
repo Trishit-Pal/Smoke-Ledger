@@ -47,11 +47,16 @@ function webClearers(store: Storage | null): Record<string, Clearer> {
 /** Ids this module can clear; a test pins them to the registry. */
 export const WEB_CLEARER_IDS: readonly string[] = Object.keys(webClearers(null));
 
+/** `keep` lists store ids to leave alone for this run (e.g. the auth cookie on a non-SIGNED_OUT null session). */
 export async function clearWebDevice(
   event: LifecycleEvent,
   store: Storage | null = defaultStorage(),
+  keep: readonly string[] = [],
 ): Promise<string[]> {
-  const failed = await runLifecycleClearers('web', event, webClearers(store));
+  const clearers = Object.fromEntries(
+    Object.entries(webClearers(store)).map(([id, clear]): [string, Clearer] => [id, keep.includes(id) ? () => {} : clear]),
+  );
+  const failed = await runLifecycleClearers('web', event, clearers);
   await reportFailedClears('web', event, failed);
   return failed;
 }
