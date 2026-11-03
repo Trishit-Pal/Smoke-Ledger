@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './_helpers/fixtures';
 import {
   canSeed,
+  clearConsentStamps,
   countAuditEvents,
   markConsentOutdated,
   readConsentState,
@@ -83,6 +84,37 @@ test.describe('re-consent gate', () => {
     // The rest of the app is still closed.
     await page.goto('/history');
     await expect(page).toHaveURL(/\/consent$/);
+  });
+
+  test('an onboarded reader missing age and data-processing stamps is asked on /consent, never in the wizard', async ({
+    page,
+    onboarded,
+  }) => {
+    await clearConsentStamps(onboarded.id);
+    const stepBefore = await readOnboardingStep(onboarded.id);
+
+    await signIn(page, onboarded);
+    await expect(page).toHaveURL(/\/consent$/);
+    // The wizard's own pages send them to the same screen, not into a loop.
+    await page.goto('/onboarding/privacy');
+    await expect(page).toHaveURL(/\/consent$/);
+
+    const accept = page.getByRole('button', { name: /Accept and continue/ });
+    await page.getByRole('checkbox', { name: /Terms of Service/ }).check();
+    await page.getByRole('checkbox', { name: /Privacy Policy/ }).check();
+    await page.getByRole('checkbox', { name: /does not provide medical advice/ }).check();
+    // The missing rows are asked, and Accept waits for them.
+    await expect(accept).toBeDisabled();
+    await page.getByRole('checkbox', { name: /18 or older/ }).check();
+    await page.getByRole('checkbox', { name: /processing my data/ }).check();
+    await expect(accept).toBeEnabled();
+    await accept.click();
+
+    await expect(page).toHaveURL(/\/dashboard/);
+    const state = await readConsentState(onboarded.id);
+    expect(state.age_confirmed_at).not.toBeNull();
+    expect(state.data_processing_consent_at).not.toBeNull();
+    expect(await readOnboardingStep(onboarded.id)).toBe(stepBefore);
   });
 
   test('a current user never sees /consent', async ({ page, onboarded }) => {

@@ -49,20 +49,22 @@ export function postAuthDestination(
   if (nextPathname === '/reset-password') return nextPath!;
 
   const steps = resumeProfileFromRow(profile);
-  if (!hasRequiredConsents(steps)) {
-    // A first-time signup confirmation fires the account-created celebration;
-    // carried in the URL so it works cross-device.
-    return type === 'signup' ? '/onboarding/privacy?welcome=1' : '/onboarding/privacy';
-  }
+  const nextIsOnboarding = !!nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname);
 
   if (!profile?.onboarded_at) {
+    if (!hasRequiredConsents(steps)) {
+      // A first-time signup confirmation fires the account-created celebration;
+      // carried in the URL so it works cross-device.
+      return type === 'signup' ? '/onboarding/privacy?welcome=1' : '/onboarding/privacy';
+    }
     // Mid-wizard sign-in resumes at the saved step, not at consent again.
-    return nextPathname && CALLBACK_ONBOARDING_PATHS.has(nextPathname)
-      ? nextPath!
-      : resumeOnboardingRoute(steps);
+    return nextIsOnboarding ? nextPath! : resumeOnboardingRoute(steps);
   }
 
-  // Older consents ask again once, before the page they were heading to, unless
-  // that page is exempt from the gate (the /settings delete-resume, the legal pages).
-  return consentGateRedirect(nextPathname ?? '/dashboard', steps, true) ?? nextPath ?? '/dashboard';
+  // An onboarded reader is never sent into the wizard: an onboarding next counts
+  // as none. Missing or older consents ask again once on /consent, before the page
+  // they were heading to, unless that page is exempt from the gate (the /settings
+  // delete-resume, the legal pages).
+  const next = nextIsOnboarding ? null : nextPath;
+  return consentGateRedirect(next ? nextPathname! : '/dashboard', steps, true) ?? next ?? '/dashboard';
 }

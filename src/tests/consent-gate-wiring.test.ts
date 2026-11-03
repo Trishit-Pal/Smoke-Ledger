@@ -17,13 +17,13 @@ describe('re-consent gate wiring', () => {
     expect(gate).toBeLessThan(bounce);
   });
 
-  it('web middleware sends / straight to /consent for outdated consents', () => {
-    expect(middleware).toMatch(/consentsOutdated\(steps\) \? CONSENT_ROUTE/);
+  it('web middleware sends / straight to /consent for outdated or missing consents', () => {
+    expect(middleware).toContain('needsConsentRefresh(steps, true) ? CONSENT_ROUTE');
   });
 
   it('post-auth routing and the Expo entry points use the same check', () => {
-    expect(read('web', 'lib', 'auth', 'postAuthDestination.ts')).toContain('consentGateRedirect(nextPathname');
-    expect(read('app', 'index.tsx')).toContain('consentsOutdated(profile)');
+    expect(read('web', 'lib', 'auth', 'postAuthDestination.ts')).toContain('consentGateRedirect(');
+    expect(read('app', 'index.tsx')).toContain('needsConsentRefresh(profile, true)');
     // One mobile guard in the root layout covers every route, modals included.
     const root = read('app', '_layout.tsx');
     expect(root).toContain('routeGuardRedirect({');
@@ -46,5 +46,15 @@ describe('re-consent gate wiring', () => {
     const end = service.indexOf('/* ---------- Step 02');
     const body = service.slice(start, end);
     expect(body).not.toMatch(/onboardingStep|setOnboardingStep/);
+  });
+
+  it('both /consent screens ask for age and data-processing only when the profile has no record of them', () => {
+    const web = read('web', 'app', 'consent', 'page.tsx');
+    expect(web).toContain('needsAgeConfirm={!profile.ageConfirmedAt}');
+    expect(web).toContain('needsDataProcessing={!profile.dataProcessingConsentAt}');
+    for (const screen of [read('web', 'app', 'consent', 'ConsentClient.tsx'), read('app', 'consent.tsx')]) {
+      expect(screen).toMatch(/acceptChangedTerms\(\{[^}]*needsAgeConfirm[^}]*needsDataProcessing/);
+    }
+    expect(read('app', 'consent.tsx')).toContain('needsAgeConfirm = !profile?.ageConfirmedAt');
   });
 });

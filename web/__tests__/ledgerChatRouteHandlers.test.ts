@@ -119,6 +119,29 @@ describe('POST /api/ledger-chat consent currency', () => {
     expect(await res.json()).toEqual({ error: 'consent_outdated' });
   });
 
+  test.each(['ageConfirmedAt', 'dataProcessingConsentAt', 'termsVersion'] as const)(
+    'an onboarded reader missing %s gets consent_outdated (pointed to /consent), before any limit',
+    async (key) => {
+      mocks.loadProfile.mockResolvedValue({ ...current, [key]: null });
+
+      const res = await POST(post());
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'consent_outdated' });
+      expect(mocks.checkRateLimits).not.toHaveBeenCalled();
+    },
+  );
+
+  test('a reader still onboarding is refused as forbidden, consented or not', async () => {
+    for (const profile of [{ ...current, onboardedAt: null }, { ...current, onboardedAt: null, ageConfirmedAt: null }]) {
+      mocks.loadProfile.mockResolvedValue(profile);
+      const res = await POST(post());
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'forbidden' });
+    }
+    expect(mocks.checkRateLimits).not.toHaveBeenCalled();
+  });
+
   test('a current reader still gets an answer', async () => {
     const res = await POST(post());
 

@@ -108,22 +108,39 @@ export interface AcceptChangedTermsInput {
   /** The profile has no `health_data_consent_at`: ask for it, and stamp it. */
   needsHealthConsent: boolean;
   healthDataConsent: boolean;
+  /** The profile has no `age_confirmed_at` (a legacy row): ask for it, and stamp it. */
+  needsAgeConfirm?: boolean;
+  ageConfirmed?: boolean;
+  /** The profile has no `data_processing_consent_at` (a legacy row): ask for it, and stamp it. */
+  needsDataProcessing?: boolean;
+  dataProcessingConsent?: boolean;
 }
 
 /**
- * The /consent screen for someone who already consented and is onboarded: stamp
- * the current versions (and the health-data consent if it was never given) and
- * audit once. Deliberately a separate write from `submitConsentStep`: it carries
- * no `onboardingStep`, so asking again can never move the wizard, and it leaves
- * the analytics preference alone.
+ * The /consent screen for an onboarded reader: stamp the current versions (plus
+ * the health-data, age and data-processing consents that are missing) and audit
+ * once. Deliberately a separate write from `submitConsentStep`: it carries no
+ * `onboardingStep`, so asking again can never move the wizard, and it leaves the
+ * analytics preference alone.
  */
 export async function acceptChangedTerms({
   needsHealthConsent,
   healthDataConsent,
+  needsAgeConfirm = false,
+  ageConfirmed = false,
+  needsDataProcessing = false,
+  dataProcessingConsent = false,
 }: AcceptChangedTermsInput): Promise<void> {
   if (needsHealthConsent && !healthDataConsent) {
     throw new AppError('validation_error', 'Validation failed: health-data consent is required');
   }
+  if (needsAgeConfirm && !ageConfirmed) {
+    throw new AppError('validation_error', 'Validation failed: age confirmation is required');
+  }
+  if (needsDataProcessing && !dataProcessingConsent) {
+    throw new AppError('validation_error', 'Validation failed: data-processing consent is required');
+  }
+  const now = new Date().toISOString();
   // Never stamp a version lower than the stored one: an older build (a store
   // binary, a stale tab) accepting must not undo a newer build's acceptance.
   const stored = await getProfile();
@@ -139,7 +156,9 @@ export async function acceptChangedTerms({
   await Promise.all([
     saveComplianceConsents({
       ...versions,
-      ...(needsHealthConsent ? { healthDataConsentAt: new Date().toISOString() } : {}),
+      ...(needsHealthConsent ? { healthDataConsentAt: now } : {}),
+      ...(needsAgeConfirm ? { ageConfirmedAt: now } : {}),
+      ...(needsDataProcessing ? { dataProcessingConsentAt: now } : {}),
     }),
     setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),
     setSetting('consent.privacyVersion', LEGAL_VERSIONS.privacy),

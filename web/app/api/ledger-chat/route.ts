@@ -10,8 +10,8 @@ import {
   type ChatResponse,
   type ChatStateResponse,
 } from '@/domain/ledgerChat/types';
-import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
-import { consentsOutdated } from '@/lib/onboardingSteps';
+import { isOnboarded } from '@/lib/compliance';
+import { needsConsentRefresh } from '@/lib/onboardingSteps';
 import type { UserProfile } from '@/types';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { isHomeTotalsHidden } from '@/lib/discreet';
@@ -185,10 +185,12 @@ type ProfileGate = { ok: true; profile: UserProfile } | { ok: false; response: N
 async function gatedProfile(db: SupabaseClient, userId: string): Promise<ProfileGate> {
   const profile = await loadProfile(db, userId);
   if (!profile) return { ok: false, response: fail('unauthorized', 401) };
-  if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return { ok: false, response: fail('forbidden', 403) };
-  // Fails closed on an old terms, privacy or medical version, or a missing
-  // health-data consent: mobile's own gate has gaps, so the server holds the line.
-  if (consentsOutdated(profile)) return { ok: false, response: fail('consent_outdated', 403) };
+  if (!isOnboarded(profile)) return { ok: false, response: fail('forbidden', 403) };
+  // Fails closed on any missing required consent, an old terms, privacy or medical
+  // version, or a missing health-data consent: mobile's own gate has gaps, so the
+  // server holds the line. consent_outdated points the reader to /consent, which
+  // now asks for whatever is missing (the same gate the pages use).
+  if (needsConsentRefresh(profile, true)) return { ok: false, response: fail('consent_outdated', 403) };
   return { ok: true, profile };
 }
 

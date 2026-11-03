@@ -6,9 +6,9 @@ import {
   canAccessOnboardingStep,
   CONSENT_ROUTE,
   consentGateRedirect,
-  consentsOutdated,
   effectiveOnboardingStep,
   hasRequiredConsents,
+  needsConsentRefresh,
   resumeOnboardingRoute,
   resumeProfileFromRow,
 } from '@/lib/onboardingSteps';
@@ -199,14 +199,18 @@ export async function middleware(request: NextRequest) {
     return finalize(
       NextResponse.redirect(
         new URL(
-          onboarded && consented ? (consentsOutdated(steps) ? CONSENT_ROUTE : '/dashboard') : resume,
+          onboarded ? (needsConsentRefresh(steps, true) ? CONSENT_ROUTE : '/dashboard') : resume,
           request.url,
         ),
       ),
     );
   }
 
+  // The wizard's consent step is for readers who are not onboarded yet. An
+  // onboarded reader missing a consent falls through to the re-consent gate:
+  // sending them here would be bounced back by the onboarded redirect, a loop.
   if (
+    !onboarded &&
     !consented &&
     pathname !== '/onboarding' &&
     pathname !== '/onboarding/privacy' &&
@@ -224,9 +228,10 @@ export async function middleware(request: NextRequest) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
 
-  // Re-consent gate: an onboarded user whose consents are older than the current
-  // legal versions (or who never gave the health-data consent) is sent to /consent
-  // before anything else, and a current user on /consent goes home. Sits before
+  // Re-consent gate: an onboarded user missing a consent, or whose consents are
+  // older than the current legal versions (or who never gave the health-data
+  // consent), is sent to /consent before anything else, and a current user on
+  // /consent goes home. Sits before
   // the onboarded bounce so /onboarding/* also lands on /consent, not /dashboard.
   // /consent and the legal, settings, auth and API paths are exempt, so no loop.
   const consentRedirect = consentGateRedirect(pathname, steps, onboarded);

@@ -5,6 +5,7 @@ import {
   consentsOutdated,
   earliestOnboardingRoute,
   effectiveOnboardingStep,
+  needsConsentRefresh,
   onboardingRouteIndex,
   resumeOnboardingRoute,
   resumeProfileFromRow,
@@ -245,7 +246,12 @@ describe('consentGateRedirect', () => {
   it('leaves users who are not onboarded to the onboarding gates, outdated or not', () => {
     expect(consentGateRedirect('/dashboard', outdated, false)).toBeNull();
     expect(consentGateRedirect('/consent', outdated, false)).toBeNull();
-    expect(consentGateRedirect('/dashboard', null, true)).toBeNull();
+    expect(consentGateRedirect('/dashboard', null, false)).toBeNull();
+  });
+
+  it('an onboarded reader with no consents on record goes to /consent, never the wizard', () => {
+    expect(consentGateRedirect('/dashboard', null, true)).toBe('/consent');
+    expect(consentGateRedirect('/onboarding/privacy', {}, true)).toBe('/consent');
   });
 
   it('is pure: it does not read or return an onboarding step', () => {
@@ -253,5 +259,58 @@ describe('consentGateRedirect', () => {
     const before = JSON.stringify(withStep);
     consentGateRedirect('/dashboard', withStep, true);
     expect(JSON.stringify(withStep)).toBe(before);
+  });
+});
+
+// Every stamp the gates read. Losing any one of them (a legacy row from before the
+// column existed) must send an onboarded reader to /consent, not the wizard.
+const STAMPS = [
+  'ageConfirmedAt',
+  'termsVersion',
+  'privacyVersion',
+  'healthDisclaimerVersion',
+  'dataProcessingConsentAt',
+  'healthDataConsentAt',
+] as const;
+const NEEDS_REFRESH: [string, object][] = [
+  ...STAMPS.map((k): [string, object] => [`missing ${k}`, { ...current, [k]: null }]),
+  ['an outdated terms version', { ...current, termsVersion: '2020-01-01' }],
+];
+const GATE_PATHS = ['/', '/dashboard', '/onboarding', '/onboarding/privacy', '/onboarding/done', '/consent', '/settings'];
+
+describe('needsConsentRefresh (an onboarded reader must answer /consent)', () => {
+  it.each(NEEDS_REFRESH)('is true for an onboarded reader with %s', (_n, p) => {
+    expect(needsConsentRefresh(p, true)).toBe(true);
+  });
+
+  it('is false for an onboarded reader whose consents are all current', () => {
+    expect(needsConsentRefresh(current, true)).toBe(false);
+  });
+
+  it('is never true before onboarding: the wizard asks those readers', () => {
+    for (const p of [null, {}, current, ...NEEDS_REFRESH.map(([, x]) => x)]) {
+      expect(needsConsentRefresh(p, false)).toBe(false);
+    }
+  });
+});
+
+describe('consentGateRedirect decision table (onboarded × consents × path)', () => {
+  it.each(NEEDS_REFRESH)('%s: every app and onboarding path goes to /consent; /consent and /settings stay', (_n, p) => {
+    for (const path of GATE_PATHS) {
+      const target = consentGateRedirect(path, p, true);
+      expect([path, target]).toEqual([path, path === '/consent' || path === '/settings' ? null : '/consent']);
+      // No loop: the destination is never redirected again.
+      if (target) expect(consentGateRedirect(target, p, true)).toBeNull();
+    }
+  });
+
+  it('current: only /consent moves (home); onboarding paths are left to the onboarded bounce', () => {
+    for (const path of GATE_PATHS) {
+      expect([path, consentGateRedirect(path, current, true)]).toEqual([path, path === '/consent' ? '/dashboard' : null]);
+    }
+  });
+
+  it.each([['current', current], ...NEEDS_REFRESH])('not onboarded (%s): never redirects', (_n, p) => {
+    for (const path of GATE_PATHS) expect(consentGateRedirect(path, p, false)).toBeNull();
   });
 });

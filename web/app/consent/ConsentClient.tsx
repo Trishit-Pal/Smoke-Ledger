@@ -22,10 +22,6 @@ import {
 } from '@web/components/onboarding/ConsentRows';
 import { InlineRule, SectionLabel } from '@web/components/visual';
 
-// The rows tied to a legal version. Age and data-processing were given once and
-// do not change with the documents, so they are not asked again.
-const VERSIONED_ROWS = REQUIRED_ROWS.filter((r) => ['terms', 'privacy', 'medical'].includes(r.id));
-
 const linkStyle: React.CSSProperties = {
   color: 'var(--accent-ink)',
   textDecoration: 'underline',
@@ -48,9 +44,13 @@ const buttonBase: React.CSSProperties = {
 export interface ConsentClientProps {
   /** The profile has no health-data consent yet: show its unticked row. */
   needsHealthConsent: boolean;
+  /** The profile has no age confirmation on record: show its row. */
+  needsAgeConfirm: boolean;
+  /** The profile has no data-processing consent on record: show its row. */
+  needsDataProcessing: boolean;
 }
 
-export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
+export function ConsentClient({ needsHealthConsent, needsAgeConfirm, needsDataProcessing }: ConsentClientProps) {
   const router = useRouter();
   const [ticked, setTicked] = React.useState<Partial<Record<RequiredKey, boolean>>>({});
   const [health, setHealth] = React.useState(false);
@@ -58,8 +58,15 @@ export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // The rows tied to a legal version are always asked. Age and data-processing do
+  // not change with the documents, so they are asked only when there is no record.
+  const askedOnlyWhenMissing: Partial<Record<RequiredKey, boolean>> = {
+    age: needsAgeConfirm,
+    dataProcessing: needsDataProcessing,
+  };
+  const rows = REQUIRED_ROWS.filter((r) => askedOnlyWhenMissing[r.id] ?? true);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
-  const canAccept = VERSIONED_ROWS.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
+  const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
 
   const setHealthConsent = (given: boolean) => {
     setHealth(given);
@@ -71,7 +78,14 @@ export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
     setSubmitting(true);
     setError(null);
     try {
-      await acceptChangedTerms({ needsHealthConsent, healthDataConsent: health });
+      await acceptChangedTerms({
+        needsHealthConsent,
+        healthDataConsent: health,
+        needsAgeConfirm,
+        ageConfirmed: ticked.age ?? false,
+        needsDataProcessing,
+        dataProcessingConsent: ticked.dataProcessing ?? false,
+      });
       router.replace('/dashboard');
       router.refresh();
     } catch (e) {
@@ -137,7 +151,7 @@ export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
         <SectionLabel id="consent-accept" rule="strong">
           Your answer
         </SectionLabel>
-        {VERSIONED_ROWS.map((row, i) => (
+        {rows.map((row, i) => (
           <ConsentCheckRow
             key={row.id}
             row={row}
@@ -151,7 +165,7 @@ export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
             checked={health}
             declined={healthDeclined}
             onChange={setHealthConsent}
-            number={String(VERSIONED_ROWS.length + 1).padStart(2, '0')}
+            number={String(rows.length + 1).padStart(2, '0')}
             existingLedger
           />
         ) : null}

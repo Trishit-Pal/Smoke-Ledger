@@ -24,19 +24,11 @@ import {
   RECONSENT_NOT_NOW_NOTE,
   RECONSENT_TITLE,
 } from '@/lib/reconsentCopy';
-import { ConsentRow } from './onboarding/privacy';
+import { CONSENT_ROWS, ConsentRow } from './onboarding/privacy';
 
-// Same rows as onboarding, in the same wording. Age and data-processing were
-// given once and do not change with the documents, so they are not asked again.
-const VERSIONED_ROWS = [
-  { id: 'terms', label: 'I agree to the Terms of Service.' },
-  { id: 'privacy', label: 'I acknowledge the Privacy Policy.' },
-  {
-    id: 'medical',
-    label: 'I understand this app does not provide medical advice.',
-    sub: 'For health decisions, please consult a clinician.',
-  },
-] as const;
+// Onboarding's required rows, in its order and wording. Health has its own row and
+// decline below; analytics is not part of this screen.
+const REQUIRED_ROWS = CONSENT_ROWS.filter((r) => r.required && r.id !== 'health');
 
 export default function Consent() {
   const router = useRouter();
@@ -68,8 +60,17 @@ export default function Consent() {
   if (away) return <Redirect href={away} />;
 
   const needsHealthConsent = !profile?.healthDataConsentAt;
+  // The rows tied to a legal version are always asked. Age and data-processing do
+  // not change with the documents, so they are asked only when there is no record.
+  const needsAgeConfirm = !profile?.ageConfirmedAt;
+  const needsDataProcessing = !profile?.dataProcessingConsentAt;
+  const askedOnlyWhenMissing: Record<string, boolean> = {
+    age: needsAgeConfirm,
+    dataProcessing: needsDataProcessing,
+  };
+  const rows = REQUIRED_ROWS.filter((r) => askedOnlyWhenMissing[r.id] ?? true);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
-  const canAccept = VERSIONED_ROWS.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
+  const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
 
   const setHealthConsent = (given: boolean) => {
     setHealth(given);
@@ -81,7 +82,14 @@ export default function Consent() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      await acceptChangedTerms({ needsHealthConsent, healthDataConsent: health });
+      await acceptChangedTerms({
+        needsHealthConsent,
+        healthDataConsent: health,
+        needsAgeConfirm,
+        ageConfirmed: ticked.age ?? false,
+        needsDataProcessing,
+        dataProcessingConsent: ticked.dataProcessing ?? false,
+      });
       await refreshProfile();
       router.replace('/(tabs)');
     } catch (e) {
@@ -140,21 +148,21 @@ export default function Consent() {
       </View>
 
       <View>
-        {VERSIONED_ROWS.map((row, i) => (
+        {rows.map((row, i) => (
           <ConsentRow
             key={row.id}
             index={i + 1}
             label={row.label}
-            sub={'sub' in row ? row.sub : undefined}
+            sub={row.sub}
             required
             value={ticked[row.id] ?? false}
             onChange={(v) => setTicked((prev) => ({ ...prev, [row.id]: v }))}
-            showBottomRule={needsHealthConsent || i < VERSIONED_ROWS.length - 1}
+            showBottomRule={needsHealthConsent || i < rows.length - 1}
           />
         ))}
         {needsHealthConsent ? (
           <ConsentRow
-            index={VERSIONED_ROWS.length + 1}
+            index={rows.length + 1}
             label={HEALTH_CONSENT_LABEL}
             sub={HEALTH_CONSENT_SUB}
             required

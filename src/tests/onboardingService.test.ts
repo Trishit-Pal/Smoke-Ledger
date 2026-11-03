@@ -144,6 +144,48 @@ describe('acceptChangedTerms (the /consent screen)', () => {
   });
 });
 
+describe('acceptChangedTerms stamps a missing age or data-processing consent, and only that', () => {
+  const base = { needsHealthConsent: false, healthDataConsent: false };
+
+  it.each([
+    ['age', { needsAgeConfirm: true, ageConfirmed: true }, ['ageConfirmedAt']],
+    ['data processing', { needsDataProcessing: true, dataProcessingConsent: true }, ['dataProcessingConsentAt']],
+    [
+      'both',
+      { needsAgeConfirm: true, ageConfirmed: true, needsDataProcessing: true, dataProcessingConsent: true },
+      ['ageConfirmedAt', 'dataProcessingConsentAt'],
+    ],
+  ])('missing %s: stamps it alongside the versions', async (_n, input, stamped) => {
+    await acceptChangedTerms({ ...base, ...input });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(Object.keys(patch).sort()).toEqual(
+      ['termsVersion', 'privacyVersion', 'healthDisclaimerVersion', ...stamped].sort(),
+    );
+    for (const key of stamped) expect(patch[key as keyof typeof patch]).toEqual(expect.any(String));
+    expect('onboardingStep' in patch).toBe(false);
+  });
+
+  it('never restamps age or data processing when they were not missing, even if ticked', async () => {
+    await acceptChangedTerms({ ...base, ageConfirmed: true, dataProcessingConsent: true });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect('ageConfirmedAt' in patch).toBe(false);
+    expect('dataProcessingConsentAt' in patch).toBe(false);
+  });
+
+  it.each([
+    ['age confirmation', { needsAgeConfirm: true, ageConfirmed: false }, /age confirmation/],
+    ['data-processing consent', { needsDataProcessing: true, dataProcessingConsent: false }, /data-processing consent/],
+  ])('refuses a missing %s that was not ticked, writing and auditing nothing', async (_n, input, message) => {
+    await expect(acceptChangedTerms({ ...base, ...input })).rejects.toMatchObject({
+      code: 'validation_error',
+      message: expect.stringMatching(message),
+    });
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
+    expect(settingsRepo.setSetting).not.toHaveBeenCalled();
+  });
+});
+
 describe('acceptChangedTerms never downgrades a stored version', () => {
   it('keeps a newer stored version (an older build accepting) and writes the build version otherwise', async () => {
     mocked(profileRepo.getProfile).mockResolvedValueOnce({

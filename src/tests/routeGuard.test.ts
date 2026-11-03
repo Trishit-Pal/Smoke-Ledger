@@ -78,6 +78,28 @@ describe('routeGuardRedirect', () => {
   it('a signed-in reader with no profile row resumes onboarding, never reaches a modal', () => {
     expect(guard('/log/new', null)).toBe('/onboarding/privacy');
   });
+
+  // An onboarded reader missing any one stamp (a legacy row) re-consents on /consent,
+  // never in the wizard, from every path, and the destination is never redirected again.
+  describe.each([
+    'ageConfirmedAt',
+    'termsVersion',
+    'privacyVersion',
+    'healthDisclaimerVersion',
+    'dataProcessingConsentAt',
+  ])('onboarded, missing %s', (key) => {
+    const missing = asProfile({ ...current, onboardedAt: NOW, onboardingStep: 'done', [key]: null });
+    it.each([...MODALS, '/', '/history', '/onboarding', '/onboarding/welcome', '/onboarding/privacy', '/onboarding/done'])(
+      'sends %s to /consent',
+      (p) => {
+        expect(guard(p, missing)).toBe('/consent');
+      },
+    );
+    it('leaves /consent and /settings alone (no loop)', () => {
+      expect(guard('/consent', missing)).toBeNull();
+      expect(guard('/settings', missing)).toBeNull();
+    });
+  });
 });
 
 describe('isGuardLoading', () => {
