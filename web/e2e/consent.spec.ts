@@ -92,9 +92,12 @@ test.describe('re-consent gate', () => {
   }) => {
     await clearConsentStamps(onboarded.id);
     const stepBefore = await readOnboardingStep(onboarded.id);
+    const auditBefore = await countAuditEvents(onboarded.id, 'consent_accepted');
 
     await signIn(page, onboarded);
     await expect(page).toHaveURL(/\/consent$/);
+    // Their documents are current, so they are not told the terms changed.
+    await expect(page.getByRole('heading', { name: 'Before you continue.' })).toBeVisible();
     // The wizard's own pages send them to the same screen, not into a loop.
     await page.goto('/onboarding/privacy');
     await expect(page).toHaveURL(/\/consent$/);
@@ -114,6 +117,7 @@ test.describe('re-consent gate', () => {
     const state = await readConsentState(onboarded.id);
     expect(state.age_confirmed_at).not.toBeNull();
     expect(state.data_processing_consent_at).not.toBeNull();
+    expect(await countAuditEvents(onboarded.id, 'consent_accepted')).toBe(auditBefore + 1);
     expect(await readOnboardingStep(onboarded.id)).toBe(stepBefore);
   });
 

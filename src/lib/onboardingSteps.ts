@@ -161,7 +161,16 @@ export function resumeOnboardingRoute(profile: ResumeProfile | null | undefined)
  * the wizard.
  */
 export function consentsOutdated(profile: ConsentProfile | null | undefined): boolean {
-  if (!hasRequiredConsents(profile)) return false;
+  return hasRequiredConsents(profile) && termsChanged(profile);
+}
+
+/**
+ * The documents changed since this reader accepted them: a stored version is
+ * missing or older than LEGAL_VERSIONS, or the health-data consent was never
+ * given. False when only the age or data-processing stamp is missing, so /consent
+ * can say so instead of "We have updated our terms."
+ */
+export function termsChanged(profile: ConsentProfile | null | undefined): boolean {
   return !(
     versionAtLeast(profile?.termsVersion, LEGAL_VERSIONS.terms) &&
     versionAtLeast(profile?.privacyVersion, LEGAL_VERSIONS.privacy) &&

@@ -7,12 +7,10 @@ import { acceptChangedTerms } from '@/services/onboarding';
 import { toSafeErrorMessage } from '@/lib/errors';
 import {
   RECONSENT_ACCEPT_LABEL,
-  RECONSENT_CAPTION,
   RECONSENT_CHANGES,
-  RECONSENT_LEDE,
   RECONSENT_NOT_NOW_LABEL,
   RECONSENT_NOT_NOW_NOTE,
-  RECONSENT_TITLE,
+  reconsentHeading,
 } from '@/lib/reconsentCopy';
 import {
   ConsentCheckRow,
@@ -42,6 +40,8 @@ const buttonBase: React.CSSProperties = {
 };
 
 export interface ConsentClientProps {
+  /** The documents changed since this reader accepted them (`termsChanged`): show what changed. */
+  termsChanged: boolean;
   /** The profile has no health-data consent yet: show its unticked row. */
   needsHealthConsent: boolean;
   /** The profile has no age confirmation on record: show its row. */
@@ -50,7 +50,12 @@ export interface ConsentClientProps {
   needsDataProcessing: boolean;
 }
 
-export function ConsentClient({ needsHealthConsent, needsAgeConfirm, needsDataProcessing }: ConsentClientProps) {
+export function ConsentClient({
+  termsChanged,
+  needsHealthConsent,
+  needsAgeConfirm,
+  needsDataProcessing,
+}: ConsentClientProps) {
   const router = useRouter();
   const [ticked, setTicked] = React.useState<Partial<Record<RequiredKey, boolean>>>({});
   const [health, setHealth] = React.useState(false);
@@ -65,6 +70,7 @@ export function ConsentClient({ needsHealthConsent, needsAgeConfirm, needsDataPr
     dataProcessing: needsDataProcessing,
   };
   const rows = REQUIRED_ROWS.filter((r) => askedOnlyWhenMissing[r.id] ?? true);
+  const heading = reconsentHeading(termsChanged);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
   const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
 
@@ -111,41 +117,45 @@ export function ConsentClient({ needsHealthConsent, needsAgeConfirm, needsDataPr
       }}
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span className="editorial-caption">{RECONSENT_CAPTION}</span>
+        <span className="editorial-caption">{heading.caption}</span>
         <h1 className="editorial-headline" style={{ fontSize: 'clamp(32px, 4vw, 44px)', margin: 0 }}>
-          {RECONSENT_TITLE}
+          {heading.title}
         </h1>
         <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: 0, lineHeight: 1.55 }}>
-          {RECONSENT_LEDE}
+          {heading.lede}
         </p>
       </header>
 
-      <section aria-labelledby="consent-changed">
-        <SectionLabel id="consent-changed" rule="strong">
-          What changed
-        </SectionLabel>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {changes.map((c, i) => (
-            <li key={c.title}>
-              {i > 0 ? <InlineRule /> : null}
-              <div style={{ padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>{c.title}</span>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55 }}>{c.body}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-          Read them in full:{' '}
-          <Link href="/terms" style={linkStyle}>
-            Terms of Service
-          </Link>
-          {' · '}
-          <Link href="/privacy" style={linkStyle}>
-            Privacy Policy
-          </Link>
-        </p>
-      </section>
+      {/* Nothing changed for a reader who only lacks a confirmation; the Terms and
+          Privacy rows below still link to both documents. */}
+      {termsChanged ? (
+        <section aria-labelledby="consent-changed">
+          <SectionLabel id="consent-changed" rule="strong">
+            What changed
+          </SectionLabel>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {changes.map((c, i) => (
+              <li key={c.title}>
+                {i > 0 ? <InlineRule /> : null}
+                <div style={{ padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>{c.title}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55 }}>{c.body}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Read them in full:{' '}
+            <Link href="/terms" style={linkStyle}>
+              Terms of Service
+            </Link>
+            {' · '}
+            <Link href="/privacy" style={linkStyle}>
+              Privacy Policy
+            </Link>
+          </p>
+        </section>
+      ) : null}
 
       <section aria-labelledby="consent-accept" style={{ display: 'flex', flexDirection: 'column' }}>
         <SectionLabel id="consent-accept" rule="strong">

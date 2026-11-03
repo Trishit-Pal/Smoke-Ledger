@@ -57,4 +57,25 @@ describe('re-consent gate wiring', () => {
     }
     expect(read('app', 'consent.tsx')).toContain('needsAgeConfirm = !profile?.ageConfirmedAt');
   });
+
+  it('both /consent screens choose the heading (and the changes list) by whether the terms changed', () => {
+    expect(read('web', 'app', 'consent', 'page.tsx')).toContain('termsChanged={termsChanged(profile)}');
+    expect(read('app', 'consent.tsx')).toContain('termsChanged(profile)');
+    for (const screen of [read('web', 'app', 'consent', 'ConsentClient.tsx'), read('app', 'consent.tsx')]) {
+      expect(screen).toContain('reconsentHeading(');
+      expect(screen).not.toMatch(/\bRECONSENT_(TITLE|LEDE|CAPTION)\b/);
+    }
+  });
+
+  it('the Expo onboarding layout never sends an onboarded reader to a wizard step', () => {
+    // The root guard owns re-consent; the layout only moves an onboarded reader to the tabs.
+    const layout = read('app', 'onboarding', '_layout.tsx').replace(/\r\n/g, '\n');
+    const branch = layout.indexOf('if (profile.onboardedAt) {');
+    expect(branch).toBeGreaterThan(-1);
+    const body = layout.slice(branch, layout.indexOf('\n    }', branch));
+    expect(body).toContain("router.replace('/(tabs)')");
+    expect(body).toContain('return;');
+    expect(body).not.toContain('/onboarding/privacy');
+    expect(branch).toBeLessThan(layout.indexOf("router.replace('/onboarding/privacy')"));
+  });
 });

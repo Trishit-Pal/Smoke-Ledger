@@ -50,6 +50,15 @@ function isRecoveryRoute(pathname: string): boolean {
   return pathname === '/reset-password';
 }
 
+// API routes answer for themselves: /api/audit checks same-origin and the session
+// (it must work before consent: it records it); /api/ledger-chat its caller and
+// its own consent and onboarding gate. Exempt from the onboarding redirects only,
+// never from sign-in: a redirect turns the wizard's audit POST into an HTML 200
+// that the caller would take for a recorded audit.
+function isApiRoute(pathname: string): boolean {
+  return pathname.startsWith('/api/');
+}
+
 type CookieOptions = {
   name: string;
   value: string;
@@ -214,7 +223,8 @@ export async function middleware(request: NextRequest) {
     !consented &&
     pathname !== '/onboarding' &&
     pathname !== '/onboarding/privacy' &&
-    !isRecoveryRoute(pathname)
+    !isRecoveryRoute(pathname) &&
+    !isApiRoute(pathname)
   ) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
@@ -223,7 +233,8 @@ export async function middleware(request: NextRequest) {
     !onboarded &&
     !isOnboardingRoute(pathname) &&
     !isPublicRoute(pathname) &&
-    !isRecoveryRoute(pathname)
+    !isRecoveryRoute(pathname) &&
+    !isApiRoute(pathname)
   ) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }

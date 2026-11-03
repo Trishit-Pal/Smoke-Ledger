@@ -1,4 +1,5 @@
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { RECONSENT_TITLE, reconsentHeading } from '@/lib/reconsentCopy';
 import {
   canAccessOnboardingStep,
   consentGateRedirect,
@@ -9,6 +10,7 @@ import {
   onboardingRouteIndex,
   resumeOnboardingRoute,
   resumeProfileFromRow,
+  termsChanged,
 } from '@/lib/onboardingSteps';
 
 const consented = {
@@ -277,6 +279,26 @@ const NEEDS_REFRESH: [string, object][] = [
   ['an outdated terms version', { ...current, termsVersion: '2020-01-01' }],
 ];
 const GATE_PATHS = ['/', '/dashboard', '/onboarding', '/onboarding/privacy', '/onboarding/done', '/consent', '/settings'];
+
+describe('termsChanged picks the /consent heading', () => {
+  it.each([
+    ['an older terms version', { termsVersion: '2020-01-01' }, true],
+    ['no privacy version on record', { privacyVersion: null }, true],
+    ['no health-data consent yet', { healthDataConsentAt: null }, true],
+    ['current, missing only the age stamp', { ageConfirmedAt: null }, false],
+    ['current, missing only the data-processing stamp', { dataProcessingConsentAt: null }, false],
+    ['current and complete', {}, false],
+  ])('%s -> %s', (_n, over, expected) => {
+    expect(termsChanged({ ...current, ...over })).toBe(expected);
+  });
+
+  it('only a reader whose documents changed is told "We have updated our terms."', () => {
+    expect(reconsentHeading(true).title).toBe(RECONSENT_TITLE);
+    const noRecord = reconsentHeading(false);
+    expect(noRecord.title).not.toBe(RECONSENT_TITLE);
+    expect(`${noRecord.caption} ${noRecord.title} ${noRecord.lede}`).not.toMatch(/updated|changed/i);
+  });
+});
 
 describe('needsConsentRefresh (an onboarded reader must answer /consent)', () => {
   it.each(NEEDS_REFRESH)('is true for an onboarded reader with %s', (_n, p) => {

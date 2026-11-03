@@ -1,11 +1,15 @@
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 
 // The real middleware, with only Supabase faked: a confirmed, signed-in reader
 // whose profile row is `state.row`. Every redirect is followed, so a loop or a
 // wizard detour for an existing reader fails here, not in production.
-const state = vi.hoisted(() => ({ row: null as Record<string, unknown> | null }));
+const SIGNED_IN = { id: 'u1', email: 'r@example.com', email_confirmed_at: 't' };
+const state = vi.hoisted(() => ({
+  row: null as Record<string, unknown> | null,
+  user: null as Record<string, unknown> | null,
+}));
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: () => {
@@ -16,7 +20,7 @@ vi.mock('@supabase/ssr', () => ({
     };
     return {
       auth: {
-        getUser: async () => ({ data: { user: { id: 'u1', email: 'r@example.com', email_confirmed_at: 't' } } }),
+        getUser: async () => ({ data: { user: state.user } }),
         signOut: async () => ({}),
       },
       from: () => chain,
@@ -29,6 +33,9 @@ const { middleware } = await import('@web/middleware');
 beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon');
+});
+beforeEach(() => {
+  state.user = SIGNED_IN;
 });
 afterAll(() => vi.unstubAllEnvs());
 
@@ -106,6 +113,29 @@ describe('middleware: onboarded readers', () => {
   test('legal pages stay readable while a stamp is missing (the /consent page links to them)', async () => {
     state.row = { ...ONBOARDED, age_confirmed_at: null };
     for (const path of ['/privacy', '/terms']) expect(await walk(path)).toEqual([path]);
+  });
+});
+
+// API routes answer for themselves (session, same-origin, their own consent gates).
+// A redirect would turn the wizard's audit POST into an HTML 200 taken for success.
+describe('middleware: API paths are never sent to an onboarding or consent page', () => {
+  test.each([
+    ['not onboarded, no consents', { onboarding_step: 'privacy' }],
+    ['not onboarded, consented mid-wizard', { ...CURRENT, onboarding_step: 'goal' }],
+    ['onboarded, missing age_confirmed_at', { ...ONBOARDED, age_confirmed_at: null }],
+    ['onboarded, outdated', { ...ONBOARDED, terms_version: '2020-01-01' }],
+  ])('%s', async (_n, row) => {
+    state.row = row;
+    for (const path of ['/api/audit', '/api/ledger-chat']) {
+      const res = await middleware(new NextRequest(new URL(path, 'http://localhost'), { method: 'POST' }));
+      expect([path, res.headers.get('location')]).toEqual([path, null]);
+    }
+  });
+
+  test('the exemption is not a sign-in bypass: signed out, /api/audit still goes to /login', async () => {
+    state.user = null;
+    const res = await middleware(new NextRequest(new URL('/api/audit', 'http://localhost'), { method: 'POST' }));
+    expect(new URL(res.headers.get('location') ?? '', 'http://localhost').pathname).toBe('/login');
   });
 });
 

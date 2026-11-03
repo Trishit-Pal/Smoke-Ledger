@@ -1,3 +1,4 @@
+import { termsChanged } from '@/lib/onboardingSteps';
 import { getServerProfile } from '@web/lib/server/data';
 import { ConsentClient } from './ConsentClient';
 
@@ -10,6 +11,7 @@ export default async function ConsentPage() {
   const profile = await getServerProfile();
   return (
     <ConsentClient
+      termsChanged={termsChanged(profile)}
       needsHealthConsent={!profile.healthDataConsentAt}
       needsAgeConfirm={!profile.ageConfirmedAt}
       needsDataProcessing={!profile.dataProcessingConsentAt}

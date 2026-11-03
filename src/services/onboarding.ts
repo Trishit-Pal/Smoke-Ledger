@@ -108,10 +108,13 @@ export interface AcceptChangedTermsInput {
   /** The profile has no `health_data_consent_at`: ask for it, and stamp it. */
   needsHealthConsent: boolean;
   healthDataConsent: boolean;
-  /** The profile has no `age_confirmed_at` (a legacy row): ask for it, and stamp it. */
+  /**
+   * The profile has no `age_confirmed_at` (a legacy row): ask for it, and stamp it.
+   * The stored profile is checked as well, so a missing stamp is required either way.
+   */
   needsAgeConfirm?: boolean;
   ageConfirmed?: boolean;
-  /** The profile has no `data_processing_consent_at` (a legacy row): ask for it, and stamp it. */
+  /** As `needsAgeConfirm`, for `data_processing_consent_at`. */
   needsDataProcessing?: boolean;
   dataProcessingConsent?: boolean;
 }
@@ -134,16 +137,20 @@ export async function acceptChangedTerms({
   if (needsHealthConsent && !healthDataConsent) {
     throw new AppError('validation_error', 'Validation failed: health-data consent is required');
   }
-  if (needsAgeConfirm && !ageConfirmed) {
+  const stored = await getProfile();
+  // The stored profile decides too, so a stale screen (or an older build that never
+  // shows these rows) cannot accept past a required stamp that is missing.
+  const stampAge = needsAgeConfirm || !stored?.ageConfirmedAt;
+  const stampDataProcessing = needsDataProcessing || !stored?.dataProcessingConsentAt;
+  if (stampAge && !ageConfirmed) {
     throw new AppError('validation_error', 'Validation failed: age confirmation is required');
   }
-  if (needsDataProcessing && !dataProcessingConsent) {
+  if (stampDataProcessing && !dataProcessingConsent) {
     throw new AppError('validation_error', 'Validation failed: data-processing consent is required');
   }
   const now = new Date().toISOString();
   // Never stamp a version lower than the stored one: an older build (a store
   // binary, a stale tab) accepting must not undo a newer build's acceptance.
-  const stored = await getProfile();
   const versions = {
     termsVersion: newerVersion(stored?.termsVersion, LEGAL_VERSIONS.terms),
     privacyVersion: newerVersion(stored?.privacyVersion, LEGAL_VERSIONS.privacy),
@@ -157,8 +164,8 @@ export async function acceptChangedTerms({
     saveComplianceConsents({
       ...versions,
       ...(needsHealthConsent ? { healthDataConsentAt: now } : {}),
-      ...(needsAgeConfirm ? { ageConfirmedAt: now } : {}),
-      ...(needsDataProcessing ? { dataProcessingConsentAt: now } : {}),
+      ...(stampAge ? { ageConfirmedAt: now } : {}),
+      ...(stampDataProcessing ? { dataProcessingConsentAt: now } : {}),
     }),
     setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),
     setSetting('consent.privacyVersion', LEGAL_VERSIONS.privacy),

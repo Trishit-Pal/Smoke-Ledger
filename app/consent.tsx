@@ -13,16 +13,14 @@ import { useSession } from '@/store/session';
 import { isOnboarded } from '@/lib/compliance';
 import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
-import { consentGateRedirect, resumeOnboardingRoute } from '@/lib/onboardingSteps';
+import { consentGateRedirect, resumeOnboardingRoute, termsChanged } from '@/lib/onboardingSteps';
 import { HEALTH_CONSENT_LABEL, HEALTH_CONSENT_SUB, HEALTH_DECLINE_LABEL, HEALTH_DECLINE_NOTE_EXISTING } from '@/lib/healthConsent';
 import {
   RECONSENT_ACCEPT_LABEL,
-  RECONSENT_CAPTION,
   RECONSENT_CHANGES,
-  RECONSENT_LEDE,
   RECONSENT_NOT_NOW_LABEL,
   RECONSENT_NOT_NOW_NOTE,
-  RECONSENT_TITLE,
+  reconsentHeading,
 } from '@/lib/reconsentCopy';
 import { CONSENT_ROWS, ConsentRow } from './onboarding/privacy';
 
@@ -69,6 +67,8 @@ export default function Consent() {
     dataProcessing: needsDataProcessing,
   };
   const rows = REQUIRED_ROWS.filter((r) => askedOnlyWhenMissing[r.id] ?? true);
+  const changed = termsChanged(profile);
+  const heading = reconsentHeading(changed);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
   const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
 
@@ -104,34 +104,39 @@ export default function Consent() {
   return (
     <Screen>
       <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>
-        {RECONSENT_CAPTION.toUpperCase()}
+        {heading.caption.toUpperCase()}
       </Text>
-      <Text variant="display">{RECONSENT_TITLE}</Text>
+      <Text variant="display">{heading.title}</Text>
       <Text variant="body" muted>
-        {RECONSENT_LEDE}
+        {heading.lede}
       </Text>
 
       <View style={{ width: 60 }}>
         <Divider strong />
       </View>
-      <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>
-        WHAT CHANGED
-      </Text>
-      <View>
-        {changes.map((c, i) => (
-          <View key={c.title}>
-            {i > 0 ? <Divider /> : null}
-            <View style={{ paddingVertical: spacing.md, gap: spacing.xs }}>
-              <Text variant="small" color={theme.text}>
-                {c.title}
-              </Text>
-              <Text variant="caption" color={theme.textFaint}>
-                {c.body}
-              </Text>
-            </View>
+      {/* Nothing changed for a reader who only lacks a confirmation. */}
+      {changed ? (
+        <>
+          <Text variant="caption" color={theme.textFaint} style={{ letterSpacing: 1.5 }}>
+            WHAT CHANGED
+          </Text>
+          <View>
+            {changes.map((c, i) => (
+              <View key={c.title}>
+                {i > 0 ? <Divider /> : null}
+                <View style={{ paddingVertical: spacing.md, gap: spacing.xs }}>
+                  <Text variant="small" color={theme.text}>
+                    {c.title}
+                  </Text>
+                  <Text variant="caption" color={theme.textFaint}>
+                    {c.body}
+                  </Text>
+                </View>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Button
           title="Privacy policy"

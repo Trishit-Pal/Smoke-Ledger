@@ -1,4 +1,4 @@
-import { isAuditSuccessStatus, redactAuditProps } from '@/services/audit';
+import { isAuditSuccessStatus, recordAuditEvent, redactAuditProps } from '@/services/audit';
 import {
   toAuthErrorMessage,
 } from '@/lib/auth-errors';
@@ -6,6 +6,48 @@ import {
 jest.mock('@/lib/supabase', () => ({
   getSupabase: jest.fn(),
 }));
+
+// The web path: recordAuditEvent posts to /api/audit. A middleware redirect used to
+// be followed to an HTML page whose 200 passed as success, losing the audit row.
+describe('recordAuditEvent on the web', () => {
+  const g = globalThis as unknown as { window?: unknown; fetch: typeof fetch };
+  const realFetch = g.fetch;
+  const answer = (over: { status?: number; redirected?: boolean; type?: string }) =>
+    jest.fn(async () => ({
+      status: over.status ?? 200,
+      redirected: over.redirected ?? false,
+      headers: new Headers(over.type ? { 'content-type': over.type } : {}),
+    })) as unknown as typeof fetch;
+
+  beforeEach(() => {
+    g.window = {};
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+  });
+  afterEach(() => {
+    delete g.window;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    g.fetch = realFetch;
+  });
+
+  it.each([
+    ['a followed redirect', { status: 200, redirected: true }],
+    ['an HTML page', { status: 200, type: 'text/html; charset=utf-8' }],
+  ])('counts %s as failure, never as a recorded audit', async (_n, over) => {
+    g.fetch = answer(over);
+    await expect(recordAuditEvent('consent_accepted', 'compliance', {})).rejects.toMatchObject({
+      code: 'dependency_failure',
+    });
+  });
+
+  it.each([
+    ['204', { status: 204 }],
+    ['a 200 with no body type', { status: 200 }],
+    ['a 200 JSON answer', { status: 200, type: 'application/json' }],
+  ])('accepts %s from the audit route', async (_n, over) => {
+    g.fetch = answer(over);
+    await expect(recordAuditEvent('consent_accepted', 'compliance', {})).resolves.toBeUndefined();
+  });
+});
 
 describe('isAuditSuccessStatus', () => {
   it('accepts 204 and 200', () => {
