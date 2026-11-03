@@ -342,6 +342,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                 <section className="rule-hair-strong flex flex-col gap-sm pt-md">
                   <SectionLabel spacing="none">Before the first answer</SectionLabel>
                   <p className="text-body text-text">{LEDGER_CHAT_NOTICE.lead}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.scope}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.sent}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.discreet}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.retention}</p>
