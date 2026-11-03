@@ -1,7 +1,7 @@
 ---
 section: glossary
 sources: []
-last_verified_commit: 1a4c025
+last_verified_commit: b4d45ae
 status: manual
 ---
 
@@ -249,12 +249,59 @@ calendar parts — so leap years and DST can't nudge the boundary. The gate
 **fails closed**: an unparseable or future date of birth is treated as *not*
 adult (`isAdult`, `src/domain/age.ts:80`).
 
+### Health-data consent
+The reader's separate, explicit agreement that Smoke Ledger may process what
+they log — smoking, spending, mood, craving and notes — because that is
+information about their health (GDPR Art 9(2)(a), India's DPDP consent
+rules). It is its own unticked row, never bundled with the terms or the
+optional analytics box, and is stored as `user_profiles.health_data_consent_at`
+(`src/lib/healthConsent.ts`). Accounts from before it existed have it empty on
+purpose, since stamping a consent nobody gave would be untrue. Withdrawing it
+cannot leave a working ledger, so Settings › Withdraw consent leads to export,
+then erase or delete.
+
+### Re-consent
+Asking an onboarded reader to accept once more because what they accepted is no
+longer current: a stored terms, privacy or medical-disclaimer version differs
+from `LEGAL_VERSIONS`, or they never gave the health-data consent
+(`consentsOutdated` in `src/lib/onboardingSteps.ts`). The next visit lands on
+`/consent` (web) or `app/consent.tsx` (mobile) before anything else; accepting
+returns them home, and "Not now" leads to Settings, where export and withdrawal
+live. Settings, the legal pages and sign-in are exempt so it can never loop.
+It is different from first-time consent in onboarding, which also moves the
+wizard; re-consent never touches the onboarding step.
+
+### Retention tier
+How long a kind of server-side record is kept, stated in the privacy policy and
+enforced by a daily job, not by good intentions. The tiers are: erased at once
+on request (the ledger, identity, the reader's own error reports); 90 days
+(error reports); 12 months (security/audit records, including the erasure proof,
+and opt-in usage events); 2 days (rate-limit counters). The numbers live in
+`RETENTION` (`src/lib/privacy/retention.ts`) and `purge_expired_records()`; a
+test keeps them equal. Nothing is deleted for inactivity.
+
+### Erasure proof
+The one `account_data_erased` audit row that `erase_account_data()` writes. It
+holds a pepper-hashed id and the fact that an earlier identity was erased, and
+is kept for the 12-month audit tier. It is the retained record that an erasure
+happened, disclosed as such in the policy; the earlier audit rows are
+anonymised, not kept in readable form.
+
+### Lifecycle registry
+The single table (`STORES` in `src/lib/privacy/lifecycle.ts`) listing every place
+something about a reader can sit — cookies, `localStorage`, SecureStore, caches,
+files, notifications and server rows — and which events clear it: sign-out,
+erase, delete, withdraw, discreet-on. The web and mobile cleanup helpers run
+from it, and a test fails if a store has no clearer.
+
 ## Open gaps
 - This glossary is hand-maintained (`status: manual`) and declares no source
   globs, so `npm run spec:drift` cannot flag it when the underlying code moves.
   If a term's code reference here goes stale, nothing automated will catch it —
   re-read it whenever the domain layer changes meaningfully. (Goal, Met, Taper,
-  Proposal and Re-anchor were last re-read against the code on 2026-11-02.)
+  Proposal and Re-anchor were last re-read against the code on 2026-11-02;
+  Health-data consent, Re-consent, Retention tier, Erasure proof and Lifecycle
+  registry were written against the privacy V3 work on 2026-11-03.)
 - "Mood" is genuinely overloaded (log mood vs. character mood). The code keeps
   them in separate modules, but the shared word is a standing trap; this entry
   is the disambiguation of record.

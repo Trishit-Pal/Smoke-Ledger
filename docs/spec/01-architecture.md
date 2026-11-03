@@ -6,7 +6,7 @@ sources:
   - web/lib/server/**
   - app/_layout.tsx
   - metro.config.js
-last_verified_commit: 13fe5cf
+last_verified_commit: b4d45ae
 status: current
 ---
 
@@ -37,6 +37,7 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
     lib/
       supabase.ts   ← Supabase client singleton (native/dev-web)
       validation.ts ← Zod schemas; single source of truth for allowed values
+      privacy/      ← lifecycle.ts (every store a reader's data lives in, and what clears it), retention.ts, promises.ts, clearDeviceNative.ts
     store/          ← Zustand stores (session.ts, auth.ts, theme.ts)
     types/
       index.ts      ← shared TypeScript interfaces (CigaretteLog, UserProfile, …)
@@ -46,7 +47,8 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
       server/
         data.ts     ← server-side data fetching (React cache + Next.js unstable_cache)
       supabase/     ← server/admin Supabase clients for Next.js
-    middleware.ts   ← auth guard + CSP nonce + onboarding-step enforcement
+    middleware.ts   ← auth guard + CSP nonce + onboarding-step enforcement + re-consent gate
+    lib/privacy/    ← web half of the lifecycle clearers (clearDevice.ts)
   supabase/
     migrations/     ← versioned SQL migrations
     functions/      ← Edge Functions (delete-account, audit-record)
@@ -60,9 +62,9 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
 
 **Repository (`src/db/repositories/`).** One file per database table. Each function calls `requireUserId()` to confirm the caller is authenticated before touching data (`src/db/repositories/_supabase.ts:4–12`). Writes always run through `parseOrThrow(SomeSchema, input, 'label')` before the Supabase call. DB errors are mapped to typed `AppError` codes (`authentication_error`, `rate_limited`, `conflict`, etc.) so callers never see raw Postgres error strings (`src/db/repositories/_supabase.ts:27–68`). The native app talks to the same repository functions as the server; the difference is which Supabase client they receive.
 
-**Store (`src/store/`).** Four Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, all goals (any status), the profile, and the canonical per-day daily summary (`summary`, up to 365 days, floored at onboarding via `summarySinceYmd` so "saved" never counts pre-onboarding days), plus a per-session `achievementDismissCount` (drives celebration suppression — see Celebrations), `pendingGoalMoments` (goal completions the ledger made on its own, waiting for the goals tab to announce them; drained by `consumeGoalMoments()`) and `goalsReconcileFailed` (true when the last reconcile could not save a due goal update). It populates itself on `boot()` with five parallel Supabase calls, then reconciles the loaded goals (`reconcileLoaded`, delegating to `src/services/goalReconcile.ts` with the goal repository as the writer; it never throws, so boot is never blocked) using the reader's ledger date, read from the profile just loaded because the store's profile is not yet set at that point. `refreshGoals()` reconciles the same way with `ledgerToday()`. It exposes per-slice `refresh*` actions plus a `refreshAll()`, wraps goal CRUD (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`), and is reset to empty on sign-out. `refreshSummary()` deliberately keeps the previous rows on a transient failure so a refresh after a log write never blanks the dashboard totals. Beside it, `ledgerTimeZone()`, `ledgerToday()` and `ledgerDaysAgo()` give native screens the profile country's zone (IST when none) for stamping logs and reading "today". `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). `useOnboardingDraft` (`src/store/onboardingDraft.ts`) holds the multi-step onboarding wizard's in-progress field values so back/forward navigation doesn't lose them; it is in-memory only and cleared on onboarding completion and on logout (via `useSession.reset()`). The stores are deliberately narrow: domain computation is never done inside them (reconcile asks the pure planner in `src/domain/goalTransitions.ts` through the service).
+**Store (`src/store/`).** Four Zustand stores. `useSession` is the in-memory cache for the current user's data (`src/store/session.ts`): it holds the last 90 days of logs, all brands, all goals (any status), the profile, and the canonical per-day daily summary (`summary`, up to 365 days, floored at onboarding via `summarySinceYmd` so "saved" never counts pre-onboarding days), plus a per-session `achievementDismissCount` (drives celebration suppression — see Celebrations), `pendingGoalMoments` (goal completions the ledger made on its own, waiting for the goals tab to announce them; drained by `consumeGoalMoments()`) and `goalsReconcileFailed` (true when the last reconcile could not save a due goal update). It populates itself on `boot()` with five parallel Supabase calls, then reconciles the loaded goals (`reconcileLoaded`, delegating to `src/services/goalReconcile.ts` with the goal repository as the writer; it never throws, so boot is never blocked) using the reader's ledger date, read from the profile just loaded because the store's profile is not yet set at that point. `refreshGoals()` reconciles the same way with `ledgerToday()`. It exposes per-slice `refresh*` actions plus a `refreshAll()`, wraps goal CRUD (`addGoal`/`updateGoal`/`setGoalStatus`/`removeGoal`), and is reset to empty on sign-out. The root layout (`app/_layout.tsx`) also runs the native device clear (`clearNativeDevice('signOut')`: stored session, first-suggestion stamps, in-memory ledger) on an explicit `SIGNED_OUT` event only, never on an `INITIAL_SESSION` with a null session, which also arrives on an offline cold start. The stored session key is the exported `SESSION_STORAGE_KEY` that `src/lib/supabase.ts` and the cleaner share, so they cannot name different keys. `refreshSummary()` deliberately keeps the previous rows on a transient failure so a refresh after a log write never blanks the dashboard totals. Beside it, `ledgerTimeZone()`, `ledgerToday()` and `ledgerDaysAgo()` give native screens the profile country's zone (IST when none) for stamping logs and reading "today". `useAuth` holds only the Supabase `Session` object and an `initialized` flag (`src/store/auth.ts`). `useThemeStore` manages light/dark/system preference and persists it to AsyncStorage non-blockingly (`src/store/theme.ts:22–26`). `useOnboardingDraft` (`src/store/onboardingDraft.ts`) holds the multi-step onboarding wizard's in-progress field values so back/forward navigation doesn't lose them; it is in-memory only and cleared on onboarding completion and on logout (via `useSession.reset()`). The stores are deliberately narrow: domain computation is never done inside them (reconcile asks the pure planner in `src/domain/goalTransitions.ts` through the service).
 
-**Server layer (`web/lib/server/data.ts`).** Next.js Server Components cannot use the Zustand stores — they run on the server, not in the browser. The server layer replicates the same data-fetching logic using React's `cache()` for per-request deduplication and Next.js `unstable_cache` for cross-request caching of slow or rarely-changing data like brands (`web/lib/server/data.ts:345–361`). Profile, logs, goals, and brands are fetched with the SSR Supabase client which reads its session from cookies set by `@supabase/ssr`. The page-level helpers (`getDashboardData`, `getTrendsPageData`, etc.) compose these cached fetchers and run everything in parallel with `Promise.all`.
+**Server layer (`web/lib/server/data.ts`).** Next.js Server Components cannot use the Zustand stores — they run on the server, not in the browser. The server layer replicates the same data-fetching logic using React's `cache()` for per-request deduplication and Next.js `unstable_cache` for cross-request caching of slow or rarely-changing data like brands (`web/lib/server/data.ts:345–361`; the 600-second `BRANDS_CACHE_TTL_SECONDS` is exported so the privacy policy states the same figure). The profile mapper carries `healthDataConsentAt`, which the re-consent gate reads. Profile, logs, goals, and brands are fetched with the SSR Supabase client which reads its session from cookies set by `@supabase/ssr`. The page-level helpers (`getDashboardData`, `getTrendsPageData`, etc.) compose these cached fetchers and run everything in parallel with `Promise.all`.
 
 ### Data flow: logging a cigarette (native app)
 
@@ -106,9 +108,9 @@ The Supabase project `tvcwrsglceahkjnfuzkn` (region: us-east-2) holds these publ
 | `goals` | Daily/weekly caps, spend caps, tapers, windows and quit dates (seven types). `meta_json` holds type-specific configuration and the cap history; `completed_at` is stamped by a trigger. See Goals and the data model. |
 | `settings_kv` | Arbitrary per-user key/value store (e.g. `consent.analyticsOptIn`). |
 | `reminders` | Push notification schedules (schema exists; no rows yet). |
-| `usage_events` | Analytics events written from the client (opt-in). |
-| `audit_events` | Server-side record of account-level actions (delete, export, etc.). |
-| `error_events` | Client-reported errors from `logClientError`. |
+| `usage_events` | Analytics events written from the client (opt-in). Deleted when the opt-in is switched off, and after 12 months. |
+| `audit_events` | Server-side record of account-level actions (delete, export, etc.). Deleted after 12 months by a daily purge. |
+| `error_events` | Client-reported errors from `logClientError`, redacted before they are stored. A user's own rows are deleted on erase; all rows after 90 days. |
 | `rate_limit_counters` | Sliding-window counters used by Postgres RPCs to enforce per-user rate limits. Identities are stored as keyed hashes, and rows older than two days are purged daily (`purge_rate_limit_counters`, scheduled by pg_cron). |
 | `price_entries` | Intended for crowd-sourced pricing data (0 rows; not yet in use). |
 | `user_facts_seen` | Tracks which motivational facts a user has seen. |

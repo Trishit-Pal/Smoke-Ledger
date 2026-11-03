@@ -36,7 +36,7 @@ sources:
   - DB: public.user_profiles (schema — Supabase project tvcwrsglceahkjnfuzkn)
   - web/lib/auth/postAuthDestination.ts
   - src/lib/onboardingSteps.ts
-last_verified_commit: b9ac848
+last_verified_commit: b4d45ae
 status: current
 ---
 
@@ -105,9 +105,10 @@ Every email link is first classified by `readAuthLink` (`src/lib/authLink.ts`), 
 - `/onboarding/privacy?welcome=1` if this is a `type=signup` link and consent columns are not yet filled
 - `/onboarding/privacy` if consent is incomplete for any reason
 - If `onboarded_at` is null: an allowlisted onboarding `next` if one was given, otherwise the user's **saved step** (`resumeOnboardingRoute` in `src/lib/onboardingSteps.ts`, read from `onboarding_step`). Someone who signed out halfway through the wizard lands back on the step they had reached, never on the consent page again. A consented row with no saved step resumes at usage.
+- `/consent` if the user is onboarded but `consentsOutdated(profile)` (a stored legal version differs from `LEGAL_VERSIONS`, or the explicit health-data consent was never given): the re-consent screen comes before the page they were heading to
 - `nextPath` (if in the allowlist) or `/dashboard` for a returning user
 
-The middleware uses the same helpers for its own redirects, so a password sign-in (which goes to `/dashboard` and gets bounced) resumes at the same place a magic-link sign-in does.
+The middleware uses the same helpers for its own redirects, so a password sign-in (which goes to `/dashboard` and gets bounced) resumes at the same place a magic-link sign-in does. The re-consent decision is shared the same way: `consentGateRedirect` (`src/lib/onboardingSteps.ts`) answers for the middleware, `postAuthDestination` and the Expo layouts, and `/consent`, the legal pages, Settings, the auth routes and `/api` are exempt so an outdated reader can still read, export, withdraw or sign in without a loop. The full gate is described in Security and Privacy.
 
 The `next` parameter is sanitized by `sanitizeCallbackNextPath` before any redirect is issued. The allowlist is explicit: shared post-auth paths (`/dashboard`, `/log`, `/log/new`, `/history`, `/trends`, `/settings`) plus callback-only paths (`/reset-password`) plus an explicit enumeration of the seven onboarding routes. Anything else — absolute URLs, path traversal, embedded newlines — is rejected and the user goes to `/dashboard`. Referrer leakage of the recovery token is suppressed with `Referrer-Policy: no-referrer` on every redirect response.
 
@@ -167,6 +168,8 @@ All email-sending surfaces (signup, password reset, resend confirmation) are gua
 ## Tests
 
 **`src/tests/authCallback.test.ts`** — covers `createSessionFromUrl`. Verifies that `token_hash`+`type` calls `verifyOtp` and returns `'recovery'`, `'signed_up'`, or `'signed_in'`; that `code` calls `exchangeCodeForSession`; that hash-fragment tokens are rejected and never call `setSession`; that API failures return `'none'`; and that a bare or malformed URL returns `'none'`. Tests use a mock Supabase client — no network required.
+
+**`src/tests/consent-gate-wiring.test.ts`** — source guards that the middleware selects `health_data_consent_at` and runs the re-consent gate before the onboarded bounce, that `/` goes straight to `/consent` for outdated consents, and that post-auth routing and the Expo entry points use the same check.
 
 **`src/tests/authLink.test.ts`**, **`web-post-auth-destination.test.ts`**, **`web-link-confirm-guard.test.ts`** — `readAuthLink` classification, `confirmLinkPath`, `maskEmail`; the shared post-sign-in routing; and source guards that the GET callback never calls `verifyOtp`, only the confirm page's server action redeems, middleware and headers cover `/auth/confirm`, and the mobile screen confirms before redeeming.
 

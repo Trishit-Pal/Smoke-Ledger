@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: 13fe5cf
+last_verified_commit: b4d45ae
 status: current
 ---
 
@@ -411,7 +411,7 @@ no-op that returns the current row.
   hidden Home totals every figure is masked. "Not now" is remembered on that device
   only, as the date, in `localStorage` (web) or `AsyncStorage` (mobile), keyed by
   user id, and hides the suggestion for 14 days
-  (`src/lib/goals/firstSuggestionDismissal.ts`). It is never sent to the server.
+  (`src/lib/goals/firstSuggestionDismissal.ts`). It is never sent to the server. Because it is a device-side store about the reader, it is listed in the privacy lifecycle registry: sign-out clears every user's stamp on the device (the user is no longer known by then; `FIRST_SUGGESTION_KEY_PREFIX` is exported for that sweep), and erase, delete and consent withdrawal clear them too (`clearFirstSuggestionDismissals`, web `localStorage` and native `AsyncStorage`, never throwing).
   Until the signed-in user id is read from the local session the suggestion stays
   hidden, and any failure to read it leaves it hidden.
 - **Onboarding** gained a fourth goal card, "Suggest one later" ("After a week of

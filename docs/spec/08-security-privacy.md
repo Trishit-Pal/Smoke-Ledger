@@ -13,7 +13,17 @@ sources:
   - src/lib/discreet.ts
   - web/components/charts/**
   - docs/security/**
-last_verified_commit: 798a45b
+  - src/lib/privacy/**
+  - src/lib/logger.ts
+  - src/lib/legalEntity.ts
+  - src/lib/healthConsent.ts
+  - src/lib/reconsentCopy.ts
+  - src/services/consentWithdrawal.ts
+  - src/services/cloudErase.ts
+  - app/consent.tsx
+  - web/app/consent/**
+  - web/lib/privacy/**
+last_verified_commit: b4d45ae
 status: current
 ---
 
@@ -25,9 +35,11 @@ Every row in the database belongs to exactly one user, and no code path should e
 
 ## What the user experiences
 
-From a user's perspective, the security model is invisible until they need it. If they open the app on a different device, they see only their own data. If they tap "Erase data" in Settings, everything disappears and onboarding resets — but they are still logged in. If they tap "Delete account", their login is removed and they are signed out. In both cases they receive no error, no partial state, and no confirmation that anyone else's data was involved.
+From a user's perspective, the security model is invisible until they need it. If they open the app on a different device, they see only their own data. If they tap "Erase data" in Settings, everything disappears and onboarding resets — but they are still logged in. "Everything" now includes their name, date of birth and gender in the sign-in record, their own error reports, and what the app keeps on the device (the chat conversation, saved dismissals, lock settings, scheduled reminders and any export file left in the cache). If they tap "Delete account", their login is removed and they are signed out. In both cases they receive no error, no partial state, and no confirmation that anyone else's data was involved.
 
-The only visible privacy surface is the data export: a JSON file containing every log, goal, brand, reminder, setting, audit event, and profile field that belongs to them. The export paginates in chunks of 5 000 rows and produces a `truncated: true` flag if the safety cap of 200 pages is ever reached (roughly 270 years of daily use at 10 sticks per day — effectively never).
+Two other things can happen to a reader who has been here a while. When the terms or privacy policy change materially, or when they never gave the separate health-data consent, the next visit lands on a calm "we have updated our terms" screen before anything else; accepting returns them to Home, and "Not now" leads to Settings where they can export or delete instead. And Settings carries a "Withdraw consent" row: since a ledger cannot be kept without consent to process health information, withdrawing explains that the data goes, offers an export first, then erase or delete.
+
+The other visible privacy surface is the data export: a JSON file containing every log, goal, brand, reminder, setting, audit event, error report, profile field and the sign-in record (email, phone, account dates) that belongs to them. The export paginates in chunks of 5 000 rows and produces a `truncated: true` flag if the safety cap of 200 pages is ever reached (roughly 270 years of daily use at 10 sticks per day — effectively never).
 
 ## How it works
 
@@ -47,7 +59,7 @@ The policy shape for most user-owned tables is a single FOR ALL policy that gate
 
 ### SECURITY DEFINER + search_path hygiene
 
-All 16 `SECURITY DEFINER` functions in `public` pin an explicit `search_path`. Fourteen pin `search_path = ''` (the empty string), which means every object reference inside the function body must be schema-qualified or the function errors. Two pin a non-empty path appropriate to their job:
+All 16 `SECURITY DEFINER` functions in `public` pin an explicit `search_path`. Fourteen pin `search_path = ''` (the empty string), which means every object reference inside the function body must be schema-qualified or the function errors. Two pin a non-empty path appropriate to their job (the V3 additions `delete_my_usage_events` and `purge_expired_records` both pin `''`):
 
 - `refresh_seed_prices_from_catalog` pins `smoke_seed, public` because it needs to read the seed catalog schema.
 - `rls_auto_enable` pins `pg_catalog` because it is a DDL helper that works in system catalogs.
@@ -56,9 +68,9 @@ No function inherits the caller's search_path. This matters because a SECURITY D
 
 **anon default-deny.** `20261030000000_security_hardening.sql` revokes every `anon` grant on public tables, sequences and functions, removes the default grants to `anon` for future objects, and drops the built-in PUBLIC `EXECUTE` default for functions the migration role creates. `anon` also inherits `EXECUTE` through PUBLIC on functions that already exist, so every `SECURITY DEFINER` function is revoked `FROM PUBLIC, anon` explicitly (enforced by `src/tests/security-migrations.test.ts`). `scripts/sql/smoke.sql` fails CI if `anon` can execute any public `SECURITY DEFINER` function or holds any public table privilege.
 
-The user-facing RPCs that `authenticated` may call are: `create_log_with_rate_limit`, `erase_account_data`, `export_account_data`, `get_daily_summary`, `get_health_milestones`, `get_random_facts`, `list_logs_page`, `mark_fact_seen`, `refresh_seed_prices_from_catalog`, `seed_default_brands_if_empty`, `sync_default_brand_catalog`.
+The user-facing RPCs that `authenticated` may call are: `create_log_with_rate_limit`, `delete_my_usage_events`, `erase_account_data`, `export_account_data`, `get_daily_summary`, `get_health_milestones`, `get_random_facts`, `list_logs_page`, `mark_fact_seen`, `refresh_seed_prices_from_catalog`, `seed_default_brands_if_empty`, `sync_default_brand_catalog`.
 
-The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `purge_rate_limit_counters` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. The former `auth_email_exists` email-existence oracle is dropped by the hardening migration.
+The service-role-only / internal functions — `consume_rate_limit`, `handle_new_user`, `record_audit_event`, `rls_auto_enable`, `purge_rate_limit_counters`, `purge_expired_records` — have had `EXECUTE` revoked from both `anon` and `authenticated`. `handle_new_user` fires as a trigger on `auth.users`; trigger execution does not require an EXECUTE grant on the function, so signup is unaffected. The former `auth_email_exists` email-existence oracle is dropped by the hardening migration.
 
 Trigger helpers that are `SECURITY INVOKER` need the opposite care. (The one that calls nothing else, `goals_stamp_completed_at()` in `20261103000000_adaptive_goals.sql`, simply has all privileges revoked from `PUBLIC`, `anon` and `authenticated`.) `keep_onboarding_step_monotonic()` (`20261101120000_onboarding_step_monotonic.sql`) runs as the writing role and calls `onboarding_step_rank(text)`, so that helper is explicitly granted to `authenticated` and `service_role` (and revoked from `PUBLIC` and `anon`); revoking it from `authenticated` would make every onboarding step write fail with `42501`. The trigger function itself is revoked from everyone — Postgres checks EXECUTE on a trigger function at `CREATE TRIGGER`, not when it fires. Neither function reads a table, so neither is a tenant-isolation boundary; RLS still decides which rows a user can update.
 
@@ -72,9 +84,9 @@ Trigger helpers that are `SECURITY INVOKER` need the opposite care. (The one tha
 2. Rewrites all `audit_events` rows for this user: nulls out `user_id`, replaces `props_json` with `{"hashed_user_id": "<hash>"}`.
 3. Deletes all `error_events` rows for this user (they used to be kept with a hashed id).
 4. Deletes all product data (logs, brands, variants, goals, reminders, settings, price entries, usage events, facts seen).
-5. Resets the profile row, including the otherwise-immutable `full_name`, `date_of_birth`, `gender`, plus `mobile_e164` and `place` (it sets the transaction-local `app.erasing` flag, which `enforce_profile_identity_rules` honours), removes the same three keys from `auth.users.raw_user_meta_data`, and no longer sets `deleted_at` (`20261104100000_erase_auth_metadata.sql`).
+5. Resets the profile row, including the otherwise-immutable `full_name`, `date_of_birth`, `gender`, plus `mobile_e164` and `place` (it sets the transaction-local `app.erasing` flag, which `enforce_profile_identity_rules` honours) and `health_data_consent_at` (`20261104130000_health_consent.sql`), removes the same three identity keys from `auth.users.raw_user_meta_data`, and no longer sets `deleted_at` (`20261104100000_erase_auth_metadata.sql`). The clients then call `refreshSession()` (`src/services/cloudErase.ts`) so the signed-in JWT stops carrying the old `user_metadata`; a failure there is logged and never blocks the erase.
 6. Re-seeds default brands via `smoke_seed.apply_default_brands(uid)`.
-7. Inserts a final `account_data_erased` audit event with `prior_identity_erased: true` (still attributed to the live user, since auth deletion comes later). That row is the record that the user's earlier name / DOB / gender existed before they re-entered new ones.
+7. Inserts a final `account_data_erased` audit event with `prior_identity_erased: true` (still attributed to the live user, since auth deletion comes later). That row is the record that the user's earlier name / DOB / gender existed before they re-entered new ones, and the disclosed accountability record of the erasure itself. It is the one thing about the person that outlives an erase, for the 12-month audit retention (see Retention below), and it is why an export taken after an erase is not empty.
 
 After `erase_account_data` returns, the `delete-account` Edge Function calls `auth.admin.deleteUser(userId)`, which cascades through foreign keys and removes anything the erase step missed (defense-in-depth against future schema drift). If `erase_account_data` fails for any reason, the function aborts without calling `deleteUser` — the user's auth row stays intact and they can retry (`supabase/functions/delete-account/index.ts:183–194`).
 
@@ -82,8 +94,8 @@ After `erase_account_data` returns, the `delete-account` Edge Function calls `au
 
 The pepper is a 32-byte random secret stored as the `AUDIT_PEPPER` Edge Function environment variable and surfaced inside the DB as the `app.audit_pepper` GUC. Two functions use it:
 
-- `delete-account/index.ts` — `hashWithPepper(user.id, AUDIT_PEPPER)` is written into the compliance delete row in `error_events` before the user is erased, and the IP is hashed the same way for the audit row and rate-limit key. The function returns `server_misconfigured` (500) if `AUDIT_PEPPER` is unset rather than storing a reversible hash; `send-sms-otp` does the same, since it keys the phone rate-limit bucket on the peppered hash.
-- `audit-record/index.ts:81` — the same hash appears in log output when a user hits the audit-record rate limit.
+- `delete-account/index.ts` — `hashWithPepper(user.id, AUDIT_PEPPER)` is written into the compliance delete row in `error_events` before the user is erased, and the IP and the per-user rate-limit key are hashed the same way, so `rate_limit_counters` never holds a raw user id. The function returns `server_misconfigured` (500) if `AUDIT_PEPPER` is unset rather than storing a reversible hash; `send-sms-otp` does the same, since it keys the phone rate-limit bucket on the peppered hash.
+- `audit-record/index.ts` — the same hash keys the per-user rate-limit bucket and appears in log output when a user hits the audit-record rate limit.
 
 The hash is computed in `supabase/functions/_shared/hash.ts` using `crypto.subtle.digest('SHA-256', ...)`. The pepper is what makes the retained audit rows non-reversible: once `auth.users` is purged, the hashed id has no public counterpart to correlate against. Rotation of the pepper (procedure in `docs/runbooks/audit-pepper-rotation.md`) severs forensic continuity across the rotation boundary — existing hashes in `error_events` remain inert.
 
@@ -91,7 +103,7 @@ Inside the DB the same `<id>:<pepper>` form is expressed using `extensions.diges
 
 ### Compliance delete row tamper-resistance
 
-A `compliance.delete` row in `error_events` is the surviving proof that a deletion happened. It is written by the service-role client in `delete-account/index.ts:164–169` with `user_id = null`, so RLS SELECT (which requires `user_id = auth.uid()`) makes it invisible to any authenticated user. Three layers enforce this:
+A `compliance.delete` row in `error_events` is a surviving trace that a deletion happened (kept 90 days like every `error_events` row; the longer erasure proof is the 12-month `account_data_erased` audit row that `erase_account_data` writes first, which survives the auth-user deletion with `user_id` set to NULL). It is written by the service-role client in `delete-account/index.ts:164–169` with `user_id = null`, so RLS SELECT (which requires `user_id = auth.uid()`) makes it invisible to any authenticated user. Three layers enforce this:
 
 **Layer 1 — RLS INSERT policy.** `error_events_insert` (`supabase/migrations/20260520000000_security_correctness.sql:254–255`) allows authenticated users to insert rows where `user_id = auth.uid() AND category <> 'compliance.delete'`. They cannot insert a null-user row, and they cannot insert a row in the compliance.delete category at all.
 
@@ -106,11 +118,39 @@ Its history is the repo's canonical migrations-can-lie example: the constraint w
 The following are reachable only with the service-role key and are never handed to browser clients:
 
 - `consume_rate_limit` RPC — backs the Edge Function rate limiter; `EXECUTE` granted only to `service_role` (`supabase/migrations/20260523092236_add_rate_limit_counters.sql:62–63`).
-- `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers. Emails, phone numbers and IPs are stored only as keyed hashes: edge functions use `hashWithPepper(value, AUDIT_PEPPER)` (`_shared/hash.ts`), the web limiter an HMAC keyed on the service-role key. Per-user buckets in `audit-record` and `delete-account` still key on the raw user UUID (`user:<id>`). The hardening migration deletes every pre-hashing row once, enables `pg_cron` (guarded) and schedules `purge_rate_limit_counters()` daily at 03:17 to drop rows older than 2 days. The migration only warns if pg_cron cannot be enabled; `scripts/sql/smoke.sql` fails if pg_cron is installed but the job is missing. Verify production after deploy with `select * from cron.job`.
+- `rate_limit_counters` table — RLS enabled, no policy, hard default-deny to all non-service-role callers. Emails, phone numbers and IPs are stored only as keyed hashes: edge functions use `hashWithPepper(value, AUDIT_PEPPER)` (`_shared/hash.ts`), the web limiter an HMAC keyed on the service-role key. Per-user buckets in `audit-record` and `delete-account` key on the peppered hash of the user id (`user:<hash>`), not the raw UUID, since the V3 work. The hardening migration deletes every pre-hashing row once, enables `pg_cron` (guarded) and schedules `purge_rate_limit_counters()` daily at 03:17 to drop rows older than 2 days. The migration only warns if pg_cron cannot be enabled; `scripts/sql/smoke.sql` fails if pg_cron is installed but the job is missing. Verify production after deploy with `select * from cron.job`.
 - `record_audit_event` RPC — `EXECUTE` revoked from `authenticated` in `supabase/migrations/20260521000000_audit_export_ops.sql:295–297`; re-granted only to `service_role`. The `audit-record` Edge Function verifies the caller's JWT with the anon client first, then writes through the service-role client.
 - `auth.admin.deleteUser` — called only by `delete-account/index.ts:203`; requires `SUPABASE_SERVICE_ROLE_KEY`, which is an Edge Function secret and a server-side Vercel env var, never a `NEXT_PUBLIC_*` value.
 
 The `audit-record` Edge Function (`supabase/functions/audit-record/index.ts`) validates the incoming bearer token via `supabase.auth.getUser()` on the anon client before touching the service-role client, which means a request without a valid JWT is rejected at line 69 before any write happens. The allowlist of valid event types and categories lives in `supabase/functions/_shared/auditAllowlist.ts:3–28`. Props are redacted through a PII denylist (email, phone, Aadhaar, PAN, OTP, tokens, etc.) in `redactAuditProps` (`supabase/functions/_shared/auditAllowlist.ts:74–101`) and the parallel `_redact_audit_props` SQL function (`supabase/migrations/20260520000000_security_correctness.sql:149–188`).
+
+### Retention: the daily purge
+
+Every server-side record has a stated life, and one job enforces it (owner decision O5). `purge_expired_records()` (`supabase/migrations/20261104110000_retention_purge.sql`, `service_role` only) runs daily at 03:37 under pg_cron and deletes `audit_events` older than 12 months, `error_events` older than 90 days and `usage_events` older than 12 months; the existing 03:17 job still drops `rate_limit_counters` after 2 days. Nothing is deleted for inactivity. The periods live in one object, `RETENTION` (`src/lib/privacy/retention.ts`), which the privacy policy renders and `src/tests/retention-purge.test.ts` compares against the SQL intervals, so the text and the job cannot drift. The retention tiers are therefore: erased at once on request (the ledger, identity, own error reports), 90 days (error reports), 12 months (security records including the erasure proof, and opt-in usage events), 2 days (rate-limit counters).
+
+If pg_cron is missing the migration only warns, which would mean the purge silently never runs. Two checks make that loud: `scripts/sql/smoke.sql` fails CI when pg_cron is installed but `purge-expired-records` is not scheduled, and `scripts/verify-backend.mjs` confirms the function exists and prints the manual `cron.job` query as an owner action.
+
+### Error-log redaction
+
+An error report is diagnostic text, so personal data is removed before it is stored, not after. `redactText` and `redactRoute` (`supabase/functions/_shared/redact.ts`, pure, no lookbehind so Hermes can run it) replace emails, UUIDs, bearer tokens, JWTs, long secret-looking runs, phone numbers and long digit runs, cap the input at 2 000 characters first so the patterns stay linear, and reduce a route to its path with dynamic segments as `:id`. The Deno edge functions import it directly and `src/lib/logger.ts` (web and mobile) imports it by relative path, so every writer to `error_events` shares one implementation. `logClientError` never throws: a redaction or insert failure must not break the screen. Over-redacting a diagnostic is accepted; storing a name or number is not.
+
+### One lifecycle table for what the device keeps
+
+Cleaning up is driven by a registry, not by each screen remembering. `STORES` in `src/lib/privacy/lifecycle.ts` lists every store that can hold something about a reader — the auth cookie, remember-me cookie, chat transcript, first-suggestion stamps, lock keys, the cached brand list, the mobile session, in-memory ledger, notifications, export file, plus the server rows — each with the events that clear it: `signOut`, `erase`, `delete`, `withdraw`, `discreetOn`. Device preferences with nothing personal in them (theme, catalog) are listed too, as kept. `clearWebDevice` (`web/lib/privacy/clearDevice.ts`) and `clearNativeDevice` (`src/lib/privacy/clearDeviceNative.ts`) run `runLifecycleClearers` for the platform and event: every clearer for the event runs, one failing never stops the rest, and the ids that failed come back and are logged as ids only (`reportFailedClears`). A test fails if a store has no clearer or a clearer has no row.
+
+Where each event fires. Sign-out: web `AuthProvider` on `SIGNED_OUT` and the Settings sign-out; mobile root layout on `SIGNED_OUT` only, never on `INITIAL_SESSION` with a null session, because that also arrives on an offline cold start and wiping the stored session then would sign the reader out for good. Erase and delete: Settings on both platforms, after the server call succeeds; delete also removes the remember-me cookie, the mobile SecureStore session and in-memory ledger. Withdraw behaves as erase (the reader chooses erase or delete). The mobile erase also cancels scheduled notifications and deletes every export file in the cache. The brand cache (`brands:<uid>`, 600 s) is revalidated rather than dropped, to spare free-tier egress.
+
+### Consent, re-consent and withdrawal
+
+**Health-data consent.** What a reader logs — smoking, spending, mood, craving, notes — is information about their health, so it has its own explicit consent, separate from the terms and privacy ticks: an unticked row with Art 9 wording (`HEALTH_CONSENT_LABEL`, `src/lib/healthConsent.ts`, shared by web and Expo), stored as `user_profiles.health_data_consent_at`. `submitConsentStep` refuses to continue without it, and "stamp all" no longer ticks the optional analytics box. Declining sits beside accepting at the same size, with a note that says truthfully what has and has not been saved.
+
+**Re-consent gate.** `consentsOutdated(profile)` (`src/lib/onboardingSteps.ts`) is true for someone who has consented before but a stored terms, privacy or medical-disclaimer version differs from `LEGAL_VERSIONS`, or `health_data_consent_at` is empty. It is never true for someone who has not consented at all (onboarding asks them) and never reads `onboarding_step`, so asking again cannot move the wizard. `consentGateRedirect` is the one decision shared by the web middleware, `postAuthDestination`, the Expo index and tabs layout: an outdated, onboarded reader is sent to `/consent` (web `web/app/consent/`, Expo `app/consent.tsx`); a current reader who opens `/consent` goes home. `/consent`, `/privacy`, `/terms`, `/support`, `/settings`, `/auth`, `/reset-password` and `/api` are exempt, so reading the documents, exporting, withdrawing and signing in never loop. Accepting calls `acceptChangedTerms` (`src/services/onboarding.ts`): one `consent_accepted` audit row, the versions (and the health consent if missing) stamped in a write that carries no onboarding step, and the `consent.*` settings; the analytics preference is left alone. "Not now" links to Settings, in the same size as Accept. The screen's copy (`src/lib/reconsentCopy.ts`) says what to look for and leaves the detail to the policy.
+
+**What fires it today.** `LEGAL_VERSIONS` is deliberately not bumped yet: that waits on the signed EU representative (`EU_REPRESENTATIVE` in `src/lib/legalEntity.ts`; the pages show a "being appointed" line while it is empty). Until then the gate triggers only for accounts with no `health_data_consent_at`, which after the migration is every existing account; bumping the versions later reaches everyone through the same gate with no further code. `src/tests/legal-release-gate.test.ts` pins the published versions as the baseline: the pages and `docs/legal` must show the `LEGAL_VERSIONS` dates, a later version fails unless every EU representative field is filled, and versions never move backwards.
+
+**Withdrawing.** Settings › Withdraw consent explains that a ledger cannot be kept without the consent, offers the export first (which includes the account email and phone), then "Withdraw and erase my data" or "Withdraw and delete my account". Both emit the existing `consent_revoked` audit type (`recordConsentWithdrawal`, `src/services/consentWithdrawal.ts`; best-effort, a failed audit write never stands between the reader and their erasure) and then run the ordinary erase or delete, including the device clears. **Analytics off** is lighter: `saveAnalyticsOptIn(false)` calls `delete_my_usage_events()` first and stores the preference only if that succeeded.
+
+**The operator facts.** Who runs the service lives in one module, `src/lib/legalEntity.ts` (controller and Data Fiduciary Trishit Pal, Grievance Officer with a 30-day response, Kolkata courts, email delivery provider, Anthropic's retention text, helplines), and the rewritten `/privacy` and `/terms` render from it, from `RETENTION` and from `DATA_PROMISES`. `DATA_PROMISES` (`src/lib/privacy/promises.ts`) is the "Our data promises" list; `src/tests/privacy-promises.test.ts` gives every key a checker that reads the code keeping the promise, so a promise cannot be added, or a mechanism removed, without a failing test. The process documents behind the policy (breach runbook, record of processing, DPIA, transfers, processors, retention schedule, owner actions) are in `docs/legal/`.
 
 ### Origin allowlist and CORS
 
@@ -142,7 +182,7 @@ Only then are the reader's data loaded — with the caller's JWT client, so RLS 
 
 **What the model may say.** The system prompt (`web/lib/server/ledgerChat/prompt.ts`) forbids numbers, links, markdown, medical advice and judgement, and declares tool results and entries to be data, never instructions. The turn engine (`web/lib/server/ledgerChat/turn.ts`) enforces the part prompts cannot: narration is sanitised to plain text (`sanitizeNarration`), and every digit-run in it must exist in this turn's tool results or read as a time or short duration (`findUnverifiedNumbers`); one retry, then the fixed fallback sentence with the rows. At most three model calls per turn; a `refusal` stop yields a calm fallback and runs no tools; unknown or invalid tool calls become `is_error` results, never throws.
 
-**What is stored and logged.** Nothing server-side: no chat table, so `export_account_data`, `erase_account_data` and `verify:sovereignty` are unchanged. The conversation lives in the browser's `localStorage` (`ledger-chat:v1:<userId>`, last 20 turns; the panel finds the user id through `sessionUserId`, which never rejects, so a failed session lookup opens an empty transcript instead of an unhandled rejection) and is cleared on every sign-out event (`AuthProvider` on `SIGNED_OUT`, which also covers expiry and deletion), on Erase data, on Delete account, and when consent is turned off. Server logs carry tool names and token counts only (`api.ledger_chat.turn`), never the question, the answer or the user id. The usage event `ledger_chat_asked` records `{ starter, tools }` under the analytics opt-in. Anthropic's processing (US, no training, limited retention) is disclosed in both privacy policies; `LEGAL_VERSIONS.privacy` moved to 2026-11-02, which by design does not re-consent existing users — the feature's own opt-in is the consent.
+**What is stored and logged.** Nothing server-side: no chat table, so `export_account_data`, `erase_account_data` and `verify:sovereignty` are unchanged. The conversation lives in the browser's `localStorage` (`ledger-chat:v1:<userId>`, last 20 turns; the panel finds the user id through `sessionUserId`, which never rejects, so a failed session lookup opens an empty transcript instead of an unhandled rejection) and is cleared by the lifecycle registry on every sign-out event (`AuthProvider` on `SIGNED_OUT`, which also covers expiry and deletion), on Erase data, on Delete account, on consent withdrawal, when chat consent is turned off, and when discreet mode is turned on. The panel also labels every answer "Written by AI" and offers a plain "Clear conversation" control that empties the transcript at once; an answer still in flight when it is pressed lands in the cleared conversation, not the old one. Server logs carry tool names and token counts only (`api.ledger_chat.turn`), never the question, the answer or the user id. The usage event `ledger_chat_asked` records `{ starter, tools }` under the analytics opt-in. Anthropic's processing (US, no training, limited retention) is disclosed in both privacy policies; `LEGAL_VERSIONS.privacy` moved to 2026-11-02, which by design did not re-consent existing users — the feature's own opt-in is the consent (the re-consent gate above now exists for later material changes).
 
 ### Discreet mode: masking at the render site
 
@@ -189,6 +229,16 @@ These rules must not break:
 
 13. A sign-in never deletes an account. The re-auth detour returns to a confirmation (`DELETE_RESUME_PATH`), and only that confirmation's button calls `deleteUserAccount`. Cancelling it must state that nothing was deleted.
 
+14. Every store that can hold something about a reader has a row in `STORES` and a clearer; a store cannot be added without a policy (`src/tests/lifecycle.test.ts`, `web/__tests__/clearDevice.test.ts`). Device clears on sign-out run only for an explicit `SIGNED_OUT`.
+
+15. The export holds everything erase removes (the sign-in record and the user's own error reports included), and erase leaves nothing personal behind except the disclosed erasure-proof audit tier (`src/tests/export-complete-migration.test.ts`, `erase-auth-metadata.test.ts`).
+
+16. Records are deleted on the stated schedule and no sooner without the reader's action: audit and usage events at 12 months, error reports at 90 days, rate-limit counters at 2 days, nothing for inactivity. The text and the SQL read the same `RETENTION` numbers.
+
+17. No `error_events` text is stored unredacted: every writer goes through `redactText` / `redactRoute`.
+
+18. The re-consent gate never loops: `/consent` and the paths needed to read, export, withdraw and sign in are exempt, and a current reader on `/consent` is sent home. Health-data consent is never pre-ticked or backfilled, and declining is the same size as accepting.
+
 ## Edge cases and gotchas
 
 **Marketing consent is locked empty.** `marketing_consent_at` is never written by the app and a CHECK keeps it NULL for every role, because the row-wide `user_profiles` UPDATE policy would otherwise let any client set it. Stamps the old mobile screen wrote from the analytics checkbox were cleared with a per-user, server-only `marketing_consent_cleared` audit row (ADR `docs/architecture/marketing-consent.md`). Shipping a real opt-in means dropping the constraint in the same migration.
@@ -197,7 +247,7 @@ These rules must not break:
 
 **`erase_account_data` must run as the user, not as service-role.** The function reads `auth.uid()` internally. Calling it with a service-role client would yield `auth.uid() = null` and the function would raise `42501`. The Edge Function deliberately passes the user's bearer token (`supabaseUser.rpc('erase_account_data')` at `delete-account/index.ts:183`).
 
-**Anonymized audit rows are invisible to the user after erase.** Once `erase_account_data` nulls out `user_id`, the SELECT policy (`user_id = auth.uid()`) can no longer match those rows. An export performed after erase will show an empty `auditEvents` array. This is correct behavior, not data loss.
+**Anonymized audit rows are invisible to the user after erase.** Once `erase_account_data` nulls out `user_id`, the SELECT policy (`user_id = auth.uid()`) can no longer match those rows. An export performed after erase shows only the one `account_data_erased` row, which is still attributed to the live user until the account itself is deleted. This is correct behavior, not data loss.
 
 **The compliance delete audit insert is best-effort.** The `try/catch` at `delete-account/index.ts:157–173` catches audit insert failures and logs a warning rather than aborting. A failed audit insert means the compliance record may be missing, but the user-requested deletion proceeds. This is intentional: the alternative — blocking account deletion because the audit table was temporarily unavailable — would be a worse outcome for the user.
 
@@ -212,6 +262,8 @@ These rules must not break:
 ## Tests
 
 **Unit — props redaction.** `src/tests/services.audit.test.ts` tests `redactAuditProps` directly: strips PII denylist keys (email, password, token), truncates long strings to 200 characters, and drops non-primitive values. Also tests `isAuditSuccessStatus`.
+
+**Unit — V3 privacy lifecycle.** `src/tests/erase-auth-metadata.test.ts`, `export-complete-migration.test.ts`, `retention-purge.test.ts` and `health-consent-migration.test.ts` read the migration SQL (copy-forward from the newest definition via `src/tests/helpers/newestMigrationFunction.ts`, grants and `search_path`, and the retention intervals matching `RETENTION`). `src/tests/redact.test.ts` and `logger.redaction.test.ts` cover the redaction patterns, their cost bounds and the logger. `lifecycle.test.ts`, `cloudErase.test.ts`, `consentWithdrawal.test.ts` and `web/__tests__/clearDevice.test.ts` cover the registry, the clearers, the post-erase session refresh, usage-event deletion and the withdrawal audit. `consent-gate-wiring.test.ts`, `onboardingSteps.test.ts`, `web-post-auth-destination.test.ts` and `consent-stamp-all.test.ts` cover the gate decision (including the no-loop property), its wiring in the middleware and layouts, and honest stamping. `privacy-promises.test.ts` maps each published promise to a checker, and `web-privacy-page.test.ts` pins the page to the same sources. `web/e2e/consent.spec.ts` drives the re-consent flow (compile-checked locally with `--list`; the authenticated run is CI-only).
 
 **Unit — export pagination.** `src/tests/exportAccountData.test.ts` tests the client-side pagination loop in `exportAccountData()`: loops until `hasMore = false`, merges log pages, throws on RPC error, sets `truncated = true` when the 200-page cap is hit (runs exactly 200 RPC calls), and sets `truncated = false` when the RPC signals natural completion.
 
@@ -235,6 +287,12 @@ The `rls-integration` CI job is configured as a required branch protection check
 **Live sovereignty probe.** `scripts/verify-sovereignty.mjs` (invoked as `npm run verify:sovereignty`) tests 17 invariants against the live project using only the public anon key: zero rows readable across all tenant tables, anon rejection of all data-rights RPCs, and `POST /functions/v1/delete-account` returning 401 without a JWT. Results are documented in `docs/security/sovereignty-audit-2026-06.md`.
 
 ## Open gaps
+
+**The V3 privacy work is not live.** The four migrations (`20261104100000` to `20261104130000`) are unapplied until the owner reviews and applies them, so on the live project erase still leaves the sign-in record, error reports are kept as they were, no purge runs, and the health-consent column does not exist. `LEGAL_VERSIONS` is not bumped, and will not be until the EU representative is named in `src/lib/legalEntity.ts`; the release gate is the owner's, and `src/tests/legal-release-gate.test.ts` fails if the versions move without a named representative. Nothing here was run against a local `supabase db reset`.
+
+**The `discreetOn` lifecycle event is not fired through the registry.** Turning discreet mode on does clear the saved chat transcript (it may hold real brand names), but web Settings calls `clearTranscript()` directly (`onToggleDiscreet`) instead of `clearWebDevice('discreetOn')`. The registry row and the behaviour agree; the two paths are just not the same code, and mobile has no chat to clear.
+
+**Questions for a lawyer, recorded not decided.** The DPDP start date; whether smoking logs are health data in law (they are treated as such here); whether a ticked box counts as the "written" consent the SPDI rules ask for; CERT-In 6-hour reporting (not built into the breach runbook); and the DPDP Rule 8(3) one-year floor against erasure on request (content is erased at once and only the 12-month audit tier is kept). The Hindi notice and a way to request other Eighth Schedule languages are a recorded follow-up before May 2027.
 
 **Discreet-mode leftovers, recorded not fixed.** The heatmap's busiest hour ("at 15:00") stays visible under discreet mode: it is a pattern, not a count. The mobile captions "A flat line." and "A sparse window" stay too: they carry no digits and match web. The mobile wiring that passes each formatter to the Expo chart components has no automated test (only the pure helpers `brandRows` and `trendsCopy` do). The strengthened discreet e2e in `responsive.spec.ts` needs a seeded local Supabase, so it runs only in CI, not on a developer machine without `web/.env.e2e`.
 

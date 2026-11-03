@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: 1a4c025
+last_verified_commit: b4d45ae
 status: current
 ---
 
@@ -57,6 +57,7 @@ One row per authenticated user, created automatically by the `on_auth_user_creat
 | `privacy_version` | text | NULL | — | — |
 | `health_disclaimer_version` | text | NULL | — | — |
 | `data_processing_consent_at` | timestamptz | NULL | — | — |
+| `health_data_consent_at` | timestamptz | NULL | — | When the reader ticked the separate, explicit health-data consent (GDPR Art 9(2)(a), DPDP s6; `20261104130000_health_consent.sql`). Deliberately no backfill: every account from before it existed has NULL, because stamping a consent nobody gave would be false. NULL on an onboarded account is what sends the reader to the re-consent screen. Cleared by `erase_account_data()`; exported with the rest of the profile row |
 | `marketing_consent_at` | timestamptz | NULL | — | CHECK `IS NULL` (`user_profiles_marketing_consent_unused`). Unused: no marketing opt-in exists. Old mobile builds stamped it from the analytics checkbox; `20261102120000_clear_marketing_consent.sql` cleared those with one `marketing_consent_cleared` audit row each. See `docs/architecture/marketing-consent.md`. |
 | `deleted_at` | timestamptz | NULL | — | Not set by `erase_account_data()` any more (`20261104100000_erase_auth_metadata.sql`); erase keeps the account live and re-onboards through `onboarded_at = NULL`. Nothing reads it |
 | `full_name` | text | NULL | — | CHECK: NULL or 1–80 chars |
@@ -253,6 +254,8 @@ Product analytics events written by the client. Schema is intentionally loose: `
 
 **RLS**: three separate policies — SELECT (`usage_select`) and INSERT (`usage_insert`) scoped to `user_id = (SELECT auth.uid())`; DELETE (`usage_delete`) also scoped the same way. No UPDATE policy.
 
+Events exist only while the reader has the analytics opt-in on. Turning it off calls `delete_my_usage_events()` (below) and removes the past events; rows older than 12 months are purged daily either way.
+
 ---
 
 #### `public.user_facts_seen`
@@ -283,7 +286,7 @@ Compliance-grade record of significant account actions (exports, erasures, conse
 | `props_json` | jsonb | NOT NULL | `'{}'` | CHECK: ≤ 4096 bytes |
 | `created_at` | timestamptz | NOT NULL | `now()` | — |
 
-`user_id` is nullable. When `erase_account_data()` runs it sets `user_id = NULL` on all prior rows for the erased user (after replacing `props_json` with a pepper-hashed pseudonym), so the audit trail survives account deletion without retaining a link to the user's identity (`supabase/migrations/20260521000000_audit_export_ops.sql:8`).
+`user_id` is nullable. When `erase_account_data()` runs it sets `user_id = NULL` on all prior rows for the erased user (after replacing `props_json` with a pepper-hashed pseudonym), so the audit trail survives account deletion without retaining a link to the user's identity (`supabase/migrations/20260521000000_audit_export_ops.sql:8`). Retention is 12 months from `created_at`: `purge_expired_records()` (below) deletes older rows, including the `account_data_erased` erasure-proof row, which the privacy policy discloses as the retained record of an erasure.
 
 **RLS**: SELECT only (`audit_events_select`) scoped to `user_id = (SELECT auth.uid())`. Rows with `user_id IS NULL` are invisible to authenticated clients — only service_role can read them.
 
@@ -291,7 +294,7 @@ Compliance-grade record of significant account actions (exports, erasures, conse
 
 #### `public.error_events`
 
-Client-side error reports and the compliance-delete forensic tombstones written by Edge Functions.
+Client-side error reports and the compliance-delete forensic tombstones written by Edge Functions. Text is redacted before it is stored (`supabase/functions/_shared/redact.ts`: emails, UUIDs, bearer tokens, JWTs, long secret-looking runs, phone numbers and long digit runs are replaced, and routes lose their query and dynamic segments), by `logClientError` on both clients and by the Edge Functions. A user's own rows are deleted by `erase_account_data()`; every row, tombstones included, is deleted 90 days after `created_at` by the daily purge.
 
 | Column | Type | Nullable | Default | Constraints |
 |---|---|---|---|---|
@@ -321,7 +324,7 @@ A generic sliding-window counter table used by `consume_rate_limit()`. Never dir
 | `window_start` | timestamptz | NOT NULL | `now()` | — |
 | `count` | int4 | NOT NULL | 0 | — |
 
-RLS is enabled but there are intentionally zero policies — every access attempt from `authenticated` or `anon` roles is default-denied. Only `service_role` (via the `SECURITY DEFINER` `consume_rate_limit()` RPC) can read or write it.
+RLS is enabled but there are intentionally zero policies — every access attempt from `authenticated` or `anon` roles is default-denied. Only `service_role` (via the `SECURITY DEFINER` `consume_rate_limit()` RPC) can read or write it. `identity` is always a keyed hash, never a raw email, phone, IP or user id: the `audit-record` and `delete-account` per-user buckets became `user:<hash>` in the V3 work, so no raw user id sits in this table. Rows older than 2 days are dropped by their own daily job.
 
 ---
 
@@ -441,7 +444,9 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 
 **`export_account_data(p_from, p_to, p_cursor_ts, p_cursor_id, p_limit)`** — produces a `version: 3` JSON export of the user's data. On the first page it includes profile, brands+variants, goals, settings, reminders, price entries, usage events, audit events, facts seen, `account` (email, phone, createdAt, lastSignInAt from `auth.users`, caller only) and the caller's own `errorEvents`, plus a paginated slice of logs. Subsequent pages return only the next log slice. Uses `(ts_utc, id) DESC` keyset pagination so the cursor is stable. Caps `p_limit` at 5000 and floors it at 100. Each goal in the export carries `completedAt` (added by `20261103000000_adaptive_goals.sql`, which re-issued the function with the same signature so existing grants are kept; `20261104120000_export_complete.sql` re-issued it again for version 3), and `ImportGoalSchema` accepts it back. Writes an `account_data_exported` audit event on the first page only.
 
-**`erase_account_data()`** — the DPDP right-to-erasure path. It is fail-closed on its secret: if the `app.audit_pepper` GUC is empty or unset it raises `P0001` and aborts, rather than writing a reversible (unpeppered) hash (`supabase/migrations/20260629000000_erase_pepper_guard.sql`). The pepper must be set at the database level (`ALTER DATABASE postgres SET app.audit_pepper = …`, same value as the edge functions' `AUDIT_PEPPER` secret) or every erase call fails. Sequence: (1) re-keys the user's audit rows by replacing the content with a SHA-256 hash of `uid:pepper` and setting `user_id = NULL` so the rows survive ON DELETE CASCADE, and deletes the user's own `error_events` rows outright; (2) deletes all user-owned data tables; (3) resets `user_profiles` to defaults (`deleted_at` is no longer touched) and removes `full_name`, `date_of_birth` and `gender` from `auth.users.raw_user_meta_data`, where signup also stored them (`supabase/migrations/20261104100000_erase_auth_metadata.sql`; the clients then call `refreshSession()` in `src/services/cloudErase.ts` so the JWT drops the old `user_metadata`); (4) re-seeds default brands so the account is functional if the user logs back in; (5) writes a `account_data_erased` compliance audit event.
+**`delete_my_usage_events()`** — deletes every `usage_events` row of the caller and returns the count. Called when the analytics opt-in is switched off (`saveAnalyticsOptIn` in `src/services/consentWithdrawal.ts`), so "off" also means "gone". `SECURITY DEFINER`, `search_path = ''`, own rows only, granted to `authenticated` (`20261104130000_health_consent.sql`). The preference is stored only after the delete succeeds, so a failure leaves it on and the toggle can be retried.
+
+**`erase_account_data()`** — the DPDP right-to-erasure path. It is fail-closed on its secret: if the `app.audit_pepper` GUC is empty or unset it raises `P0001` and aborts, rather than writing a reversible (unpeppered) hash (`supabase/migrations/20260629000000_erase_pepper_guard.sql`). The pepper must be set at the database level (`ALTER DATABASE postgres SET app.audit_pepper = …`, same value as the edge functions' `AUDIT_PEPPER` secret) or every erase call fails. Sequence: (1) re-keys the user's audit rows by replacing the content with a SHA-256 hash of `uid:pepper` and setting `user_id = NULL` so the rows survive ON DELETE CASCADE, and deletes the user's own `error_events` rows outright; (2) deletes all user-owned data tables; (3) resets `user_profiles` to defaults (`deleted_at` is no longer touched) and removes `full_name`, `date_of_birth` and `gender` from `auth.users.raw_user_meta_data`, where signup also stored them (`supabase/migrations/20261104100000_erase_auth_metadata.sql`; the clients then call `refreshSession()` in `src/services/cloudErase.ts` so the JWT drops the old `user_metadata`); (4) re-seeds default brands so the account is functional if the user logs back in; (5) writes a `account_data_erased` compliance audit event. `20261104130000_health_consent.sql` copied the function forward again (grants and `search_path` unchanged) so the profile reset also clears `health_data_consent_at`.
 
 **`sync_default_brand_catalog()`** — adds any catalog brands/variants the user does not yet have. Safe to call repeatedly; skips already-present entries by name (case-insensitive). Used after a catalog expansion migration to push new brands to existing users without re-running a full seed.
 
@@ -454,6 +459,8 @@ All RPCs are `SECURITY DEFINER` with `SET search_path = ''`. Every function vali
 **`consume_rate_limit(p_kind, p_key, p_max, p_window_sec)`** — generic atomic sliding-window counter. Upserts the `rate_limit_counters` row under a row lock, resets the window when it has elapsed, and returns `true` if the call is within budget. Used by Edge Functions for rate-limiting auth and account operations.
 
 **`record_audit_event(p_event_type, p_event_category, p_props)`** — writes one row to `audit_events` after redacting sensitive keys from `p_props` through `_redact_audit_props()`. Revoked from `authenticated` in `20260521000000_audit_export_ops.sql:295`; only `service_role` (i.e. Edge Functions) may call it.
+
+**`purge_expired_records()`** — the retention job (`20261104110000_retention_purge.sql`). Deletes `audit_events` older than 12 months, `error_events` older than 90 days and `usage_events` older than 12 months, and returns the three counts as JSON. `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` revoked from `PUBLIC`, `anon` and `authenticated`, granted to `service_role`. Scheduled daily at 03:37 as the pg_cron job `purge-expired-records` (beside the 03:17 rate-limit job); the migration only warns if pg_cron is missing, and `scripts/sql/smoke.sql` fails CI if pg_cron is installed but the job is not. The periods are mirrored in `src/lib/privacy/retention.ts` (`RETENTION`), which the privacy policy renders; a test compares the two. There is no deletion for inactivity.
 
 #### Internal / trigger-only
 
@@ -516,7 +523,7 @@ These rules must never break:
 1. Every `public.*` table has RLS enabled. No table is open to `anon` or `authenticated` in ways broader than the policies listed above.
 2. `user_id = auth.uid()` (or `id = auth.uid()` for `user_profiles`) is the sole gating condition in every RLS USING and WITH CHECK clause. There are no policy exceptions.
 3. All SECURITY DEFINER functions have `SET search_path = ''` and use fully-qualified object names. This prevents search-path injection via untrusted schema objects.
-4. `record_audit_event` is callable only by `service_role`. Authenticated clients cannot write to `audit_events` directly.
+4. `record_audit_event` and `purge_expired_records` are callable only by `service_role`. Authenticated clients cannot write to `audit_events` directly.
 5. `compliance.delete` rows in `error_events` always have `user_id IS NULL` (enforced by CHECK constraint). Authenticated clients can neither insert nor delete them.
 6. A minor (under 18) can never create an account. The `on_auth_user_created` trigger aborts the `auth.users` INSERT when a date of birth is supplied and the age check fails. Absence of a date of birth is the only legitimate path past the gate for the legacy/admin flow — the trigger treats a missing DOB permissively.
 7. `brand_variants.brand_id` is ON DELETE RESTRICT. Deleting a brand that still has variants raises a FK violation; the repository surfaces it as `AppError('conflict')` so the UI can guide the user.
@@ -533,7 +540,7 @@ These rules must never break:
 
 **`trigger_tag`, `mood_before`, `mood_after`, `context_tag` have no DB CHECK**. The valid values are enforced only in TypeScript. A direct Postgres INSERT (e.g. from a migration script or an integration test) can store any string. This is the tradeoff described in the Logging section.
 
-**Audit event rows survive account deletion**. When a user erases their data, their audit rows are not deleted — they are anonymised in place (`user_id = NULL`, `props_json` replaced with a hashed pseudonym). The rows remain as compliance evidence. Only `service_role` can see them after the anonymisation.
+**Audit event rows survive account deletion, for a while**. When a user erases their data, their audit rows are not deleted — they are anonymised in place (`user_id = NULL`, `props_json` replaced with a hashed pseudonym). The rows remain as compliance evidence for 12 months, then the retention purge deletes them. Only `service_role` can see them after the anonymisation. The user's `error_events` are the opposite case: erase deletes them at once rather than keeping their text.
 
 **`smoke_seed` tables have no RLS**. The advisor warning is real but not a security bug in practice: the tables have no data that could harm a user if read (they are public health facts and generic brand info), and the `REVOKE ALL … FROM PUBLIC` on the schema prevents direct client access via PostgREST. However, enabling RLS with appropriate policies (or keeping them as internal-only tables with no PostgREST exposure) is the cleaner long-term posture.
 
@@ -550,6 +557,7 @@ These rules must never break:
 
 ## Open gaps
 
+- **The V3 migrations are not applied anywhere yet.** `20261104100000` to `20261104130000` are proven by source-level tests (`src/tests/erase-auth-metadata.test.ts`, `retention-purge.test.ts`, `export-complete-migration.test.ts`, `health-consent-migration.test.ts`) and `smoke.sql` checks the purge job in CI, but the owner applies them to the live project after review. If pg_cron is absent the purge never runs; `npm run verify:backend` prints the manual `cron.job` check.
 - **`smoke_seed` tables have RLS disabled**. The Supabase advisor flags `smoke_seed.brand_catalog`, `smoke_seed.smoking_facts`, and `smoke_seed.health_milestones` as critical. In practice, these tables have `REVOKE ALL … FROM PUBLIC` and are not directly reachable by PostgREST, but the belt-and-suspenders posture would be to add `ENABLE ROW LEVEL SECURITY` with no policies (which makes them default-deny) or to move them fully outside PostgREST's reach.
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
 - **`goals.completed_at` is NULL for goals finished before `20261103000000_adaptive_goals.sql`**, and for any goal that is active or paused. Readers must treat NULL as "date unknown" (the Done list prints the bare word), not as "never finished". No automated test exercises the trigger itself; `src/tests/session-goals.test.ts` covers the store's local mirror of the stamp.
