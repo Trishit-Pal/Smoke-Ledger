@@ -113,6 +113,15 @@ const _brandFavoritedValid: EventPayloadMap['brand_favorited'] = { category: 'bu
 // Runtime sanity: the shapes above are valid JS objects
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// ledger_chat_opened: surface + page only; never the question text
+// ---------------------------------------------------------------------------
+
+// @ts-expect-error question text is not in ledger_chat_opened payload
+const _chatOpenedWithQuestion: EventPayloadMap['ledger_chat_opened'] = { surface: 'dock', page: 'dashboard', question: 'how many?' };
+
+const _chatOpenedDock: EventPayloadMap['ledger_chat_opened'] = { surface: 'dock', page: 'dashboard' };
+
 describe('EventPayloadMap shape contracts', () => {
   it('log_edited accepts empty object', () => {
     const payload: EventPayloadMap['log_edited'] = {};
@@ -166,6 +175,14 @@ describe('EventPayloadMap shape contracts', () => {
     categories.forEach((category) => {
       const payload: EventPayloadMap['brand_created'] = { category, is_seed: false };
       expect(payload.category).toBe(category);
+    });
+  });
+
+  it('ledger_chat_opened accepts each surface', () => {
+    const surfaces: Array<EventPayloadMap['ledger_chat_opened']['surface']> = ['dock', 'pill'];
+    surfaces.forEach((surface) => {
+      const payload: EventPayloadMap['ledger_chat_opened'] = { surface, page: 'trends' };
+      expect(Object.keys(payload).sort()).toEqual(['page', 'surface']);
     });
   });
 

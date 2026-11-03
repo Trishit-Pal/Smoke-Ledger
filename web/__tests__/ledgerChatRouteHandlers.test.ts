@@ -172,7 +172,9 @@ describe('GET /api/ledger-chat panel state', () => {
     expect(await res.json()).toEqual({
       consented: true,
       discreet: true,
+      hideTotals: true,
       currency: 'EUR',
+      locale: 'de-DE',
       starters: ['What does my ledger say so far?'],
     });
     expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: true, limit: 200 });
@@ -207,9 +209,25 @@ describe('GET /api/ledger-chat panel state', () => {
     const res = await GET(get());
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ consented: false, discreet: true, currency: 'EUR', starters: [] });
+    expect(await res.json()).toEqual({
+      consented: false,
+      discreet: true,
+      hideTotals: true,
+      currency: 'EUR',
+      locale: 'de-DE',
+      starters: [],
+    });
     expect(mocks.loadProfile).toHaveBeenCalledTimes(1);
     for (const load of [mocks.loadLogsPage, mocks.loadDailySummary, mocks.loadGoals]) expect(load).not.toHaveBeenCalled();
+  });
+
+  test('hide-totals-on-home alone still masks the panel figures', async () => {
+    mocks.loadProfile.mockResolvedValue({ ...current, discreetMode: false, hideTotalsOnHome: true });
+
+    const body = (await (await GET(get())).json()) as { discreet: boolean; hideTotals: boolean };
+
+    expect(body.discreet).toBe(false);
+    expect(body.hideTotals).toBe(true);
   });
 
   test('applies the same profile gates as POST', async () => {

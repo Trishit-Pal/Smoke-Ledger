@@ -13,7 +13,8 @@ import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
 import { consentsOutdated } from '@/lib/onboardingSteps';
 import type { UserProfile } from '@/types';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
-import { timezoneForCountry } from '@/lib/regions';
+import { isHomeTotalsHidden } from '@/lib/discreet';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { checkRateLimits } from '@web/lib/auth/rateLimit';
 import { serverLog } from '@web/lib/log';
 import { resolveChatCaller } from '@web/lib/server/ledgerChat/auth';
@@ -143,7 +144,12 @@ export async function GET(request: Request) {
     if (!gate.ok) return gate.response;
     const { profile } = gate;
 
-    const state = { discreet: profile.discreetMode, currency: profile.currency };
+    const state = {
+      discreet: profile.discreetMode,
+      hideTotals: isHomeTotalsHidden(profile),
+      currency: profile.currency,
+      locale: localeForCountry(profile.country),
+    };
     if (!(await readChatOptIn(db, userId))) {
       const body: ChatStateResponse = { consented: false, ...state, starters: [] };
       return NextResponse.json(body);

@@ -28,6 +28,7 @@ describe('lifecycle registry', () => {
       'mobile.catalog',
       'mobile.theme',
       'web.catalog',
+      'web.chatDockMinimised',
       'web.theme',
     ]);
   });

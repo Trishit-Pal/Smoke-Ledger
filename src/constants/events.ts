@@ -29,6 +29,7 @@ export const AnalyticsEvents = {
   BRAND_CREATED: 'brand_created',
   BRAND_FAVORITED: 'brand_favorited',
   LEDGER_CHAT_ASKED: 'ledger_chat_asked',
+  LEDGER_CHAT_OPENED: 'ledger_chat_opened',
 } as const;
 
 export type AnalyticsEvent = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];
@@ -70,4 +71,6 @@ export interface EventPayloadMap {
   brand_favorited: { category: BrandCategory; is_seed: boolean };
   // Whether a starter was tapped and how many tools answered; never the question.
   ledger_chat_asked: { starter: boolean; tools: number };
+  // Which floating control opened the panel and on which page; never the question.
+  ledger_chat_opened: { surface: 'dock' | 'pill'; page: string };
 }

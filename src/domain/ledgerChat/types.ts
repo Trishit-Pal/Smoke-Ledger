@@ -73,7 +73,11 @@ export interface ChatResponse {
 export interface ChatStateResponse {
   consented: boolean;
   discreet: boolean;
+  /** Mask figures at the panel's render sites: discreet mode or hide-totals-on-home. */
+  hideTotals: boolean;
   currency: CurrencyCode;
+  /** The reader's country locale, for money formatting. */
+  locale: string;
   starters: string[];
 }
 
