@@ -17,7 +17,7 @@ Scale: small, one-person operation. Nature of readers: adults only (18+ gate), s
 - **Storage limitation.** Fixed periods in `retention-schedule.md`, enforced by a daily purge.
 - **Rights.** Complete export, erase (keeps the account), delete, consent withdrawal, in-app. Name, DOB and gender are locked once set; correction goes through the Grievance Officer.
 - **Processors.** Listed in `processors.md`. DPAs to be accepted by the owner.
-- **Transfers.** US processors under SCCs; see `transfer-impact-assessment.md`.
+- **Transfers.** US processors, under SCCs once the owner accepts them; see `transfer-impact-assessment.md`.
 - **Transparency.** Privacy policy rewritten against the code; every data promise has a mechanism and a test (`src/tests/privacy-promises.test.ts`).
 
 ## 3. Risks to readers and how they are handled
@@ -29,7 +29,7 @@ Likelihood and severity are judged for the reader, not for the business. L = low
 | R1 | Another reader sees my entries (RLS failure) | L | H | RLS on every table, `auth.uid()` scoping, RLS integration test in CI, per-user cache tag, SECURITY DEFINER functions with fixed `search_path` and revoked grants | Low | Keep the RLS suite mandatory |
 | R2 | Someone with my phone or screen sees my smoking | M | M | Discreet mode (aliases, hidden totals), optional app lock, masking at every render site | Low | None |
 | R3 | Health data leaks through a leaked secret (service-role key, pepper) | L | H | Server-only keys, secret hygiene, pepper-hashed audit rows, runbook (`breach-runbook.md`) | Medium | Rotate keys on a schedule; owner to enable Supabase alerts |
-| R4 | Health data sent to an AI processor without a real choice | L | H | Opt-in, off by default, fails closed, exact list of what is sent shown before the switch, label on answers, discreet mode drops notes, no storage by us, no training by Anthropic | Low | Re-check Anthropic retention wording (lawyer item) |
+| R4 | Health data sent to an AI processor without a real choice | L | H | Opt-in, off by default, fails closed, exact list of what is sent shown before the switch, label on answers, discreet mode drops notes, no storage by us, no training per Anthropic's commercial terms | Low | Re-check Anthropic retention wording (lawyer item) |
 | R5 | Notes contain more than the reader meant to share with the AI | M | M | Notes clipped to 120 characters; the notice says notes are sent when a question needs recent entries; chat can be turned off and cleared | Medium | Consider a pre-send preview (decision O4 kept the current behaviour) |
 | R6 | AI reply misleads or reads as medical advice | M | M | Replies come from tool results, numbers are checked against the data, a refusal for off-topic questions, "written by AI, not medical advice" label | Low | Keep the guard tests |
 | R7 | Data stays after I ask to erase it | L | H | Erase covers product rows, profile fields, auth metadata keys, own error events, device stores; export is a superset of what erase removes; tests for both | Low | Only the disclosed 12-month erasure-proof row remains |

@@ -22,7 +22,7 @@ Order matters. Do these in sequence.
   SELECT jobname, schedule FROM cron.job WHERE jobname = 'purge-expired-records';
   ```
   Expect `37 3 * * *`. If pg_cron is missing, enable it in Database, Extensions, and re-run the migration. Why: without it, nothing purges and the retention promise is false.
-- [ ] **Deploy the edge functions `audit-record` and `delete-account`.** Why: hashed rate-limit keys and redaction. Where: `supabase functions deploy audit-record delete-account`. Redeploy `audit-record` whenever its allowlist gains an event.
+- [ ] **Deploy the edge functions `audit-record` and `delete-account`.** Why: hashed rate-limit keys and redaction. Where: `supabase functions deploy audit-record delete-account`. Redeploy `audit-record` whenever its allowlist gains an event. If phone sign-in is switched on, also deploy `send-sms-otp`.
 - [ ] **Deploy web and mobile.** Expect every existing reader to see the re-consent screen once after deploy, because health consent is missing for them. That is intended and honest; do not backfill it.
 
 ## 2. Release gate (the EU representative)
