@@ -20,6 +20,7 @@ Order matters. Do these in sequence. **Do not deploy the web or mobile code unti
   5. `20261104130000_health_consent.sql`: adds `user_profiles.health_data_consent_at` (the new middleware reads it and breaks for everyone without it) and `delete_my_usage_events` (analytics off deletes past usage events).
   6. `20261104140000_erase_profile_leftovers.sql`: erase also clears `mobile_changed_at` (the 30-day mobile lock) and old `deleted_at` stamps.
   7. `20261105100000_goal_target_by_unit.sql`: spend-cap goals may go up to 100,000 (sticks stay at 1,000). Until it is applied, saving a weekly or monthly spend cap above 1,000 fails; apply it before or with the deploy (deploying web first is no worse than today).
+  8. `20261105110000_marketing_consent_null_trigger.sql`: swaps the `marketing_consent_at` CHECK for a trigger that nulls it. Why: a mobile build from before the consent fix still sends that column, and the CHECK made its whole consent update fail (23514), so those readers could not get past consent.
 
   Then **confirm the purge job exists.** Run `npm run verify:backend`, then check by hand:
   ```sql

@@ -203,4 +203,21 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'goals_target_value_check must bound spend_cap_daily at 100000 (goal target by unit)';
   END IF;
+
+  -- marketing_consent_at is nulled by trigger; the old CHECK made an older mobile
+  -- build's consent write fail with 23514.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_user_profiles_marketing_consent_null'
+      AND tgrelid = 'public.user_profiles'::regclass
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'missing trigger trg_user_profiles_marketing_consent_null on user_profiles';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_profiles_marketing_consent_unused'
+  ) THEN
+    RAISE EXCEPTION 'user_profiles_marketing_consent_unused CHECK must be gone (replaced by trigger)';
+  END IF;
 END $$;
