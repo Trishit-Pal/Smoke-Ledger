@@ -91,6 +91,9 @@ const CHECKERS: Record<DataPromiseKey, () => void> = {
     expect(body).toMatch(/DELETE FROM public\.cigarette_logs\s+WHERE user_id = uid;/);
     expect(body).toMatch(/raw_user_meta_data - 'full_name' - 'date_of_birth' - 'gender'/);
     expect(body).toMatch(/full_name\s+= NULL/);
+    // Nothing personal survives on the profile row: the 30-day mobile lock and an old erase stamp go too.
+    expect(body).toMatch(/mobile_changed_at\s+= NULL/);
+    expect(body).toMatch(/deleted_at\s+= NULL/);
   },
   deleteRemovesIdentity: () => {
     const fn = read('supabase/functions/delete-account/index.ts');

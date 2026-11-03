@@ -99,8 +99,8 @@ BEGIN
 
   PERFORM smoke_seed.apply_default_brands(uid);
 
-  -- Erase clears the otherwise-immutable identity, so the user can re-enter a
-  -- different name / DOB / gender. This row (still linked to uid) is the record
+  -- Erase clears the otherwise-immutable identity; corrected name / DOB / gender
+  -- are recorded only by writing to us (owner-actions §9). This row (still linked to uid) is the record
   -- that a prior identity existed.
   INSERT INTO public.audit_events (user_id, event_type, event_category, props_json)
   VALUES (uid, 'account_data_erased', 'compliance',

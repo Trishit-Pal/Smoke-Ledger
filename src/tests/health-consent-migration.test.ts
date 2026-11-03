@@ -24,8 +24,8 @@ describe(NAME, () => {
 describe('newest erase_account_data', () => {
   const { file, body } = newestFunction('erase_account_data');
 
-  it('is this migration, so the column is cleared and the earlier fixes are copied forward', () => {
-    expect(file).toBe(NAME);
+  it('is this migration or a later copy-forward, so the column is cleared and the earlier fixes are kept', () => {
+    expect(file >= NAME).toBe(true);
   });
 
   it('clears the health consent stamp with the other consent columns', () => {

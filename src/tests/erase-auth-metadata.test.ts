@@ -28,7 +28,7 @@ describe(`erase_account_data (introduced by ${NAME})`, () => {
   });
 
   it('no longer stamps deleted_at: the account stays live', () => {
-    expect(erase).not.toMatch(/deleted_at/);
+    expect(erase).not.toMatch(/deleted_at\s*=\s*now\(\)/);
   });
 
   it('keeps SECURITY DEFINER, an empty search_path and the fail-closed pepper guard', () => {
