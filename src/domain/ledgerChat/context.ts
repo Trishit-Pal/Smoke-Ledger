@@ -25,16 +25,6 @@ export interface ToolContext {
   goals: Goal[];
   /** Every goal, whatever its status, for goal_history. */
   goalHistory: Goal[];
-  /** The reader's own price notes, newest first, brands aliased when discreet. */
-  prices: PriceEntry[];
-}
-
-/** One row of the reader's price_entries, with the brand name resolved. */
-export interface PriceEntry {
-  brandName: string | null;
-  unitPriceInr: number;
-  packSize: number | null;
-  observedAt: string;
 }
 
 export interface BuildToolContextInput {
@@ -43,28 +33,18 @@ export interface BuildToolContextInput {
   rows: DailySummaryRow[];
   goals: Goal[];
   goalHistory?: Goal[];
-  prices?: PriceEntry[];
   today: string;
   summarySinceYmd: string;
 }
 
-type Aliaser = (name: string | null) => string | null;
-
-/** Brand names to "Brand A", "Brand B"… by first-seen order; one aliaser per turn keeps them consistent. */
-function brandAliaser(): Aliaser {
-  const aliases = new Map<string, string>();
-  return (name) => {
-    if (!name) return null;
-    const existing = aliases.get(name);
-    if (existing) return existing;
-    const alias = brandAlias(aliases.size);
-    aliases.set(name, alias);
-    return alias;
-  };
-}
-
 /** New log objects with brands aliased by first-seen order and free text removed. */
-export function aliasLogsForDiscreet(logs: readonly CigaretteLog[], alias: Aliaser = brandAliaser()): CigaretteLog[] {
+export function aliasLogsForDiscreet(logs: readonly CigaretteLog[]): CigaretteLog[] {
+  const aliases = new Map<string, string>();
+  const alias = (name: string | null): string | null => {
+    if (!name) return null;
+    if (!aliases.has(name)) aliases.set(name, brandAlias(aliases.size));
+    return aliases.get(name) ?? null;
+  };
   return logs.map((log) => ({ ...log, brandNameSnap: alias(log.brandNameSnap), variantSnap: null, notes: null }));
 }
 
@@ -84,9 +64,6 @@ function pickProfile(source: UserProfile): ContextProfile {
 export function buildToolContext(input: BuildToolContextInput): ToolContext {
   const profile = pickProfile(input.profile);
   const discreet = profile.discreetMode;
-  const prices = input.prices ?? [];
-  // Logs first, then prices, through one aliaser: a brand is the same alias in both.
-  const alias = brandAliaser();
   return {
     today: input.today,
     timezone: timezoneForCountry(profile.country),
@@ -95,10 +72,9 @@ export function buildToolContext(input: BuildToolContextInput): ToolContext {
     baselinePerDay: profile.baselinePerDay,
     summarySinceYmd: input.summarySinceYmd,
     discreet,
-    logs: discreet ? aliasLogsForDiscreet(input.logs, alias) : input.logs,
+    logs: discreet ? aliasLogsForDiscreet(input.logs) : input.logs,
     rows: input.rows,
     goals: input.goals,
     goalHistory: input.goalHistory ?? [],
-    prices: discreet ? prices.map((p) => ({ ...p, brandName: alias(p.brandName) })) : prices,
   };
 }

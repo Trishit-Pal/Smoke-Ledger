@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   loadLogsPage: vi.fn(async () => ({ logs: [], nextCursor: null })),
   loadDailySummary: vi.fn(async () => [] as unknown[]),
   loadGoals: vi.fn(async () => [] as unknown[]),
-  loadPriceEntries: vi.fn(async () => [] as unknown[]),
   checkRateLimits: vi.fn(async () => true),
   runLedgerChatTurn: vi.fn(),
   consentValue: { value: true as unknown },
@@ -28,7 +27,6 @@ vi.mock('@web/lib/server/data', () => ({
   loadLogsPage: mocks.loadLogsPage,
   loadDailySummary: mocks.loadDailySummary,
   loadGoals: mocks.loadGoals,
-  loadPriceEntries: mocks.loadPriceEntries,
   toDailySummaryRow: (d: { localDate: string; sticks: number; totalSpendInr: number }) => ({
     date: d.localDate,
     sticks: d.sticks,
@@ -129,7 +127,7 @@ describe('POST /api/ledger-chat consent currency', () => {
 });
 
 describe('ledger loads', () => {
-  test('one goals read covers active goals and history; price notes come from the last 365 days', async () => {
+  test('one goals read covers active goals and history, and no other table is read', async () => {
     const goal = { id: 'g', type: 'daily_cap', targetValue: 5, currentBaseline: null, startDate: '2026-01-01', endDate: null, meta: null, createdAt: '', completedAt: null };
     mocks.loadGoals.mockResolvedValue([
       { ...goal, id: 'a', status: 'active' },
@@ -140,7 +138,6 @@ describe('ledger loads', () => {
 
     expect(mocks.loadGoals).toHaveBeenCalledTimes(1);
     expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: false });
-    expect(mocks.loadPriceEntries).toHaveBeenCalledWith(expect.anything(), 'u1', { sinceYmd: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
     const ctx = mocks.runLedgerChatTurn.mock.calls[0][0].ctx;
     expect(ctx.goals.map((g: { id: string }) => g.id)).toEqual(['a']);
     expect(ctx.goalHistory.map((g: { id: string }) => g.id)).toEqual(['a', 'p']);
@@ -166,7 +163,7 @@ describe('GET /api/ledger-chat panel state', () => {
     expect(await res.json()).toEqual({ error: 'unauthorized' });
   });
 
-  test('returns consent, discreet, currency and starters without the model or the rate cap', async () => {
+  test('opted in: returns state and starters from the summary, active goals and a short log read; no model', async () => {
     mocks.loadDailySummary.mockResolvedValue([{ localDate: '2026-06-21', sticks: 3, totalSpendInr: 60 }]);
 
     const res = await GET(get());
@@ -178,18 +175,41 @@ describe('GET /api/ledger-chat panel state', () => {
       currency: 'EUR',
       starters: ['What does my ledger say so far?'],
     });
-    expect(mocks.checkRateLimits).not.toHaveBeenCalled();
+    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: true });
+    const logOpts = (mocks.loadLogsPage.mock.calls[0] as unknown[])[2] as { limit: number };
+    expect(logOpts.limit).toBeLessThanOrEqual(200);
     expect(mocks.runLedgerChatTurn).not.toHaveBeenCalled();
   });
 
-  test('reports consented false without opt-in, and does not need the model key', async () => {
+  test('spends its own daily state cap, never the question cap', async () => {
+    await GET(get());
+
+    expect(mocks.checkRateLimits).toHaveBeenCalledTimes(1);
+    expect(mocks.checkRateLimits).toHaveBeenCalledWith([
+      { kind: 'ledger_chat_state', key: 'u1', max: 120, windowSec: 86_400 },
+    ]);
+  });
+
+  test('over the state cap: 429 and no ledger reads', async () => {
+    mocks.checkRateLimits.mockResolvedValueOnce(false);
+
+    const res = await GET(get());
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'rate_limited' });
+    expect(mocks.loadLogsPage).not.toHaveBeenCalled();
+  });
+
+  test('not opted in: consented false and no starters, after reading only the profile; no model key needed', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', '');
     mocks.consentValue.value = null;
 
     const res = await GET(get());
 
     expect(res.status).toBe(200);
-    expect((await res.json()).consented).toBe(false);
+    expect(await res.json()).toEqual({ consented: false, discreet: true, currency: 'EUR', starters: [] });
+    expect(mocks.loadProfile).toHaveBeenCalledTimes(1);
+    for (const load of [mocks.loadLogsPage, mocks.loadDailySummary, mocks.loadGoals]) expect(load).not.toHaveBeenCalled();
   });
 
   test('applies the same profile gates as POST', async () => {

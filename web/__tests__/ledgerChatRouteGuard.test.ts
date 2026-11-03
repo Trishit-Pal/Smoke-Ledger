@@ -49,11 +49,12 @@ describe('ledger-chat route guards', () => {
     expect(gate).toContain("fail('consent_outdated', 403)");
   });
 
-  test('GET never reaches the model or the daily cap', () => {
+  test('GET never reaches the model and spends only its own state cap', () => {
     const get = route.slice(route.indexOf('export async function GET('), route.indexOf('async function readChatOptIn('));
     expect(get).toContain('resolveChatCaller(');
     expect(get).toContain('gatedProfile(');
-    for (const banned of ['checkRateLimits(', 'new Anthropic(', 'runLedgerChatTurn(', 'ANTHROPIC_API_KEY']) {
+    expect(get).toContain("kind: 'ledger_chat_state'");
+    for (const banned of ['ledger_chat_user', 'ledger_chat_global', 'new Anthropic(', 'runLedgerChatTurn(', 'ANTHROPIC_API_KEY']) {
       expect(get).not.toContain(banned);
     }
   });
@@ -95,7 +96,8 @@ describe('ledger-chat route guards', () => {
 describe('ledger-chat log window', () => {
   test('reads the same 2000-row goal window as Home, not a private 200 cap', () => {
     expect(route).toMatch(/import \{[^}]*GOAL_WINDOW_LOG_LIMIT[^}]*\} from '@web\/lib\/server\/data'/);
-    expect(route).toContain('limit: GOAL_WINDOW_LOG_LIMIT');
+    // A turn reads the goal window; only the starters (GET) read a short page.
+    expect(route).toContain('limit: forStarters ? STARTER_LOG_LIMIT : GOAL_WINDOW_LOG_LIMIT');
     expect(route).not.toMatch(/LOG_ROW_CAP|limit:\s*200\b/);
   });
 });

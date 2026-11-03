@@ -64,7 +64,7 @@ const PEAK_HOURS = 3;
 const PEAK_WEEKDAYS = 2;
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
-const PRICE_WINDOW_DAYS = 365;
+const PAID_SOURCES: ReadonlySet<string> = new Set(['exact', 'estimated']);
 const PRICE_MAX_ROWS = 200;
 const PRICE_ROWS_TOP = 5;
 const GOAL_HISTORY_MAX = 50;
@@ -162,7 +162,7 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'price_history',
     description:
-      'The reader\'s own price notes from the last 365 days, newest first: brand, unit price, pack size, and the date noted. Use for "what did I pay", "has my brand got dearer".',
+      'Prices the reader recorded on entries in the last 90 days, newest first, one line each time a brand\'s price changed: brand, variant, unit price, pack size, and date. Use for "what did I pay", "has my brand got dearer".',
     strict: true,
     input_schema: schema({}),
   },
@@ -446,18 +446,43 @@ function goalHistory(_input: unknown, ctx: ToolContext): ToolOutcome {
   };
 }
 
+interface PricePoint {
+  brand: string | null;
+  variant: string | null;
+  unitPrice: number;
+  packSize: number | null;
+  date: string;
+}
+
+/** Prices the reader paid (exact or estimated), oldest first, one point per change for each brand and variant. */
+function priceChanges(ctx: ToolContext): PricePoint[] {
+  const start = logWindowStart(ctx);
+  const paid = ctx.logs
+    .filter((l) => l.unitPriceInr != null && PAID_SOURCES.has(l.priceSource) && l.localDate >= start && l.localDate <= ctx.today)
+    .sort((x, y) => (x.tsUtc < y.tsUtc ? -1 : x.tsUtc > y.tsUtc ? 1 : 0));
+  const last = new Map<string, number>();
+  const points: PricePoint[] = [];
+  for (const l of paid) {
+    const key = JSON.stringify([l.brandNameSnap, l.variantSnap]);
+    const price = l.unitPriceInr as number;
+    if (last.get(key) === price) continue;
+    last.set(key, price);
+    points.push({ brand: l.brandNameSnap, variant: l.variantSnap, unitPrice: price, packSize: l.packSize, date: l.localDate });
+  }
+  return points;
+}
+
 function priceHistory(_input: unknown, ctx: ToolContext): ToolOutcome {
-  const startYmd = dayShift(ctx.today, -(PRICE_WINDOW_DAYS - 1));
-  const inWindow = ctx.prices
-    .map((p) => ({ brand: p.brandName, unitPrice: p.unitPriceInr, packSize: p.packSize, observedDate: toLocalDate(p.observedAt, ctx.timezone) }))
-    .filter((p) => p.observedDate >= startYmd && p.observedDate <= ctx.today);
-  const entries = inWindow.slice(0, PRICE_MAX_ROWS);
+  // From the reader's own entries only (aliased when discreet, like every other tool);
+  // inferred and unknown prices are catalogue guesses, not what the reader paid.
+  const all = priceChanges(ctx).reverse();
+  const entries = all.slice(0, PRICE_MAX_ROWS);
   // Rows: the newest price per brand (entries are newest first).
   const latest = new Map<string, number>();
   for (const e of entries) if (e.brand && !latest.has(e.brand)) latest.set(e.brand, e.unitPrice);
   return {
     ok: true,
-    data: { windowDays: PRICE_WINDOW_DAYS, count: entries.length, truncated: inWindow.length > entries.length, entries },
+    data: { windowDays: LOG_WINDOW_DAYS, count: entries.length, truncated: all.length > entries.length, entries },
     rows: [...latest].slice(0, PRICE_ROWS_TOP).map(([brand, price], i) => row(`price.${i}`, `Latest price, ${brand}`, price, 'money')),
   };
 }

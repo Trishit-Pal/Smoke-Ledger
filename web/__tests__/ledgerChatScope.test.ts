@@ -7,9 +7,30 @@ import { SYSTEM_PROMPT } from '@web/lib/server/ledgerChat/prompt';
 // Guardrail 1 (scope as data): the prompt and the notice render from scope.ts,
 // so neither can promise more or less than the other.
 describe('ledger chat scope', () => {
-  test('both lists are non-empty', () => {
-    expect(IN_SCOPE.length).toBeGreaterThan(0);
-    expect(OUT_OF_SCOPE.length).toBeGreaterThan(0);
+  test('the in-scope list keeps all six lines of the contract', () => {
+    expect(IN_SCOPE).toHaveLength(6);
+    const pins = [
+      'Your entries from the last 90 days',
+      'Daily totals for up to a year',
+      'paused, completed and abandoned goals',
+      'Prices you recorded on entries in the last 90 days',
+      'Which entries you edited, and on what date',
+      'A short context line',
+    ];
+    pins.forEach((pin, i) => expect(IN_SCOPE[i]).toContain(pin));
+  });
+
+  test('the out-of-scope list keeps all six lines of the contract', () => {
+    expect(OUT_OF_SCOPE).toHaveLength(6);
+    const pins = [
+      'name, date of birth or age, gender, email, phone or place',
+      'Account machinery: sign-in history, audit, error and usage records, consents, legal versions',
+      'Anyone else’s data',
+      'Health: medical advice, diagnosis, health claims or ways to quit',
+      'Judgement or pressure: praise, scolding, streak talk or nagging',
+      'Anything older than the windows above',
+    ];
+    pins.forEach((pin, i) => expect(OUT_OF_SCOPE[i]).toContain(pin));
   });
 
   test('every in-scope line appears verbatim in the system prompt', () => {
@@ -42,7 +63,7 @@ describe('ledger chat scope', () => {
   test('the sent-data sentence names the goal history, price history and edit dates the tools send', () => {
     for (const phrase of [
       'your goal history (type, target, dates and outcome)',
-      'your price history for the last year (brand, unit price, pack size and date)',
+      'the prices you recorded on entries, last 90 days (brand, unit price, pack size and date)',
       'the dates you edited entries',
     ]) {
       expect(LEDGER_CHAT_NOTICE.sent).toContain(phrase);

@@ -24,13 +24,12 @@ import {
   loadDailySummary,
   loadGoals,
   loadLogsPage,
-  loadPriceEntries,
   loadProfile,
   toDailySummaryRow,
 } from '@web/lib/server/data';
 import { cleanEnvValue } from '@web/lib/supabase/env';
 
-// Two model calls plus five parallel reads fit well inside this; Hobby allows 300s.
+// Two model calls plus four parallel reads fit well inside this; Hobby allows 300s.
 export const maxDuration = 30;
 // Production Supabase is in AWS us-east-2 (Ohio); cle1 (Cleveland) is the Vercel
 // region next to it, so the tool queries stay in-region.
@@ -41,6 +40,10 @@ const CONSENT_KEY = 'consent.ledgerChatOptIn';
 const DEFAULT_MODEL = 'claude-haiku-5-5';
 const DEFAULT_USER_CAP = 20;
 const DEFAULT_GLOBAL_CAP = 500;
+/** Dock opens per reader per day; separate from the question cap. */
+const DEFAULT_STATE_CAP = 120;
+/** Enough recent entries for the starters' mood/trigger check. */
+const STARTER_LOG_LIMIT = 200;
 const DAY_SECONDS = 86_400;
 /** Same windows the screens load, so tool figures equal screen figures. */
 const LOG_WINDOW_DAYS = 90;
@@ -117,8 +120,9 @@ export async function POST(request: Request) {
 
 /**
  * Panel state for the dock: opt-in, discreet, currency and starter questions.
- * Same flag, caller and profile gates as POST; it never calls the model, needs
- * no model key and spends no daily ask.
+ * Same flag, caller and profile gates as POST. It never calls the model, needs
+ * no model key, and spends its own daily cap, never the question cap. Without
+ * opt-in it reads only the profile; with it, only what the starters need.
  */
 export async function GET(request: Request) {
   try {
@@ -127,16 +131,23 @@ export async function GET(request: Request) {
     if (!resolved.ok) return fail(resolved.error, resolved.status);
     const { userId, db } = resolved.caller;
 
+    const allowed = await checkRateLimits([
+      { kind: 'ledger_chat_state', key: userId, max: envInt('LEDGER_CHAT_DAILY_CAP_STATE', DEFAULT_STATE_CAP), windowSec: DAY_SECONDS },
+    ]);
+    if (!allowed) return fail('rate_limited', 429);
+
     const gate = await gatedProfile(db, userId);
     if (!gate.ok) return gate.response;
+    const { profile } = gate;
 
-    const [consented, ctx] = await Promise.all([readChatOptIn(db, userId), loadLedgerContext(db, userId, gate.profile)]);
-    const body: ChatStateResponse = {
-      consented,
-      discreet: ctx.discreet,
-      currency: ctx.currency,
-      starters: starterQuestions(ctx).map((s) => s.text),
-    };
+    const state = { discreet: profile.discreetMode, currency: profile.currency };
+    if (!(await readChatOptIn(db, userId))) {
+      const body: ChatStateResponse = { consented: false, ...state, starters: [] };
+      return NextResponse.json(body);
+    }
+
+    const ctx = await loadLedgerContext(db, userId, profile, { forStarters: true });
+    const body: ChatStateResponse = { consented: true, ...state, starters: starterQuestions(ctx).map((s) => s.text) };
     return NextResponse.json(body);
   } catch (error) {
     serverLog('error', 'api.ledger_chat.state_failed', { name: error instanceof Error ? error.name : 'unknown' });
@@ -168,8 +179,17 @@ async function gatedProfile(db: SupabaseClient, userId: string): Promise<Profile
   return { ok: true, profile };
 }
 
-/** The reader's own rows for one turn, loaded in parallel under RLS. */
-async function loadLedgerContext(db: SupabaseClient, userId: string, profile: UserProfile): Promise<ToolContext> {
+/**
+ * The reader's own rows, loaded in parallel under RLS. A turn reads the full
+ * windows; the starters (GET) need only the summary, active goals and a short
+ * log page for the mood/trigger check, so they read no goal history.
+ */
+async function loadLedgerContext(
+  db: SupabaseClient,
+  userId: string,
+  profile: UserProfile,
+  { forStarters = false }: { forStarters?: boolean } = {},
+): Promise<ToolContext> {
   const zone = timezoneForCountry(profile.country);
   const today = todayInZone(zone);
   // Floor the summary at onboarding, exactly as the dashboard does.
@@ -179,21 +199,22 @@ async function loadLedgerContext(db: SupabaseClient, userId: string, profile: Us
 
   // ponytail: one page of up to GOAL_WINDOW_LOG_LIMIT (2000) rows, like Home; the 90-day window
   // holds ~22 entries a day under that ceiling. recent_entries still hands the model only 200.
-  // One goals read serves both goal_status (active) and goal_history (all).
-  const [logsPage, summary, allGoals, prices] = await Promise.all([
-    loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: GOAL_WINDOW_LOG_LIMIT }),
+  // A turn's one goals read serves both goal_status (active) and goal_history (all).
+  const [logsPage, summary, goals] = await Promise.all([
+    loadLogsPage(db, userId, {
+      fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone),
+      limit: forStarters ? STARTER_LOG_LIMIT : GOAL_WINDOW_LOG_LIMIT,
+    }),
     loadDailySummary(db, { from: summarySinceYmd, to: today }),
-    loadGoals(db, userId, { activeOnly: false }),
-    loadPriceEntries(db, userId, { sinceYmd: yearAgo }),
+    loadGoals(db, userId, { activeOnly: forStarters }),
   ]);
 
   return buildToolContext({
     profile,
     logs: logsPage.logs,
     rows: summary.map(toDailySummaryRow),
-    goals: allGoals.filter((g) => g.status === 'active'),
-    goalHistory: allGoals,
-    prices,
+    goals: goals.filter((g) => g.status === 'active'),
+    goalHistory: forStarters ? [] : goals,
     today,
     summarySinceYmd,
   });

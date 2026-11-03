@@ -375,28 +375,41 @@ describe('goal_history', () => {
 });
 
 describe('price_history', () => {
-  const prices = [
-    { brandName: 'Marlboro', unitPriceInr: 22, packSize: 10, observedAt: '2026-06-10T04:00:00.000Z' },
-    { brandName: 'Gold Flake', unitPriceInr: 18.5, packSize: 20, observedAt: '2026-05-01T04:00:00.000Z' },
-    { brandName: 'Marlboro', unitPriceInr: 20, packSize: null, observedAt: '2025-01-01T04:00:00.000Z' },
+  const priced = [
+    log({ localDate: '2026-06-21', localHour: 20, tsUtc: '2026-06-21T14:30:00.000Z', unitPriceInr: 22, priceSource: 'exact', brandNameSnap: 'Marlboro', variantSnap: 'Advance', packSize: 20 }),
+    log({ localDate: '2026-06-20', tsUtc: '2026-06-20T03:30:00.000Z', unitPriceInr: 20, priceSource: 'estimated', brandNameSnap: 'Marlboro', variantSnap: 'Advance' }),
+    log({ localDate: '2026-06-19', tsUtc: '2026-06-19T03:30:00.000Z', unitPriceInr: 20, priceSource: 'exact', brandNameSnap: 'Marlboro', variantSnap: 'Advance' }),
+    log({ localDate: '2026-06-18', tsUtc: '2026-06-18T03:30:00.000Z', unitPriceInr: 18, priceSource: 'exact', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
+    log({ localDate: '2026-06-17', tsUtc: '2026-06-17T03:30:00.000Z', unitPriceInr: 99, priceSource: 'inferred', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
+    log({ localDate: '2026-06-16', tsUtc: '2026-06-16T03:30:00.000Z', unitPriceInr: null, priceSource: 'unknown', brandNameSnap: 'Gold Flake' }),
+    log({ localDate: '2026-01-01', tsUtc: '2026-01-01T03:30:00.000Z', unitPriceInr: 15, priceSource: 'exact', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
   ];
 
-  it('returns brand, unit price, pack size and observed date for the last 365 days', () => {
-    const data = okData('price_history', {}, ctx({ prices })) as { entries: Record<string, unknown>[] };
+  it('reads prices the reader recorded on entries in the last 90 days, change points only, newest first', () => {
+    const data = okData('price_history', {}, ctx({ logs: priced })) as { windowDays: number; entries: Record<string, unknown>[] };
+    expect(data.windowDays).toBe(90);
     expect(data.entries).toEqual([
-      { brand: 'Marlboro', unitPrice: 22, packSize: 10, observedDate: '2026-06-10' },
-      { brand: 'Gold Flake', unitPrice: 18.5, packSize: 20, observedDate: '2026-05-01' },
-    ]);
+      { brand: 'Marlboro', variant: 'Advance', unitPrice: 22, packSize: 20, date: '2026-06-21' },
+      { brand: 'Gold Flake', variant: 'Kings', unitPrice: 18, packSize: null, date: '2026-06-18' },
+      { brand: 'Marlboro', variant: 'Advance', unitPrice: 20, packSize: null, date: '2026-06-19' },
+    ].sort((x, y) => (x.date < y.date ? 1 : -1)));
   });
 
-  it('aliases brands in discreet mode with the same aliases the entries use', () => {
-    const c = ctx({ profile: { ...profile, discreetMode: true }, prices });
-    const data = okData('price_history', {}, c) as { entries: { brand: string }[] };
-    const entryBrands = (okData('recent_entries', { days: 30 }, c) as { entries: { brand: string }[] }).entries;
-    // logs: Gold Flake first, then Marlboro.
-    expect(entryBrands.map((e) => e.brand)).toEqual(['Brand A', 'Brand B', 'Brand A']);
-    expect(data.entries.map((e) => e.brand)).toEqual(['Brand B', 'Brand A']);
-    expect(JSON.stringify(c.prices)).not.toMatch(/Marlboro|Gold Flake/);
+  it('leaves out inferred and unknown prices, which the reader did not pay', () => {
+    const data = okData('price_history', {}, ctx({ logs: priced })) as { entries: { unitPrice: number }[] };
+    expect(data.entries.map((e) => e.unitPrice)).not.toContain(99);
+  });
+
+  it('uses the same discreet aliases as brand_mix, and drops variants', () => {
+    const c = ctx({ profile: { ...profile, discreetMode: true }, logs: priced });
+    const prices = (okData('price_history', {}, c) as { entries: { brand: string; variant: unknown }[] }).entries;
+    const mix = (okData('brand_mix', {}, c) as { brands: { brand: string }[] }).brands.map((b) => b.brand);
+    expect(new Set(prices.map((p) => p.brand))).toEqual(new Set(['Brand A', 'Brand B']));
+    for (const p of prices) {
+      expect(mix).toContain(p.brand);
+      expect(p.variant).toBeNull();
+    }
+    expect(JSON.stringify(prices)).not.toMatch(/Marlboro|Gold Flake|Advance|Kings/);
   });
 });
 

@@ -8,7 +8,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 import type { DailySummaryRow } from '@/domain/periodSummary';
-import type { PriceEntry } from '@/domain/ledgerChat/context';
 import type {
   Brand,
   BrandVariant,
@@ -315,55 +314,6 @@ export async function loadGoals(
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data as GoalRow[]).map(mapGoal);
-}
-
-/** Upper bound on price notes read for Ask the ledger (365 days). */
-export const PRICE_ENTRIES_LIMIT = 500;
-
-/**
- * The reader's own price notes since `sinceYmd`, newest first, with brand names
- * resolved from their own brands (price_entries has no brand FK to embed).
- * RLS scopes both reads to the caller; the user_id filters are belt and braces.
- */
-export async function loadPriceEntries(
-  supabase: SupabaseClient,
-  userId: string,
-  { sinceYmd }: { sinceYmd: string },
-): Promise<PriceEntry[]> {
-  const { data, error } = await supabase
-    .from('price_entries')
-    .select('brand_id, unit_price_inr, pack_size, observed_at')
-    .eq('user_id', userId)
-    .gte('observed_at', sinceYmd)
-    .order('observed_at', { ascending: false })
-    .limit(PRICE_ENTRIES_LIMIT);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{
-    brand_id: string | null;
-    unit_price_inr: number | string;
-    pack_size: number | null;
-    observed_at: string;
-  }>;
-
-  const brandIds = [...new Set(rows.map((r) => r.brand_id).filter((id): id is string => !!id))];
-  const names = new Map<string, string>();
-  if (brandIds.length > 0) {
-    const { data: brands, error: brandError } = await supabase
-      .from('brands')
-      .select('id, name')
-      .eq('user_id', userId)
-      .in('id', brandIds);
-    if (brandError) throw new Error(brandError.message);
-    for (const b of (brands ?? []) as Array<{ id: string; name: string }>) names.set(b.id, b.name);
-  }
-
-  return rows.map((r) => ({
-    brandName: r.brand_id ? (names.get(r.brand_id) ?? null) : null,
-    // Postgres numeric arrives as a string from supabase-js.
-    unitPriceInr: Number(r.unit_price_inr),
-    packSize: r.pack_size,
-    observedAt: r.observed_at,
-  }));
 }
 
 export const getServerGoals = cache(async (): Promise<Goal[]> => {
