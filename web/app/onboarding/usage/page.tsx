@@ -407,7 +407,7 @@ export default function OnboardingUsagePage() {
       </div>
 
       {error ? (
-        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: 0 }}>
           {error}
         </p>
       ) : null}

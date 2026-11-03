@@ -567,7 +567,7 @@ export function LogNewClient({ brands, country }: LogNewClientProps) {
             <p
               role="alert"
               className="text-small text-center mb-sm"
-              style={{ color: 'var(--warn-earth)' }}
+              style={{ color: 'var(--warn-earth-ink)' }}
             >
               {error}
             </p>

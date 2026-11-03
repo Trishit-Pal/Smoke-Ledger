@@ -419,7 +419,7 @@ export function DashboardClient({
   const deck = headlineDeck({ sticks, windowDays, deltaPct: period.stickDeltaPct, streak, hidden });
   const tTone = trendTone(period.stickDeltaPct);
   const trendColour =
-    tTone === 'up' ? 'var(--warn-earth)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
+    tTone === 'up' ? 'var(--warn-earth-ink)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
   const periodCap = WINDOWS.find((w) => w.days === windowDays)?.label ?? 'Day';
 
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
@@ -509,7 +509,7 @@ export function DashboardClient({
             ) : null}
             {quickLogError ? (
               <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
-                <p className="text-small flex-1" style={{ color: 'var(--warn-earth)' }}>
+                <p className="text-small flex-1" style={{ color: 'var(--warn-earth-ink)' }}>
                   {quickLogError}
                 </p>
                 {lastLogParams && (

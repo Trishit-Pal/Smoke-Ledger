@@ -168,7 +168,7 @@ function SignupEmailSuccess({ email }: { email: string }) {
       {resendError ? (
         <p
           role="alert"
-          style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}
+          style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: 0 }}
         >
           {resendError}
         </p>
@@ -538,7 +538,7 @@ export default function SignupPage() {
           <p
             id="signup-acknowledged-error"
             role="alert"
-            style={{ fontSize: 13, color: 'var(--warn-earth)', margin: '4px 0 0 0' }}
+            style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: '4px 0 0 0' }}
           >
             {errors.acknowledged.message}
           </p>
@@ -552,7 +552,7 @@ export default function SignupPage() {
 
         {submitError ? (
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}>
+            <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: 0 }}>
               {submitError}
             </p>
             {existingEmail ? (
@@ -614,7 +614,7 @@ export default function SignupPage() {
         {otpSignupError ? (
           <p
             role="alert"
-            style={{ fontSize: 13, color: 'var(--warn-earth)', margin: '12px 0 0 0' }}
+            style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: '12px 0 0 0' }}
           >
             {otpSignupError}
           </p>

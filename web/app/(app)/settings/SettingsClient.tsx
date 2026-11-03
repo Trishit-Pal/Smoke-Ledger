@@ -252,8 +252,8 @@ function TextLink({
       aria-label={ariaLabel}
       className="text-small underline underline-offset-4 decoration-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg rounded-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center min-h-11 min-w-11 px-xs"
       style={{
-        color: destructive ? 'var(--warn-earth)' : 'var(--text)',
-        textDecorationColor: destructive ? 'var(--warn-earth)' : 'var(--rule-strong)',
+        color: destructive ? 'var(--warn-earth-ink)' : 'var(--text)',
+        textDecorationColor: destructive ? 'var(--warn-earth-ink)' : 'var(--rule-strong)',
       }}
     >
       {children}
@@ -1497,7 +1497,7 @@ export function SettingsClient({
                 <p
                   role="status"
                   className="text-small italic"
-                  style={{ color: 'var(--warn-earth)' }}
+                  style={{ color: 'var(--warn-earth-ink)' }}
                 >
                   {exportWarning}
                 </p>
@@ -1604,7 +1604,7 @@ export function SettingsClient({
               </p>
             ) : null}
             {error ? (
-              <p className="text-small" style={{ color: 'var(--warn-earth)' }}>
+              <p className="text-small" style={{ color: 'var(--warn-earth-ink)' }}>
                 {error}
               </p>
             ) : null}

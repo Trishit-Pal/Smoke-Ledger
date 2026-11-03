@@ -351,7 +351,7 @@ export function LogEditModal({
             {/* Error message */}
             {error ? (
               <div className="mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
-                <p className="text-small text-[var(--warn-earth)]">{error}</p>
+                <p className="text-small text-[var(--warn-earth-ink)]">{error}</p>
               </div>
             ) : null}
 

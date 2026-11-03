@@ -195,7 +195,7 @@ export function BackdateTimeField({
 
       <p
         className={'text-caption nums-tabular ' + (isError ? '' : 'text-text-muted')}
-        style={isError ? { color: 'var(--warn-earth)' } : undefined}
+        style={isError ? { color: 'var(--warn-earth-ink)' } : undefined}
         role={isError ? 'alert' : 'status'}
         aria-live="polite"
       >

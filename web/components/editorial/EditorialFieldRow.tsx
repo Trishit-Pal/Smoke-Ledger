@@ -47,7 +47,7 @@ export function EditorialFieldRow({
       {error ? (
         <span
           role="alert"
-          style={{ fontSize: 12, color: 'var(--warn-earth)', lineHeight: 1.5 }}
+          style={{ fontSize: 12, color: 'var(--warn-earth-ink)', lineHeight: 1.5 }}
         >
           {error}
         </span>

@@ -58,7 +58,7 @@ export default async function ConfirmEmailLinkPage({
       />
 
       {signedInAs ? (
-        <p role="status" className="mt-md" style={{ fontSize: 13, color: 'var(--warn-earth)' }}>
+        <p role="status" className="mt-md" style={{ fontSize: 13, color: 'var(--warn-earth-ink)' }}>
           You&apos;re signed in as {signedInAs}. If this link is for a different account, continuing switches to it.
         </p>
       ) : null}

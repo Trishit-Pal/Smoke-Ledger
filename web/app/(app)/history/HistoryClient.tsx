@@ -439,7 +439,7 @@ export function HistoryClient({
                 <p
                   role="alert"
                   className="text-small text-center"
-                  style={{ color: 'var(--warn-earth)' }}
+                  style={{ color: 'var(--warn-earth-ink)' }}
                 >
                   {loadError}
                 </p>

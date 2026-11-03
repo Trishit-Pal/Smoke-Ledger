@@ -496,7 +496,7 @@
     font-style: italic;
     font-size: 15px;
     line-height: 1.45;
-    color: var(--warn-earth);
+    color: var(--warn-earth-ink);
     text-wrap: pretty;
   }
 
