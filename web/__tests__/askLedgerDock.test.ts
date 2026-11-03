@@ -159,6 +159,16 @@ describe('dock source pins', () => {
     expect(dock.match(/FOCUS_RING,/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 
+  test('focus: the panel returns to a visible dock control; Minimise and Show focus the swapped control', () => {
+    expect(dock).toContain('returnFocus={focusDock}');
+    // Box, pill and folded tab are all focus targets; CSS hides one of box/pill, so focusDock filters on visibility.
+    expect(dock.match(/^\s*data-ask-focus\s*$/gm)?.length).toBe(3);
+    expect(dock).toContain('getClientRects().length > 0');
+    const minimise = dock.slice(dock.indexOf('const onMinimise'), dock.indexOf('return (', dock.indexOf('const onMinimise')));
+    expect(minimise.indexOf('focusSwapRef.current = true')).toBeLessThan(minimise.indexOf('setMinimised(value)'));
+    expect(dock).toMatch(/focusDock\(\);\s*\}, \[minimised\]\)/);
+  });
+
   test('the old page launcher and its page props are gone', () => {
     for (const parts of [
       ['app', '(app)', 'dashboard', 'DashboardClient.tsx'],

@@ -31,6 +31,29 @@ describe('AskLedgerPanel', () => {
     expect(panel).not.toContain("return '•••'");
   });
 
+  test('the newest answer is announced inside the live region, masked exactly like the prose on screen', () => {
+    // The transcript sits outside the region, so the answer is mirrored into it as hidden text.
+    const start = panel.indexOf('aria-live="polite"');
+    expect(start).toBeGreaterThan(-1);
+    const region = panel.slice(start, panel.indexOf("status === 'consent'", start));
+    expect(region).toContain('sr-only');
+    expect(region).toMatch(/maskNumbers\(announced\.answer, announcedMasked\)/);
+    // Never the raw answer: in discreet mode that would read unmasked figures aloud.
+    expect(panel).not.toMatch(/\{announced\.answer\}/);
+    expect(panel).toMatch(/announcedMasked = announced \? hidden && !revealed\.has\(`\$\{announced\.id\}:answer`\) : true/);
+  });
+
+  test('keyboard focus: the question box on open (never Clear), the dock control on close', () => {
+    expect(panel).toContain('onOpenAutoFocus={onOpenFocus}');
+    expect(panel).toContain('onCloseAutoFocus={onCloseFocus}');
+    const open = panel.slice(panel.indexOf('const onOpenFocus'), panel.indexOf('const onCloseFocus'));
+    expect(open).toContain('e.preventDefault()');
+    expect(open).toContain('inputRef.current');
+    const close = panel.slice(panel.indexOf('const onCloseFocus'), panel.indexOf('const wasBusyRef'));
+    expect(close).toContain('e.preventDefault()');
+    expect(close).toContain('returnFocus?.()');
+  });
+
   test('is a Radix dialog with a live answer region and the shared 16px input style', () => {
     expect(panel).toContain("from '@radix-ui/react-dialog'");
     expect(panel).toContain('aria-live="polite"');

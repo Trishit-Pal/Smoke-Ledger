@@ -56,6 +56,8 @@ export interface AskLedgerPanelProps {
   onOpenChange: (open: boolean) => void;
   /** A question typed into the dock: pre-filled, and sent once per open when opted in. */
   initialQuestion?: string;
+  /** Where focus goes on close. The dock owns the controls that opened the panel; Radix has no Trigger to return to. */
+  returnFocus?: () => void;
 }
 
 type Status = 'idle' | 'loading' | 'consent' | 'outdated' | 'rate_limited' | 'disabled' | 'error';
@@ -130,8 +132,12 @@ function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): st
   return String(row.value);
 }
 
-export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedgerPanelProps) {
+export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocus }: AskLedgerPanelProps) {
   const inputId = React.useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  // The newest answer that arrived while the panel was open: the one the live region announces.
+  const [announcedId, setAnnouncedId] = React.useState<string | null>(null);
   const [userId, setUserId] = React.useState<string | null>(null);
   const [turns, setTurnsState] = React.useState<TranscriptTurn[]>([]);
   // send() awaits the network; it must append to the turns as they are when the
@@ -165,6 +171,35 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     [state?.currency, state?.locale],
   );
   const busy = status === 'loading';
+  const announced = turns.find((t) => t.id === announcedId);
+  // Same rule as the prose on screen, so discreet mode never reads a figure aloud.
+  const announcedMasked = announced ? hidden && !revealed.has(`${announced.id}:answer`) : true;
+
+  // Radix would focus the first tabbable, the confirm-free Clear button once there are turns,
+  // and a stray Enter would wipe the conversation. The question box is the right start.
+  // A disabled box (an answer still in flight) falls back to the dialog itself.
+  const onOpenFocus = (e: Event) => {
+    e.preventDefault();
+    const input = inputRef.current;
+    (input && !input.disabled ? input : contentRef.current)?.focus({ preventScroll: true });
+  };
+  const onCloseFocus = (e: Event) => {
+    e.preventDefault();
+    returnFocus?.();
+  };
+
+  // The box and starters are disabled while an answer is in flight, which drops focus to the dialog.
+  // When it ends, put focus back in the box, unless the reader has moved to another control.
+  const wasBusyRef = React.useRef(false);
+  React.useEffect(() => {
+    if (wasBusyRef.current && !busy && open) {
+      const active = document.activeElement;
+      const lost =
+        !active || active === document.body || active === contentRef.current || active === inputRef.current || active.closest('[data-starters]');
+      if (lost) inputRef.current?.focus({ preventScroll: true });
+    }
+    wasBusyRef.current = busy;
+  }, [busy, open]);
 
   // The transcript key needs the user id: getSession() reads the local session,
   // no network round-trip. The panel state is read from GET on every open: the dock
@@ -178,6 +213,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       // Unknown state masks every figure, and a figure the reader revealed stays revealed only for that open.
       setState(null);
       setRevealed(new Set());
+      setAnnouncedId(null);
       return;
     }
     let cancelled = false;
@@ -239,6 +275,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
           };
           const next = [...current, turn];
           setTurns(userId ? saveTranscript(userId, next) : next);
+          setAnnouncedId(turn.id);
           setPending(null);
           setDraft('');
           setStatus('idle');
@@ -336,7 +373,12 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
-        <Dialog.Content className="ask-sheet fixed inset-x-0 bottom-0 z-[60] flex max-h-[88dvh] flex-col rounded-t-lg border-t border-border bg-card shadow-xl md:inset-y-0 md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[min(100vw,28rem)] md:rounded-none md:border-l md:border-t-0">
+        <Dialog.Content
+          ref={contentRef}
+          onOpenAutoFocus={onOpenFocus}
+          onCloseAutoFocus={onCloseFocus}
+          className="ask-sheet fixed inset-x-0 bottom-0 z-[60] flex max-h-[88dvh] flex-col rounded-t-lg border-t border-border bg-card shadow-xl md:inset-y-0 md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[min(100vw,28rem)] md:rounded-none md:border-l md:border-t-0"
+        >
           <header className="flex shrink-0 items-start justify-between gap-md px-lg pt-lg">
             <div className="flex min-w-0 flex-col gap-xs">
               <Dialog.Title asChild>
@@ -371,7 +413,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
             {!ready && !state ? (
               <p className="rule-hair-strong mt-lg pt-md text-caption italic text-text-faint">{COPY.loading}</p>
             ) : starters.length > 0 ? (
-              <section className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
+              <section data-starters className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
                 <SectionLabel spacing="none">To begin</SectionLabel>
                 <ul className="flex flex-col">
                   {starters.map((text) => (
@@ -447,6 +489,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
             })}
 
             <div aria-live="polite" className="flex flex-col gap-sm">
+              {/* The transcript above is outside this region, so the newest answer is mirrored here as hidden text. */}
+              {announced ? <p className="sr-only">{maskNumbers(announced.answer, announcedMasked)}</p> : null}
               {pending && status !== 'idle' ? (
                 <p className="editorial-pullquote mt-md text-[clamp(1rem,2vw,1.125rem)] text-text">{pending.question}</p>
               ) : null}
@@ -509,6 +553,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
                 Ask your ledger
               </label>
               <input
+                ref={inputRef}
                 id={inputId}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

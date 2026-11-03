@@ -69,6 +69,18 @@ function deviceStorage(): Storage | null {
   }
 }
 
+/**
+ * Focus whichever dock control is on screen: the desktop box, the phone pill or the folded tab.
+ * The box and the pill are both in the DOM and CSS hides one, so visibility, not presence, picks.
+ * (offsetParent is null for fixed elements, hence getClientRects.)
+ */
+export function focusDock(): void {
+  const visible = Array.from(document.querySelectorAll<HTMLElement>('[data-ask-focus]')).find(
+    (el) => el.getClientRects().length > 0,
+  );
+  visible?.focus();
+}
+
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg';
 
@@ -96,6 +108,15 @@ export function AskLedgerDock({ enabled }: AskLedgerDockProps) {
     setMounted(true);
   }, []);
 
+  // Minimise and Show unmount the control the reader just pressed, which drops focus to the body;
+  // once the swapped-in control has rendered, focus it. Only after a press, never on first load.
+  const focusSwapRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!focusSwapRef.current) return;
+    focusSwapRef.current = false;
+    focusDock();
+  }, [minimised]);
+
   if (!enabled || isDockHidden(pathname)) return null;
 
   const onAsk = (surface: Surface, q?: string) => {
@@ -111,6 +132,7 @@ export function AskLedgerDock({ enabled }: AskLedgerDockProps) {
   };
 
   const onMinimise = (value: boolean) => {
+    focusSwapRef.current = true;
     setMinimised(value);
     writeDockMinimised(deviceStorage(), value);
   };
@@ -119,7 +141,7 @@ export function AskLedgerDock({ enabled }: AskLedgerDockProps) {
     <>
       <span data-ask-dock hidden />
       {mounted ? <DockControls minimised={minimised} onMinimise={onMinimise} onAsk={onAsk} /> : null}
-      {panelLoaded ? <AskLedgerPanel open={open} onOpenChange={onOpenChange} initialQuestion={question} /> : null}
+      {panelLoaded ? <AskLedgerPanel open={open} onOpenChange={onOpenChange} initialQuestion={question} returnFocus={focusDock} /> : null}
     </>
   );
 }
@@ -140,6 +162,7 @@ export function DockControls({ minimised, onMinimise, onAsk }: DockControlsProps
       <button
         type="button"
         onClick={() => onMinimise(false)}
+        data-ask-focus
         aria-label="Show Ask the ledger"
         className={cn(
           POSITION,
@@ -187,6 +210,7 @@ export function DockControls({ minimised, onMinimise, onAsk }: DockControlsProps
         </label>
         <input
           id={inputId}
+          data-ask-focus
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -217,6 +241,7 @@ export function DockControls({ minimised, onMinimise, onAsk }: DockControlsProps
         <button
           type="button"
           onClick={() => onAsk('pill')}
+          data-ask-focus
           className={cn(
             'inline-flex min-h-11 items-center rounded-full border border-border bg-card px-xl text-small font-medium text-text shadow-lg transition-colors hover:bg-bg md:hidden',
             FOCUS_RING,
