@@ -1152,7 +1152,13 @@ export function SettingsClient({
               sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
               control={
                 <div className="flex items-center gap-md">
-                  <TextLink onClick={() => clearTranscript()} disabled={busy != null}>
+                  <TextLink
+                    onClick={() => {
+                      clearTranscript();
+                      flashToast('Conversation cleared from this device.');
+                    }}
+                    disabled={busy != null}
+                  >
                     Clear conversation
                   </TextLink>
                   <EditorialSwitch

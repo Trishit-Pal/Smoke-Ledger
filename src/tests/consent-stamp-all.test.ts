@@ -50,7 +50,7 @@ describe('re-consent decline note', () => {
   it('the /consent screens use the existing-ledger note, not the onboarding one', () => {
     const mobile = read('app/consent.tsx');
     expect(mobile).toContain('HEALTH_DECLINE_NOTE_EXISTING');
-    expect(mobile).not.toMatch(/HEALTH_DECLINE_NOTE/);
+    expect(mobile).not.toMatch(/\bHEALTH_DECLINE_NOTE\b/);
     expect(read('web/app/consent/ConsentClient.tsx')).toMatch(/existingLedger/);
     expect(read('web/components/onboarding/ConsentRows.tsx')).toContain('HEALTH_DECLINE_NOTE_EXISTING');
   });

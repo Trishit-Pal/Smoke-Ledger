@@ -76,8 +76,18 @@ describe('AI label and Clear conversation', () => {
     expect(panel).not.toMatch(/ConfirmDialog|window\.confirm/);
   });
 
-  test('Settings Ask-the-ledger row offers the same control', () => {
-    expect(settings).toContain('Clear conversation');
+  test('an answer in flight cannot undo a clear: send appends to the live turns, and Clear is hidden while busy', () => {
+    // The stale closure over `turns` is what resurrected cleared turns.
+    expect(panel).not.toMatch(/\[\.\.\.turns, turn\]/);
+    expect(panel).toContain('turnsRef.current');
+    expect(panel).toMatch(/const next = \[\.\.\.current, turn\]/);
+    const send = panel.slice(panel.indexOf('const send = React.useCallback'), panel.indexOf('const onTurnOnAndAsk'));
+    expect(send).not.toMatch(/turns/);
+    expect(panel).toMatch(/turns\.length > 0 && !busy/);
+  });
+
+  test('Settings Ask-the-ledger row offers the same control and says it was done', () => {
+    expect(settings).toMatch(/clearTranscript\(\);\s*flashToast\('Conversation cleared from this device\.'\)/);
   });
 });
 

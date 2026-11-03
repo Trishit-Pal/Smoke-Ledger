@@ -95,7 +95,14 @@ function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): st
 export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLedgerPanelProps) {
   const inputId = React.useId();
   const [userId, setUserId] = React.useState<string | null>(null);
-  const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
+  const [turns, setTurnsState] = React.useState<TranscriptTurn[]>([]);
+  // send() awaits the network; it must append to the turns as they are when the
+  // answer lands, not as they were when it started, or a Clear in between is undone.
+  const turnsRef = React.useRef<TranscriptTurn[]>([]);
+  const setTurns = React.useCallback((next: TranscriptTurn[]) => {
+    turnsRef.current = next;
+    setTurnsState(next);
+  }, []);
   const [status, setStatus] = React.useState<Status>('idle');
   const [pending, setPending] = React.useState<Pending | null>(null);
   const [draft, setDraft] = React.useState('');
@@ -133,18 +140,19 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         const res = await fetch('/api/ledger-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q, history: historyFor(turns) }),
+          body: JSON.stringify({ question: q, history: historyFor(turnsRef.current) }),
         });
         if (res.ok) {
           const body = (await res.json()) as ChatResponse;
+          const current = turnsRef.current;
           const turn: TranscriptTurn = {
-            id: `${Date.now().toString(36)}-${turns.length}`,
+            id: `${Date.now().toString(36)}-${current.length}`,
             question: q,
             answer: body.answer,
             rows: body.rows,
             at: new Date().toISOString(),
           };
-          const next = [...turns, turn];
+          const next = [...current, turn];
           setTurns(userId ? saveTranscript(userId, next) : next);
           setPending(null);
           setDraft('');
@@ -166,7 +174,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         setStatus('error');
       }
     },
-    [turns, userId],
+    [setTurns, userId],
   );
 
   const onTurnOnAndAsk = async () => {
@@ -223,7 +231,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               <Dialog.Description asChild>
                 <p className="max-w-[40ch] text-small text-text-muted">{COPY.description}</p>
               </Dialog.Description>
-              {turns.length > 0 ? (
+              {turns.length > 0 && !busy ? (
                 <button
                   type="button"
                   onClick={onClear}
