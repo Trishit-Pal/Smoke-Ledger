@@ -20,21 +20,43 @@ describe('ledger-chat route guards', () => {
   });
 
   test('gate order: kill switch, consent key, profile gates, then limits, then the ledger loads', () => {
-    const killSwitch = route.indexOf('isLedgerChatEnabled()');
-    const consent = route.indexOf(".from('settings_kv')");
-    const profile = route.indexOf('loadProfile(');
-    const consents = route.indexOf('hasRequiredConsents(');
-    const limits = route.indexOf('checkRateLimits(');
-    const logs = route.indexOf('loadLogsPage(');
+    const post = route.slice(route.indexOf('export async function POST('), route.indexOf('export async function GET('));
+    const killSwitch = post.indexOf('isLedgerChatEnabled()');
+    const consent = post.indexOf('readChatOptIn(');
+    const profile = post.indexOf('gatedProfile(');
+    const limits = post.indexOf('checkRateLimits(');
+    const loads = post.indexOf('loadLedgerContext(');
     expect(route).toContain("'consent.ledgerChatOptIn'");
+    expect(route).toContain(".from('settings_kv')");
     expect(killSwitch).toBeGreaterThan(-1);
     expect(consent).toBeGreaterThan(killSwitch);
     // The profile gates run before a daily token is spent, so a reader without
     // consents is refused without losing one of their asks.
     expect(profile).toBeGreaterThan(consent);
-    expect(consents).toBeGreaterThan(profile);
-    expect(limits).toBeGreaterThan(consents);
-    expect(logs).toBeGreaterThan(limits);
+    expect(limits).toBeGreaterThan(profile);
+    expect(loads).toBeGreaterThan(limits);
+    expect(post).toContain("fail('consent_required', 403)");
+  });
+
+  test('the profile gate checks consents, onboarding, then current legal versions', () => {
+    const gate = route.slice(route.indexOf('async function gatedProfile('));
+    const load = gate.indexOf('loadProfile(');
+    const consents = gate.indexOf('hasRequiredConsents(');
+    const outdated = gate.indexOf('consentsOutdated(');
+    expect(load).toBeGreaterThan(-1);
+    expect(consents).toBeGreaterThan(load);
+    expect(outdated).toBeGreaterThan(consents);
+    expect(gate).toContain("fail('consent_outdated', 403)");
+  });
+
+  test('GET never reaches the model and spends only its own state cap', () => {
+    const get = route.slice(route.indexOf('export async function GET('), route.indexOf('async function readChatOptIn('));
+    expect(get).toContain('resolveChatCaller(');
+    expect(get).toContain('gatedProfile(');
+    expect(get).toContain("kind: 'ledger_chat_state'");
+    for (const banned of ['ledger_chat_user', 'ledger_chat_global', 'new Anthropic(', 'runLedgerChatTurn(', 'ANTHROPIC_API_KEY']) {
+      expect(get).not.toContain(banned);
+    }
   });
 
   test('the confirmed-email rule is the shared one, not a copy', () => {
@@ -74,7 +96,8 @@ describe('ledger-chat route guards', () => {
 describe('ledger-chat log window', () => {
   test('reads the same 2000-row goal window as Home, not a private 200 cap', () => {
     expect(route).toMatch(/import \{[^}]*GOAL_WINDOW_LOG_LIMIT[^}]*\} from '@web\/lib\/server\/data'/);
-    expect(route).toContain('limit: GOAL_WINDOW_LOG_LIMIT');
+    // A turn reads the goal window; only the starters (GET) read a short page.
+    expect(route).toContain('limit: forStarters ? STARTER_LOG_LIMIT : GOAL_WINDOW_LOG_LIMIT');
     expect(route).not.toMatch(/LOG_ROW_CAP|limit:\s*200\b/);
   });
 });

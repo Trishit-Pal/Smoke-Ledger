@@ -32,6 +32,7 @@ describe('web device cleanup', () => {
       'ledger-chat:v1:u1': '[]',
       'smoke-ledger-theme': 'dark',
       sl_catalog_sync_v: '3',
+      sl_chat_dock_minimised: '1',
     });
     const failed = await clearWebDevice('signOut', store);
     expect(store.getItem(firstSuggestionKey('u1'))).toBeNull();
@@ -39,6 +40,7 @@ describe('web device cleanup', () => {
     expect(store.getItem('ledger-chat:v1:u1')).toBeNull();
     expect(store.getItem('smoke-ledger-theme')).toBe('dark');
     expect(store.getItem('sl_catalog_sync_v')).toBe('3');
+    expect(store.getItem('sl_chat_dock_minimised')).toBe('1');
     expect(failed).toEqual([]);
   });
 

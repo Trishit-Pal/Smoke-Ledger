@@ -20,7 +20,7 @@ import { proposalFor } from '@/domain/goalProposals';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { periodWithTrend, savedAllTime, totalsForWindow, weightedAvgUnitPrice } from '@/domain/periodSummary';
-import { hourBucketLabel } from '@/lib/date';
+import { hourBucketLabel, toLocalDate } from '@/lib/date';
 import { formatMoney } from '@/lib/format';
 
 export const TOOL_NAMES = [
@@ -33,6 +33,9 @@ export const TOOL_NAMES = [
   'goal_status',
   'insights',
   'recent_entries',
+  'goal_history',
+  'price_history',
+  'entry_edits',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -61,6 +64,12 @@ const PEAK_HOURS = 3;
 const PEAK_WEEKDAYS = 2;
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const PAID_SOURCES: ReadonlySet<string> = new Set(['exact', 'estimated']);
+const PRICE_MAX_ROWS = 200;
+const PRICE_ROWS_TOP = 5;
+const GOAL_HISTORY_MAX = 50;
+/** An update this long after creation is an edit, not the save of a new entry. */
+const EDIT_THRESHOLD_MS = 60_000;
 
 const emptyInput = z.object({}).strict();
 const comparePeriodsInput = z.object({ window: z.enum(['week', 'month']) }).strict();
@@ -142,6 +151,27 @@ export const TOOL_DEFS: readonly ToolDef[] = [
     // Strict mode accepts no numeric constraints; the 1–30 range is enforced by
     // recentEntriesInput (zod) and stated in the description.
     input_schema: schema({ days: { type: 'integer', description: `Days to include, 1 to ${RECENT_MAX_DAYS}` } }, ['days']),
+  },
+  {
+    name: 'goal_history',
+    description:
+      'Every goal the reader has set, active, paused, completed or abandoned: type, target, start and end dates, the date it closed, and its status. Use for "what goals have I had", "when did I stop my last goal".',
+    strict: true,
+    input_schema: schema({}),
+  },
+  {
+    name: 'price_history',
+    description:
+      'Prices the reader recorded on entries in the last 90 days, newest first, one line each time a brand\'s price changed: brand, variant, unit price, pack size, and date. Use for "what did I pay", "has my brand got dearer".',
+    strict: true,
+    input_schema: schema({}),
+  },
+  {
+    name: 'entry_edits',
+    description:
+      'Entries from the last 90 days that were edited after they were saved: the entry\'s date and hour and the date of the edit. Values before an edit are not kept. Use for "which entries did I change".',
+    strict: true,
+    input_schema: schema({}),
   },
 ];
 
@@ -391,6 +421,93 @@ function recentEntries(input: z.infer<typeof recentEntriesInput>, ctx: ToolConte
   };
 }
 
+function goalHistory(_input: unknown, ctx: ToolContext): ToolOutcome {
+  const money = { currency: ctx.currency, locale: ctx.locale };
+  const list = ctx.goalHistory.slice(0, GOAL_HISTORY_MAX);
+  const goals = list.map((g) => ({
+    type: goalTypeLabel(g.type),
+    target: g.targetValue,
+    startDate: g.startDate,
+    endDate: g.endDate,
+    completedDate: g.completedAt ? toLocalDate(g.completedAt, ctx.timezone) : null,
+    status: g.status,
+  }));
+  return {
+    ok: true,
+    data: { goals, truncated: ctx.goalHistory.length > list.length },
+    rows: list.map((g, i) =>
+      row(
+        `goalHistory.${i}`,
+        `${goalTypeLabel(g.type)}, ${g.status}`,
+        g.targetValue,
+        goalUnit(evaluateGoal(g, ctx.logs, ctx.today, money).unit),
+      ),
+    ),
+  };
+}
+
+interface PricePoint {
+  brand: string | null;
+  variant: string | null;
+  unitPrice: number;
+  packSize: number | null;
+  date: string;
+}
+
+/** Prices the reader paid (exact or estimated), oldest first, one point per change for each brand and variant. */
+function priceChanges(ctx: ToolContext): PricePoint[] {
+  const start = logWindowStart(ctx);
+  const paid = ctx.logs
+    .filter((l) => l.unitPriceInr != null && PAID_SOURCES.has(l.priceSource) && l.localDate >= start && l.localDate <= ctx.today)
+    .sort((x, y) => (x.tsUtc < y.tsUtc ? -1 : x.tsUtc > y.tsUtc ? 1 : 0));
+  const last = new Map<string, number>();
+  const points: PricePoint[] = [];
+  for (const l of paid) {
+    const key = JSON.stringify([l.brandNameSnap, l.variantSnap]);
+    const price = l.unitPriceInr as number;
+    if (last.get(key) === price) continue;
+    last.set(key, price);
+    points.push({ brand: l.brandNameSnap, variant: l.variantSnap, unitPrice: price, packSize: l.packSize, date: l.localDate });
+  }
+  return points;
+}
+
+function priceHistory(_input: unknown, ctx: ToolContext): ToolOutcome {
+  // From the reader's own entries only (aliased when discreet, like every other tool);
+  // inferred and unknown prices are catalogue guesses, not what the reader paid.
+  const all = priceChanges(ctx).reverse();
+  const entries = all.slice(0, PRICE_MAX_ROWS);
+  // Rows: the newest price per brand (entries are newest first).
+  const latest = new Map<string, number>();
+  for (const e of entries) if (e.brand && !latest.has(e.brand)) latest.set(e.brand, e.unitPrice);
+  return {
+    ok: true,
+    data: { windowDays: LOG_WINDOW_DAYS, count: entries.length, truncated: all.length > entries.length, entries },
+    rows: [...latest].slice(0, PRICE_ROWS_TOP).map(([brand, price], i) => row(`price.${i}`, `Latest price, ${brand}`, price, 'money')),
+  };
+}
+
+function isEdited(createdAt: string, updatedAt: string): boolean {
+  const gap = Date.parse(updatedAt) - Date.parse(createdAt);
+  return Number.isFinite(gap) && gap > EDIT_THRESHOLD_MS;
+}
+
+function entryEdits(_input: unknown, ctx: ToolContext): ToolOutcome {
+  const start = logWindowStart(ctx);
+  const edited = ctx.logs.filter((l) => l.localDate >= start && isEdited(l.createdAt, l.updatedAt));
+  // Dates only: the ledger keeps no before-and-after values, so none are sent.
+  const edits = edited.slice(0, RECENT_MAX_ROWS).map((l) => ({
+    entryDate: l.localDate,
+    entryHour: l.localHour,
+    editedOn: toLocalDate(l.updatedAt, ctx.timezone),
+  }));
+  return {
+    ok: true,
+    data: { windowDays: LOG_WINDOW_DAYS, count: edited.length, truncated: edited.length > edits.length, edits },
+    rows: [],
+  };
+}
+
 type Runner = (input: unknown, ctx: ToolContext) => ToolOutcome;
 
 function withInput<S extends z.ZodTypeAny>(schema: S, run: (input: z.infer<S>, ctx: ToolContext) => ToolOutcome): Runner {
@@ -410,6 +527,9 @@ const RUNNERS: Record<ToolName, Runner> = {
   goal_status: withInput(emptyInput, goalStatus),
   insights: withInput(emptyInput, insights),
   recent_entries: withInput(recentEntriesInput, recentEntries),
+  goal_history: withInput(emptyInput, goalHistory),
+  price_history: withInput(emptyInput, priceHistory),
+  entry_edits: withInput(emptyInput, entryEdits),
 };
 
 export function isToolName(name: string): name is ToolName {

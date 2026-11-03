@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { spacing } from '@/constants/theme';
 import { CONTENT_MAX_WIDTH } from '@/hooks/useLayout';
+import { scrollBottomPadding } from '@/lib/askPill';
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -61,7 +62,8 @@ export function Screen({
       {masthead ?? null}
       {scroll ? (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: spacing.xxxl }}
+          // Clears the floating Ask pill when it is on (see src/lib/askPill.ts).
+          contentContainerStyle={{ paddingBottom: scrollBottomPadding() }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           refreshControl={

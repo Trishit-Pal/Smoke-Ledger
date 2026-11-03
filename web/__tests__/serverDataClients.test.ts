@@ -23,6 +23,14 @@ describe('server data loaders take an explicit client', () => {
     const wrapper = flat.slice(flat.indexOf('export const getServerDailySummary'));
     expect(wrapper.slice(0, 400)).not.toContain('requireServerUserId');
   });
+  test('loadGoals can bound its read, and the chat route always bounds it', () => {
+    const flat = src.replace(/\s+/g, ' ');
+    const start = flat.indexOf('export async function loadGoals');
+    const body = flat.slice(start, flat.indexOf('export const getServerGoals', start));
+    expect(body).toContain('.limit(limit)');
+    const route = readFileSync(path.resolve(__dirname, '..', 'app/api/ledger-chat/route.ts'), 'utf8').replace(/\s+/g, ' ');
+    expect(route).toContain('loadGoals(db, userId, { activeOnly: forStarters, limit: CHAT_GOALS_READ_LIMIT })');
+  });
   test('createAdminClient is used only for the brand catalog', () => {
     const uses = src.split('\n').filter((l) => /createAdminClient\(\)/.test(l));
     expect(uses).toHaveLength(1);

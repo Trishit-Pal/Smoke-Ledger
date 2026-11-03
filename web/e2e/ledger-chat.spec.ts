@@ -1,11 +1,13 @@
+import type { Route } from '@playwright/test';
 import { test, expect, login } from './_helpers/fixtures';
 import { canSeed, getAdmin, seedLogs, istYmdDaysAgo } from './_helpers/seed';
 
 // Ask the ledger, end to end on the real UI with the model route mocked:
 // the route is a network boundary, so page.route stands in for Anthropic and
-// the server, and the spec proves the panel, the consent flow, the row
-// rendering, the limit message, and discreet masking.
+// the server (GET state and POST answers), and the spec proves the panel, the
+// consent flow, the row rendering, the limit message, and discreet masking.
 const CHAT_ROUTE = '**/api/ledger-chat';
+const STARTER = 'What does my ledger say so far?';
 
 const ANSWER = {
   answer: 'Fewer than the week before, and the spend followed.',
@@ -22,6 +24,10 @@ function json(status: number, body: unknown) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
+function chatState(over: Record<string, unknown> = {}) {
+  return { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [STARTER], ...over };
+}
+
 test.describe('ask the ledger', () => {
   test.skip(!canSeed(), 'Set SUPABASE_SERVICE_ROLE_KEY + E2E_SUPABASE_URL/ANON_KEY to run.');
   test.skip(process.env.LEDGER_CHAT_ENABLED !== 'true', 'Set LEDGER_CHAT_ENABLED=true for the e2e web server.');
@@ -33,24 +39,24 @@ test.describe('ask the ledger', () => {
       { localDate: istYmdDaysAgo(3), quantity: 3, totalPriceInr: 60, unitPriceInr: 20 },
     ]);
 
-    let calls = 0;
-    await page.route(CHAT_ROUTE, async (route) => {
-      calls += 1;
-      if (calls === 1) return route.fulfill(json(403, { error: 'consent_required' }));
-      if (calls === 2) return route.fulfill(json(200, ANSWER));
+    let posts = 0;
+    await page.route(CHAT_ROUTE, async (route: Route) => {
+      if (route.request().method() === 'GET') return route.fulfill(json(200, chatState({ consented: false, starters: [] })));
+      posts += 1;
+      if (posts === 1) return route.fulfill(json(200, ANSWER));
       return route.fulfill(json(429, { error: 'rate_limited' }));
     });
 
     await login(page, onboarded);
     await expect(page).toHaveURL(/\/dashboard/);
 
-    await page.getByRole('button', { name: /^Ask the ledger/ }).click();
+    // Not opted in: the dock's question waits behind the consent notice.
+    await page.getByLabel('Ask the ledger', { exact: true }).fill('How was my week?');
+    await page.getByLabel('Ask the ledger', { exact: true }).press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
     await expect(dialog).toBeVisible();
-
-    // Three priced days, no goal, no moods: the single open starter.
-    await dialog.getByRole('button', { name: 'What does my ledger say so far?' }).click();
-    await expect(dialog.getByRole('button', { name: 'Turn on and ask' })).toBeVisible();
+    await expect(dialog.getByText('How was my week?').first()).toBeVisible();
+    expect(posts).toBe(0);
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
 
     await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
@@ -79,13 +85,17 @@ test.describe('ask the ledger', () => {
       .from('settings_kv')
       .upsert({ user_id: onboarded.id, key: 'consent.ledgerChatOptIn', value_json: true }, { onConflict: 'user_id,key' });
     await seedLogs(onboarded.id, [{ localDate: istYmdDaysAgo(0), quantity: 2, totalPriceInr: 40, unitPriceInr: 20 }]);
-    await page.route(CHAT_ROUTE, (route) => route.fulfill(json(200, ANSWER)));
+    await page.route(CHAT_ROUTE, (route: Route) =>
+      route.fulfill(
+        route.request().method() === 'GET' ? json(200, chatState({ discreet: true, hideTotals: true })) : json(200, ANSWER),
+      ),
+    );
 
     await page.setViewportSize({ width: 320, height: 640 });
     await login(page, onboarded);
-    await page.getByRole('button', { name: /^Ask the ledger/ }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
-    await dialog.getByRole('button', { name: 'What does my ledger say so far?' }).click();
+    await dialog.getByRole('button', { name: STARTER }).click();
     await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
 
     // Money and stick rows are masked at the render site; the percent row is not.
@@ -95,5 +105,15 @@ test.describe('ask the ledger', () => {
 
     const fits = await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
+  });
+
+  test('outdated agreements get a calm note and a link to review them', async ({ page, onboarded }) => {
+    await page.route(CHAT_ROUTE, (route: Route) => route.fulfill(json(403, { error: 'consent_outdated' })));
+
+    await login(page, onboarded);
+    await page.getByLabel('Ask the ledger', { exact: true }).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toBeVisible();
+    await expect(dialog.getByRole('link', { name: 'Review agreements' })).toHaveAttribute('href', '/consent');
   });
 });

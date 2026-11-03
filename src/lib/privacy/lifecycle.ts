@@ -47,6 +47,8 @@ export const STORES: readonly LifecycleStore[] = [
   // Kept: device preferences, nothing personal.
   { id: 'web.theme', platform: 'web', kind: 'local-storage', personal: false, clearOn: [] },
   { id: 'web.catalog', platform: 'web', kind: 'local-storage', personal: false, clearOn: [] },
+  // sl_chat_dock_minimised: whether the Ask dock is folded away on this device.
+  { id: 'web.chatDockMinimised', platform: 'web', kind: 'local-storage', personal: false, clearOn: [] },
 
   // Mobile device
   { id: 'mobile.session', platform: 'mobile', kind: 'secure-store', personal: true, clearOn: ['signOut', 'delete'] },

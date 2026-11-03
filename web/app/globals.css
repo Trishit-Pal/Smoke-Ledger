@@ -959,3 +959,18 @@
     animation: ask-sheet-fade 200ms ease-out both;
   }
 }
+/* Room the Ask dock / pill needs at the bottom of the (app) shell: its height
+   plus a gap. Set only while the dock is on this page (the dock renders a
+   [data-ask-dock] marker from the server), so it is 0 when off and on Log. */
+[data-app-shell]:has([data-ask-dock]) {
+  --ask-dock-clear: 4.5rem;
+}
+/* The Ask dock / pill settles in once, slowly, like the page's own reveal. */
+.ask-dock {
+  animation: ask-sheet-rise 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask-dock {
+    animation: ask-sheet-fade 200ms ease-out both;
+  }
+}

@@ -94,7 +94,7 @@ function okData(name: string, input: unknown, c: ToolContext = ctx()): Record<st
 
 describe('TOOL_DEFS', () => {
   it('every tool is strict with a closed object schema', () => {
-    expect(TOOL_DEFS.length).toBe(9);
+    expect(TOOL_DEFS.length).toBe(12);
     for (const t of TOOL_DEFS) {
       expect(t.strict).toBe(true);
       expect(t.input_schema.type).toBe('object');
@@ -335,5 +335,100 @@ describe('chatRequestSchema', () => {
       ],
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe('goal_history', () => {
+  const history: Goal[] = [
+    goals[0],
+    { ...goals[0], id: 'g2', type: 'spend_cap_daily', targetValue: 300, status: 'paused', startDate: '2026-03-01' },
+    {
+      ...goals[0],
+      id: 'g3',
+      targetValue: 8,
+      status: 'completed',
+      startDate: '2026-02-01',
+      endDate: '2026-02-28',
+      completedAt: '2026-02-28T20:00:00.000Z',
+    },
+    { ...goals[0], id: 'g4', targetValue: 12, status: 'abandoned', startDate: '2026-01-05', completedAt: '2026-01-20T05:00:00.000Z' },
+  ];
+
+  it('lists every goal, whatever its status, with type, target, dates and outcome, and no ids', () => {
+    const data = okData('goal_history', {}, ctx({ goalHistory: history })) as { goals: Record<string, unknown>[] };
+    expect(data.goals.map((g) => g.status)).toEqual(['active', 'paused', 'completed', 'abandoned']);
+    expect(data.goals[2]).toEqual({
+      type: goalTypeLabel('daily_cap'),
+      target: 8,
+      startDate: '2026-02-01',
+      endDate: '2026-02-28',
+      completedDate: '2026-03-01',
+      status: 'completed',
+    });
+    for (const g of data.goals) expect(g).not.toHaveProperty('id');
+  });
+
+  it('reports nothing when the reader has no goals', () => {
+    const data = okData('goal_history', {}, ctx({ goalHistory: [] })) as { goals: unknown[] };
+    expect(data.goals).toEqual([]);
+  });
+});
+
+describe('price_history', () => {
+  const priced = [
+    log({ localDate: '2026-06-21', localHour: 20, tsUtc: '2026-06-21T14:30:00.000Z', unitPriceInr: 22, priceSource: 'exact', brandNameSnap: 'Marlboro', variantSnap: 'Advance', packSize: 20 }),
+    log({ localDate: '2026-06-20', tsUtc: '2026-06-20T03:30:00.000Z', unitPriceInr: 20, priceSource: 'estimated', brandNameSnap: 'Marlboro', variantSnap: 'Advance' }),
+    log({ localDate: '2026-06-19', tsUtc: '2026-06-19T03:30:00.000Z', unitPriceInr: 20, priceSource: 'exact', brandNameSnap: 'Marlboro', variantSnap: 'Advance' }),
+    log({ localDate: '2026-06-18', tsUtc: '2026-06-18T03:30:00.000Z', unitPriceInr: 18, priceSource: 'exact', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
+    log({ localDate: '2026-06-17', tsUtc: '2026-06-17T03:30:00.000Z', unitPriceInr: 99, priceSource: 'inferred', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
+    log({ localDate: '2026-06-16', tsUtc: '2026-06-16T03:30:00.000Z', unitPriceInr: null, priceSource: 'unknown', brandNameSnap: 'Gold Flake' }),
+    log({ localDate: '2026-01-01', tsUtc: '2026-01-01T03:30:00.000Z', unitPriceInr: 15, priceSource: 'exact', brandNameSnap: 'Gold Flake', variantSnap: 'Kings' }),
+  ];
+
+  it('reads prices the reader recorded on entries in the last 90 days, change points only, newest first', () => {
+    const data = okData('price_history', {}, ctx({ logs: priced })) as { windowDays: number; entries: Record<string, unknown>[] };
+    expect(data.windowDays).toBe(90);
+    expect(data.entries).toEqual([
+      { brand: 'Marlboro', variant: 'Advance', unitPrice: 22, packSize: 20, date: '2026-06-21' },
+      { brand: 'Gold Flake', variant: 'Kings', unitPrice: 18, packSize: null, date: '2026-06-18' },
+      { brand: 'Marlboro', variant: 'Advance', unitPrice: 20, packSize: null, date: '2026-06-19' },
+    ].sort((x, y) => (x.date < y.date ? 1 : -1)));
+  });
+
+  it('leaves out inferred and unknown prices, which the reader did not pay', () => {
+    const data = okData('price_history', {}, ctx({ logs: priced })) as { entries: { unitPrice: number }[] };
+    expect(data.entries.map((e) => e.unitPrice)).not.toContain(99);
+  });
+
+  it('uses the same discreet aliases as brand_mix, and drops variants', () => {
+    const c = ctx({ profile: { ...profile, discreetMode: true }, logs: priced });
+    const prices = (okData('price_history', {}, c) as { entries: { brand: string; variant: unknown }[] }).entries;
+    const mix = (okData('brand_mix', {}, c) as { brands: { brand: string }[] }).brands.map((b) => b.brand);
+    expect(new Set(prices.map((p) => p.brand))).toEqual(new Set(['Brand A', 'Brand B']));
+    for (const p of prices) {
+      expect(mix).toContain(p.brand);
+      expect(p.variant).toBeNull();
+    }
+    expect(JSON.stringify(prices)).not.toMatch(/Marlboro|Gold Flake|Advance|Kings/);
+  });
+});
+
+describe('entry_edits', () => {
+  it('lists entries edited more than a minute after they were made, with dates only', () => {
+    const edited = [
+      log({
+        localDate: '2026-06-20',
+        localHour: 21,
+        quantity: 4,
+        createdAt: '2026-06-20T15:30:00.000Z',
+        updatedAt: '2026-06-21T03:00:00.000Z',
+      }),
+      log({ localDate: '2026-06-19', createdAt: '2026-06-19T03:30:00.000Z', updatedAt: '2026-06-19T03:30:45.000Z' }),
+      log({ localDate: '2026-06-18', createdAt: '', updatedAt: '' }),
+    ];
+    const data = okData('entry_edits', {}, ctx({ logs: edited })) as { edits: Record<string, unknown>[]; count: number };
+    expect(data.count).toBe(1);
+    expect(data.edits).toEqual([{ entryDate: '2026-06-20', entryHour: 21, editedOn: '2026-06-21' }]);
+    expect(JSON.stringify(data)).not.toContain('"quantity"');
   });
 });

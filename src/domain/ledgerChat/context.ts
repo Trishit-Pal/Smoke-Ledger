@@ -21,7 +21,10 @@ export interface ToolContext {
   discreet: boolean;
   logs: CigaretteLog[];
   rows: DailySummaryRow[];
+  /** Active goals, for goal_status. */
   goals: Goal[];
+  /** Every goal, whatever its status, for goal_history. */
+  goalHistory: Goal[];
 }
 
 export interface BuildToolContextInput {
@@ -29,6 +32,7 @@ export interface BuildToolContextInput {
   logs: CigaretteLog[];
   rows: DailySummaryRow[];
   goals: Goal[];
+  goalHistory?: Goal[];
   today: string;
   summarySinceYmd: string;
 }
@@ -36,23 +40,29 @@ export interface BuildToolContextInput {
 /** New log objects with brands aliased by first-seen order and free text removed. */
 export function aliasLogsForDiscreet(logs: readonly CigaretteLog[]): CigaretteLog[] {
   const aliases = new Map<string, string>();
-  return logs.map((log) => {
-    let brandNameSnap: string | null = null;
-    if (log.brandNameSnap) {
-      const existing = aliases.get(log.brandNameSnap);
-      if (existing) {
-        brandNameSnap = existing;
-      } else {
-        brandNameSnap = brandAlias(aliases.size);
-        aliases.set(log.brandNameSnap, brandNameSnap);
-      }
-    }
-    return { ...log, brandNameSnap, variantSnap: null, notes: null };
-  });
+  const alias = (name: string | null): string | null => {
+    if (!name) return null;
+    if (!aliases.has(name)) aliases.set(name, brandAlias(aliases.size));
+    return aliases.get(name) ?? null;
+  };
+  return logs.map((log) => ({ ...log, brandNameSnap: alias(log.brandNameSnap), variantSnap: null, notes: null }));
+}
+
+/**
+ * The only profile fields the chat may see. Identity (name, birth date, gender,
+ * phone, place, email) is left out structurally: buildToolContext copies these
+ * keys and nothing else, and ledgerChatContext.test.ts fails if a value leaks.
+ */
+export const CONTEXT_PROFILE_FIELDS = ['country', 'currency', 'baselinePerDay', 'discreetMode'] as const;
+
+type ContextProfile = Pick<UserProfile, (typeof CONTEXT_PROFILE_FIELDS)[number]>;
+
+function pickProfile(source: UserProfile): ContextProfile {
+  return Object.fromEntries(CONTEXT_PROFILE_FIELDS.map((key) => [key, source[key]])) as ContextProfile;
 }
 
 export function buildToolContext(input: BuildToolContextInput): ToolContext {
-  const { profile } = input;
+  const profile = pickProfile(input.profile);
   const discreet = profile.discreetMode;
   return {
     today: input.today,
@@ -65,5 +75,6 @@ export function buildToolContext(input: BuildToolContextInput): ToolContext {
     logs: discreet ? aliasLogsForDiscreet(input.logs) : input.logs,
     rows: input.rows,
     goals: input.goals,
+    goalHistory: input.goalHistory ?? [],
   };
 }

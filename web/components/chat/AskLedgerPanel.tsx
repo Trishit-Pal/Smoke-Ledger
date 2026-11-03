@@ -10,6 +10,11 @@
  * site when totals are hidden, tap to reveal, exactly as on Home. Consent is
  * asked the first time an answer would leave the app, inside the panel, and
  * the one tap saves it and sends the pending question.
+ *
+ * The panel reads its own state (opt-in, masking, currency, starters) from
+ * GET /api/ledger-chat on first open, so the dock needs no page data. An
+ * initial question from the dock is sent once per open when the reader has
+ * opted in, and waits behind the consent notice when they have not.
  */
 
 import * as React from 'react';
@@ -17,7 +22,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { AnalyticsEvents } from '@/constants/events';
 import { setSetting } from '@/db/repositories/settings';
-import type { Starter } from '@/domain/ledgerChat/starters';
 import {
   CHAT_HISTORY_MAX_TURNS,
   CHAT_HISTORY_TEXT_MAX,
@@ -25,15 +29,14 @@ import {
   type ChatErrorCode,
   type ChatHistoryTurn,
   type ChatResponse,
+  type ChatStateResponse,
   type Row,
 } from '@/domain/ledgerChat/types';
-import { isHomeTotalsHidden, maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { maskCount, maskInr, maskNumbers } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
-import { localeForCountry } from '@/lib/regions';
 import { track } from '@/services/analytics';
 import { recordAuditEvent } from '@/services/audit';
-import type { UserProfile } from '@/types';
 import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
 import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
@@ -50,11 +53,11 @@ import {
 export interface AskLedgerPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  profile: UserProfile;
-  starters: Starter[];
+  /** A question typed into the dock: pre-filled, and sent once per open when opted in. */
+  initialQuestion?: string;
 }
 
-type Status = 'idle' | 'loading' | 'consent' | 'rate_limited' | 'disabled' | 'error';
+type Status = 'idle' | 'loading' | 'consent' | 'outdated' | 'rate_limited' | 'disabled' | 'error';
 
 interface Pending {
   question: string;
@@ -65,9 +68,12 @@ const COPY = {
   description:
     "Answers are written by an AI model from your ledger's own figures. Your conversation is kept only on this device.",
   empty: 'Log a few days first; then ask how your week compares.',
+  // Before opt-in the panel knows nothing of the ledger, so it claims nothing about it.
+  invite: 'Ask about your week, your spend or your goals.',
   loading: 'Reading the ledger…',
   rateLimited: "You've reached today's limit. The ledger is still here tomorrow.",
   disabled: 'Ask the ledger is resting for now.',
+  outdated: 'Your agreements changed. Review them to keep asking.',
   error: "The ledger couldn't be read just now. The charts behind this panel still can.",
   footnote: 'Not medical advice. A daily limit applies.',
 } as const;
@@ -84,6 +90,34 @@ function historyFor(turns: readonly TranscriptTurn[]): ChatHistoryTurn[] {
   ]);
 }
 
+/** One mapping from a refusal to what the panel says, for GET and POST alike. */
+function statusFor(httpStatus: number, error: ChatErrorCode | undefined): Status {
+  if (httpStatus === 403 && error === 'consent_required') return 'consent';
+  if (httpStatus === 403 && error === 'consent_outdated') return 'outdated';
+  if (httpStatus === 429) return 'rate_limited';
+  if (httpStatus === 503) return 'disabled';
+  return 'error';
+}
+
+interface LoadedState {
+  state: ChatStateResponse | null;
+  /** Only refusals that also stop a question: the feature resting, or agreements out of date. */
+  blocked: Status | null;
+}
+
+/** Never throws: an unreadable state leaves the panel usable, masked, and asking the server. */
+async function loadChatState(): Promise<LoadedState> {
+  try {
+    const res = await fetch('/api/ledger-chat', { method: 'GET' });
+    if (res.ok) return { state: (await res.json()) as ChatStateResponse, blocked: null };
+    const body = (await res.json().catch(() => null)) as { error?: ChatErrorCode } | null;
+    const status = statusFor(res.status, body?.error);
+    return { state: null, blocked: status === 'disabled' || status === 'outdated' ? status : null };
+  } catch {
+    return { state: null, blocked: null };
+  }
+}
+
 /** Same helpers Home uses, so the mask glyph and rules stay in one place. */
 function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): string {
   if (row.unit === 'money') return typeof row.value === 'number' ? maskInr(row.value, masked, money) : String(row.value);
@@ -92,7 +126,7 @@ function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): st
   return String(row.value);
 }
 
-export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLedgerPanelProps) {
+export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedgerPanelProps) {
   const inputId = React.useId();
   const [userId, setUserId] = React.useState<string | null>(null);
   const [turns, setTurnsState] = React.useState<TranscriptTurn[]>([]);
@@ -108,27 +142,53 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
   const [draft, setDraft] = React.useState('');
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(() => new Set());
 
-  const hidden = isHomeTotalsHidden(profile);
+  const [state, setState] = React.useState<ChatStateResponse | null>(null);
+  // Set once the session and (on first open) the GET state have both landed for this open.
+  const [ready, setReady] = React.useState(false);
+  const fetchedRef = React.useRef(false);
+  // The in-flight GET, shared by a StrictMode re-run so the state cap is spent once.
+  const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
+  const consumedRef = React.useRef(false);
+
+  // Until the state is read, figures stay masked: the safe default.
+  const hidden = state ? state.hideTotals : true;
+  const starters = state?.starters ?? [];
+  // ponytail: a failed GET formats a revealed figure as INR; carry currency on POST if EUR readers hit it.
   const money = React.useCallback(
-    (value: number) => formatMoney(value, profile.currency, { locale: localeForCountry(profile.country) }),
-    [profile.currency, profile.country],
+    (value: number) => formatMoney(value, state?.currency ?? 'INR', { locale: state?.locale }),
+    [state?.currency, state?.locale],
   );
   const busy = status === 'loading';
 
-  // The transcript key needs the user id, which the profile does not carry.
-  // getSession() reads the local session; no network round-trip.
+  // The transcript key needs the user id: getSession() reads the local session,
+  // no network round-trip. The panel state is read from GET once per mount.
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setReady(false);
+      consumedRef.current = false;
+      return;
+    }
     let cancelled = false;
-    void sessionUserId(() => getSupabase().auth.getSession()).then((id) => {
+    let stateLoad: Promise<LoadedState | null> = Promise.resolve(null);
+    if (!fetchedRef.current) {
+      stateLoadRef.current ??= loadChatState();
+      stateLoad = stateLoadRef.current;
+    }
+    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoad]).then(([id, loaded]) => {
       if (cancelled) return;
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
+      if (loaded) {
+        fetchedRef.current = true;
+        setState(loaded.state);
+        if (loaded.blocked) setStatus(loaded.blocked);
+      }
+      setReady(true);
     });
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, setTurns]);
 
   const send = React.useCallback(
     async (question: string, starter: boolean) => {
@@ -161,14 +221,9 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
           return;
         }
         const body = (await res.json().catch(() => null)) as { error?: ChatErrorCode } | null;
-        if (res.status === 403 && body?.error === 'consent_required') {
-          setStatus('consent');
-          return;
-        }
-        setPending(null);
-        if (res.status === 429) setStatus('rate_limited');
-        else if (res.status === 503) setStatus('disabled');
-        else setStatus('error');
+        const next = statusFor(res.status, body?.error);
+        if (next !== 'consent') setPending(null);
+        setStatus(next);
       } catch {
         setPending(null);
         setStatus('error');
@@ -176,6 +231,23 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
     },
     [setTurns, userId],
   );
+
+  // The dock's question, once per open, after the session and state are read.
+  React.useEffect(() => {
+    if (!open || !ready || consumedRef.current) return;
+    consumedRef.current = true;
+    const q = initialQuestion?.trim();
+    if (!q || status === 'disabled' || status === 'outdated') return;
+    setDraft(q);
+    // An answer still in flight: leave the question in the box, never send two at once.
+    if (status === 'loading') return;
+    if (state && !state.consented) {
+      setPending({ question: q, starter: false });
+      setStatus('consent');
+      return;
+    }
+    void send(q, false);
+  }, [open, ready, initialQuestion, state, status, send]);
 
   const onTurnOnAndAsk = async () => {
     if (!pending) return;
@@ -196,7 +268,11 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
       // Consent is already saved. The audit row is best-effort here: the edge
       // allowlist may lag a deploy, and that must never block the answer.
     }
+    setState((prev) => (prev ? { ...prev, consented: true } : prev));
     await send(pending.question, pending.starter);
+    // Opted in now: read the state again so the starters appear without a reload.
+    const loaded = await loadChatState();
+    if (loaded.state) setState(loaded.state);
   };
 
   const onNotNow = () => {
@@ -254,27 +330,31 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-lg pb-md">
-            {starters.length > 0 ? (
+            {!ready && !state ? (
+              <p className="rule-hair-strong mt-lg pt-md text-caption italic text-text-faint">{COPY.loading}</p>
+            ) : starters.length > 0 ? (
               <section className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
                 <SectionLabel spacing="none">To begin</SectionLabel>
                 <ul className="flex flex-col">
-                  {starters.map((s) => (
-                    <li key={s.id}>
+                  {starters.map((text) => (
+                    <li key={text}>
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void send(s.text, true)}
+                        onClick={() => void send(text, true)}
                         className={`${LINK_BUTTON} text-body text-text hover:text-text-muted`}
                         style={{ textDecorationColor: 'var(--rule-strong)' }}
                       >
-                        {s.text}
+                        {text}
                       </button>
                     </li>
                   ))}
                 </ul>
               </section>
             ) : (
-              <p className="rule-hair-strong mt-lg pt-md text-small text-text-muted">{COPY.empty}</p>
+              <p className="rule-hair-strong mt-lg pt-md text-small text-text-muted">
+                {state?.consented ? COPY.empty : COPY.invite}
+              </p>
             )}
 
             {turns.map((turn) => {
@@ -342,6 +422,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                 <section className="rule-hair-strong flex flex-col gap-sm pt-md">
                   <SectionLabel spacing="none">Before the first answer</SectionLabel>
                   <p className="text-body text-text">{LEDGER_CHAT_NOTICE.lead}</p>
+                  <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.scope}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.sent}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.discreet}</p>
                   <p className="max-w-[52ch] text-small text-text-muted">{LEDGER_CHAT_NOTICE.retention}</p>
@@ -365,6 +446,18 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               ) : null}
               {status === 'rate_limited' ? <p className="text-small text-text-muted">{COPY.rateLimited}</p> : null}
               {status === 'disabled' ? <p className="text-small text-text-muted">{COPY.disabled}</p> : null}
+              {status === 'outdated' ? (
+                <p className="text-small text-text-muted">
+                  {COPY.outdated}{' '}
+                  <a
+                    href="/consent"
+                    className="underline decoration-1 underline-offset-4 text-text hover:text-text-muted"
+                    style={{ textDecorationColor: 'var(--rule-strong)' }}
+                  >
+                    Review agreements
+                  </a>
+                </p>
+              ) : null}
               {status === 'error' ? <p className="text-small text-text-muted">{COPY.error}</p> : null}
             </div>
           </div>

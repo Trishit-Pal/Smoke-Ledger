@@ -186,7 +186,12 @@ jobs:
     # playwright.config.ts: prod CSP's upgrade-insecure-requests breaks WebKit on
     # http loopback); the spec warms every route before sweeping.
     runs-on: ubuntu-24.04 # Playwright does not support 26.04 yet (see verify)
-    timeout-minutes: 40
+    timeout-minutes: 50
+    env:
+      # Ask the ledger on for this job's dev servers: the responsive sweep then
+      # also checks the dock fits every viewport, and the chat specs below run.
+      # No Anthropic key: the specs mock /api/ledger-chat, so no model is called.
+      LEDGER_CHAT_ENABLED: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -231,6 +236,20 @@ jobs:
         working-directory: web
         env:
           E2E_RESPONSIVE: '1'
+
+      # Seeded functional specs on the same throwaway stack (Chromium only).
+      # They skip themselves without a seedable stack, so a silent skip here
+      # would be a false pass: fail the step if anything was skipped.
+      - name: Functional E2E (chat, dock, consent, goals)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          npx playwright test e2e/ledger-chat.spec.ts e2e/ask-dock.spec.ts e2e/consent.spec.ts e2e/goals.spec.ts \
+            --reporter=list,json 2>&1 | tee functional.log
+          node -e "const r=require('./functional-report.json');const s=r.stats||{};if((s.skipped||0)>0||(s.expected||0)===0){console.error('::error::functional specs skipped or none ran',JSON.stringify(s));process.exit(1)}"
+        working-directory: web
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: functional-report.json
 
       - name: Stop local Supabase
         if: always()

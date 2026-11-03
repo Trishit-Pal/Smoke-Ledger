@@ -17,6 +17,12 @@ import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
 // covers dashboard/log/trends/history/goals/settings uniformly. Quiet tier
 // (dimmed, no bloom) so task-focused pages stay legible.
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
+// Ask the ledger on every reading page (hidden on Log). The layout passes the
+// server flag only; the dock reads its own state on first open. Where the dock
+// shows, --ask-dock-clear (globals.css) pads main and lifts page-level fixed
+// controls (History's New log, its toast) clear of it; 0 when off and on Log.
+import { AskLedgerDock } from '@web/components/chat/AskLedgerDock';
+import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </a>
       <SceneBackdrop intensity="quiet" />
       <Sidebar />
-      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:short-landscape:pb-0 md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] md:short-landscape:pb-[var(--ask-dock-clear,0px)] md:pb-[var(--ask-dock-clear,0px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
             WCAG-AA contrast over the moving scene. */}
         <div
@@ -47,6 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       {/* CHARACTER: event-driven overlays. Order doesn't matter — both portal
           to document.body and fire only on their respective custom events. */}
+      <AskLedgerDock enabled={isLedgerChatEnabled()} />
       <MilestoneCelebration />
       <LogoutFarewell />
       <GoalMoment />

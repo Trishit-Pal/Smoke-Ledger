@@ -5,7 +5,7 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ToolContext } from '@/domain/ledgerChat/context';
-import { allowedNumbers, findUnverifiedNumbers, sanitizeNarration } from '@/domain/ledgerChat/guard';
+import { allowedNumbers, findUnverifiedFigures, sanitizeNarration } from '@/domain/ledgerChat/guard';
 import { TOOL_DEFS, runTool, type ToolOutcome } from '@/domain/ledgerChat/tools';
 import type { ChatHistoryTurn, ChatResponse, Row } from '@/domain/ledgerChat/types';
 import { SYSTEM_PROMPT, userContextBlock } from './prompt';
@@ -141,8 +141,11 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   if (narration == null || last == null) return finish(FALLBACK_ANSWER);
 
   const allowed = allowedNumbers(outcomes, { year: ctx.today.slice(0, 4), extraText: [contextBlock] });
+  // Brand and variant names the tools may echo (aliases when discreet): "Four Square" is a name.
+  const allowedPhrases = ctx.logs.flatMap((l) => [l.brandNameSnap ?? '', l.variantSnap ?? '']);
+  const figureOpts = { discreet: ctx.discreet, allowedPhrases };
   let answer = sanitizeNarration(narration);
-  let unverified = findUnverifiedNumbers(answer, allowed);
+  let unverified = findUnverifiedFigures(answer, allowed, figureOpts);
 
   if (unverified.length > 0) {
     usage.guardRetries = 1;
@@ -152,7 +155,7 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
     if (retry.stop_reason === 'refusal') return finish(REFUSAL_ANSWER);
     if (toolUsesOf(retry).length > 0) return finish(FALLBACK_ANSWER);
     answer = sanitizeNarration(textOf(retry));
-    unverified = findUnverifiedNumbers(answer, allowed);
+    unverified = findUnverifiedFigures(answer, allowed, figureOpts);
     if (unverified.length > 0) return finish(FALLBACK_ANSWER);
   }
 

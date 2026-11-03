@@ -2,6 +2,7 @@
 // Pure types and zod schemas; no I/O, no SDK imports (shared by jest and vitest).
 
 import { z } from 'zod';
+import type { CurrencyCode } from '@/lib/regions';
 
 export const CHAT_QUESTION_MAX = 500;
 export const CHAT_HISTORY_MAX_TURNS = 10;
@@ -68,11 +69,24 @@ export interface ChatResponse {
   toolsUsed: string[];
 }
 
+/** GET /api/ledger-chat: what the dock needs before the first question. */
+export interface ChatStateResponse {
+  consented: boolean;
+  discreet: boolean;
+  /** Mask figures at the panel's render sites: discreet mode or hide-totals-on-home. */
+  hideTotals: boolean;
+  currency: CurrencyCode;
+  /** The reader's country locale, for money formatting. */
+  locale: string;
+  starters: string[];
+}
+
 export type ChatErrorCode =
   | 'validation_error'
   | 'unauthorized'
   | 'forbidden'
   | 'consent_required'
+  | 'consent_outdated'
   | 'rate_limited'
   | 'feature_disabled'
   | 'server_misconfigured'

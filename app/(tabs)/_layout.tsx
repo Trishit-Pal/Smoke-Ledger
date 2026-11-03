@@ -18,6 +18,8 @@ import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { isOnboarded } from '@/lib/compliance';
 import { consentGateRedirect, resumeOnboardingRoute } from '@/lib/onboardingSteps';
+import { tabBarHeight } from '@/lib/askPill';
+import { AskPill } from '@/components/ask/AskPill';
 
 // Derive the tab-bar prop type from expo-router's own Tabs so it always matches
 // expo-router's vendored react-navigation types (avoids cross-package type drift).
@@ -42,7 +44,6 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
   // Landscape phone: labels drop out (glyph + a11y label remain) so the bar is
   // shorter, but each tab keeps a 44pt touch target (50 - 6 paddingTop).
   const { isShort } = useLayout();
-  const BAR_H = isShort ? 50 : 56;
   // Absolute children ignore the bar's paddingLeft, so the indicator adds the
   // inset itself to stay centred over the active tab on a rotated notched phone.
   const insetLeft = insets.left;
@@ -74,7 +75,7 @@ function CustomTabBar({ state, navigation }: TabBarProps) {
         paddingLeft: insets.left,
         paddingRight: insets.right,
         paddingTop: 6,
-        height: BAR_H + BOTTOM_PAD,
+        height: tabBarHeight(insets.bottom, isShort),
         shadowColor: theme.mode === 'dark' ? theme.accent : '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: theme.mode === 'dark' ? 0.06 : 0.04,
@@ -215,13 +216,17 @@ export default function TabsLayout() {
   if (consentRedirect) return <Redirect href={consentRedirect} />;
 
   return (
-    <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index"    options={{ title: 'Home' }} />
-      <Tabs.Screen name="log"      options={{ title: 'Log' }} />
-      <Tabs.Screen name="trends"   options={{ title: 'Trends' }} />
-      <Tabs.Screen name="history"  options={{ title: 'History' }} />
-      <Tabs.Screen name="goals"    options={{ title: 'Goals' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-    </Tabs>
+    <View style={{ flex: 1 }}>
+      <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
+        <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+        <Tabs.Screen name="log"      options={{ title: 'Log' }} />
+        <Tabs.Screen name="trends"   options={{ title: 'Trends' }} />
+        <Tabs.Screen name="history"  options={{ title: 'History' }} />
+        <Tabs.Screen name="goals"    options={{ title: 'Goals' }} />
+        <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+      </Tabs>
+      {/* Self-hides off the reading tabs and when the build flag is off. */}
+      <AskPill />
+    </View>
   );
 }
