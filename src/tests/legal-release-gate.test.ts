@@ -32,7 +32,9 @@ describe('legal release gate', () => {
   });
 
   it('the chat gate stays shut at exactly the privacy version readers accepted', () => {
-    expect(CHAT_UNDISCLOSED_PRIVACY).toBe(PUBLISHED.privacy);
+    // A literal, not PUBLISHED.privacy: PUBLISHED moves when the bump ships, the gate date must not.
+    expect(CHAT_UNDISCLOSED_PRIVACY).toBe('2026-11-02');
+    expect(CHAT_UNDISCLOSED_PRIVACY <= PUBLISHED.privacy).toBe(true);
     expect(isChatPolicyLive(PUBLISHED.privacy)).toBe(false);
     expect(isChatPolicyLive('2026-11-03')).toBe(true);
   });

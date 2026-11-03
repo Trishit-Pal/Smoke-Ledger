@@ -14,9 +14,10 @@ function setEnv(name: string, value: string | undefined) {
   }
 }
 
-function stub(flag: string | undefined, vercelEnv: string | undefined) {
+function stub(flag: string | undefined, vercelEnv: string | undefined, nodeEnv = 'production') {
   setEnv('LEDGER_CHAT_ENABLED', flag);
   setEnv('VERCEL_ENV', vercelEnv);
+  setEnv('NODE_ENV', nodeEnv);
 }
 
 describe('isLedgerChatEnabled release gate', () => {
@@ -42,9 +43,15 @@ describe('isLedgerChatEnabled release gate', () => {
     expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(true);
   });
 
-  it('is on where VERCEL_ENV is unset (CI, next dev)', () => {
-    stub('true', undefined);
+  it('fails closed where VERCEL_ENV is missing in a production build', () => {
+    stub('true', undefined, 'production');
     expect(process.env.VERCEL_ENV).toBeUndefined();
+    expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(false);
+    expect(isLedgerChatEnabled(NEW_PRIVACY)).toBe(true);
+  });
+
+  it.each(['test', 'development'])('is on where VERCEL_ENV is unset and NODE_ENV is %s (CI, next dev)', (nodeEnv) => {
+    stub('true', undefined, nodeEnv);
     expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(true);
   });
 

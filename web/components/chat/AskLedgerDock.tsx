@@ -5,7 +5,7 @@
  * desktop, an "Ask" pill above the bottom nav on phones. Either opens the
  * panel; the box opens it with its question. Both fold away to a small tab,
  * remembered on this device. Mounted once in the (app) layout, which passes
- * only the server flag; the panel and its state load on first open.
+ * only the server flag; the panel loads on first open and re-reads its state on every open.
  *
  * Stacking: z-40 sits above the page veil (z-1) and under the bottom nav
  * (z-50), dialogs (z-50+, portalled) and the skip link (z-60). The pill rides

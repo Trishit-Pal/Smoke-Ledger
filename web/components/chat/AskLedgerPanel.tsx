@@ -12,7 +12,7 @@
  * the one tap saves it and sends the pending question.
  *
  * The panel reads its own state (opt-in, masking, currency, starters) from
- * GET /api/ledger-chat on first open, so the dock needs no page data. An
+ * GET /api/ledger-chat on every open, so the dock needs no page data. An
  * initial question from the dock is sent once per open when the reader has
  * opted in, and waits behind the consent notice when they have not.
  */
@@ -58,6 +58,9 @@ export interface AskLedgerPanelProps {
 }
 
 type Status = 'idle' | 'loading' | 'consent' | 'outdated' | 'rate_limited' | 'disabled' | 'error';
+
+/** Statuses a fresh clean GET proves out of date. Never 'loading': that is an answer in flight. */
+const STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set(['disabled', 'outdated', 'error']);
 
 interface Pending {
   question: string;
@@ -180,15 +183,24 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
       setState(loaded.state);
-      // A refusal from an earlier open is stale once this GET is fine (the reader may have just
-      // reviewed the agreements); an answer in flight or a POST-side status is left alone.
-      setStatus((prev) => loaded.blocked ?? (prev === 'disabled' || prev === 'outdated' ? 'idle' : prev));
+      // A refusal or error from an earlier open is stale once this GET is clean (the reader may have
+      // just reviewed the agreements); loading, rate_limited and consent are left alone here.
+      setStatus((prev) => loaded.blocked ?? (loaded.state && STALE_ON_CLEAN_GET.has(prev) ? 'idle' : prev));
       setReady(true);
     });
     return () => {
       cancelled = true;
     };
   }, [open, setTurns]);
+
+  // The consent card kept from an earlier open is moot once the fresh state says consented
+  // (opted in elsewhere, e.g. Settings): drop it and its pending question, never a send in flight.
+  React.useEffect(() => {
+    if (status === 'consent' && state?.consented) {
+      setStatus('idle');
+      setPending(null);
+    }
+  }, [status, state?.consented]);
 
   const send = React.useCallback(
     async (question: string, starter: boolean) => {

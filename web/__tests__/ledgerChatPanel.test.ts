@@ -128,7 +128,11 @@ describe('state from GET and the initial question', () => {
   });
 
   test('a fresh open drops a stale GET refusal, and the post-consent re-read cannot land after a close or reopen', () => {
-    expect(panel).toMatch(/setStatus\(\(prev\) => loaded\.blocked \?\? \(prev === 'disabled' \|\| prev === 'outdated' \? 'idle' : prev\)\)/);
+    expect(panel).toMatch(/loaded\.blocked \?\? \(loaded\.state && STALE_ON_CLEAN_GET\.has\(prev\) \? 'idle' : prev\)/);
+    expect(panel).toMatch(/STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set\(\['disabled', 'outdated', 'error'\]\)/);
+    // A kept consent card is stale once the fresh state says consented; loading is never reset.
+    expect(panel).toMatch(/status === 'consent' && state\?\.consented\) \{\s*setStatus\('idle'\);\s*setPending\(null\);/);
+    expect(panel).not.toMatch(/STALE_ON_CLEAN_GET[^;]*'loading'/);
     const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
     expect(turnOn.indexOf('const openLoad = stateLoadRef.current')).toBeLessThan(turnOn.indexOf('await send('));
     expect(turnOn).toContain('stateLoadRef.current === openLoad');

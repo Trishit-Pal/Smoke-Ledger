@@ -82,7 +82,7 @@ test.describe('ask dock', () => {
     await dockBox(page).press('Enter');
     await expect(dialog.getByLabel('This week hidden, tap to reveal')).toBeVisible();
     await expect(dialog.getByLabel('This week 8', { exact: true })).toHaveCount(0);
-    expect(gets).toBe(2);
+    await expect.poll(() => gets).toBe(2);
   });
 
   test('reopening after the agreements were reviewed clears the outdated notice and sends the question', async ({ page, onboarded }) => {
@@ -110,6 +110,30 @@ test.describe('ask dock', () => {
     await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toHaveCount(0);
     expect(gets).toBe(2);
+  });
+
+  test('reopening after a failed answer clears the error notice once the state reads clean', async ({ page, onboarded }) => {
+    let failPost = true;
+    await page.route(CHAT_ROUTE, (route: Route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill(json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }));
+      }
+      return route.fulfill(failPost ? json(500, { error: 'upstream_failed' }) : json(200, ANSWER));
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    const errorNotice = dialog.getByText("The ledger couldn't be read just now.", { exact: false });
+    await expect(errorNotice).toBeVisible();
+
+    failPost = false;
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await dockBox(page).press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(errorNotice).toHaveCount(0);
   });
 
   test('never covers History’s New log button, on a phone or a desktop', async ({ page, onboarded }) => {
