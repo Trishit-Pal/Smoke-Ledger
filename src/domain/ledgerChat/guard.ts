@@ -11,7 +11,9 @@ const NUMBER_TOKEN = /\d{1,2}:\d{2}|\d+(?:[,   ]\d{2,3})*(?:\.\d+)?/g;
 const MONTHS = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
 /**
  * What may follow a small integer for it to read as a time, a duration or a day of the month, not a figure.
- * ponytail: day-before-month only ("14 June", the en-IN and EU order); "June 14" gets the retry.
+ * ponytail: English month names, day before month only ("14 June", the en-IN and EU order).
+ * "June 14", "14 juin", "14. Juni" and "14 जून" take the retry; so does the 8 in "8–14 June".
+ * "14 may be…" passes, because "may" is a month. Per-language month lists if that matters.
  */
 const DURATION_CONTEXT = new RegExp(
   "^(?:\\s*(?::\\d{2}|(?:am|pm|a\\.m\\.|p\\.m\\.|o'clock|days?|weeks?|months?|years?|hours?|hrs?|minutes?|mins?)\\b)" +
@@ -22,8 +24,12 @@ const SMALL_INT_MAX = 31;
 const COMMON_WINDOWS = new Set(['7', '30', '90', '365']);
 /** An ISO date lends only its year: its month and day are small enough to pass for a made-up figure. */
 const ISO_DATE = /\b(\d{4})-\d{2}-\d{2}/g;
-/** Hour fields (hour, entryHour) are clock times, not figures; a narrated time passes by its context. */
-const HOUR_KEY = /hour$/i;
+/**
+ * Fields that verify no figure: hours (hour, entryHour) are clock times, and a narrated
+ * time passes by its context; notes are the reader's own free text ("had 10 with Raj"),
+ * not ledger figures.
+ */
+const UNHARVESTED_KEY = /hour$|^notes$/i;
 
 const UNICODE_DIGIT = /\p{Nd}/gu;
 const IS_UNICODE_DIGIT = /^\p{Nd}$/u;
@@ -74,7 +80,7 @@ function harvest(set: Set<string>, value: unknown): void {
   } else if (Array.isArray(value)) {
     value.forEach((v) => harvest(set, v));
   } else if (value && typeof value === 'object') {
-    for (const [key, v] of Object.entries(value)) if (!HOUR_KEY.test(key)) harvest(set, v);
+    for (const [key, v] of Object.entries(value)) if (!UNHARVESTED_KEY.test(key)) harvest(set, v);
   }
 }
 

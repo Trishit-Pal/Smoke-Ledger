@@ -190,6 +190,20 @@ describe('dates and hours verify no figures (review fixes, Task 7)', () => {
   it('hours read as times by their context', () => {
     expect(findUnverifiedNumbers('Mostly around 9 pm, or 21:00.', allowedHere)).toEqual([]);
   });
+
+  it('a figure under a key that is not an hour is still harvested (peakHours[].sticks)', () => {
+    const peaks = allowedNumbers([{ ok: true, data: { peakHours: [{ hour: 21, sticks: 17 }] }, rows: [] }], { year: '2026' });
+    expect(findUnverifiedNumbers('17 sticks at the peak.', peaks)).toEqual([]);
+  });
+
+  it("the reader's own notes verify no figures", () => {
+    const noted = allowedNumbers(
+      [{ ok: true, data: { entries: [{ quantity: 1, notes: 'had 10 with Raj, 3 coffees' }] }, rows: [] }],
+      { year: '2026' },
+    );
+    expect(findUnverifiedNumbers('3 sticks today.', noted)).toEqual(['3']);
+    expect(findUnverifiedNumbers('10 sticks today.', noted)).toEqual(['10']);
+  });
 });
 
 describe('decimals pass only as roundings of the data (review fixes, Task 7)', () => {
