@@ -51,8 +51,21 @@ export function aliasLogsForDiscreet(logs: readonly CigaretteLog[]): CigaretteLo
   });
 }
 
+/**
+ * The only profile fields the chat may see. Identity (name, birth date, gender,
+ * phone, place, email) is left out structurally: buildToolContext copies these
+ * keys and nothing else, and ledgerChatContext.test.ts fails if a value leaks.
+ */
+export const CONTEXT_PROFILE_FIELDS = ['country', 'currency', 'baselinePerDay', 'discreetMode'] as const;
+
+type ContextProfile = Pick<UserProfile, (typeof CONTEXT_PROFILE_FIELDS)[number]>;
+
+function pickProfile(source: UserProfile): ContextProfile {
+  return Object.fromEntries(CONTEXT_PROFILE_FIELDS.map((key) => [key, source[key]])) as ContextProfile;
+}
+
 export function buildToolContext(input: BuildToolContextInput): ToolContext {
-  const { profile } = input;
+  const profile = pickProfile(input.profile);
   const discreet = profile.discreetMode;
   return {
     today: input.today,
