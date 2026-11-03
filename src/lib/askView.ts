@@ -3,7 +3,7 @@
 
 import { LEDGER_CHAT_NOTICE } from '@/domain/ledgerChat/notice';
 import type { ChatStateResponse, Row } from '@/domain/ledgerChat/types';
-import { maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { maskCount, maskInr, maskNumbers, spokenMask } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/regions';
 import type { ChatFailure } from '@/services/ledgerChat';
@@ -60,7 +60,7 @@ export function leaveTarget(canGoBack: boolean): 'back' | '/(tabs)' {
  */
 export function answerAnnouncement(answer: string, hidden: boolean): string {
   const paragraphs = answer.split(/\n+/).filter((p) => p.trim().length > 0);
-  return maskNumbers(paragraphs.join(' '), hidden);
+  return spokenMask(paragraphs.join(' '), hidden);
 }
 
 /** Same helpers Home uses, so the mask glyph and rules stay in one place. */

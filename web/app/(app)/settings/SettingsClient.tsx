@@ -12,7 +12,7 @@
  *  hairline-row preference list. Label-left, control-right. Destructive
  *  operations (Erase data, Delete account) live as hairline rows of the same
  *  visual weight as Export and Sign out — they are data-rights actions, and
- *  they deserve the same dignity. Their colour is --warn-earth (terracotta),
+ *  they deserve the same dignity. Their colour is --warn-earth-ink (terracotta),
  *  never alarm red.
  *
  *  Motion: .editorial-stage choreography. Index allocation:
@@ -226,7 +226,7 @@ function EditorialSwitch({
 /**
  * A text-link control — underlined, hairline decoration colour. Used for
  * "Save", "Refresh now", "Download JSON", "Sign out". Has a destructive
- * variant that paints in --warn-earth for Erase / Delete.
+ * variant that paints in --warn-earth-ink for Erase / Delete.
  */
 function TextLink({
   onClick,

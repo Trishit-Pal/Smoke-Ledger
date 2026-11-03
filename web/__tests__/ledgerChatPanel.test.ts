@@ -37,7 +37,8 @@ describe('AskLedgerPanel', () => {
     expect(start).toBeGreaterThan(-1);
     const region = panel.slice(start, panel.indexOf("status === 'consent'", start));
     expect(region).toContain('sr-only');
-    expect(region).toMatch(/maskNumbers\(announced\.answer, announcedMasked\)/);
+    // Spoken form: "hidden" for each figure, never the bullet glyph.
+    expect(region).toMatch(/spokenMask\(announced\.answer, announcedMasked\)/);
     // Never the raw answer: in discreet mode that would read unmasked figures aloud.
     expect(panel).not.toMatch(/\{announced\.answer\}/);
     expect(panel).toMatch(/announcedMasked = announced \? hidden && !revealed\.has\(`\$\{announced\.id\}:answer`\) : true/);
@@ -112,7 +113,7 @@ describe('AI label and Clear conversation', () => {
     expect(panel).toMatch(/turns\.length > 0 && !busy/);
   });
 
-  test('a late answer is dropped, not saved, when the transcript was cleared or the panel closed meanwhile', () => {
+  test('a late answer is dropped, not saved, when the transcript was cleared meanwhile', () => {
     const send = panel.slice(panel.indexOf('const send = React.useCallback'), panel.indexOf('const onTurnOnAndAsk'));
     // Compared against the store's clear count taken before the POST; the check sits before the save.
     expect(send.indexOf('const clearsAtStart = transcriptClearCount()')).toBeLessThan(send.indexOf('await fetch('));

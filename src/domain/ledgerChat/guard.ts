@@ -129,8 +129,8 @@ export function findUnverifiedNumbers(text: string, allowed: ReadonlySet<string>
 // "do" ("do you"). Outside discreet mode the Hinglish digits and "do" count only
 // before a unit or a scale word, and "one", "two" and "zero" never ("zero entries
 // today" is prose). Discreet mode is stricter, because the panel masks digits, not
-// words: every Hinglish digit and "zero" always count, and "one", "two" and "do"
-// count before a unit ("two packs").
+// words: every Hinglish digit, "zero", "twice", "a couple of" and "a dozen" always count,
+// and "one", "two" and "do" count before a unit ("two packs").
 // English and Hinglish only: the system prompt keeps discreet replies in English (prompt.ts).
 const TENS = 'twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
 const ONES = 'one|two|three|four|five|six|seven|eight|nine';
@@ -146,7 +146,7 @@ const HINGLISH_UNIT =
 const ALWAYS = `\\b(?:${ENGLISH_WORDS}|${HINGLISH_SCALE})\\b`;
 const NUMBER_WORD_PLAIN = new RegExp(`${ALWAYS}|\\b(?:do|${HINGLISH_DIGITS_NOT_DO})\\b${HINGLISH_UNIT}`, 'gi');
 const NUMBER_WORD_DISCREET = new RegExp(
-  `${ALWAYS}|\\b(?:zero|${HINGLISH_DIGITS_NOT_DO})\\b|\\b(?:one|two|do)\\b${HINGLISH_UNIT}`,
+  `${ALWAYS}|\\b(?:zero|twice|a\\s+couple\\s+of|a\\s+dozen|${HINGLISH_DIGITS_NOT_DO})\\b|\\b(?:one|two|do)\\b${HINGLISH_UNIT}`,
   'gi',
 );
 const WORD_DURATION_CONTEXT =

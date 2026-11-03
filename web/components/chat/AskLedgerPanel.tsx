@@ -32,7 +32,7 @@ import {
   type ChatStateResponse,
   type Row,
 } from '@/domain/ledgerChat/types';
-import { maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { maskCount, maskInr, maskNumbers, spokenMask } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { track } from '@/services/analytics';
@@ -336,7 +336,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
       // allowlist may lag a deploy, and that must never block the answer.
     }
     // Closed during the consent writes: the consent is saved, but the panel is gone, so no question
-    // is sent and nothing is written to it. The reader asks again on the next open.
+    // is sent and no answer is saved; status and pending are reset. The reader asks again on the next open.
     // ponytail: resets status even if the panel was reopened meanwhile; that open re-derives it from its own GET.
     if (openEpochRef.current !== openEpoch) {
       setStatus('idle');
@@ -493,7 +493,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
               {/* The transcript above is outside this region, so the newest answer is mirrored here as hidden text.
                   ponytail: a screen reader's browse mode can read it twice (here and in the transcript); aria-hide the
                   transcript's newest article if that proves noisy. */}
-              {announced ? <p className="sr-only">{maskNumbers(announced.answer, announcedMasked)}</p> : null}
+              {announced ? <p className="sr-only">{spokenMask(announced.answer, announcedMasked)}</p> : null}
               {pending && status !== 'idle' ? (
                 <p className="editorial-pullquote mt-md text-[clamp(1rem,2vw,1.125rem)] text-text">{pending.question}</p>
               ) : null}

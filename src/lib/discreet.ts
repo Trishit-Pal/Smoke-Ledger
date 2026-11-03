@@ -62,3 +62,9 @@ export function maskNumbers(text: string, discreet: boolean): string {
   if (!discreet || !text) return text;
   return text.replace(PROSE_NUMBER, '•••');
 }
+
+/** Spoken form of maskNumbers: a screen reader would read '•••' as "bullet bullet bullet". */
+export function spokenMask(text: string, discreet: boolean): string {
+  if (!discreet || !text) return text;
+  return text.replace(PROSE_NUMBER, 'hidden');
+}

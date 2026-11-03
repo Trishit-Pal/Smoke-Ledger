@@ -155,6 +155,15 @@ describe('Unicode digits, zero, and the review strings (review fixes, Task 7)', 
     expect(findUnverifiedNumberWords('Zero entries today.', discreet)).toEqual(['Zero']);
   });
 
+  it('in discreet mode "twice", "a couple of" and "a dozen" are figures; plain mode leaves them', () => {
+    expect(findUnverifiedNumberWords('You smoked twice.', discreet)).toEqual(['twice']);
+    expect(findUnverifiedNumberWords('A couple of packs.', discreet)).toEqual(['A couple of']);
+    expect(findUnverifiedNumberWords('About a dozen sticks.', discreet)).toEqual(['a dozen']);
+    for (const text of ['You smoked twice.', 'A couple of packs.', 'About a dozen sticks.']) {
+      expect(findUnverifiedNumberWords(text, { discreet: false })).toEqual([]);
+    }
+  });
+
   it('in discreet mode one and two count before a unit, like "do"', () => {
     expect(findUnverifiedNumberWords('One stick, then two cigarettes.', discreet)).toEqual(['One', 'two']);
     expect(findUnverifiedNumberWords('One of the evenings, two quiet days.', discreet)).toEqual([]);

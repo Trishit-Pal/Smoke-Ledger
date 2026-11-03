@@ -1,4 +1,4 @@
-import { maskNumbers } from '@/lib/discreet';
+import { maskNumbers, spokenMask } from '@/lib/discreet';
 
 // Model prose is a render site too: a verified figure in the narration must be
 // masked exactly like the row beside it when totals are hidden.
@@ -20,5 +20,17 @@ describe('maskNumbers', () => {
 
   it('passes through empty and null-ish text', () => {
     expect(maskNumbers('', true)).toBe('');
+  });
+});
+
+describe('spokenMask', () => {
+  it('replaces each figure with the word "hidden", never digits or the bullet glyph', () => {
+    const spoken = spokenMask('₹1,200 over 14 days, ५०० in all', true);
+    expect(spoken).toBe('₹hidden over hidden days, hidden in all');
+    expect(spoken).not.toMatch(/[\p{Nd}•]/u);
+  });
+
+  it('is the text unchanged when not discreet', () => {
+    expect(spokenMask('Down 21.3%.', false)).toBe('Down 21.3%.');
   });
 });

@@ -219,7 +219,7 @@ function comparePeriods(input: z.infer<typeof comparePeriodsInput>, ctx: ToolCon
     rows: [
       row('compare.current.sticks', thisLabel, trend.current.sticks, 'sticks'),
       row('compare.previous.sticks', lastLabel, trend.previous.sticks, 'sticks'),
-      row('compare.delta', 'Change', stickDeltaPct, 'percent', deltaTone(stickDeltaPct)),
+      row('compare.delta', `Change, ${thisLabel.toLowerCase()}`, stickDeltaPct, 'percent', deltaTone(stickDeltaPct)),
       row('compare.current.spend', `Spend, ${thisLabel.toLowerCase()}`, trend.current.spendInr, 'money'),
       row('compare.previous.spend', `Spend, ${lastLabel.toLowerCase()}`, trend.previous.spendInr, 'money'),
     ],
@@ -245,8 +245,10 @@ function totalsInWindow(input: z.infer<typeof totalsInWindowInput>, ctx: ToolCon
     data: { startYmd, endYmd, sticks, spendInr, daysWithEntries },
     rows: [
       row('totals.sticks', `Sticks, ${startYmd} to ${endYmd}`, sticks, 'sticks'),
-      row('totals.spend', 'Spend', spendInr, 'money'),
-      row('totals.days', 'Days with entries', daysWithEntries, 'days'),
+      // Every label names its window: addRow drops rows equal in label + value, so
+      // two windows with equal figures must still differ here.
+      row('totals.spend', `Spend, ${startYmd} to ${endYmd}`, spendInr, 'money'),
+      row('totals.days', `Days with entries, ${startYmd} to ${endYmd}`, daysWithEntries, 'days'),
     ],
   };
 }
