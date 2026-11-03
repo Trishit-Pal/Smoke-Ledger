@@ -46,6 +46,8 @@ import {
 } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { LEGAL_URLS } from '@/lib/legal';
+import { isLedgerChatEnabled } from '@/lib/askPill';
+import { LedgerChatSetting } from '@/components/ask/LedgerChatSetting';
 import { describeError, isAppError } from '@/lib/errors';
 import { ACCOUNT_DELETED_PARAM } from '@/lib/reauth';
 import { dispatchFarewell } from '@/lib/character/mood';
@@ -1117,6 +1119,7 @@ export default function Settings() {
                 />
               }
             />
+            {isLedgerChatEnabled() ? <LedgerChatSetting /> : null}
             <PrefRow
               label={WITHDRAW_ROW_LABEL}
               sublabel={WITHDRAW_ROW_SUBLABEL}
