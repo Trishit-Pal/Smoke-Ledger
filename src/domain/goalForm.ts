@@ -3,7 +3,7 @@
 // per goal type, with cheap pre-validation before the Zod schema runs.
 
 import type { CigaretteLog, Goal, GoalType } from '@/types';
-import type { GoalPatchInput } from '@/lib/validation';
+import { maxTargetFor, type GoalPatchInput } from '@/lib/validation';
 import { rollingAvgSticks } from './calc';
 import { daysUntil, todayIst } from '@/lib/date';
 import {
@@ -161,6 +161,9 @@ export function buildGoalPayload(
     case 'spend_cap_daily': {
       const v = Number(form.target);
       if (!Number.isFinite(v) || v <= 0) return { ok: false, error: 'Enter a target greater than 0.' };
+      const max = maxTargetFor(form.type);
+      // en-US grouping: the form has no currency, and the max is a bare count or amount.
+      if (v > max) return { ok: false, error: `Enter a target no higher than ${max.toLocaleString('en-US')}.` };
       if (form.type === 'spend_cap_daily') {
         return { ok: true, payload: { type: form.type, targetValue: v, meta: { period: form.period } } };
       }

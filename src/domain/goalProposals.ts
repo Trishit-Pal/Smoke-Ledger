@@ -4,6 +4,7 @@
 import type { CigaretteLog, Goal, GoalType } from '@/types';
 import type { CurrencyCode } from '@/lib/regions';
 import { daysUntil } from '@/lib/date';
+import { maxTargetFor } from '@/lib/validation';
 import { dayShift, rollingAvgSpend, rollingAvgSticks } from './calc';
 import { dailyAdherence, holdStatus, type GoalState } from './goalAdherence';
 import {
@@ -35,7 +36,6 @@ interface Opts {
   currency: CurrencyCode;
 }
 
-const MAX_REANCHOR_VALUE = 1000;
 const SPEND_CAP_FACTOR = 0.9;
 const PERIOD_DAYS: Record<SpendPeriod, number> = { day: 1, week: 7, month: 30 };
 const PER: Record<SpendPeriod, string> = { day: 'a day', week: 'a week', month: 'a month' };
@@ -58,7 +58,18 @@ function isSnoozed(goal: Goal, kind: DismissKind, today: string): boolean {
   return stamped !== undefined && daysUntil(stamped, today) < PROPOSAL_SNOOZE_DAYS;
 }
 
+/** A value the schema and DB CHECK would reject is no proposal at all (never an unsaveable offer). */
 export function proposeStart(
+  type: GoalType,
+  logs: CigaretteLog[],
+  today: string,
+  opts: { currency: CurrencyCode; period?: SpendPeriod },
+): Proposal | null {
+  const p = startProposal(type, logs, today, opts);
+  return p && p.value > maxTargetFor(type) ? null : p;
+}
+
+function startProposal(
   type: GoalType,
   logs: CigaretteLog[],
   today: string,
@@ -131,14 +142,14 @@ export function proposeReanchor(goal: Goal, logs: CigaretteLog[], today: string,
   if (goal.type === 'spend_cap_daily') {
     const step = moneyStep(opts.currency);
     const avgSpend = rollingAvgSpend(logs, today, 7);
-    const value = Math.min(MAX_REANCHOR_VALUE, Math.ceil(avgSpend / step) * step);
-    if (value <= cap) return null;
+    const value = Math.ceil(avgSpend / step) * step;
+    if (value <= cap || value > maxTargetFor(goal.type)) return null;
     return { kind: 'reanchor', type: goal.type, value, unit: 'money', period: 'day', basisAvg: avgSpend, overDays };
   }
 
   const avg7 = rollingAvgSticks(logs, today, 7);
-  const value = Math.min(MAX_REANCHOR_VALUE, Math.ceil(avg7));
-  if (value <= cap) return null;
+  const value = Math.ceil(avg7);
+  if (value <= cap || value > maxTargetFor(goal.type)) return null; // D5: no clamped, misleading offer
   return { kind: 'reanchor', type: goal.type, value, unit: 'sticks', basisAvg: avg7, overDays };
 }
 

@@ -193,4 +193,14 @@ BEGIN
      OR NOT has_column_privilege('authenticated', 'public.cigarette_logs', 'ts_utc', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated lost UPDATE on editable cigarette_logs columns';
   END IF;
+
+  -- Goal targets are bounded per unit: spend caps to 100000, everything else to 1000.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'goals_target_value_check'
+      AND pg_get_constraintdef(oid) LIKE '%spend_cap_daily%'
+      AND pg_get_constraintdef(oid) LIKE '%100000%'
+  ) THEN
+    RAISE EXCEPTION 'goals_target_value_check must bound spend_cap_daily at 100000 (goal target by unit)';
+  END IF;
 END $$;

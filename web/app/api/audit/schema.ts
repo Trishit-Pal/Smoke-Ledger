@@ -24,6 +24,7 @@ export const auditBodySchema = z.object({
       format: propValue, // account_data_exported_requested
       enabled: propValue, // discreet_mode_toggled / ledger_chat_consent_toggled
       kind: propValue, // reminder_enabled / reminder_disabled
+      noticeVersion: propValue, // ledger_chat_consent_toggled
     })
     .strict()
     .optional(),

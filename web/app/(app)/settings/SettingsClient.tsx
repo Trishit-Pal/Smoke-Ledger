@@ -67,7 +67,12 @@ import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
 import { clearWebDevice } from '@web/lib/privacy/clearDevice';
-import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
+import {
+  LEDGER_CHAT_NOTICE_TEXT,
+  LEDGER_CHAT_NOTICE_VERSION,
+  LEDGER_CHAT_SETTINGS_SUBLABEL,
+  chatOptInValue,
+} from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
 import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
@@ -110,6 +115,8 @@ export interface SettingsClientProps {
   brands: (Brand & { variants: BrandVariant[] })[];
   analyticsOptIn: boolean;
   ledgerChatOptIn: boolean;
+  /** The server chat flag (isLedgerChatEnabled); off hides the Ask the ledger row and its notice. */
+  chatEnabled: boolean;
   initialAction?: string;
 }
 
@@ -259,6 +266,7 @@ export function SettingsClient({
   brands: initialBrands,
   analyticsOptIn: initialAnalyticsOptIn,
   ledgerChatOptIn: initialLedgerChatOptIn,
+  chatEnabled,
   initialAction,
 }: SettingsClientProps) {
   const router = useRouter();
@@ -446,13 +454,15 @@ export function SettingsClient({
     setBusy('toggle-ledger-chat');
     setError(null);
     try {
-      await setSetting('consent.ledgerChatOptIn', value);
+      // The notice version on, false off: the consent covers only the notice this dialog shows.
+      await setSetting('consent.ledgerChatOptIn', chatOptInValue(value));
       if (!value) clearTranscript();
       setLedgerChatOptIn(value);
       try {
         await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
           enabled: value,
           privacyVersion: LEGAL_VERSIONS.privacy,
+          noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
         });
       } catch {
         // The consent itself is saved; the audit row is best-effort here.
@@ -1148,29 +1158,33 @@ export function SettingsClient({
                 />
               }
             />
-            <PrefRow
-              label="Ask the ledger"
-              sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
-              control={
-                <div className="flex items-center gap-md">
-                  <TextLink
-                    onClick={() => {
-                      clearTranscript();
-                      flashToast('Conversation cleared from this device.');
-                    }}
-                    disabled={busy != null}
-                  >
-                    Clear conversation
-                  </TextLink>
-                  <EditorialSwitch
-                    checked={ledgerChatOptIn}
-                    onChange={onToggleLedgerChat}
-                    disabled={busy != null}
-                    ariaLabel="Ask the ledger"
-                  />
-                </div>
-              }
-            />
+            {/* Same server flag as the dock and the route: while the chat is off there is
+                nothing to consent to, so neither this row nor its notice renders. */}
+            {chatEnabled ? (
+              <PrefRow
+                label="Ask the ledger"
+                sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
+                control={
+                  <div className="flex items-center gap-md">
+                    <TextLink
+                      onClick={() => {
+                        clearTranscript();
+                        flashToast('Conversation cleared from this device.');
+                      }}
+                      disabled={busy != null}
+                    >
+                      Clear conversation
+                    </TextLink>
+                    <EditorialSwitch
+                      checked={ledgerChatOptIn}
+                      onChange={onToggleLedgerChat}
+                      disabled={busy != null}
+                      ariaLabel="Ask the ledger"
+                    />
+                  </div>
+                }
+              />
+            ) : null}
             <PrefRow
               label={WITHDRAW_ROW_LABEL}
               sublabel={WITHDRAW_ROW_SUBLABEL}
@@ -1224,18 +1238,20 @@ export function SettingsClient({
               </div>
             ) : null}
           </dl>
-          <ConfirmDialog
-            open={confirmLedgerChat}
-            title="Turn on Ask the ledger"
-            description={LEDGER_CHAT_NOTICE_TEXT}
-            confirmLabel="Turn on"
-            cancelLabel="Not now"
-            loading={busy === 'toggle-ledger-chat'}
-            onConfirm={() => void saveLedgerChat(true)}
-            onOpenChange={(open) => {
-              if (!open) setConfirmLedgerChat(false);
-            }}
-          />
+          {chatEnabled ? (
+            <ConfirmDialog
+              open={confirmLedgerChat}
+              title="Turn on Ask the ledger"
+              description={LEDGER_CHAT_NOTICE_TEXT}
+              confirmLabel="Turn on"
+              cancelLabel="Not now"
+              loading={busy === 'toggle-ledger-chat'}
+              onConfirm={() => void saveLedgerChat(true)}
+              onOpenChange={(open) => {
+                if (!open) setConfirmLedgerChat(false);
+              }}
+            />
+          ) : null}
         </section>
 
         {/* ─────────────── Brand catalog ─────────────── */}

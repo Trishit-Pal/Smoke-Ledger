@@ -85,6 +85,12 @@ const CHECKERS: Record<DataPromiseKey, () => void> = {
       expect(read(rel)).not.toMatch(/\.(insert|upsert|update)\(/);
     }
     expect(read('web/components/chat/transcriptStore.ts')).toMatch(/localStorage/);
+    // Mobile keeps the conversation in component state only: the Ask screen and
+    // its turn view touch no device storage and no settings table.
+    for (const rel of ['app/ask.tsx', 'src/components/ask/AskTurn.tsx']) {
+      expect(read(rel)).not.toMatch(/AsyncStorage|SecureStore|secureStore|localStorage|repositories\/settings/);
+    }
+    expect(read('app/ask.tsx')).toMatch(/useState<AskTurnData\[\]>\(\[\]\)/);
   },
   eraseEverywhere: () => {
     const { body } = newestFunction('erase_account_data');

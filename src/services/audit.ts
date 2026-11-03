@@ -91,8 +91,8 @@ export interface AuditEventPropsMap {
   reminder_enabled: { kind: string };
   reminder_disabled: { kind: string };
   // Consent to send ledger figures to the AI processor (Ask the ledger), with
-  // the privacy-policy version the notice was based on.
-  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string };
+  // the privacy-policy version and the notice version (LEDGER_CHAT_NOTICE_VERSION) it rested on.
+  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string; noticeVersion?: string };
 }
 
 function isPrimitive(value: unknown): value is string | number | boolean | null {

@@ -8,6 +8,9 @@ import { describe, expect, test } from 'vitest';
 const chat = join(__dirname, '..', 'components', 'chat');
 const panel = readFileSync(join(chat, 'AskLedgerPanel.tsx'), 'utf8');
 const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'SettingsClient.tsx'), 'utf8');
+const settingsPage = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 'page.tsx'), 'utf8');
+const route = readFileSync(join(__dirname, '..', 'app', 'api', 'ledger-chat', 'route.ts'), 'utf8');
+const data = readFileSync(join(__dirname, '..', 'lib', 'server', 'data.ts'), 'utf8');
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
@@ -37,7 +40,7 @@ describe('AskLedgerPanel', () => {
   });
 
   test('consent is one tap, saved before the question is sent, and the audit call cannot block it', () => {
-    const consent = panel.indexOf("setSetting('consent.ledgerChatOptIn', true)");
+    const consent = panel.indexOf("setSetting('consent.ledgerChatOptIn', chatOptInValue(true))");
     const audit = panel.indexOf("recordAuditEvent('ledger_chat_consent_toggled'");
     expect(consent).toBeGreaterThan(-1);
     expect(audit).toBeGreaterThan(consent);
@@ -58,7 +61,7 @@ describe('AskLedgerPanel', () => {
   test('the consent card uses the shared notice, links the policy, and records the notice version', () => {
     expect(panel).toContain("from '@web/components/chat/notice'");
     expect(panel).toContain('href="/privacy"');
-    expect(panel).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: true,\s*privacyVersion: LEGAL_VERSIONS\.privacy/);
+    expect(panel).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: true,\s*privacyVersion: LEGAL_VERSIONS\.privacy,\s*noticeVersion: LEDGER_CHAT_NOTICE_VERSION,/);
   });
 });
 
@@ -90,10 +93,10 @@ describe('AI label and Clear conversation', () => {
 });
 
 describe('state from GET and the initial question', () => {
-  test('reads panel state from GET /api/ledger-chat once, not from page props', () => {
+  test('reads panel state from GET /api/ledger-chat on every open, not from page props', () => {
     expect(panel).toMatch(/fetch\('\/api\/ledger-chat', \{ method: 'GET' \}\)/);
     expect(panel).not.toMatch(/profile: UserProfile/);
-    expect(panel).toContain('fetchedRef.current');
+    expect(panel).not.toContain('fetchedRef');
   });
 
   test('an initial question is sent once when consented, and waits behind the consent notice when not', () => {
@@ -112,12 +115,27 @@ describe('state from GET and the initial question', () => {
 
   test('after Turn on and ask, the state is read again so starters appear without a reload', () => {
     const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
-    expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*if \(loaded\.state\) setState\(loaded\.state\);/);
+    expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*\/\/[^\n]*\n\s*if \(loaded\.state && stateLoadRef\.current === openLoad\) setState\(loaded\.state\);/);
   });
 
-  test('one GET per first open, even when an effect re-runs, and no second send while one is in flight', () => {
+  test('one GET per open, even when an effect re-runs, and no second send while one is in flight', () => {
     expect(panel).toContain('stateLoadRef.current ??= loadChatState()');
+    // The shared load is dropped on close, not in the effect cleanup (that would double the StrictMode GET).
+    const effect = panel.slice(panel.indexOf('if (!open) {'), panel.indexOf('}, [open, setTurns])'));
+    expect(effect.indexOf('stateLoadRef.current = null')).toBeLessThan(effect.indexOf('return;'));
+    expect(effect.slice(effect.indexOf('return () =>'))).not.toContain('stateLoadRef');
     expect(panel).toContain("if (status === 'loading') return;");
+  });
+
+  test('a fresh open drops a stale GET refusal, and the post-consent re-read cannot land after a close or reopen', () => {
+    expect(panel).toMatch(/loaded\.blocked \?\? \(loaded\.state && STALE_ON_CLEAN_GET\.has\(prev\) \? 'idle' : prev\)/);
+    expect(panel).toMatch(/STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set\(\['disabled', 'outdated', 'error'\]\)/);
+    // A kept consent card is stale once the fresh state says consented; loading is never reset.
+    expect(panel).toMatch(/status === 'consent' && state\?\.consented\) \{\s*setStatus\('idle'\);\s*setPending\(null\);/);
+    expect(panel).not.toMatch(/STALE_ON_CLEAN_GET[^;]*'loading'/);
+    const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
+    expect(turnOn.indexOf('const openLoad = stateLoadRef.current')).toBeLessThan(turnOn.indexOf('await send('));
+    expect(turnOn).toContain('stateLoadRef.current === openLoad');
   });
 
   test('outdated agreements and a resting feature get calm copy; outdated links to /consent', () => {
@@ -155,6 +173,28 @@ describe('Settings integration', () => {
   test('turning the switch on shows the same notice as the panel before saving', () => {
     expect(settings).toContain("from '@web/components/chat/notice'");
     expect(settings).toMatch(/<ConfirmDialog[\s\S]*confirmLabel="Turn on"/);
+  });
+
+  test('the switch stores the notice version (or false) and audits both versions', () => {
+    expect(settings).toContain("setSetting('consent.ledgerChatOptIn', chatOptInValue(value))");
+    expect(settings).toMatch(/recordAuditEvent\('ledger_chat_consent_toggled', 'privacy', \{\s*enabled: value,\s*privacyVersion: LEGAL_VERSIONS\.privacy,\s*noticeVersion: LEDGER_CHAT_NOTICE_VERSION,/);
+  });
+
+  test('with the chat flag off, neither the row nor its notice dialog renders', () => {
+    // The server flag (same gate as the dock and the route) reaches the client as a prop.
+    expect(settingsPage).toContain("import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled'");
+    expect(settingsPage).toContain('chatEnabled={isLedgerChatEnabled()}');
+    expect(settings.match(/label="Ask the ledger"/g)?.length).toBe(1);
+    expect(settings.match(/title="Turn on Ask the ledger"/g)?.length).toBe(1);
+    expect(settings).toMatch(/\{chatEnabled \? \(\s*<PrefRow\s+label="Ask the ledger"/);
+    expect(settings).toMatch(/\{chatEnabled \? \(\s*<ConfirmDialog\s+open=\{confirmLedgerChat\}\s+title="Turn on Ask the ledger"/);
+  });
+
+  test('every server reader counts only the current notice version, never a bare true', () => {
+    for (const src of [route, data]) {
+      expect(src).toContain('isCurrentChatOptIn(');
+      expect(src).not.toMatch(/value_json === true|ledgerChatOptIn === true/);
+    }
   });
 
   test('any sign-out event clears the device transcript, including session expiry and deletion', () => {

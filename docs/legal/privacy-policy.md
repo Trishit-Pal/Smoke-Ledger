@@ -15,7 +15,7 @@ Effective date: 2026-11-02
 - Only your account can read your ledger. The database checks every request against who is signed in.
 - Usage analytics stay off until you turn them on. Turning them off deletes the events already recorded.
 - Nothing is sent to the AI service unless you have turned Ask the ledger on.
-- We keep no chat questions or replies on our servers. The conversation stays in your browser.
+- We keep no chat questions or replies on our servers. The conversation stays on your device: in your browser on the web, in the app’s memory on mobile.
 - Erase removes your ledger, and your name, date of birth and gender, from every place we keep them, including the sign-in record.
 - Delete account erases your data first, then removes your sign-in identity.
 - Records are deleted on a fixed daily schedule: security records after 12 months, error reports after 90 days, usage events after 12 months.
@@ -65,7 +65,7 @@ Each promise has a mechanism checker in `src/tests/privacy-promises.test.ts`.
 | Error reports | 90 days |
 | Usage events | 12 months, or until analytics is turned off |
 | Rate-limit counters | about 2 days |
-| Ask the ledger conversation | In your browser until cleared |
+| Ask the ledger conversation | Web: in your browser until cleared. Mobile: in memory until you close the Ask screen |
 | Brand cache (Vercel) | up to 10 minutes |
 | Host backups | Under the host's own schedule; never used to bring back erased data |
 
@@ -81,7 +81,7 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 
 ## Withdrawing consent
 - Usage analytics off: collection stops and past usage events are deleted.
-- Ask the ledger off: nothing more is sent and the browser conversation is cleared; Anthropic's copy ages out on its schedule.
+- Ask the ledger off: nothing more is sent and the conversation on your device is cleared; Anthropic's copy ages out on its schedule.
 - Health data: Settings › Withdraw consent ends in erase (keep login) or delete, the reader's choice; export offered first.
 - Withdrawal does not affect earlier processing and is as easy as giving consent.
 
@@ -92,19 +92,20 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 - Nothing in the terms waives the right to complain to a regulator.
 
 ## The AI feature, and no automated decisions
-- Web only, off until turned on; answers from an Anthropic model, labelled "Written by AI"; can be wrong; not medical advice.
-- Our server reads up to 2,000 entries from the last 90 days (`GOAL_WINDOW_LOG_LIMIT`) and daily totals for up to the past year to compute figures.
-- Anthropic receives: the question; up to 10 earlier turns (`CHAT_HISTORY_MAX_TURNS`), both sides; a context line (date, time zone, currency, locale, baseline, days with entries, kind and state of active goals, discreet flag); and requested lookup results (totals, comparisons, savings, spend outlook, peak hours and weekdays, mood/trigger pairings, brand share, goal progress and targets, rules-based insights).
+- In the web and mobile apps, off until turned on. Web: a box at the bottom of Dashboard, Trends, History, Goals and Settings (an Ask button on a phone), not on Log. Mobile: an Ask button on every tab except Log. Answers from an Anthropic model, labelled "Written by AI"; can be wrong; not medical advice.
+- Our server reads up to 2,000 entries from the last 90 days (`GOAL_WINDOW_LOG_LIMIT`) daily totals for up to the past year, and all your goals to compute figures.
+- Anthropic receives: the question; up to 10 earlier turns (`CHAT_HISTORY_MAX_TURNS`), both sides; a context line (date, time zone, currency, locale, baseline, days with entries, kind and state of active goals, discreet flag); and requested lookup results (totals, comparisons, savings, spend outlook, peak hours and weekdays, mood/trigger pairings, brand share, goal progress and targets, goal history (type, target, dates and outcome, for paused, completed and abandoned goals too), price history (brand, variant, unit price, pack size and date, from the prices you recorded on entries in the last 90 days), the dates you edited entries (never what they said before), rules-based insights).
 - When needed: up to 200 entries from the last 30 days (date, hour, quantity, trigger, moods, craving, situation, brand, first 120 characters of the note).
-- Discreet mode: aliased brands, no notes; a brand typed into a question is sent as typed. Name, date of birth, gender, email, phone and place are never sent.
+- Discreet mode: aliased brands, no notes or variants; a brand typed into a question is sent as typed. Name, date of birth, gender, email, phone and place are never sent.
 - Anthropic's commercial terms say it may not train its models on this data. Anthropic says it deletes API inputs and outputs within 30 days, with exceptions (usage-policy flags, legal requirements). No shorter period has been arranged.
-- The conversation stays in the browser, under the chat consent, until Clear conversation, turning the feature off, sign-out, erase, delete or turning discreet mode on.
+- Web: the conversation stays in the browser, under the chat consent, until Clear conversation, turning the feature off, sign-out, erase, delete or turning discreet mode on. Mobile: it stays in the app’s memory only and is gone when you close the Ask screen.
+- If your consent to the policy is out of date, Ask the ledger refuses until you accept the current one.
 - No decisions with legal or similarly significant effect. Goal suggestions and insights can be ignored.
 
 ## On your device
-- Web: session sign-in cookies; Remember me (opt-in) adds a cookie that keeps you signed in. Browser storage: chat conversation, dismissed goal suggestion, app-lock state, theme, brand catalogue.
-- Mobile: secure storage for session and app-lock PIN; app storage for theme, catalogue and dismissed suggestion; locally scheduled reminders; export file in the cache after an export.
-- Sign-out clears the session, conversation and dismissed suggestion. Erase/delete also clear app-lock state, cancel reminders and delete the export file; delete also removes the Remember me cookie. Theme and catalogue stay (not personal).
+- Web: session sign-in cookies; Remember me (opt-in) adds a cookie that keeps you signed in. Browser storage: chat conversation, whether you folded the Ask box away (a display choice, kept after sign-out), dismissed goal suggestion, app-lock state, theme, brand catalogue.
+- Mobile: secure storage for session and app-lock PIN; app storage for theme, catalogue and dismissed suggestion (never the Ask conversation); locally scheduled reminders; export file in the cache after an export.
+- Sign-out clears the session, conversation and dismissed suggestion. Erase/delete also clear app-lock state, cancel reminders and delete the export file; delete also removes the Remember me cookie. Theme, catalogue and the Ask box preference stay (not personal).
 - No advertising or tracking cookies.
 
 ## Security, and if something goes wrong

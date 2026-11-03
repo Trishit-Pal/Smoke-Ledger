@@ -54,6 +54,7 @@ export function rowDisplay(
 }
 
 /** What the phone says where the web says "in this browser": nothing is kept on the device. */
+// Part of the consent notice: bump LEDGER_CHAT_NOTICE_VERSION with any change here.
 export const MOBILE_DEVICE_NOTE =
   'We store no questions or replies on our servers, and the app keeps none on this device. The conversation lives only on this screen, and leaving it clears it. You can turn this off in Settings at any time.';
 

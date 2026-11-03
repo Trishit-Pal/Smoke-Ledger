@@ -15,7 +15,7 @@ Effective date: 2026-05-19
 
 ## What the service is
 - A private ledger of cigarettes smoked and their cost: trends, goals to cut down or stop, optional reminders, and export, erase or delete at any time.
-- Ask the ledger (web only): opt-in; answers about your own ledger from an Anthropic model; each answer labelled "Written by AI"; daily question limit; answers can be wrong.
+- Ask the ledger (web and mobile): opt-in; answers about your own ledger from an Anthropic model; each answer labelled "Written by AI"; daily question limit; answers can be wrong.
 - Features may change, as set out under changes.
 
 ## Not medical advice

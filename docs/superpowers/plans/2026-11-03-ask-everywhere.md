@@ -151,8 +151,8 @@ Verified when: `npm run spec:test` and `spec:drift` pass and the promise tests p
 | Phase | Status |
 |---|---|
 | 0 Leak fix on #105 | done (3aa2f5f on feat/goals-adaptive) |
-| 1 Guardrails & scope | pending |
-| 2 Web dock | pending |
-| 3 Mobile | pending |
-| 4 CI | pending |
-| 5 Docs | pending |
+| 1 Guardrails & scope | done (3aa4ce5..4d949bf on feat/ask-everywhere) |
+| 2 Web dock | done (e5bb6df..bc6f671, 28ebf36) |
+| 3 Mobile | done (4b5cffe..165ad7e); the manual Expo check is an owner step (owner-actions section 8) |
+| 4 CI | done (029c645) |
+| 5 Docs | done (policy, terms, legal docs, owner-actions section 8, spec and glossary); the memory update is left to the main session |

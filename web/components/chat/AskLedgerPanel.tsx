@@ -12,7 +12,7 @@
  * the one tap saves it and sends the pending question.
  *
  * The panel reads its own state (opt-in, masking, currency, starters) from
- * GET /api/ledger-chat on first open, so the dock needs no page data. An
+ * GET /api/ledger-chat on every open, so the dock needs no page data. An
  * initial question from the dock is sent once per open when the reader has
  * opted in, and waits behind the consent notice when they have not.
  */
@@ -42,7 +42,7 @@ import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
-import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
+import { LEDGER_CHAT_NOTICE, LEDGER_CHAT_NOTICE_VERSION, chatOptInValue } from '@web/components/chat/notice';
 import {
   clearTranscript,
   loadTranscript,
@@ -58,6 +58,9 @@ export interface AskLedgerPanelProps {
 }
 
 type Status = 'idle' | 'loading' | 'consent' | 'outdated' | 'rate_limited' | 'disabled' | 'error';
+
+/** Statuses a fresh clean GET proves out of date. Never 'loading': that is an answer in flight. */
+const STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set(['disabled', 'outdated', 'error']);
 
 interface Pending {
   question: string;
@@ -143,10 +146,10 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(() => new Set());
 
   const [state, setState] = React.useState<ChatStateResponse | null>(null);
-  // Set once the session and (on first open) the GET state have both landed for this open.
+  // Set once the session and the GET state have both landed for this open.
   const [ready, setReady] = React.useState(false);
-  const fetchedRef = React.useRef(false);
-  // The in-flight GET, shared by a StrictMode re-run so the state cap is spent once.
+  // This open's GET, shared by a StrictMode re-run so the state cap is spent once per open.
+  // Cleared on close, never in the effect cleanup, or the re-run would fetch twice.
   const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
   const consumedRef = React.useRef(false);
 
@@ -161,34 +164,43 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const busy = status === 'loading';
 
   // The transcript key needs the user id: getSession() reads the local session,
-  // no network round-trip. The panel state is read from GET once per mount.
+  // no network round-trip. The panel state is read from GET on every open: the dock
+  // outlives Settings changes (Hide totals, discreet, country), so a kept copy goes stale.
   React.useEffect(() => {
     if (!open) {
       setReady(false);
       consumedRef.current = false;
+      stateLoadRef.current = null;
+      // Unknown state masks every figure, and a figure the reader revealed stays revealed only for that open.
+      setState(null);
+      setRevealed(new Set());
       return;
     }
     let cancelled = false;
-    let stateLoad: Promise<LoadedState | null> = Promise.resolve(null);
-    if (!fetchedRef.current) {
-      stateLoadRef.current ??= loadChatState();
-      stateLoad = stateLoadRef.current;
-    }
-    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoad]).then(([id, loaded]) => {
+    stateLoadRef.current ??= loadChatState();
+    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoadRef.current]).then(([id, loaded]) => {
       if (cancelled) return;
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
-      if (loaded) {
-        fetchedRef.current = true;
-        setState(loaded.state);
-        if (loaded.blocked) setStatus(loaded.blocked);
-      }
+      setState(loaded.state);
+      // A refusal or error from an earlier open is stale once this GET is clean (the reader may have
+      // just reviewed the agreements); loading, rate_limited and consent are left alone here.
+      setStatus((prev) => loaded.blocked ?? (loaded.state && STALE_ON_CLEAN_GET.has(prev) ? 'idle' : prev));
       setReady(true);
     });
     return () => {
       cancelled = true;
     };
   }, [open, setTurns]);
+
+  // The consent card kept from an earlier open is moot once the fresh state says consented
+  // (opted in elsewhere, e.g. Settings): drop it and its pending question, never a send in flight.
+  React.useEffect(() => {
+    if (status === 'consent' && state?.consented) {
+      setStatus('idle');
+      setPending(null);
+    }
+  }, [status, state?.consented]);
 
   const send = React.useCallback(
     async (question: string, starter: boolean) => {
@@ -251,9 +263,11 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
 
   const onTurnOnAndAsk = async () => {
     if (!pending) return;
+    const openLoad = stateLoadRef.current;
     setStatus('loading');
     try {
-      await setSetting('consent.ledgerChatOptIn', true);
+      // The notice version, not `true`: the consent covers only the words shown here.
+      await setSetting('consent.ledgerChatOptIn', chatOptInValue(true));
     } catch {
       setStatus('error');
       setPending(null);
@@ -263,6 +277,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
         enabled: true,
         privacyVersion: LEGAL_VERSIONS.privacy,
+        noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
       });
     } catch {
       // Consent is already saved. The audit row is best-effort here: the edge
@@ -272,7 +287,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     await send(pending.question, pending.starter);
     // Opted in now: read the state again so the starters appear without a reload.
     const loaded = await loadChatState();
-    if (loaded.state) setState(loaded.state);
+    // Closed (ref cleared) or reopened (a newer GET) in the meantime: that open's state wins.
+    if (loaded.state && stateLoadRef.current === openLoad) setState(loaded.state);
   };
 
   const onNotNow = () => {

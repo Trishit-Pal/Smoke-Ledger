@@ -14,7 +14,7 @@ sources:
   - web/components/marketing/AccountDeletedNotice.tsx
   - web/components/character/MilestoneCelebration.tsx
   - app/(auth)/login.tsx
-last_verified_commit: 798a45b
+last_verified_commit: 27c86cb
 status: current
 ---
 

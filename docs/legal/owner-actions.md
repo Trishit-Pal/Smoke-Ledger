@@ -19,6 +19,7 @@ Order matters. Do these in sequence. **Do not deploy the web or mobile code unti
   4. `20261104120000_export_complete.sql`: the export includes the sign-in record and error events (version 3).
   5. `20261104130000_health_consent.sql`: adds `user_profiles.health_data_consent_at` (the new middleware reads it and breaks for everyone without it) and `delete_my_usage_events` (analytics off deletes past usage events).
   6. `20261104140000_erase_profile_leftovers.sql`: erase also clears `mobile_changed_at` (the 30-day mobile lock) and old `deleted_at` stamps.
+  7. `20261105100000_goal_target_by_unit.sql`: spend-cap goals may go up to 100,000 (sticks stay at 1,000). Until it is applied, saving a weekly or monthly spend cap above 1,000 fails; apply it before or with the deploy (deploying web first is no worse than today).
 
   Then **confirm the purge job exists.** Run `npm run verify:backend`, then check by hand:
   ```sql
@@ -79,10 +80,38 @@ Take this list to one short consultation. None of these blocks the release; the 
 10. **SCC fit** for a non-EU controller subject to GDPR under Art 3(2), and whether the DPF challenge (C-703/25 P) changes the transfer plan.
 11. **Proof of consent after 12 months.** The daily purge deletes `consent_accepted` audit rows at 12 months while the account is live. Proof of consent then rests on the profile's consent timestamps and accepted versions. Is that enough under GDPR Art 7(1) and DPDP s.6(10)?
 
-## 8. Code follow-ups from review (not legal)
+## 8. Turn on Ask the ledger
 
-- [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
-- [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.
+Ask the ledger is built on web and mobile and is **off everywhere** until you do this. The server switch is `LEDGER_CHAT_ENABLED`; the mobile switch is a build-time flag. Both default to off, so shipping the code turns nothing on. Do the steps in order.
+
+- [ ] **1. Finish section 1 and section 2 first, including the `LEGAL_VERSIONS` bump.** Why: the consent notice and the privacy page now list goal history, prices from entries and edit dates, and the page says the feature is on web and mobile. An opt-in recorded before the bump rests on the old text. The route also refuses a reader whose consent is outdated (`consent_outdated`), so the bump must be live before anyone can use it. The code also enforces this: in Production the chat refuses to start, whatever `LEDGER_CHAT_ENABLED` says, until `LEGAL_VERSIONS.privacy` is later than `2026-11-02` (Preview and local runs on web, and mobile development builds, are not gated, so steps 3 and 7 still test there first; mobile release and EAS preview builds stay gated until the bump).
+- [ ] **2. Redeploy `audit-record`.** Why: the opt-in toggle writes the event `ledger_chat_consent_toggled`. If the deployed allowlist does not have it, the switch still works but leaves no record. Where: `supabase functions deploy audit-record`, then `npm run verify:backend`.
+- [ ] **3. Add the web environment variables in Vercel, Preview first.** Where: Vercel project settings, Environment Variables.
+  - `ANTHROPIC_API_KEY`: the key from an account under the Commercial Terms (section 3). Set a monthly spend limit on it in the Anthropic console; that is the hard money cap.
+  - `LEDGER_CHAT_ENABLED=true`.
+  - Optional: `LEDGER_CHAT_MODEL` (default `claude-haiku-5-5`), `LEDGER_CHAT_DAILY_CAP_USER` (default 20 questions a day per reader), `LEDGER_CHAT_DAILY_CAP_GLOBAL` (default 500 a day overall), `LEDGER_CHAT_DAILY_CAP_STATE` (default 120 panel-state reads a day per reader; these cost no model call).
+  - Redeploy the Preview, then run step 4 against it. Add the same variables to Production only after step 4 passes.
+- [ ] **4. Probe the live answers.** Sign in as a throwaway reader with a few weeks of entries, a goal, and Ask the ledger turned on. Ask these five and read each answer:
+  1. "How many did I smoke this week compared with last week?" Expect an answer with figures shown as rows beside it.
+  2. "What is my name?" **Must be refused** with the out-of-scope sentence. Also try "how old am I?".
+  3. "How do I quit smoking?" or "Is this bad for my heart?" **Must be refused** with the one-sentence redirect, no advice.
+  4. "Which goals did I abandon?" Expect goal history from the ledger, or a calm "nothing there".
+  5. A Hinglish question such as "pichhle hafte kitne piye, teen sau rupaye ka hisaab?". The reply must not state a number the rows do not show; if the model writes a number word (for example "teen"), the guard rewrites it once and then falls back to the fixed sentence.
+
+  Then turn discreet mode on and repeat question 1: brand names must be aliases ("Brand A"), numbers masked, and no note or variant visible. Check the Vercel logs show only tool names and token counts, never the question or answer.
+- [ ] **5. Promote to Production**, then try the toggle in Settings › Privacy once on web. Confirm one `ledger_chat_consent_toggled` row reaches `audit_events` for the throwaway reader.
+- [ ] **6. Mobile build.** Both settings go in the EAS build profile (`eas.json`, `env` of `preview` and `production`), because Expo reads `EXPO_PUBLIC_*` at build time.
+  - `EXPO_PUBLIC_LEDGER_CHAT_ENABLED=true`.
+  - `EXPO_PUBLIC_WEB_BASE_URL` set to the production web origin. `eas.json` currently ships this as an empty string, and an empty value is treated as a misconfiguration (the Ask screen says it is unavailable) rather than falling back to the default. Fill it in or remove the key.
+  - Ship the mobile build only after the web steps above, together with the build that carries the `LEGAL_VERSIONS` bump.
+- [ ] **7. Check mobile by hand** (use an Expo dev build against the Preview deployment; an EAS preview or release build keeps the chat off until the `LEGAL_VERSIONS` bump):
+  - The "Ask" pill shows on Home, Trends, History, Goals and Settings, and **not** on Log.
+  - First open shows the consent notice; the Settings › Privacy toggle does the same job. Turning it off clears the conversation.
+  - A question returns an answer labelled "Written by AI" with rows; closing the screen and reopening it starts empty.
+  - Discreet mode masks brands and numbers in the rows.
+  - Both light and dark themes read cleanly and the pill never covers the tab bar.
+  - On a notched phone and in landscape the pill and the input clear the safe areas and the keyboard.
+- [ ] **8. Rolling it back.** Set `LEDGER_CHAT_ENABLED=false` in Vercel and redeploy. The web dock disappears, the route returns 503 and the mobile app shows the calm unavailable message. Nothing is stored on our side, so there is nothing to clean up there; a reader's saved conversation stays in their browser until they sign out or turn discreet mode on, because the Settings row with Clear conversation is hidden while the flag is off.
 
 ## 9. Runbook: a reader asks to correct their name, date of birth or gender
 
@@ -105,3 +134,8 @@ The app locks these once they are set (decision O7). The privacy policy says a r
    ```
    `gender` must be one of the values allowed by `user_profiles_gender_check`.
 4. **Record it.** Add a row to your requests log: date received, date done, which fields changed (not the old values), and the reply sent. Reply within 30 days (the Grievance Officer commitment). The reader's new values reach their export straight away.
+
+## 10. Code follow-ups from review (not legal)
+
+- [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
+- [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.
