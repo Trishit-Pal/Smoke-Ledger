@@ -63,7 +63,7 @@ describe('ledger chat scope', () => {
   test('the sent-data sentence names the goal history, price history and edit dates the tools send', () => {
     for (const phrase of [
       'your goal history (type, target, dates and outcome)',
-      'the prices you recorded on entries, last 90 days (brand, unit price, pack size and date)',
+      'the prices you recorded on entries, last 90 days (brand, variant, unit price, pack size and date)',
       'the dates you edited entries',
     ]) {
       expect(LEDGER_CHAT_NOTICE.sent).toContain(phrase);
