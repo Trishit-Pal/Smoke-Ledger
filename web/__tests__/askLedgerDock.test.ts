@@ -13,13 +13,15 @@ vi.mock('@/services/analytics', () => ({ track: vi.fn() }));
 
 (globalThis as { React?: typeof React }).React = React;
 
-const { AskLedgerDock, DOCK_MINIMISED_KEY, dockPage, isDockHidden, readDockMinimised, writeDockMinimised } =
+const { AskLedgerDock, DockControls, DOCK_MINIMISED_KEY, dockPage, isDockHidden, readDockMinimised, writeDockMinimised } =
   await import('@web/components/chat/AskLedgerDock');
 
 const web = join(__dirname, '..');
 const read = (...parts: string[]) => readFileSync(join(web, ...parts), 'utf8');
 const dock = read('components', 'chat', 'AskLedgerDock.tsx');
 const layout = read('app', '(app)', 'layout.tsx');
+const css = read('app', 'globals.css');
+const history = read('app', '(app)', 'history', 'HistoryClient.tsx');
 
 function fakeStorage(seed: Record<string, string> = {}): Storage {
   const map = new Map<string, string>(Object.entries(seed));
@@ -36,6 +38,8 @@ function fakeStorage(seed: Record<string, string> = {}): Storage {
 }
 
 const render = (enabled: boolean) => renderToStaticMarkup(React.createElement(AskLedgerDock, { enabled }));
+const renderControls = (minimised: boolean) =>
+  renderToStaticMarkup(React.createElement(DockControls, { minimised, onMinimise: () => {}, onAsk: () => {} }));
 
 beforeEach(() => {
   mocks.path = '/dashboard';
@@ -62,13 +66,49 @@ describe('where the dock shows', () => {
     expect(render(true)).toBe('');
   });
 
+  test('server render is only the clearance marker: no box flashes before the minimise choice is read', () => {
+    expect(render(true)).toBe('<span data-ask-dock="true" hidden=""></span>');
+  });
+
   test('desktop box is a labelled form; phone shows an Ask pill instead', () => {
-    const html = render(true);
+    const html = renderControls(false);
     expect(html).toContain('<form');
     expect(html).toMatch(/<label[^>]*class="sr-only"[^>]*>Ask the ledger<\/label>/);
     expect(html).toContain('placeholder="Ask the ledger…"');
     expect(html).toMatch(/<form[^>]*class="[^"]*hidden[^"]*md:flex/);
     expect(html).toMatch(/<button[^>]*class="[^"]*md:hidden[^"]*"[^>]*>Ask<\/button>/);
+    // Focus shows on the input itself: the global rule outlines text fields over the inline outline:none.
+    expect(css).toMatch(/input:focus-visible:not\(\[type='checkbox'\]\):not\(\[type='radio'\]\),\s*textarea:focus-visible \{\s*outline: 2px solid var\(--accent-ink\) !important;/);
+    expect(html).toMatch(/<input[^>]*type|<input[^>]*placeholder="Ask the ledger…"/);
+    expect(html).not.toMatch(/<input[^>]*type="(checkbox|radio)"/);
+  });
+
+  test('minimised, only the Show tab renders', () => {
+    const html = renderControls(true);
+    expect(html).not.toContain('<form');
+    expect(html).toContain('aria-label="Show Ask the ledger"');
+  });
+});
+
+describe('clearance: the dock never covers page content or page controls', () => {
+  test('--ask-dock-clear is on only where the dock marker renders', () => {
+    expect(css).toMatch(/\[data-app-shell\]:has\(\[data-ask-dock\]\) \{\s*--ask-dock-clear: 4\.5rem;/);
+    expect(layout).toContain('data-app-shell');
+  });
+
+  test('main pads its end by it on phone and desktop', () => {
+    expect(layout).toContain('pb-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))]');
+    expect(layout).toContain('short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))]');
+    expect(layout).toContain('md:pb-[var(--ask-dock-clear,0px)]');
+    expect(layout).toContain('md:short-landscape:pb-[var(--ask-dock-clear,0px)]');
+  });
+
+  test("History's New log button and delete toast are lifted by it", () => {
+    expect(history).toContain(
+      'fixed right-lg bottom-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] md:bottom-[calc(theme(spacing.lg)+var(--ask-dock-clear,0px))]',
+    );
+    expect(history).toContain('md:bottom-[calc(theme(spacing.xxl)+var(--ask-dock-clear,0px))]');
+    expect(history).not.toContain('fixed bottom-8');
   });
 });
 

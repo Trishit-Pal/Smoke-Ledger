@@ -470,7 +470,7 @@ export function HistoryClient({
           The one explicit call-to-action on this page. Reshaped from the
           accent-teal pill to the dark inverse used on the Dashboard empty
           state — it stays distinct without breaking the editorial register. */}
-      <div className="fixed right-lg bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-lg z-10">
+      <div className="fixed right-lg bottom-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] md:bottom-[calc(theme(spacing.lg)+var(--ask-dock-clear,0px))] z-10">
         <Link
           href="/log/new"
           className="inline-flex items-center min-h-[44px] px-lg rounded-md bg-text text-bg font-medium text-body shadow-lg hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
@@ -515,7 +515,7 @@ export function HistoryClient({
 
       {/* Show delete error if any */}
       {deleteError && (
-        <div className="fixed bottom-8 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-40 p-md bg-bg border border-[var(--warn-earth)] rounded-md shadow-lg">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] left-4 right-4 md:bottom-[calc(theme(spacing.xxl)+var(--ask-dock-clear,0px))] md:left-auto md:right-4 md:max-w-sm z-40 p-md bg-bg border border-[var(--warn-earth)] rounded-md shadow-lg">
           <p className="text-small text-[var(--warn-earth)]">{deleteError}</p>
         </div>
       )}

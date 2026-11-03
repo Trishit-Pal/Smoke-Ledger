@@ -57,6 +57,36 @@ test.describe('ask dock', () => {
     await expect(dialog.getByText('Written by AI')).toBeVisible();
   });
 
+  test('never covers History’s New log button, on a phone or a desktop', async ({ page, onboarded }) => {
+    await login(page, onboarded);
+    for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/history');
+      const newLog = page.getByRole('link', { name: 'New log' });
+      // The whole visible dock: the desktop form, or the phone pill row (pill + minimise).
+      const dock =
+        viewport.width < 768
+          ? page.getByRole('button', { name: 'Ask', exact: true }).locator('..')
+          : page.locator('form', { has: dockBox(page) });
+      await expect(newLog).toBeVisible();
+      await expect(dock).toBeVisible();
+      const a = await newLog.boundingBox();
+      const b = await dock.boundingBox();
+      expect(a && b, `${viewport.width}px`).toBeTruthy();
+      const intersects = a!.x < b!.x + b!.width && b!.x < a!.x + a!.width && a!.y < b!.y + b!.height && b!.y < a!.y + a!.height;
+      expect(intersects, `${viewport.width}px: New log ${JSON.stringify(a)} vs dock ${JSON.stringify(b)}`).toBe(false);
+    }
+  });
+
+  test('is not on public pages outside the app shell', async ({ page, onboarded }) => {
+    // Structural: the dock mounts only in (app)/layout.tsx; /consent, onboarding and legal pages sit outside it.
+    await login(page, onboarded);
+    await page.goto('/privacy');
+    await page.waitForLoadState('networkidle');
+    await expect(dockBox(page)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Show Ask the ledger' })).toHaveCount(0);
+  });
+
   test('Escape in the box clears it', async ({ page, onboarded }) => {
     await login(page, onboarded);
     await dockBox(page).fill(QUESTION);
