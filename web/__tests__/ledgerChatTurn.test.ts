@@ -139,6 +139,42 @@ describe('runLedgerChatTurn', () => {
     expect(result.answer).toBe(FALLBACK_ANSWER);
   });
 
+  test('a brand whose name is a number word is a name, not a figure; other number words still count', async () => {
+    const brandLog: CigaretteLog = {
+      id: 'fs', tsUtc: '2026-06-21T03:30:00.000Z', localDate: TODAY, localHour: 9, brandId: 'b', brandNameSnap: 'Four Square',
+      variantSnap: null, quantity: 1, purchaseMode: 'single', packSize: null, totalPriceInr: 20, unitPriceInr: 20,
+      priceSource: 'exact', triggerTag: null, moodBefore: null, moodAfter: null, craving: null, contextTag: null,
+      notes: null, createdAt: '', updatedAt: '',
+    };
+    const brandCtx = buildToolContext({ profile, logs: [brandLog], rows, goals: [], today: TODAY, summarySinceYmd: '2025-06-22' });
+    const ok = fakeClient([message([toolUse('brand_mix', {})], 'tool_use'), message([text('Most of it went on Four Square.')], 'end_turn')]);
+    const kept = await runLedgerChatTurn({ anthropic: ok.client, model: 'fake', ctx: brandCtx, history: [], question: 'Which brand?' });
+    expect(kept.answer).toBe('Most of it went on Four Square.');
+    expect(kept.usage.guardRetries).toBe(0);
+
+    const bad = fakeClient([
+      message([toolUse('brand_mix', {})], 'tool_use'),
+      message([text('Four Square, about four packs.')], 'end_turn'),
+      message([text('Four Square, about four packs.')], 'end_turn'),
+    ]);
+    const flagged = await runLedgerChatTurn({ anthropic: bad.client, model: 'fake', ctx: brandCtx, history: [], question: 'Which brand?' });
+    expect(flagged.answer).toBe(FALLBACK_ANSWER);
+  });
+
+  test('discreet mode reaches the guard: a spelled-out duration triggers the retry', async () => {
+    const discreetCtx = buildToolContext({
+      profile: { ...profile, discreetMode: true }, logs, rows, goals: [], today: TODAY, summarySinceYmd: '2025-06-22',
+    });
+    const { client } = fakeClient([
+      message([toolUse('compare_periods', { window: 'week' })], 'tool_use'),
+      message([text('The last three days were quieter.')], 'end_turn'),
+      message([text('The last few days were quieter.')], 'end_turn'),
+    ]);
+    const result = await runLedgerChatTurn({ anthropic: client, model: 'fake', ctx: discreetCtx, history: [], question: 'q' });
+    expect(result.usage.guardRetries).toBe(1);
+    expect(result.answer).toBe('The last few days were quieter.');
+  });
+
   test('a refusal yields the calm fallback and runs no tools', async () => {
     const { client, calls } = fakeClient([message([], 'refusal')]);
 

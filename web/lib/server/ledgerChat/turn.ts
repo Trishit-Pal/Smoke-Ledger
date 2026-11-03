@@ -141,7 +141,9 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   if (narration == null || last == null) return finish(FALLBACK_ANSWER);
 
   const allowed = allowedNumbers(outcomes, { year: ctx.today.slice(0, 4), extraText: [contextBlock] });
-  const figureOpts = { discreet: ctx.discreet };
+  // Brand and variant names the tools may echo (aliases when discreet): "Four Square" is a name.
+  const allowedPhrases = ctx.logs.flatMap((l) => [l.brandNameSnap ?? '', l.variantSnap ?? '']);
+  const figureOpts = { discreet: ctx.discreet, allowedPhrases };
   let answer = sanitizeNarration(narration);
   let unverified = findUnverifiedFigures(answer, allowed, figureOpts);
 

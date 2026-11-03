@@ -87,16 +87,23 @@ export function findUnverifiedNumbers(text: string, allowed: ReadonlySet<string>
 
 // Number words (gap N2): a figure spelled out dodges the digit check above.
 // "one" and "two" are left alone; they are everyday English ("one of", "two
-// quiet days"). Hinglish words count only before a unit, because "do" is also
-// English ("do you").
+// quiet days"). Outside discreet mode the Hinglish digits count only before a
+// unit or a scale word, because "do" is also English ("do you"). In discreet
+// mode they always count (the panel masks digits, not words), except a bare "do".
 const TENS = 'twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
 const ONES = 'one|two|three|four|five|six|seven|eight|nine';
 const ENGLISH_WORDS =
   `(?:${TENS})(?:-(?:${ONES}))?|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen` +
   '|sixteen|seventeen|eighteen|nineteen|hundreds?|thousands?|lakhs?|crores?|millions?|percent|per\\s+cent';
-const HINGLISH_WORDS = 'ek|do|teen|char|chaar|paanch|panch|chhe|saat|aath|nau|das';
-const HINGLISH_UNIT = '(?=\\s+(?:sticks?|cigarettes?|cigs?|packs?|rupees?|rs|euros?|baar|din|ghante)\\b)';
-const NUMBER_WORD = new RegExp(`\\b(?:${ENGLISH_WORDS})\\b|\\b(?:${HINGLISH_WORDS})\\b${HINGLISH_UNIT}`, 'gi');
+/** Hinglish hundreds and thousands: always figures (lakh and crore are in the English list). */
+const HINGLISH_SCALE = 'sau|hazaar|hazar';
+const HINGLISH_DIGITS_NOT_DO = 'ek|teen|char|chaar|paanch|panch|chhe|saat|aath|nau|das';
+const HINGLISH_UNIT =
+  '(?=\\s+(?:sticks?|cigarettes?|cigs?|packs?|rupees?|rupaye|rupay|rupaiye|rupaiya|rupiya|rs|paise|euros?' +
+  `|baar|din|ghante|${HINGLISH_SCALE}|lakhs?|crores?)\\b)`;
+const ALWAYS = `\\b(?:${ENGLISH_WORDS}|${HINGLISH_SCALE})\\b`;
+const NUMBER_WORD_PLAIN = new RegExp(`${ALWAYS}|\\b(?:do|${HINGLISH_DIGITS_NOT_DO})\\b${HINGLISH_UNIT}`, 'gi');
+const NUMBER_WORD_DISCREET = new RegExp(`${ALWAYS}|\\b(?:${HINGLISH_DIGITS_NOT_DO})\\b|\\bdo\\b${HINGLISH_UNIT}`, 'gi');
 const WORD_DURATION_CONTEXT =
   /^[\s-]*(?:days?|weeks?|months?|years?|hours?|hrs?|minutes?|mins?|o['’]clock|am|pm|a\.m\.|p\.m\.|din|ghante)(?![a-z])/i;
 
@@ -108,7 +115,7 @@ const WORD_DURATION_CONTEXT =
  */
 export function findUnverifiedNumberWords(text: string, opts: { discreet: boolean }): string[] {
   const out: string[] = [];
-  const re = new RegExp(NUMBER_WORD.source, 'gi');
+  const re = new RegExp((opts.discreet ? NUMBER_WORD_DISCREET : NUMBER_WORD_PLAIN).source, 'gi');
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const word = m[0];
@@ -120,13 +127,26 @@ export function findUnverifiedNumberWords(text: string, opts: { discreet: boolea
   return out;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** `text` with each phrase blanked out, case-insensitive, longest first. */
+function withoutPhrases(text: string, phrases: readonly string[]): string {
+  const sorted = [...new Set(phrases.map((p) => p.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+  return sorted.reduce((acc, p) => acc.replace(new RegExp(escapeRegExp(p), 'gi'), ' '), text);
+}
+
+export interface FigureCheckOptions {
+  discreet: boolean;
+  /** Brand, variant and alias strings from this turn's data: "Four Square" is a name, not a figure. */
+  allowedPhrases?: readonly string[];
+}
+
 /** Digits and number words together: what the turn engine checks before showing a reply. */
-export function findUnverifiedFigures(
-  text: string,
-  allowed: ReadonlySet<string>,
-  opts: { discreet: boolean },
-): string[] {
-  return [...findUnverifiedNumbers(text, allowed), ...findUnverifiedNumberWords(text, opts)];
+export function findUnverifiedFigures(text: string, allowed: ReadonlySet<string>, opts: FigureCheckOptions): string[] {
+  const words = withoutPhrases(text, opts.allowedPhrases ?? []);
+  return [...findUnverifiedNumbers(text, allowed), ...findUnverifiedNumberWords(words, opts)];
 }
 
 /** Plain text only: no links, no markdown, no html, bounded length. */

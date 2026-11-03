@@ -1,4 +1,10 @@
-import { allowedNumbers, findUnverifiedNumberWords, findUnverifiedNumbers, sanitizeNarration } from '@/domain/ledgerChat/guard';
+import {
+  allowedNumbers,
+  findUnverifiedFigures,
+  findUnverifiedNumberWords,
+  findUnverifiedNumbers,
+  sanitizeNarration,
+} from '@/domain/ledgerChat/guard';
 import type { ToolOutcome } from '@/domain/ledgerChat/tools';
 
 const outcome: ToolOutcome = {
@@ -84,5 +90,59 @@ describe('findUnverifiedNumberWords', () => {
   it('in discreet mode every number word is unverified, durations included', () => {
     expect(findUnverifiedNumberWords('The last three days, teen din.', { discreet: true })).toEqual(['three', 'teen']);
     expect(findUnverifiedNumberWords('Do you want one of those?', { discreet: true })).toEqual([]);
+  });
+});
+
+describe('Hinglish hundreds, thousands and money (fix round 1, I1)', () => {
+  it.each([
+    ['Teen sau rupaye lage.', ['Teen', 'sau']],
+    ['Do hazaar ka kharcha.', ['Do', 'hazaar']],
+    ['Paanch rupaye ka.', ['Paanch']],
+    ['Das paise kam.', ['Das']],
+  ])('flags them outside discreet mode: %s', (text, expected) => {
+    expect(findUnverifiedNumberWords(text, { discreet: false })).toEqual(expected);
+  });
+
+  it.each([
+    ['Teen sau rupaye lage.', ['Teen', 'sau']],
+    ['Paanch rupaye ka.', ['Paanch']],
+    ['Do hazaar ka kharcha.', ['Do', 'hazaar']],
+    ['Kal saat, aaj teen.', ['saat', 'teen']],
+    ['Ek hazar.', ['Ek', 'hazar']],
+  ])('flags every Hinglish number word in discreet mode, unit or not: %s', (text, expected) => {
+    expect(findUnverifiedNumberWords(text, { discreet: true })).toEqual(expected);
+  });
+
+  it.each(['Do you want to look at last week?', 'What do you see in it?', 'I do.'])(
+    '"do" as English is never flagged, discreet or not: %s',
+    (text) => {
+      expect(findUnverifiedNumberWords(text, { discreet: true })).toEqual([]);
+      expect(findUnverifiedNumberWords(text, { discreet: false })).toEqual([]);
+    },
+  );
+});
+
+describe('brand names are not figures (fix round 1, I2)', () => {
+  const brandOutcome: ToolOutcome = {
+    ok: true,
+    data: { brands: [{ brand: 'Four Square', sharePct: 60 }] },
+    rows: [],
+  };
+  const allowedHere = allowedNumbers([brandOutcome], { year: '2026' });
+  const phrases = ['Four Square', 'Seven Hills Kings'];
+
+  it('an answer naming a brand from the tool data passes', () => {
+    expect(findUnverifiedFigures('Most of it went on four square lately.', allowedHere, { discreet: false, allowedPhrases: phrases })).toEqual([]);
+    expect(findUnverifiedFigures('Seven Hills Kings came second.', allowedHere, { discreet: false, allowedPhrases: phrases })).toEqual([]);
+  });
+
+  it('a number word outside the brand name is still flagged', () => {
+    expect(
+      findUnverifiedFigures('Four Square, about four packs.', allowedHere, { discreet: false, allowedPhrases: phrases }),
+    ).toEqual(['four']);
+  });
+
+  it('without the phrase the brand word trips the guard, as before', () => {
+    expect(findUnverifiedFigures('Four Square led.', allowedHere, { discreet: false })).toEqual(['Four']);
   });
 });
