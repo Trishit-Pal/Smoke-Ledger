@@ -111,7 +111,7 @@ Ask the ledger is built on web and mobile and is **off everywhere** until you do
   - Discreet mode masks brands and numbers in the rows.
   - Both light and dark themes read cleanly and the pill never covers the tab bar.
   - On a notched phone and in landscape the pill and the input clear the safe areas and the keyboard.
-- [ ] **8. Rolling it back.** Set `LEDGER_CHAT_ENABLED=false` in Vercel and redeploy. The web dock disappears, the route returns 503 and the mobile app shows the calm unavailable message. Nothing is stored on our side, so there is nothing to clean up.
+- [ ] **8. Rolling it back.** Set `LEDGER_CHAT_ENABLED=false` in Vercel and redeploy. The web dock disappears, the route returns 503 and the mobile app shows the calm unavailable message. Nothing is stored on our side, so there is nothing to clean up there; a reader's saved conversation stays in their browser until they sign out or turn discreet mode on, because the Settings row with Clear conversation is hidden while the flag is off.
 
 ## 9. Runbook: a reader asks to correct their name, date of birth or gender
 
