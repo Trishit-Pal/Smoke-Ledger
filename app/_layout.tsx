@@ -10,7 +10,7 @@ import {
 } from '@expo-google-fonts/dm-sans';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack, usePathname, useRootNavigationState, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSession } from '@/store/session';
 import { useAuth } from '@/store/auth';
@@ -23,7 +23,7 @@ import { spacing } from '@/constants/theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
-import { routeGuardRedirect } from '@/lib/routeGuard';
+import { isGuardLoading, routeGuardRedirect } from '@/lib/routeGuard';
 import { clearNativeDevice } from '@/lib/privacy/clearDeviceNative';
 import { MilestoneCelebration } from '@/components/character/MilestoneCelebration';
 import { LogoutFarewell } from '@/components/character/LogoutFarewell';
@@ -60,10 +60,13 @@ export default function RootLayout() {
 
   // The one guard for every route (tabs, modals, deep links). Redirects from an
   // effect, not <Redirect>: the Stack below must stay mounted so router.replace
-  // has a navigator, and <Redirect> needs a focused screen.
+  // has a navigator, and <Redirect> needs a focused screen. Not Stack.Protected
+  // either: it is one boolean per screen and cannot say "resume at onboarding
+  // step X" or "Settings yes, History no". The guard stays `loading` until the
+  // Stack is rendered (fonts, boot, error screen), because a replace before that
+  // is dropped and, with an unchanged target, never retried.
   const router = useRouter();
   const pathname = usePathname();
-  const navReady = Boolean(useRootNavigationState()?.key);
   const session = useAuth((s) => s.session);
   const authInitialized = useAuth((s) => s.initialized);
   const profile = useSession((s) => s.profile);
@@ -72,12 +75,19 @@ export default function RootLayout() {
     pathname,
     hasSession: Boolean(session),
     profile,
-    // A signed-out reader has no profile to wait for.
-    loading: !ready || !authInitialized || (Boolean(session) && !booted),
+    loading: isGuardLoading({
+      ready,
+      fontsReady,
+      hasError: Boolean(error),
+      authInitialized,
+      hasSession: Boolean(session),
+      booted,
+    }),
   });
+  // pathname in the deps: a gated -> gated move with the same target must retry.
   useEffect(() => {
-    if (navReady && guardTarget) router.replace(guardTarget);
-  }, [navReady, guardTarget, router]);
+    if (guardTarget) router.replace(guardTarget);
+  }, [guardTarget, pathname, router]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -216,13 +226,16 @@ export default function RootLayout() {
           <Stack.Screen name="ask" options={{ presentation: 'modal' }} />
         </Stack>
         </ErrorBoundary>
-        {/* Cover the screen (and its touches) for the frame before the guard's
-            redirect lands, so a deep link never shows or saves from a gated route. */}
+        {/* Covers the root content for the frame before the redirect lands. On iOS
+            native-stack presents `modal` screens above the RN root, so this sits
+            beneath them: the redirect landing is the protection, this only avoids
+            a flash. accessibilityViewIsModal (iOS) keeps VoiceOver on the spinner. */}
         {guardTarget ? (
           <View
+            accessibilityViewIsModal
             style={[StyleSheet.absoluteFill, { backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }]}
           >
-            <ActivityIndicator color={theme.accent} />
+            <ActivityIndicator color={theme.accent} accessibilityLabel="Loading" />
           </View>
         ) : null}
         {/* Character listeners — mounted once at the root so dispatchMilestone()

@@ -17,6 +17,24 @@ export interface RouteGuardInput {
   loading: boolean;
 }
 
+export interface GuardReadiness {
+  ready: boolean;
+  fontsReady: boolean;
+  hasError: boolean;
+  authInitialized: boolean;
+  hasSession: boolean;
+  booted: boolean;
+}
+
+/**
+ * True until the root layout is actually rendering its Stack with auth and
+ * profile resolved. Fonts and the error screen count: they replace the Stack, so
+ * a redirect fired meanwhile is dropped. A signed-out reader has no profile to wait for.
+ */
+export function isGuardLoading(r: GuardReadiness): boolean {
+  return !r.ready || !r.fontsReady || r.hasError || !r.authInitialized || (r.hasSession && !r.booted);
+}
+
 /**
  * The one mobile route guard (app/_layout.tsx): where this reader must be sent
  * instead of `pathname`, or null to let them stay. Covers every route, modals

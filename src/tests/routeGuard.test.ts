@@ -1,5 +1,5 @@
 import { LEGAL_VERSIONS } from '@/lib/legal';
-import { routeGuardRedirect } from '@/lib/routeGuard';
+import { isGuardLoading, routeGuardRedirect } from '@/lib/routeGuard';
 import type { UserProfile } from '@/types';
 
 const NOW = '2026-11-03T00:00:00.000Z';
@@ -75,7 +75,27 @@ describe('routeGuardRedirect', () => {
     });
   });
 
-  it('a not-yet-loaded profile for a signed-in reader resumes onboarding, never reaches a modal', () => {
+  it('a signed-in reader with no profile row resumes onboarding, never reaches a modal', () => {
     expect(guard('/log/new', null)).toBe('/onboarding/privacy');
+  });
+});
+
+describe('isGuardLoading', () => {
+  const settled = { ready: true, fontsReady: true, hasError: false, authInitialized: true, hasSession: true, booted: true };
+
+  it('is false only when the Stack is rendering and auth and profile are resolved', () => {
+    expect(isGuardLoading(settled)).toBe(false);
+  });
+  it.each([
+    ['boot not finished', { ready: false }],
+    ['fonts still loading', { fontsReady: false }],
+    ['error screen up', { hasError: true }],
+    ['auth not initialised', { authInitialized: false }],
+    ['signed in, profile not booted', { booted: false }],
+  ])('is true while %s', (_n, over) => {
+    expect(isGuardLoading({ ...settled, ...over })).toBe(true);
+  });
+  it('does not wait for a profile when signed out', () => {
+    expect(isGuardLoading({ ...settled, hasSession: false, booted: false })).toBe(false);
   });
 });

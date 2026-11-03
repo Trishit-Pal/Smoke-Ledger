@@ -28,6 +28,7 @@ describe('re-consent gate wiring', () => {
     const root = read('app', '_layout.tsx');
     expect(root).toContain('routeGuardRedirect({');
     expect(root).toContain('router.replace(guardTarget');
+    expect(root).toContain('isGuardLoading({');
     // ...and it is the only place: the tabs layout no longer repeats the checks.
     const tabs = read('app', '(tabs)', '_layout.tsx');
     expect(tabs).not.toMatch(/consentGateRedirect|resumeOnboardingRoute|<Redirect/);
