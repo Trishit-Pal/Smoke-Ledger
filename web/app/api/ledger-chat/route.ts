@@ -44,6 +44,9 @@ const DEFAULT_GLOBAL_CAP = 500;
 const DEFAULT_STATE_CAP = 120;
 /** Enough recent entries for the starters' mood/trigger check. */
 const STARTER_LOG_LIMIT = 200;
+/** Bounds the one goals read (active + history). Generous so an old active goal is never cut;
+ *  goal_history still hands the model at most 50. */
+const CHAT_GOALS_READ_LIMIT = 200;
 const DAY_SECONDS = 86_400;
 /** Same windows the screens load, so tool figures equal screen figures. */
 const LOG_WINDOW_DAYS = 90;
@@ -206,7 +209,7 @@ async function loadLedgerContext(
       limit: forStarters ? STARTER_LOG_LIMIT : GOAL_WINDOW_LOG_LIMIT,
     }),
     loadDailySummary(db, { from: summarySinceYmd, to: today }),
-    loadGoals(db, userId, { activeOnly: forStarters }),
+    loadGoals(db, userId, { activeOnly: forStarters, limit: CHAT_GOALS_READ_LIMIT }),
   ]);
 
   return buildToolContext({

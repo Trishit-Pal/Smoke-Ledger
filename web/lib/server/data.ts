@@ -307,11 +307,12 @@ export const getServerLogs = cache(
 export async function loadGoals(
   supabase: SupabaseClient,
   userId: string,
-  { activeOnly = true }: { activeOnly?: boolean } = {},
+  { activeOnly = true, limit }: { activeOnly?: boolean; limit?: number } = {},
 ): Promise<Goal[]> {
   let q = supabase.from('goals').select('*').eq('user_id', userId);
   if (activeOnly) q = q.eq('status', 'active');
-  const { data, error } = await q.order('created_at', { ascending: false });
+  const ordered = q.order('created_at', { ascending: false });
+  const { data, error } = await (limit ? ordered.limit(limit) : ordered);
   if (error) throw new Error(error.message);
   return (data as GoalRow[]).map(mapGoal);
 }

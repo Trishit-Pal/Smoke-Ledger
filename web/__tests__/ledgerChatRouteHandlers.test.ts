@@ -137,7 +137,7 @@ describe('ledger loads', () => {
     await POST(post());
 
     expect(mocks.loadGoals).toHaveBeenCalledTimes(1);
-    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: false });
+    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: false, limit: 200 });
     const ctx = mocks.runLedgerChatTurn.mock.calls[0][0].ctx;
     expect(ctx.goals.map((g: { id: string }) => g.id)).toEqual(['a']);
     expect(ctx.goalHistory.map((g: { id: string }) => g.id)).toEqual(['a', 'p']);
@@ -175,7 +175,7 @@ describe('GET /api/ledger-chat panel state', () => {
       currency: 'EUR',
       starters: ['What does my ledger say so far?'],
     });
-    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: true });
+    expect(mocks.loadGoals).toHaveBeenCalledWith(expect.anything(), 'u1', { activeOnly: true, limit: 200 });
     const logOpts = (mocks.loadLogsPage.mock.calls[0] as unknown[])[2] as { limit: number };
     expect(logOpts.limit).toBeLessThanOrEqual(200);
     expect(mocks.runLedgerChatTurn).not.toHaveBeenCalled();
