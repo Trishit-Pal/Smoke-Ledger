@@ -59,7 +59,10 @@ async function reconcileLoaded(goals: Goal[], logs: CigaretteLog[], today: strin
       completeIfActive: goalsRepo.completeGoalIfActive,
       markMet: goalsRepo.markGoalMet,
     });
-    return { goals: r.goals, applied: r.applied, failed: r.failed.length > 0 };
+    // A skipped write means the goal changed on another device: reload it once (web does the
+    // same) rather than show the stale copy until next boot. One reload, no re-reconcile, so no loop.
+    const current = r.skipped.length > 0 ? await goalsRepo.listAllGoals().catch(() => r.goals) : r.goals;
+    return { goals: current, applied: r.applied, failed: r.failed.length > 0 };
   } catch {
     return { goals, applied: [], failed: true };
   }

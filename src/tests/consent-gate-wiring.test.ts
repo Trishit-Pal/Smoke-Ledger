@@ -29,6 +29,8 @@ describe('re-consent gate wiring', () => {
     expect(root).toContain('routeGuardRedirect({');
     expect(root).toContain('router.replace(guardTarget');
     expect(root).toContain('isGuardLoading({');
+    // The overlay's modal is iOS-only: the content hides from TalkBack while it shows.
+    expect(root).toContain("importantForAccessibility={guardTarget ? 'no-hide-descendants' : 'auto'}");
     // ...and it is the only place: the tabs layout no longer repeats the checks.
     const tabs = read('app', '(tabs)', '_layout.tsx');
     expect(tabs).not.toMatch(/consentGateRedirect|resumeOnboardingRoute|<Redirect/);

@@ -208,6 +208,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        {/* importantForAccessibility is the Android half of the overlay's modal: TalkBack
+            can otherwise reach this content during the redirect frame. */}
+        <View style={{ flex: 1 }} importantForAccessibility={guardTarget ? 'no-hide-descendants' : 'auto'}>
         <ErrorBoundary label="App">
         <Stack
           screenOptions={{
@@ -226,10 +229,12 @@ export default function RootLayout() {
           <Stack.Screen name="ask" options={{ presentation: 'modal' }} />
         </Stack>
         </ErrorBoundary>
+        </View>
         {/* Covers the root content for the frame before the redirect lands. On iOS
             native-stack presents `modal` screens above the RN root, so this sits
             beneath them: the redirect landing is the protection, this only avoids
-            a flash. accessibilityViewIsModal (iOS) keeps VoiceOver on the spinner. */}
+            a flash. accessibilityViewIsModal (iOS) keeps VoiceOver on the spinner; the
+            content wrapper above hides itself from TalkBack while this shows. */}
         {guardTarget ? (
           <View
             accessibilityViewIsModal

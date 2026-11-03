@@ -13,8 +13,8 @@ interface DeleteOptions {
   onReauthRequired?: () => void;
   /**
    * The deletion ends a consent withdrawal. The server writes the `consent_revoked`
-   * row itself, after its re-auth gate and before the erase: once the account is
-   * gone no client can authenticate an audit write. Omitted (web) sends no body.
+   * row itself, only once the deletion succeeded (a failed delete leaves none): after the
+   * account is gone no client can authenticate an audit write. Omitted (web) sends no body.
    */
   withdraw?: boolean;
 }

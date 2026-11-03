@@ -75,6 +75,22 @@ describe('session goals reconcile', () => {
     expect(useSession.getState().consumeGoalMoments()).toEqual([]);
   });
 
+  it('a skipped transition reloads the goals once, so a goal changed elsewhere shows as it now is', async () => {
+    const changedElsewhere: Goal = { ...dueGoal(), status: 'paused' };
+    listAllGoals.mockResolvedValueOnce([dueGoal()]).mockResolvedValueOnce([changedElsewhere]);
+    completeIfActive.mockResolvedValue(false);
+    await useSession.getState().refreshGoals();
+    expect(listAllGoals).toHaveBeenCalledTimes(2);
+    expect(useSession.getState().goals[0].status).toBe('paused');
+    expect(useSession.getState().consumeGoalMoments()).toEqual([]);
+  });
+
+  it('reads the goals once when nothing was skipped', async () => {
+    listAllGoals.mockResolvedValue([dueGoal()]);
+    await useSession.getState().refreshGoals();
+    expect(listAllGoals).toHaveBeenCalledTimes(1);
+  });
+
   it('boot and refreshLogs read the goal window in one page of up to 2000 rows', async () => {
     listAllGoals.mockResolvedValue([]);
     const listLogsPage = logsRepo.listLogsPage as jest.Mock;

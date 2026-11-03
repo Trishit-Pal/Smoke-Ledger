@@ -133,12 +133,16 @@ describe('withdrawal proof on delete', () => {
       return i;
     };
 
-    it('writes consent_revoked after the re-auth gate and before the erase', () => {
-      const gate = at('if (!hasRecentSignIn(authHeader');
-      const revoked = at("event_type: 'consent_revoked'");
+    it('writes consent_revoked only after deleteUser succeeded, erase-proof and without a user id', () => {
       const erase = at("rpc('erase_account_data')");
-      expect(gate).toBeLessThan(revoked);
-      expect(revoked).toBeLessThan(erase);
+      const del = at('auth.admin.deleteUser(');
+      const delFailed = at("error: 'delete_failed'");
+      const revoked = at("event_type: 'consent_revoked'");
+      expect(erase).toBeLessThan(del);
+      expect(delFailed).toBeLessThan(revoked);
+      // user_id null + hashed id and reason in props: the erase rewrites earlier rows' props.
+      expect(source).toMatch(/user_id: null,\n\s+event_type: 'consent_revoked'/);
+      expect(source).toContain("hashed_user_id: hashedUserId, reason: 'delete'");
       // Only when asked, and through the shared allowlist redaction + source stamp.
       expect(source).toMatch(/if \(withdraw\) \{[\s\S]*?event_type: 'consent_revoked'/);
       expect(source).toContain('markClientReported(');

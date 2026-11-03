@@ -25,7 +25,8 @@
 //    `account_data_erased` row with the same hash. A tamper-evident copy lives
 //    in `error_events` (category compliance.delete) so the record survives the
 //    auth-row cascade. When the body says `{ withdraw: true }` a `consent_revoked`
-//    row is written in the same block (past the re-auth gate, before the erase).
+//    row (user_id null, props `{ hashed_user_id, reason: 'delete' }`) is written
+//    AFTER deleteUser succeeds, so a failed deletion leaves no withdrawal claim.
 // 6. Erase fail-safe: if `erase_account_data()` fails the function aborts WITHOUT
 //    calling admin.deleteUser. The user's data and auth row stay intact and the
 //    user can retry. We never delete the auth row over an unverified purge.
@@ -194,19 +195,6 @@ serve(async (req) => {
         message: redactText('account_deleted'),
         details_json: { request_id: requestId, hashed_user_id: hashedUserId },
       });
-      // The withdrawal proof row. Only here, past the re-auth gate: a cancelled detour
-      // never reaches it. The client cannot write it after the delete (no account left to
-      // authenticate), and erase_account_data anonymises it like the rows above.
-      if (withdraw) {
-        await supabaseAdmin.from('audit_events').insert({
-          user_id: userId,
-          event_type: 'consent_revoked',
-          event_category: 'compliance',
-          props_json: markClientReported(
-            redactAuditProps({ reason: 'health_data_withdrawn_then_delete' }),
-          ),
-        });
-      }
     } catch (auditErr) {
       // Audit is best-effort; do not abort the user-requested deletion.
       log.warn('audit_insert_failed', {
@@ -247,6 +235,30 @@ serve(async (req) => {
         400,
         origin,
       );
+    }
+
+    // The withdrawal proof row, written only once the deletion happened: a failed erase
+    // or deleteUser leaves no claim of a withdrawal, and retries cannot stack rows. The
+    // client cannot write it (no account left to authenticate). user_id is null and the
+    // hashed id is in props because erase_account_data already ran and would have
+    // rewritten an earlier row's props to `{hashed_user_id}`, losing `reason`.
+    if (withdraw) {
+      try {
+        await supabaseAdmin.from('audit_events').insert({
+          user_id: null,
+          event_type: 'consent_revoked',
+          event_category: 'compliance',
+          props_json: markClientReported(
+            redactAuditProps({ hashed_user_id: hashedUserId, reason: 'delete' }),
+          ),
+        });
+      } catch (auditErr) {
+        // Best-effort like the other audit rows: never block the success response.
+        log.warn('audit_insert_failed', {
+          request_id: requestId,
+          error: auditErr instanceof Error ? String(auditErr.message).slice(0, 200) : 'unknown',
+        });
+      }
     }
 
     return json({ ok: true, request_id: requestId }, 200, origin);
