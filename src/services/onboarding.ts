@@ -103,6 +103,43 @@ export async function submitConsentStep({
   invalidateAnalyticsConsentCache();
 }
 
+export interface AcceptChangedTermsInput {
+  /** The profile has no `health_data_consent_at`: ask for it, and stamp it. */
+  needsHealthConsent: boolean;
+  healthDataConsent: boolean;
+}
+
+/**
+ * The /consent screen for someone who already consented and is onboarded: stamp
+ * the current versions (and the health-data consent if it was never given) and
+ * audit once. Deliberately a separate write from `submitConsentStep`: it carries
+ * no `onboardingStep`, so asking again can never move the wizard, and it leaves
+ * the analytics preference alone.
+ */
+export async function acceptChangedTerms({
+  needsHealthConsent,
+  healthDataConsent,
+}: AcceptChangedTermsInput): Promise<void> {
+  if (needsHealthConsent && !healthDataConsent) {
+    throw new AppError('validation_error', 'Validation failed: health-data consent is required');
+  }
+  await recordAuditEvent('consent_accepted', 'compliance', {
+    termsVersion: LEGAL_VERSIONS.terms,
+    privacyVersion: LEGAL_VERSIONS.privacy,
+  });
+  await Promise.all([
+    saveComplianceConsents({
+      termsVersion: LEGAL_VERSIONS.terms,
+      privacyVersion: LEGAL_VERSIONS.privacy,
+      healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
+      ...(needsHealthConsent ? { healthDataConsentAt: new Date().toISOString() } : {}),
+    }),
+    setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),
+    setSetting('consent.privacyVersion', LEGAL_VERSIONS.privacy),
+    setSetting('consent.medicalDisclaimerVersion', LEGAL_VERSIONS.medicalDisclaimer),
+  ]);
+}
+
 /* ---------- Step 02 · baseline ---------- */
 
 export interface UsageDraft {

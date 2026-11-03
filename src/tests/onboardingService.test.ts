@@ -8,6 +8,7 @@ import { emptyGoalForm } from '@/domain/goalForm';
 import { OnboardingUsageSchema, ProfilePatchSchema } from '@/lib/validation';
 import type { Goal, UserProfile } from '@/types';
 import {
+  acceptChangedTerms,
   consentsCurrent,
   finishOnboarding,
   loadGoalStep,
@@ -97,6 +98,49 @@ describe('consentsCurrent', () => {
     expect(consentsCurrent(consentedProfile)).toBe(true);
     expect(consentsCurrent({ ...consentedProfile, termsVersion: '2020-01-01' })).toBe(false);
     expect(consentsCurrent({ ...consentedProfile, dataProcessingConsentAt: null })).toBe(false);
+  });
+});
+
+describe('acceptChangedTerms (the /consent screen)', () => {
+  it('stamps the current versions and the health consent, audits once, and never touches the step', async () => {
+    await acceptChangedTerms({ needsHealthConsent: true, healthDataConsent: true });
+
+    expect(profileRepo.saveComplianceConsents).toHaveBeenCalledTimes(1);
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(patch).toEqual({
+      termsVersion: LEGAL_VERSIONS.terms,
+      privacyVersion: LEGAL_VERSIONS.privacy,
+      healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
+      healthDataConsentAt: expect.any(String),
+    });
+    expect('onboardingStep' in patch).toBe(false);
+    expect(profileRepo.setOnboardingStep).not.toHaveBeenCalled();
+    expect(recordAuditEvent).toHaveBeenCalledTimes(1);
+    expect(recordAuditEvent).toHaveBeenCalledWith(
+      'consent_accepted',
+      'compliance',
+      expect.objectContaining({ termsVersion: LEGAL_VERSIONS.terms }),
+    );
+    // Audit lands first, so a failed audit never leaves a recorded consent without its row.
+    expect(mocked(recordAuditEvent).mock.invocationCallOrder[0]).toBeLessThan(
+      mocked(profileRepo.saveComplianceConsents).mock.invocationCallOrder[0],
+    );
+    // The analytics preference is not part of this screen.
+    expect(settingsRepo.setSetting).not.toHaveBeenCalledWith('consent.analyticsOptIn', expect.anything());
+  });
+
+  it('does not restamp the health consent when it was already given', async () => {
+    await acceptChangedTerms({ needsHealthConsent: false, healthDataConsent: false });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect('healthDataConsentAt' in patch).toBe(false);
+  });
+
+  it('refuses to continue without the health consent when it is missing, and writes nothing', async () => {
+    await expect(
+      acceptChangedTerms({ needsHealthConsent: true, healthDataConsent: false }),
+    ).rejects.toThrow(/health-data consent/);
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
   });
 });
 

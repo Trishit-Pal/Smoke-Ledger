@@ -26,8 +26,11 @@ describe.each([
   });
 
   it('shows the health consent in the Art 9 wording and a decline control', () => {
-    expect(src).toContain('HEALTH_CONSENT_LABEL');
-    expect(src).toContain('HEALTH_DECLINE_LABEL');
+    // Web renders the row through the shared component (also used by /consent).
+    const rowSrc = _platform === 'web' ? read('web/components/onboarding/ConsentRows.tsx') : src;
+    expect(rowSrc).toContain('HEALTH_CONSENT_LABEL');
+    expect(rowSrc).toContain('HEALTH_DECLINE_LABEL');
+    if (_platform === 'web') expect(src).toContain('HealthConsentRow');
   });
 
   it('passes the health consent to the service, and gates Continue on it', () => {

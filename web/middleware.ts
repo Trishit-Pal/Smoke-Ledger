@@ -4,6 +4,9 @@ import { isEmailConfirmed } from '@/lib/compliance';
 import { isReauthRequest } from '@/lib/reauth';
 import {
   canAccessOnboardingStep,
+  CONSENT_ROUTE,
+  consentGateRedirect,
+  consentsOutdated,
   effectiveOnboardingStep,
   hasRequiredConsents,
   resumeOnboardingRoute,
@@ -178,7 +181,7 @@ export async function middleware(request: NextRequest) {
   const { data: profile } = await supabase
     .from('user_profiles')
     .select(
-      'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at',
+      'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at, health_data_consent_at',
     )
     .eq('id', user.id)
     .maybeSingle();
@@ -194,7 +197,12 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/') {
     return finalize(
-      NextResponse.redirect(new URL(onboarded && consented ? '/dashboard' : resume, request.url)),
+      NextResponse.redirect(
+        new URL(
+          onboarded && consented ? (consentsOutdated(steps) ? CONSENT_ROUTE : '/dashboard') : resume,
+          request.url,
+        ),
+      ),
     );
   }
 
@@ -214,6 +222,16 @@ export async function middleware(request: NextRequest) {
     !isRecoveryRoute(pathname)
   ) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
+  }
+
+  // Re-consent gate: an onboarded user whose consents are older than the current
+  // legal versions (or who never gave the health-data consent) is sent to /consent
+  // before anything else, and a current user on /consent goes home. Sits before
+  // the onboarded bounce so /onboarding/* also lands on /consent, not /dashboard.
+  // /consent and the legal, settings, auth and API paths are exempt, so no loop.
+  const consentRedirect = consentGateRedirect(pathname, steps, onboarded);
+  if (consentRedirect) {
+    return finalize(NextResponse.redirect(new URL(consentRedirect, request.url)));
   }
 
   // Enforce funnel step order so a partially-onboarded user can't skip ahead

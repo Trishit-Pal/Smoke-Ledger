@@ -1,4 +1,5 @@
 import type { OnboardingStep } from '@/types';
+import { LEGAL_VERSIONS } from '@/lib/legal';
 
 /**
  * Single source of truth for onboarding step order. Consumed by the web
@@ -87,6 +88,7 @@ export interface ConsentProfile {
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
+  healthDataConsentAt?: string | null;
 }
 
 export function hasRequiredConsents(profile: ConsentProfile | null | undefined): boolean {
@@ -111,6 +113,7 @@ export interface ResumeProfileRow {
   privacy_version?: string | null;
   health_disclaimer_version?: string | null;
   data_processing_consent_at?: string | null;
+  health_data_consent_at?: string | null;
 }
 
 /**
@@ -126,6 +129,7 @@ export function resumeProfileFromRow(row: ResumeProfileRow | null | undefined): 
     privacyVersion: row?.privacy_version ?? null,
     healthDisclaimerVersion: row?.health_disclaimer_version ?? null,
     dataProcessingConsentAt: row?.data_processing_consent_at ?? null,
+    healthDataConsentAt: row?.health_data_consent_at ?? null,
   };
 }
 
@@ -146,4 +150,56 @@ export function effectiveOnboardingStep(profile: ResumeProfile | null | undefine
 /** Where a not-yet-onboarded user should land: the privacy step until the consents exist, then the saved step. */
 export function resumeOnboardingRoute(profile: ResumeProfile | null | undefined): string {
   return earliestOnboardingRoute(effectiveOnboardingStep(profile));
+}
+
+/**
+ * Someone who consented before, but not to what is current: a stored version is
+ * older than LEGAL_VERSIONS, or the explicit health-data consent was never given
+ * (every user from before it existed has it NULL). Never true for someone who has
+ * not consented at all - onboarding asks them. Reads only consent columns, never
+ * `onboarding_step`, so asking again cannot move the wizard.
+ */
+export function consentsOutdated(profile: ConsentProfile | null | undefined): boolean {
+  if (!hasRequiredConsents(profile)) return false;
+  return (
+    profile?.termsVersion !== LEGAL_VERSIONS.terms ||
+    profile?.privacyVersion !== LEGAL_VERSIONS.privacy ||
+    profile?.healthDisclaimerVersion !== LEGAL_VERSIONS.medicalDisclaimer ||
+    !profile?.healthDataConsentAt
+  );
+}
+
+export const CONSENT_ROUTE = '/consent';
+
+// Reachable while consents are outdated, so the reader can read the documents,
+// export or withdraw (both live in settings), sign in/out and recover a password.
+// Exact or `/x/...` matches only: `/settingsx` is not `/settings`.
+const CONSENT_EXEMPT_PATHS = [
+  CONSENT_ROUTE,
+  '/privacy',
+  '/terms',
+  '/support',
+  '/settings',
+  '/auth',
+  '/reset-password',
+  '/api',
+];
+
+/**
+ * Where an onboarded user must go for the re-consent gate, or null. Shared by the
+ * web middleware, post-auth routing and the Expo layout so they cannot disagree.
+ * Outdated -> /consent (which is exempt, so it never loops); current on /consent
+ * -> `home`. A user still onboarding is left to the onboarding gates.
+ */
+export function consentGateRedirect(
+  pathname: string,
+  profile: ConsentProfile | null | undefined,
+  onboarded: boolean,
+  home = '/dashboard',
+): string | null {
+  if (!onboarded) return null;
+  const onConsent = pathname === CONSENT_ROUTE || pathname.startsWith(`${CONSENT_ROUTE}/`);
+  if (!consentsOutdated(profile)) return onConsent ? home : null;
+  const exempt = CONSENT_EXEMPT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return exempt ? null : CONSENT_ROUTE;
 }

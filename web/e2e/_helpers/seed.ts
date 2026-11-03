@@ -17,6 +17,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
+import { LEGAL_VERSIONS } from '../../../src/lib/legal';
 
 export interface SeededUser {
   id: string;
@@ -179,15 +180,47 @@ export async function markOnboarded(
       onboarded_at: opts.onboardedAt ?? now,
       onboarding_step: 'done',
       age_confirmed_at: now,
-      terms_version: '1',
-      privacy_version: '1',
-      health_disclaimer_version: '1',
+      // Current versions + the health consent, so the re-consent gate leaves a seeded
+      // user alone. markConsentOutdated() makes one stale on purpose.
+      terms_version: LEGAL_VERSIONS.terms,
+      privacy_version: LEGAL_VERSIONS.privacy,
+      health_disclaimer_version: LEGAL_VERSIONS.medicalDisclaimer,
       data_processing_consent_at: now,
+      health_data_consent_at: now,
       baseline_per_day: opts.baselinePerDay ?? 10,
       baseline_window_days: 30,
     })
     .eq('id', userId);
   if (error) throw new Error(`seed: markOnboarded failed: ${error.message}`);
+}
+
+/**
+ * Make an onboarded user's consents stale, the way every live user is before they
+ * accept the rewrite: an older terms version and no health-data consent.
+ */
+export async function markConsentOutdated(userId: string): Promise<void> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { error } = await a
+    .from('user_profiles')
+    .update({ terms_version: '2020-01-01', health_data_consent_at: null })
+    .eq('id', userId);
+  if (error) throw new Error(`seed: markConsentOutdated failed: ${error.message}`);
+}
+
+/** The consent columns the re-consent screen writes, read back with the service role. */
+export async function readConsentState(
+  userId: string,
+): Promise<{ terms_version: string | null; health_data_consent_at: string | null }> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { data, error } = await a
+    .from('user_profiles')
+    .select('terms_version,health_data_consent_at')
+    .eq('id', userId)
+    .single();
+  if (error) throw new Error(`seed: readConsentState failed: ${error.message}`);
+  return data as { terms_version: string | null; health_data_consent_at: string | null };
 }
 
 /** The saved onboarding step pointer (what the middleware gates on). */

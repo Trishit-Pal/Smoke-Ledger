@@ -274,7 +274,7 @@ interface ConsentRowProps {
   showBottomRule: boolean;
 }
 
-function ConsentRow({ index, label, sub, required, value, onChange, showBottomRule }: ConsentRowProps) {
+export function ConsentRow({ index, label, sub, required, value, onChange, showBottomRule }: ConsentRowProps) {
   const theme = useTheme();
   return (
     <View>

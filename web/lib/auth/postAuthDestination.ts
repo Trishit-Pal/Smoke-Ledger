@@ -1,5 +1,7 @@
 import type { AllowedEmailOtpType } from '@/lib/emailOtpType';
 import {
+  CONSENT_ROUTE,
+  consentsOutdated,
   hasRequiredConsents,
   resumeOnboardingRoute,
   resumeProfileFromRow,
@@ -9,7 +11,7 @@ import { CALLBACK_ONBOARDING_PATHS } from '@web/lib/auth/callbackNextPath';
 
 /** The profile columns the post-sign-in routing reads. */
 export const POST_AUTH_PROFILE_COLUMNS =
-  'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at';
+  'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at, health_data_consent_at';
 
 export interface PostAuthProfile {
   onboarded_at?: string | null;
@@ -19,6 +21,7 @@ export interface PostAuthProfile {
   privacy_version?: string | null;
   health_disclaimer_version?: string | null;
   data_processing_consent_at?: string | null;
+  health_data_consent_at?: string | null;
 }
 
 /**
@@ -59,6 +62,9 @@ export function postAuthDestination(
       ? nextPath!
       : resumeOnboardingRoute(steps);
   }
+
+  // Older consents ask again once, before the page they were heading to.
+  if (consentsOutdated(steps)) return CONSENT_ROUTE;
 
   return nextPath ?? '/dashboard';
 }
