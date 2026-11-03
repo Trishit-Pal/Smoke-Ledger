@@ -44,6 +44,7 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['--on-accent', '--accent-ink'],
   ['--on-accent', '--warn-earth-ink'],
   ['--warn-earth-ink', '--bg'],
+  ['--warn-earth-ink', '--card'],
   ['--warn-earth-ink', '--warn-earth-soft'],
 ];
 

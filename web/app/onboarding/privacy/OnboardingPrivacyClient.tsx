@@ -196,7 +196,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           role="alert"
           style={{
             fontSize: 13,
-            color: 'var(--warn-earth)',
+            color: 'var(--warn-earth-ink)',
             margin: 0,
           }}
         >

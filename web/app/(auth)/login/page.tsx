@@ -753,7 +753,7 @@ function InlineInfo({ message, tone = 'info' }: { message: string; tone?: 'info'
       role="status"
       style={{
         fontSize: 13,
-        color: tone === 'warn' ? 'var(--warn-earth)' : 'var(--accent-ink)',
+        color: tone === 'warn' ? 'var(--warn-earth-ink)' : 'var(--accent-ink)',
         fontFamily: 'var(--font-display)',
         fontStyle: 'italic',
         margin: '12px 0 0 0',

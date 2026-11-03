@@ -516,7 +516,7 @@ export function HistoryClient({
       {/* Show delete error if any */}
       {deleteError && (
         <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] left-4 right-4 md:bottom-[calc(theme(spacing.xxl)+var(--ask-dock-clear,0px))] md:left-auto md:right-4 md:max-w-sm z-40 p-md bg-bg border border-[var(--warn-earth)] rounded-md shadow-lg">
-          <p className="text-small text-[var(--warn-earth)]">{deleteError}</p>
+          <p className="text-small text-[var(--warn-earth-ink)]">{deleteError}</p>
         </div>
       )}
     </div>
