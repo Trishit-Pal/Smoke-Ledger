@@ -5,9 +5,11 @@ import {
   LEDGER_CHAT_NOTICE,
   LEDGER_CHAT_NOTICE_TEXT,
   LEDGER_CHAT_NOTICE_VERSION,
+  LEDGER_CHAT_SETTINGS_SUBLABEL,
   chatOptInValue,
   isCurrentChatOptIn,
 } from '@/domain/ledgerChat/notice';
+import { mobileNoticeParagraphs } from '@/lib/askView';
 import * as webNotice from '@web/components/chat/notice';
 import { SYSTEM_PROMPT } from '@web/lib/server/ledgerChat/prompt';
 
@@ -91,10 +93,16 @@ describe('ledger chat scope', () => {
 // changed notice must come with a new version, or old opt-ins would silently cover new words.
 describe('chat opt-in is versioned to the notice', () => {
   test('notice text is pinned to its version', () => {
-    const pinned = { version: '2026-11-03', sha256: '5a073b038c9ff8d7e48832ac121980f349c73c78a7cde12b71fd1fa0d204a233' };
-    const sha256 = createHash('sha256').update(LEDGER_CHAT_NOTICE_TEXT).digest('hex');
-    expect(sha256, 'notice text changed: bump LEDGER_CHAT_NOTICE_VERSION and update this hash').toBe(pinned.sha256);
-    expect(LEDGER_CHAT_NOTICE_VERSION).toBe(pinned.version);
+    // Append-only: a new notice adds a new version key; never edit an old hash.
+    const NOTICE_HASHES: Record<string, string> = {
+      '2026-11-03': '3681aa9d86874a5acfe9574a43909b6c0706b3a061a03baf0a1486931771e183',
+    };
+    // Everything a reader sees before opting in: the web notice, the mobile notice, the Settings line.
+    const shown = [LEDGER_CHAT_NOTICE_TEXT, ...mobileNoticeParagraphs(), LEDGER_CHAT_SETTINGS_SUBLABEL].join('\n');
+    const sha256 = createHash('sha256').update(shown).digest('hex');
+    expect(sha256, 'notice text changed: bump LEDGER_CHAT_NOTICE_VERSION and update this hash').toBe(
+      NOTICE_HASHES[LEDGER_CHAT_NOTICE_VERSION],
+    );
   });
 
   test('only the current version counts as consent; a pre-versioning true, an older version or off do not', () => {

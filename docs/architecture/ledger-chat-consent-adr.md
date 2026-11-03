@@ -27,7 +27,7 @@ Store the notice version instead of `true`.
 - Opting out still stores `false`.
 - No migration. Existing `true` rows read as "not consented". Those readers see the consent card again the next time they ask.
 - The `ledger_chat_consent_toggled` audit event gains a `noticeVersion` prop beside `privacyVersion`. It is registered in `src/services/audit.ts` and `web/app/api/audit/schema.ts`. The edge function `audit-record` filters props with a key denylist, so the new key passes there without change.
-- `web/__tests__/ledgerChatScope.test.ts` pins a sha256 of `LEDGER_CHAT_NOTICE_TEXT` next to the version. If the text changes, the test fails with "notice text changed: bump LEDGER_CHAT_NOTICE_VERSION and update this hash".
+- `web/__tests__/ledgerChatScope.test.ts` pins one sha256 of everything a reader sees before opting in: the web notice (`LEDGER_CHAT_NOTICE_TEXT`), the mobile notice (`mobileNoticeParagraphs()`, with its own device line) and the Settings line (`LEDGER_CHAT_SETTINGS_SUBLABEL`). The pin is an append-only map keyed by version (`NOTICE_HASHES`). If any of the text changes, the test fails with "notice text changed: bump LEDGER_CHAT_NOTICE_VERSION and update this hash". A new hash without a new version key shows up in the diff as an edited old entry.
 - Web Settings shows the switch and its notice dialog only when `isLedgerChatEnabled()` is true. That is the same gate the dock and the route use.
 
 ## Options considered
@@ -68,16 +68,16 @@ A and B cost about the same today. Only A keeps the record true as the notice ke
 
 ## Consequences
 
-- **Each notice change asks everyone again.** Any edit to `LEDGER_CHAT_NOTICE` needs a new `LEDGER_CHAT_NOTICE_VERSION` and a new pinned hash in the same change. Readers then see the consent card again on their next question.
+- **Each notice change asks everyone again.** Any edit to the web notice, the mobile notice or the Settings line needs a new `LEDGER_CHAT_NOTICE_VERSION` and a new `NOTICE_HASHES` entry in the same change. Readers then see the consent card again on their next question.
 - **Mobile and web must ship the same version.** Both read the one constant in `src/domain`, but they deploy separately. An installed mobile build with an older version stores that older version when the reader opts in. A build from before this change stores `true`. Either way the web route refuses the opt-in, and the mobile screen asks again, until the reader updates the app. Ship the mobile build with the web deploy whenever the version changes.
 - **Readers who opted in before this change opt in again.** Their `true` rows stay in `settings_kv` and read as off. Nothing is deleted.
 - **The audit trail names the notice.** `noticeVersion` in `ledger_chat_consent_toggled` records which notice each toggle rested on. Redeploying `audit-record` is already step 2 of owner-actions §8.
-- **Only the shared notice is hashed.** On mobile, the device sentence of the notice is `MOBILE_DEVICE_NOTE` in `src/lib/askView.ts`, and the hash does not cover it. A change there needs a manual version bump.
+- **Both platforms' texts are covered.** On mobile, the notice's device sentence is `MOBILE_DEVICE_NOTE` in `src/lib/askView.ts`, in place of the web one. The pin hashes it through `mobileNoticeParagraphs()`, so a mobile-only edit also fails the test.
 
 ## Action items
 
 1. [x] `LEDGER_CHAT_NOTICE_VERSION`, `isCurrentChatOptIn` and `chatOptInValue` in `src/domain/ledgerChat/notice.ts`, re-exported from `web/components/chat/notice.ts`.
 2. [x] Writers (`AskLedgerPanel.tsx`, `SettingsClient.tsx`, `src/services/ledgerChat.ts`) store `chatOptInValue(...)` and audit `noticeVersion`. Readers (`web/app/api/ledger-chat/route.ts`, `web/lib/server/data.ts`, `src/services/ledgerChat.ts`) use `isCurrentChatOptIn`.
 3. [x] Settings row and notice dialog behind `isLedgerChatEnabled()`.
-4. [x] Hash pin and stale-value tests (`ledgerChatScope`, `ledgerChatRouteHandlers`, `ledgerChatService`, `ledgerChatPanel`), plus the e2e seed.
+4. [x] Hash pin over the web notice, the mobile notice and the Settings line, plus stale-value tests (`ledgerChatScope`, `ledgerChatRouteHandlers`, `ledgerChatService`, `ledgerChatPanel`), plus the e2e seed.
 5. [ ] Owner: redeploy `audit-record` (owner-actions §8 step 2), and ship the mobile build in step with web whenever the version changes.

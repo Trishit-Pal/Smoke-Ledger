@@ -28,7 +28,8 @@ export const LEDGER_CHAT_NOTICE_TEXT = Object.values(LEDGER_CHAT_NOTICE).join(' 
 /**
  * The opt-in (settings_kv `consent.ledgerChatOptIn`) stores the version of the notice it was
  * given to, so a reader is asked again whenever the notice changes. Bump this with any change
- * to LEDGER_CHAT_NOTICE; web/__tests__/ledgerChatScope.test.ts pins the text's hash to it.
+ * to what a reader sees before opting in (LEDGER_CHAT_NOTICE, LEDGER_CHAT_SETTINGS_SUBLABEL, and
+ * mobile's MOBILE_DEVICE_NOTE); web/__tests__/ledgerChatScope.test.ts pins their hash to it.
  * Web and mobile read this one constant but deploy separately: ship both when it changes, or an
  * older app build stores a version the route refuses. See docs/architecture/ledger-chat-consent-adr.md.
  */
@@ -44,5 +45,6 @@ export function chatOptInValue(enabled: boolean): typeof LEDGER_CHAT_NOTICE_VERS
   return enabled ? LEDGER_CHAT_NOTICE_VERSION : false;
 }
 
+// Shown before opt-in on both platforms: bump LEDGER_CHAT_NOTICE_VERSION with any change here.
 export const LEDGER_CHAT_SETTINGS_SUBLABEL =
   'Answers questions about your own ledger with an AI model run by Anthropic (United States). Off by default; you will see exactly what is sent before it turns on. Turning it off clears the conversation on this device.';
