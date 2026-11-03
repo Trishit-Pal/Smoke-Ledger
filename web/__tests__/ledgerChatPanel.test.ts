@@ -115,7 +115,7 @@ describe('state from GET and the initial question', () => {
 
   test('after Turn on and ask, the state is read again so starters appear without a reload', () => {
     const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
-    expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*if \(loaded\.state\) setState\(loaded\.state\);/);
+    expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*\/\/[^\n]*\n\s*if \(loaded\.state && stateLoadRef\.current === openLoad\) setState\(loaded\.state\);/);
   });
 
   test('one GET per open, even when an effect re-runs, and no second send while one is in flight', () => {
@@ -125,6 +125,13 @@ describe('state from GET and the initial question', () => {
     expect(effect.indexOf('stateLoadRef.current = null')).toBeLessThan(effect.indexOf('return;'));
     expect(effect.slice(effect.indexOf('return () =>'))).not.toContain('stateLoadRef');
     expect(panel).toContain("if (status === 'loading') return;");
+  });
+
+  test('a fresh open drops a stale GET refusal, and the post-consent re-read cannot land after a close or reopen', () => {
+    expect(panel).toMatch(/setStatus\(\(prev\) => loaded\.blocked \?\? \(prev === 'disabled' \|\| prev === 'outdated' \? 'idle' : prev\)\)/);
+    const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
+    expect(turnOn.indexOf('const openLoad = stateLoadRef.current')).toBeLessThan(turnOn.indexOf('await send('));
+    expect(turnOn).toContain('stateLoadRef.current === openLoad');
   });
 
   test('outdated agreements and a resting feature get calm copy; outdated links to /consent', () => {

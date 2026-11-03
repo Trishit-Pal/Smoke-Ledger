@@ -85,6 +85,33 @@ test.describe('ask dock', () => {
     expect(gets).toBe(2);
   });
 
+  test('reopening after the agreements were reviewed clears the outdated notice and sends the question', async ({ page, onboarded }) => {
+    // The dock stays mounted while the reader visits /consent, so a block from one open must not outlive it.
+    let gets = 0;
+    await page.route(CHAT_ROUTE, (route: Route) => {
+      if (route.request().method() !== 'GET') return route.fulfill(json(200, ANSWER));
+      gets += 1;
+      return route.fulfill(
+        gets === 1
+          ? json(403, { error: 'consent_outdated' })
+          : json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }),
+      );
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toHaveCount(0);
+    expect(gets).toBe(2);
+  });
+
   test('never covers History’s New log button, on a phone or a desktop', async ({ page, onboarded }) => {
     await login(page, onboarded);
     for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {

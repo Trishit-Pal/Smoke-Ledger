@@ -180,7 +180,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
       setState(loaded.state);
-      if (loaded.blocked) setStatus(loaded.blocked);
+      // A refusal from an earlier open is stale once this GET is fine (the reader may have just
+      // reviewed the agreements); an answer in flight or a POST-side status is left alone.
+      setStatus((prev) => loaded.blocked ?? (prev === 'disabled' || prev === 'outdated' ? 'idle' : prev));
       setReady(true);
     });
     return () => {
@@ -249,6 +251,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
 
   const onTurnOnAndAsk = async () => {
     if (!pending) return;
+    const openLoad = stateLoadRef.current;
     setStatus('loading');
     try {
       // The notice version, not `true`: the consent covers only the words shown here.
@@ -272,7 +275,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     await send(pending.question, pending.starter);
     // Opted in now: read the state again so the starters appear without a reload.
     const loaded = await loadChatState();
-    if (loaded.state) setState(loaded.state);
+    // Closed (ref cleared) or reopened (a newer GET) in the meantime: that open's state wins.
+    if (loaded.state && stateLoadRef.current === openLoad) setState(loaded.state);
   };
 
   const onNotNow = () => {
