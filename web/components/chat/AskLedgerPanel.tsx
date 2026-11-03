@@ -190,9 +190,10 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
 
   // The box and starters are disabled while an answer is in flight, which drops focus to the dialog.
   // When it ends, put focus back in the box, unless the reader has moved to another control.
+  // Not on touch: it would raise the keyboard over each new answer in the short sheet.
   const wasBusyRef = React.useRef(false);
   React.useEffect(() => {
-    if (wasBusyRef.current && !busy && open) {
+    if (wasBusyRef.current && !busy && open && !window.matchMedia('(pointer: coarse)').matches) {
       const active = document.activeElement;
       const lost =
         !active || active === document.body || active === contentRef.current || active === inputRef.current || active.closest('[data-starters]');
@@ -489,7 +490,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
             })}
 
             <div aria-live="polite" className="flex flex-col gap-sm">
-              {/* The transcript above is outside this region, so the newest answer is mirrored here as hidden text. */}
+              {/* The transcript above is outside this region, so the newest answer is mirrored here as hidden text.
+                  ponytail: a screen reader's browse mode can read it twice (here and in the transcript); aria-hide the
+                  transcript's newest article if that proves noisy. */}
               {announced ? <p className="sr-only">{maskNumbers(announced.answer, announcedMasked)}</p> : null}
               {pending && status !== 'idle' ? (
                 <p className="editorial-pullquote mt-md text-[clamp(1rem,2vw,1.125rem)] text-text">{pending.question}</p>

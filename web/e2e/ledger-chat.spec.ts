@@ -60,7 +60,7 @@ test.describe('ask the ledger', () => {
     expect(posts).toBe(0);
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
 
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByRole('definition').filter({ hasText: /^8$/ })).toBeVisible();
     await expect(dialog.getByText('₹160')).toBeVisible();
 
@@ -100,7 +100,7 @@ test.describe('ask the ledger', () => {
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
     await dialog.getByRole('button', { name: STARTER }).click();
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
 
     // Money and stick rows are masked at the render site; the percent row is not.
     await expect(dialog.getByLabel('Spend, this week hidden, tap to reveal')).toBeVisible();

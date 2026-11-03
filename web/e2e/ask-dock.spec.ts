@@ -53,7 +53,7 @@ test.describe('ask dock', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(QUESTION).first()).toBeVisible();
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByText('Written by AI')).toBeVisible();
   });
 
@@ -107,7 +107,7 @@ test.describe('ask dock', () => {
     await expect(dialog).toBeHidden();
     await dockBox(page).fill(QUESTION);
     await dockBox(page).press('Enter');
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toHaveCount(0);
     expect(gets).toBe(2);
   });
@@ -187,7 +187,7 @@ test.describe('ask dock', () => {
     await dockBox(page).fill(QUESTION);
     await dockBox(page).press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(dockBox(page)).toBeFocused();
@@ -241,7 +241,7 @@ test.describe('ask dock', () => {
     await dockBox(page).fill(QUESTION);
     await dockBox(page).press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
-    await expect(dialog.getByText(ANSWER.answer).first()).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByLabel('Ask your ledger')).toBeFocused();
   });
 

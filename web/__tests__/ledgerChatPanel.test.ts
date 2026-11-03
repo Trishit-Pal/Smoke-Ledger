@@ -52,6 +52,8 @@ describe('AskLedgerPanel', () => {
     const close = panel.slice(panel.indexOf('const onCloseFocus'), panel.indexOf('const wasBusyRef'));
     expect(close).toContain('e.preventDefault()');
     expect(close).toContain('returnFocus?.()');
+    // The refocus after an answer is skipped on touch, where it would raise the keyboard over each answer.
+    expect(panel).toMatch(/wasBusyRef\.current && !busy && open && !window\.matchMedia\('\(pointer: coarse\)'\)\.matches/);
   });
 
   test('is a Radix dialog with a live answer region and the shared 16px input style', () => {
