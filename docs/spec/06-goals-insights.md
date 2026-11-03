@@ -362,7 +362,7 @@ resurrect steps and dismissals written since) and updates only if the goal is st
 active and its `target_value` is the one the plan used. When the server declines
 (the goal was set aside, deleted or re-anchored elsewhere) the transition lands in
 `skipped`: not an error, no "Quit day." moment, and the web hook keeps the card as
-stored and refreshes. A user's own status change (`setGoalStatus`) stays
+stored and refreshes (the mobile store reloads the goals once in `reconcileLoaded`). A user's own status change (`setGoalStatus`) stays
 unconditional.
 
 - **Web.** The `useGoalReconcile(goals, logs, today)` hook

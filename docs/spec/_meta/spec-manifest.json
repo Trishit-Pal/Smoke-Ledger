@@ -116,7 +116,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "3d534c0",
+      "last_verified_commit": "e974a1e",
       "status": "current"
     },
     {
@@ -174,7 +174,7 @@
         "src/lib/askView.ts",
         "web/components/chat/**"
       ],
-      "last_verified_commit": "3d534c0",
+      "last_verified_commit": "e974a1e",
       "status": "current"
     },
     {
