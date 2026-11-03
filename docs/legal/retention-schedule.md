@@ -8,9 +8,9 @@ The facts below are read from `src/lib/privacy/retention.ts`, `supabase/migratio
 | Record | Where | Kept for | Ends by | Notes |
 |---|---|---|---|---|
 | Ledger: logs, brands and variants, goals, price entries, reminders, settings, facts seen | Supabase Postgres | While the account exists | Erase, delete, or the reader editing or removing a row | No inactivity deletion. A free-tier Supabase project pauses when idle; that is not deletion |
-| Profile: name, date of birth, gender, country, currency, preferences, consent stamps and versions | `user_profiles`, and name / DOB / gender copies in `auth.users` metadata | While the account exists | Erase (profile fields cleared, metadata keys removed) or delete | Name, DOB and gender are locked once set (O7); erase still clears them |
+| Profile: name, date of birth, gender, country, currency, preferences, consent stamps and versions | `user_profiles`, and name / DOB / gender copies in `auth.users` metadata | While the account exists | Erase (profile fields cleared, including the mobile-change stamp; country and currency kept as regional settings; metadata keys removed) or delete | Name, DOB and gender are locked once set (O7); erase still clears them |
 | Sign-in record: email, phone, password hash | `auth.users` | While the account exists | Delete account | Erase alone keeps the sign-in record, because the reader keeps the account |
-| Audit events | `audit_events` | 12 months | Daily purge; prior rows are anonymised on erase | Exports, erasures, consent changes. Properties are allowlisted and size-capped |
+| Audit events | `audit_events` | 12 months | Daily purge; prior rows are anonymised on erase | Exports, erasures, consent changes. Properties are allowlisted and size-capped. `consent_accepted` rows are purged at 12 months even while the account is live; proof of consent then rests on the profile's consent timestamps and accepted versions (lawyer item 11 in `owner-actions.md`) |
 | Erasure proof (`account_data_erased` row) | `audit_events` | 12 months | Daily purge | Disclosed retained record of erasure (GDPR Art 5(2) and 17 accountability). Holds a pepper-hashed pseudonym, not the user id |
 | Error events | `error_events` | 90 days | Daily purge; a reader's own rows are also deleted on erase | Text is redacted when written. `compliance.delete` tombstones carry no user id |
 | Usage events (analytics, opt-in only) | `usage_events` | 12 months | Daily purge; deleted at once when the reader turns analytics off | Nothing is written without consent |
@@ -24,7 +24,7 @@ The facts below are read from `src/lib/privacy/retention.ts`, `supabase/migratio
 
 - Function: `public.purge_expired_records()`, SECURITY DEFINER, empty `search_path`, execute granted to `service_role`.
 - Schedule: pg_cron job `purge-expired-records`, `37 3 * * *` (03:37 daily, database time). The rate-limit purge is a separate job at 03:17.
-- Deletes: `audit_events` older than 12 months, `error_events` older than 90 days, `usage_events` older than 12 months.
+- Deletes: `audit_events` older than 12 months, `error_events` older than 90 days, `usage_events` older than 12 months. That includes `consent_accepted` rows; the consent itself stays recorded on the profile (`*_consent_at` timestamps and `terms_version` / `privacy_version` / `health_disclaimer_version`) for as long as the account exists.
 - If pg_cron is not installed the migration only warns. `npm run verify:backend` prints the manual check: `SELECT jobname, schedule FROM cron.job WHERE jobname = 'purge-expired-records';`. CI's `scripts/sql/smoke.sql` fails when pg_cron is installed and the job is missing.
 
 ## Device

@@ -74,7 +74,7 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 ## Your rights, and how to use them
 - Copy: Settings › Export your data (JSON).
 - Correct: profile details in Settings (name, date of birth and gender: see below).
-- Erase: Settings › Erase all log data (keeps the login). Delete: Settings › Delete account permanently (needs a sign-in within 15 minutes).
+- Erase: Settings › Erase all log data (keeps the login). Country and currency stay: regional settings the app needs to work, not part of the ledger. Delete: Settings › Delete account permanently (needs a sign-in within 15 minutes).
 - Withdraw consent: next section. Object, restrict or anything else: write to us.
 - Free; requests answered within one month, grievances within 30 days; we may ask you to write from the account email.
 - From DPDP commencement: nominate someone to act for you after death or incapacity, by writing to us.
@@ -116,11 +116,11 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 
 ## Name, date of birth and gender
 - Locked once set, because the 18+ check rests on the date of birth and a changeable one would let the check be stepped around.
-- If one is wrong: Erase clears all three (with the ledger) so they can be entered again, or write to us. Erase and Delete remove them everywhere, including the sign-in record.
+- If one is wrong: write to us and we correct it by hand (owner-actions §9). Erase clears all three (with the ledger), but there is no screen to enter them again; corrected details after an erase are also recorded only by writing to us. Erase and Delete remove them everywhere, including the sign-in record.
 
 ## Languages
 - English now. Hindi is being prepared; other Eighth Schedule languages on request.
 
 ## Versions and changes
 - The date at the top is this version; we record which version you accepted and when.
-- A change that matters is explained, with reasons, and must be accepted again on the next visit; until then the app shows only the consent screen. Declining leaves export and delete open. Earlier versions on request.
+- A change that matters is explained, with reasons, and must be accepted again on the next visit; until then the app shows only the consent screen, Settings (where you can export or delete) and the legal pages. Declining leaves export and delete open. Earlier versions on request.

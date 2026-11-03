@@ -97,7 +97,7 @@ const sections = [
     body: [
       'See and take a copy: Settings › Export your data gives you a JSON file of everything listed in our promises.',
       'Correct: change your profile details in Settings. Your name, date of birth and gender work differently; see below.',
-      'Erase: Settings › Erase all log data removes your ledger and identity details and keeps your login. Delete: Settings › Delete account permanently does the same and then removes your account. Deleting needs a sign-in within the last 15 minutes.',
+      'Erase: Settings › Erase all log data removes your ledger and identity details and keeps your login. Your country and currency stay, because the app needs them to work: they are regional settings, not part of your ledger. Delete: Settings › Delete account permanently does the same and then removes your account. Deleting needs a sign-in within the last 15 minutes.',
       'Withdraw consent: see the next section. To object to or restrict any processing, or for anything the app cannot do, write to us.',
       `We answer requests free of charge within one month, and grievances within ${grievanceOfficer.responseDays} days. We may ask you to write from the email address on your account so we know the request is yours.`,
       'Once the DPDP rules apply, you will also be able to name someone to use these rights for you if you die or cannot act yourself. Write to us to do that.',
@@ -160,7 +160,7 @@ const sections = [
     title: 'Name, date of birth and gender',
     body: [
       'Once set, your name, date of birth and gender cannot be edited. Your date of birth is what the 18+ check rests on; if it could be changed later, the check could be stepped around, so it and the other identity details are fixed once given.',
-      'If one is wrong, Erase clears all three, along with your ledger, so you can enter them again, or write to us. Erase and Delete remove them everywhere we keep them, including the sign-in record.',
+      'If one is wrong, write to us and we will correct it by hand. Erase clears all three along with your ledger, but the app has no screen to enter them again, so to record corrected details after an erase, write to us too. Erase and Delete remove them everywhere we keep them, including the sign-in record.',
     ],
   },
   {
@@ -173,7 +173,7 @@ const sections = [
     title: 'Versions and changes',
     body: [
       'The date at the top is this version. We record which version you accepted, and when.',
-      'When we change this policy or the terms in a way that matters to you, we will say what changed and why, and ask you to accept again the next time you open the app. Until you do, the app shows only the consent screen. If you would rather not accept, you can export your data or delete your account. Earlier versions are available on request.',
+      'When we change this policy or the terms in a way that matters to you, we will say what changed and why, and ask you to accept again the next time you open the app. Until you do, the app shows only the consent screen, Settings (where you can export or delete) and the legal pages. If you would rather not accept, you can export your data or delete your account. Earlier versions are available on request.',
     ],
   },
 ] as const;

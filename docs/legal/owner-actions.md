@@ -5,31 +5,35 @@ Written 3 November 2026.
 
 ## 1. Database and deploy order
 
-Order matters. Do these in sequence.
+Order matters. Do these in sequence. **Do not deploy the web or mobile code until step 5.** Every live reader has no health-data consent yet (`health_data_consent_at` is NULL, deliberately not backfilled), so the re-consent screen fires the moment the new code is live, whatever `LEGAL_VERSIONS` says. Readers must only ever be asked to accept the final policy: the one that names the EU representative, under the bumped versions.
 
-- [ ] **Review the migrations**, then check the prerequisite for the first one. Why: erase must be able to update `auth.users`. Where: Supabase SQL editor.
+- [ ] **1. Check the `auth.users` privilege.** Why: erase updates `auth.users`. If the privilege is missing, erase fails outright (the whole transaction rolls back), and delete-account fails too, because it runs erase first. Where: Supabase SQL editor.
   ```sql
   SELECT has_table_privilege('postgres','auth.users','UPDATE');
   ```
   It must return `true`. If it does not, stop and fix the privilege first.
-- [ ] **Apply `20261103000000_adaptive_goals.sql`** if not already applied. Why: the goals e2e in CI needs it, and the export function copies forward from it. Ship the mobile app with or ahead of the web release. Where: `npm run db:push` or the dashboard.
-- [ ] **Apply `20261104100000_erase_auth_metadata.sql`**. Why: erase now clears name, date of birth and gender from the sign-in record and deletes the reader's own error events.
-- [ ] **Apply `20261104110000_retention_purge.sql`**. Why: the daily purge for audit (12 months), error (90 days) and usage (12 months) records.
-- [ ] **Apply `20261104120000_export_complete.sql`**. Why: the export now includes the sign-in record and error events (version 3).
-- [ ] **Apply `20261104130000_health_consent.sql` BEFORE deploying the web and mobile code.** Why: it adds `user_profiles.health_data_consent_at`. The new middleware reads that column, and without it the middleware breaks for everyone. Also adds the withdrawal-related changes (analytics off deletes past usage events).
-- [ ] **Confirm the purge job exists.** Run `npm run verify:backend`, then check by hand:
+- [ ] **2. Apply the migrations, in this order**, to the live project **and to the CI Supabase project** (`web/e2e/_helpers/seed.ts` writes `health_data_consent_at`, so every seeded e2e user fails without it). Where: `npm run db:push` or the dashboard. Review each first.
+  1. `20261103000000_adaptive_goals.sql`, if not already applied. The export function copies forward from it.
+  2. `20261104100000_erase_auth_metadata.sql`: erase clears name, date of birth and gender from the sign-in record and deletes the reader's own error events.
+  3. `20261104110000_retention_purge.sql`: the daily purge for audit (12 months), error (90 days) and usage (12 months) records.
+  4. `20261104120000_export_complete.sql`: the export includes the sign-in record and error events (version 3).
+  5. `20261104130000_health_consent.sql`: adds `user_profiles.health_data_consent_at` (the new middleware reads it and breaks for everyone without it) and `delete_my_usage_events` (analytics off deletes past usage events).
+  6. `20261104140000_erase_profile_leftovers.sql`: erase also clears `mobile_changed_at` (the 30-day mobile lock) and old `deleted_at` stamps.
+
+  Then **confirm the purge job exists.** Run `npm run verify:backend`, then check by hand:
   ```sql
   SELECT jobname, schedule FROM cron.job WHERE jobname = 'purge-expired-records';
   ```
   Expect `37 3 * * *`. If pg_cron is missing, enable it in Database, Extensions, and re-run the migration. Why: without it, nothing purges and the retention promise is false.
-- [ ] **Deploy the edge functions `audit-record` and `delete-account`.** Why: hashed rate-limit keys and redaction. Where: `supabase functions deploy audit-record delete-account`. Redeploy `audit-record` whenever its allowlist gains an event. If phone sign-in is switched on, also deploy `send-sms-otp`.
-- [ ] **Deploy web and mobile.** Expect every existing reader to see the re-consent screen once after deploy, because health consent is missing for them. That is intended and honest; do not backfill it.
+- [ ] **3. Confirm `AUDIT_PEPPER` is set** for the edge functions (`supabase secrets list`), **then redeploy `audit-record` and `delete-account`**. Why: `delete-account` now hashes its rate-limit keys with the pepper and imports `_shared/redact.ts`; deployed without the secret, keys are hashed with an empty pepper. Where: `supabase functions deploy audit-record delete-account`. If phone sign-in is switched on, also deploy `send-sms-otp`. Redeploy `audit-record` whenever its allowlist gains an event.
+- [ ] **4. Release gate: sign the EU representative, fill `legalEntity`, bump `LEGAL_VERSIONS`.** See section 2. Nothing in step 5 happens before this.
+- [ ] **5. Only then deploy web and mobile together, both carrying the same `LEGAL_VERSIONS`.** Why: a mobile build is compiled with its own `LEGAL_VERSIONS` and there are no over-the-air updates. The app treats a stored version as current when it is the same or newer, so an older build no longer loops, but an older build will not ask its readers to accept the new version either; the web will. Ship the mobile build that carries the bump at the same time as the web, never ahead of it (a mobile build ahead of the bump would ask readers to accept the old policy). Expect every existing reader to see the re-consent screen once. That is intended and honest; do not backfill the health consent.
 
 ## 2. Release gate (the EU representative)
 
 - [ ] **Sign an EU Art 27 representative** (decision O1). Why: GDPR applies to EU readers and an Art 27 representative is required. Where: a commercial representative service; no sourced pricing was found, so get quotes. Choose a Member State where you have the most readers.
 - [ ] **Fill the representative fields in `src/lib/legalEntity.ts`.** Why: the policy names the representative once signed. A one-line change.
-- [ ] **Task 12 then bumps `LEGAL_VERSIONS`.** Why: re-consent must not fire before the policy names the representative. Everything else can ship first behind the old version.
+- [ ] **Task 12 then bumps `LEGAL_VERSIONS`.** Why: re-consent must not fire before the policy names the representative. Migrations and edge functions (section 1, steps 1 to 3) can go first; the web and mobile code cannot, because re-consent fires on deploy (section 1, step 5).
 
 ## 3. Processors
 
@@ -73,6 +77,7 @@ Take this list to one short consultation. None of these blocks the release; the 
 8. **Intermediary status and consumer-law applicability** for a free app run by an individual (IT Act s.2(1)(w), Consumer Protection Act 2019, dark-pattern guidelines).
 9. **ePrivacy and localStorage.** Does the first-party chat transcript need more than the chat consent?
 10. **SCC fit** for a non-EU controller subject to GDPR under Art 3(2), and whether the DPF challenge (C-703/25 P) changes the transfer plan.
+11. **Proof of consent after 12 months.** The daily purge deletes `consent_accepted` audit rows at 12 months while the account is live. Proof of consent then rests on the profile's consent timestamps and accepted versions. Is that enough under GDPR Art 7(1) and DPDP s.6(10)?
 
 ## 8. Code follow-ups from review (not legal)
 
