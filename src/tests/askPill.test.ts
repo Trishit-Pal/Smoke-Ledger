@@ -6,31 +6,40 @@ import {
   scrollBottomPadding,
   tabBarHeight,
 } from '@/lib/askPill';
+import { CHAT_UNDISCLOSED_PRIVACY } from '@/lib/legal';
+
+// Any version later than the undisclosed one counts as "the policy now describes the chat".
+const NEWER_PRIVACY = '2026-11-03';
 
 describe('isLedgerChatEnabled', () => {
   it('is on only for the exact string "true"', () => {
-    expect(isLedgerChatEnabled('true')).toBe(true);
+    expect(isLedgerChatEnabled('true', NEWER_PRIVACY)).toBe(true);
     for (const v of [undefined, '', 'false', 'TRUE', '1', 'yes']) {
-      expect(isLedgerChatEnabled(v)).toBe(false);
+      expect(isLedgerChatEnabled(v, NEWER_PRIVACY)).toBe(false);
     }
+  });
+
+  it('stays off while the privacy policy is the undisclosed version, flag or not', () => {
+    expect(isLedgerChatEnabled('true', CHAT_UNDISCLOSED_PRIVACY)).toBe(false);
+    expect(isLedgerChatEnabled('true')).toBe(false);
   });
 });
 
 describe('isAskPillVisible', () => {
   it.each(['/', '/index', '/trends', '/history', '/goals', '/settings'])('shows on %s when the flag is on', (path) => {
-    expect(isAskPillVisible(path, 'true')).toBe(true);
+    expect(isAskPillVisible(path, 'true', NEWER_PRIVACY)).toBe(true);
   });
 
   it.each(['/log', '/log/new', '/ask', '/consent', '/onboarding/privacy', '/login', '/goals/new'])(
     'hides on %s even with the flag on',
     (path) => {
-      expect(isAskPillVisible(path, 'true')).toBe(false);
+      expect(isAskPillVisible(path, 'true', NEWER_PRIVACY)).toBe(false);
     },
   );
 
   it('hides everywhere when the flag is not "true"', () => {
-    expect(isAskPillVisible('/trends', undefined)).toBe(false);
-    expect(isAskPillVisible('/trends', 'false')).toBe(false);
+    expect(isAskPillVisible('/trends', undefined, NEWER_PRIVACY)).toBe(false);
+    expect(isAskPillVisible('/trends', 'false', NEWER_PRIVACY)).toBe(false);
   });
 });
 
@@ -41,7 +50,7 @@ describe('scrollBottomPadding', () => {
   });
   it('clears the whole pill (gap above the bar plus its height) when the flag is on', () => {
     expect(ASK_PILL_CLEARANCE).toBeGreaterThanOrEqual(ASK_PILL_TARGET + 8);
-    expect(scrollBottomPadding('true')).toBeGreaterThanOrEqual(ASK_PILL_CLEARANCE);
+    expect(scrollBottomPadding('true', NEWER_PRIVACY)).toBeGreaterThanOrEqual(ASK_PILL_CLEARANCE);
   });
 });
 

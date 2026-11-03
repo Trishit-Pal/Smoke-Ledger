@@ -80,38 +80,11 @@ Take this list to one short consultation. None of these blocks the release; the 
 10. **SCC fit** for a non-EU controller subject to GDPR under Art 3(2), and whether the DPF challenge (C-703/25 P) changes the transfer plan.
 11. **Proof of consent after 12 months.** The daily purge deletes `consent_accepted` audit rows at 12 months while the account is live. Proof of consent then rests on the profile's consent timestamps and accepted versions. Is that enough under GDPR Art 7(1) and DPDP s.6(10)?
 
-## 8. Code follow-ups from review (not legal)
-
-- [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
-- [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.
-
-## 9. Runbook: a reader asks to correct their name, date of birth or gender
-
-The app locks these once they are set (decision O7). The privacy policy says a reader can write to us to correct them, so this is how.
-
-1. **Check it is the account holder.** Reply only to the email address on the account (`SELECT id, email FROM auth.users WHERE email = '<from address>';`). If the request came from another address, ask them to write from the account email. Never act on a phone call or a forwarded message.
-2. **Check a new date of birth still passes 18+.** If the corrected date makes the reader under 18, do not apply it. Delete the account and its data instead (the policy's "Adults only" rule), and tell them why.
-3. **Make the change in the Supabase SQL editor, in one transaction.** The identity trigger lets the update through only while `app.erasing` is on for this transaction. Change both places, so the profile and the sign-in record agree:
-   ```sql
-   BEGIN;
-   SET LOCAL app.erasing = 'on';
-   UPDATE public.user_profiles
-      SET full_name = '<name>', date_of_birth = '<YYYY-MM-DD>', gender = '<allowed value>'  -- only the fields asked for
-    WHERE id = '<user id>';
-   UPDATE auth.users
-      SET raw_user_meta_data = raw_user_meta_data
-          || jsonb_build_object('full_name', '<name>', 'date_of_birth', '<YYYY-MM-DD>', 'gender', '<allowed value>')  -- same fields
-    WHERE id = '<user id>';
-   COMMIT;
-   ```
-   `gender` must be one of the values allowed by `user_profiles_gender_check`.
-4. **Record it.** Add a row to your requests log: date received, date done, which fields changed (not the old values), and the reply sent. Reply within 30 days (the Grievance Officer commitment). The reader's new values reach their export straight away.
-
 ## 8. Turn on Ask the ledger
 
 Ask the ledger is built on web and mobile and is **off everywhere** until you do this. The server switch is `LEDGER_CHAT_ENABLED`; the mobile switch is a build-time flag. Both default to off, so shipping the code turns nothing on. Do the steps in order.
 
-- [ ] **1. Finish section 1 and section 2 first, including the `LEGAL_VERSIONS` bump.** Why: the consent notice and the privacy page now list goal history, prices from entries and edit dates, and the page says the feature is on web and mobile. An opt-in recorded before the bump rests on the old text. The route also refuses a reader whose consent is outdated (`consent_outdated`), so the bump must be live before anyone can use it.
+- [ ] **1. Finish section 1 and section 2 first, including the `LEGAL_VERSIONS` bump.** Why: the consent notice and the privacy page now list goal history, prices from entries and edit dates, and the page says the feature is on web and mobile. An opt-in recorded before the bump rests on the old text. The route also refuses a reader whose consent is outdated (`consent_outdated`), so the bump must be live before anyone can use it. The code also enforces this: in Production the chat refuses to start, whatever `LEDGER_CHAT_ENABLED` says, until `LEGAL_VERSIONS.privacy` is later than `2026-11-02` (Preview and local runs are not gated, so step 3 still tests there first).
 - [ ] **2. Redeploy `audit-record`.** Why: the opt-in toggle writes the event `ledger_chat_consent_toggled`. If the deployed allowlist does not have it, the switch still works but leaves no record. Where: `supabase functions deploy audit-record`, then `npm run verify:backend`.
 - [ ] **3. Add the web environment variables in Vercel, Preview first.** Where: Vercel project settings, Environment Variables.
   - `ANTHROPIC_API_KEY`: the key from an account under the Commercial Terms (section 3). Set a monthly spend limit on it in the Anthropic console; that is the hard money cap.
@@ -139,3 +112,30 @@ Ask the ledger is built on web and mobile and is **off everywhere** until you do
   - Both light and dark themes read cleanly and the pill never covers the tab bar.
   - On a notched phone and in landscape the pill and the input clear the safe areas and the keyboard.
 - [ ] **8. Rolling it back.** Set `LEDGER_CHAT_ENABLED=false` in Vercel and redeploy. The web dock disappears, the route returns 503 and the mobile app shows the calm unavailable message. Nothing is stored on our side, so there is nothing to clean up.
+
+## 9. Runbook: a reader asks to correct their name, date of birth or gender
+
+The app locks these once they are set (decision O7). The privacy policy says a reader can write to us to correct them, so this is how.
+
+1. **Check it is the account holder.** Reply only to the email address on the account (`SELECT id, email FROM auth.users WHERE email = '<from address>';`). If the request came from another address, ask them to write from the account email. Never act on a phone call or a forwarded message.
+2. **Check a new date of birth still passes 18+.** If the corrected date makes the reader under 18, do not apply it. Delete the account and its data instead (the policy's "Adults only" rule), and tell them why.
+3. **Make the change in the Supabase SQL editor, in one transaction.** The identity trigger lets the update through only while `app.erasing` is on for this transaction. Change both places, so the profile and the sign-in record agree:
+   ```sql
+   BEGIN;
+   SET LOCAL app.erasing = 'on';
+   UPDATE public.user_profiles
+      SET full_name = '<name>', date_of_birth = '<YYYY-MM-DD>', gender = '<allowed value>'  -- only the fields asked for
+    WHERE id = '<user id>';
+   UPDATE auth.users
+      SET raw_user_meta_data = raw_user_meta_data
+          || jsonb_build_object('full_name', '<name>', 'date_of_birth', '<YYYY-MM-DD>', 'gender', '<allowed value>')  -- same fields
+    WHERE id = '<user id>';
+   COMMIT;
+   ```
+   `gender` must be one of the values allowed by `user_profiles_gender_check`.
+4. **Record it.** Add a row to your requests log: date received, date done, which fields changed (not the old values), and the reply sent. Reply within 30 days (the Grievance Officer commitment). The reader's new values reach their export straight away.
+
+## 10. Code follow-ups from review (not legal)
+
+- [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
+- [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.

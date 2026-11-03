@@ -118,7 +118,7 @@ Create `fix/review-highs` from 312eafd. Copy this plan to `docs/superpowers/plan
 - Tests: extract pure helpers into `src/lib/askView.ts` where logic branches (waiting-question reset, back fallback) and test them.
 
 ### Task 13 — Mobile root guard and consent row labels (S, sonnet)
-- `app/_layout.tsx`: one guard for every non-auth route (session → onboarding → `consentGateRedirect`), reusing the `(tabs)/_layout.tsx` logic (move, don't copy); closes owner-actions §8 "Mobile app/log/new and app/goals/new are not behind the consent gate" (tick it).
+- `app/_layout.tsx`: one guard for every non-auth route (session → onboarding → `consentGateRedirect`), reusing the `(tabs)/_layout.tsx` logic (move, don't copy); closes owner-actions §10 "Mobile app/log/new and app/goals/new are not behind the consent gate" (tick it).
 - `app/onboarding/privacy.tsx:320` `ConsentRow`: Switch gets `accessibilityLabel` = the row label.
 - Test: pure route-guard decision function tested in `src/tests/consent-gate-wiring.test.ts`.
 
