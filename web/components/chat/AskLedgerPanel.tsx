@@ -68,6 +68,8 @@ const COPY = {
   description:
     "Answers are written by an AI model from your ledger's own figures. Your conversation is kept only on this device.",
   empty: 'Log a few days first; then ask how your week compares.',
+  // Before opt-in the panel knows nothing of the ledger, so it claims nothing about it.
+  invite: 'Ask about your week, your spend or your goals.',
   loading: 'Reading the ledger…',
   rateLimited: "You've reached today's limit. The ledger is still here tomorrow.",
   disabled: 'Ask the ledger is resting for now.',
@@ -144,11 +146,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   // Set once the session and (on first open) the GET state have both landed for this open.
   const [ready, setReady] = React.useState(false);
   const fetchedRef = React.useRef(false);
+  // The in-flight GET, shared by a StrictMode re-run so the state cap is spent once.
+  const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
   const consumedRef = React.useRef(false);
 
   // Until the state is read, figures stay masked: the safe default.
   const hidden = state ? state.hideTotals : true;
   const starters = state?.starters ?? [];
+  // ponytail: a failed GET formats a revealed figure as INR; carry currency on POST if EUR readers hit it.
   const money = React.useCallback(
     (value: number) => formatMoney(value, state?.currency ?? 'INR', { locale: state?.locale }),
     [state?.currency, state?.locale],
@@ -164,11 +169,12 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       return;
     }
     let cancelled = false;
-    const needState = !fetchedRef.current;
-    void Promise.all([
-      sessionUserId(() => getSupabase().auth.getSession()),
-      needState ? loadChatState() : Promise.resolve(null),
-    ]).then(([id, loaded]) => {
+    let stateLoad: Promise<LoadedState | null> = Promise.resolve(null);
+    if (!fetchedRef.current) {
+      stateLoadRef.current ??= loadChatState();
+      stateLoad = stateLoadRef.current;
+    }
+    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoad]).then(([id, loaded]) => {
       if (cancelled) return;
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
@@ -233,6 +239,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     const q = initialQuestion?.trim();
     if (!q || status === 'disabled' || status === 'outdated') return;
     setDraft(q);
+    // An answer still in flight: leave the question in the box, never send two at once.
+    if (status === 'loading') return;
     if (state && !state.consented) {
       setPending({ question: q, starter: false });
       setStatus('consent');
@@ -262,6 +270,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     }
     setState((prev) => (prev ? { ...prev, consented: true } : prev));
     await send(pending.question, pending.starter);
+    // Opted in now: read the state again so the starters appear without a reload.
+    const loaded = await loadChatState();
+    if (loaded.state) setState(loaded.state);
   };
 
   const onNotNow = () => {
@@ -319,7 +330,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-lg pb-md">
-            {starters.length > 0 ? (
+            {!ready && !state ? (
+              <p className="rule-hair-strong mt-lg pt-md text-caption italic text-text-faint">{COPY.loading}</p>
+            ) : starters.length > 0 ? (
               <section className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
                 <SectionLabel spacing="none">To begin</SectionLabel>
                 <ul className="flex flex-col">
@@ -339,7 +352,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
                 </ul>
               </section>
             ) : (
-              <p className="rule-hair-strong mt-lg pt-md text-small text-text-muted">{COPY.empty}</p>
+              <p className="rule-hair-strong mt-lg pt-md text-small text-text-muted">
+                {state?.consented ? COPY.empty : COPY.invite}
+              </p>
             )}
 
             {turns.map((turn) => {

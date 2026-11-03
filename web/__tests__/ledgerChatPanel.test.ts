@@ -104,6 +104,22 @@ describe('state from GET and the initial question', () => {
     expect(effect).toContain('void send(q, false)');
   });
 
+  test('reads the state before claiming anything: loading first, a neutral invite before opt-in', () => {
+    expect(panel).toMatch(/!ready && !state \? \(\s*<p[^>]*>\{COPY\.loading\}<\/p>/);
+    expect(panel).toContain("invite: 'Ask about your week, your spend or your goals.'");
+    expect(panel).toContain('{state?.consented ? COPY.empty : COPY.invite}');
+  });
+
+  test('after Turn on and ask, the state is read again so starters appear without a reload', () => {
+    const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
+    expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*if \(loaded\.state\) setState\(loaded\.state\);/);
+  });
+
+  test('one GET per first open, even when an effect re-runs, and no second send while one is in flight', () => {
+    expect(panel).toContain('stateLoadRef.current ??= loadChatState()');
+    expect(panel).toContain("if (status === 'loading') return;");
+  });
+
   test('outdated agreements and a resting feature get calm copy; outdated links to /consent', () => {
     expect(panel).toContain('Your agreements changed. Review them to keep asking.');
     expect(panel).toContain('href="/consent"');
