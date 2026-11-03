@@ -4,6 +4,15 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-03 — 467615f
+- goals-insights: goal targets are bounded per unit (`maxTargetFor`: sticks 1 000, spend caps 100 000), through the schema, the create form's message and the database; a start or re-anchor proposal above the limit is dropped, not clamped.
+- data-model: `goals_target_value_check` is per unit (`20261105100000_goal_target_by_unit.sql`, with a `smoke.sql` check); a new open gap says the migration is unapplied and, until it is, weekly or monthly spend caps over 1 000 are refused on save.
+- security-privacy: the chat's kill switch is now a code-enforced release gate (`isChatPolicyLive`: Production and mobile release builds stay off until `LEGAL_VERSIONS.privacy` passes 2026-11-02; mobile dev builds exempt). The opt-in stores the notice version (`LEDGER_CHAT_NOTICE_VERSION`) instead of `true`, with a notice hash tripwire and `noticeVersion` on the audit event; web Settings hides the switch while the flag is off; the panel re-reads its state on every open. Records the earlier consent-gate edit to this section that had no entry (the versioned opt-in text, made in 5ace0ac). ADR: `docs/architecture/ledger-chat-consent-adr.md`. Tests and the open gap updated.
+- architecture: the dock reads its state on every open, and Settings receives the server chat flag.
+- identity-profile: the Settings › Privacy opt-in stores the notice version and web shows it only while the flag is on.
+- glossary: Ledger Chat consent wording; new Notice version entry.
+- Not recorded in the spec: mobile `textFaint` now meets WCAG AA (DESIGN.md already carries the values); no spec section owns `src/constants/theme.ts`.
+
 ## 2026-11-03 — 27c86cb
 - security-privacy: Ask the ledger rewritten for web and mobile. New gates and shapes: `consent_outdated` (403) in the profile gate; `GET /api/ledger-chat` (own `ledger_chat_state` bucket, no model, returns only `{ consented, discreet, hideTotals, currency, locale, starters }`). `scope.ts` is the one list of what the chat may read and never reads, rendered into the prompt and the notice; the tool context is built from an allowlist (identity-leak test). Twelve tools (goal history, price history from entries, entry edit dates added). Number words count as figures and are blocked outright in discreet mode. Where it appears: the web dock (five pages, not Log, minimise as the device preference `sl_chat_dock_minimised`) and the mobile pill and `/ask` screen; mobile keeps the conversation in memory only. New invariants 19 and a longer 9 and 11, the CI specs, and an honest open gap: built but off, owner steps in owner-actions section 8.
 - architecture: the `(app)` layout mounts the dock with the server flag only; mobile registers the `/ask` modal.

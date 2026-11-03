@@ -16,7 +16,7 @@ sources:
   - web/middleware.ts
   - web/app/onboarding/**
   - app/onboarding/**
-last_verified_commit: 27c86cb
+last_verified_commit: 467615f
 status: current
 ---
 
@@ -40,7 +40,7 @@ Once inside, the Settings screen shows a **Profile** section with five rows:
 
 The three read-only rows look visually identical to the editable ones — same hairline-rule table, same label-left / value-right layout — except there is no "Edit" link next to them. The UI does not explain why they cannot be changed; it simply doesn't offer the option.
 
-Beside the profile, Settings › Privacy holds the choice to use Ask the ledger. When the feature is on for the build, mobile shows the same switch and notice as web (`LedgerChatSetting`), writes `consent.ledgerChatOptIn` and the `ledger_chat_consent_toggled` audit row, and turning it off drops any open conversation. The chat never reads the identity rows above: they are outside the allowlist that builds its context (see Security and Privacy).
+Beside the profile, Settings › Privacy holds the choice to use Ask the ledger. The opt-in stores the notice version (not `true`), so a changed notice asks again. When the feature is on for the build, web and mobile show the same switch and notice as web (`LedgerChatSetting`), writes `consent.ledgerChatOptIn` and the `ledger_chat_consent_toggled` audit row, and turning it off drops any open conversation. The chat never reads the identity rows above: they are outside the allowlist that builds its context (see Security and Privacy).
 
 ## How it works
 

@@ -1,7 +1,7 @@
 ---
 section: glossary
 sources: []
-last_verified_commit: 27c86cb
+last_verified_commit: 467615f
 status: current
 ---
 
@@ -182,9 +182,16 @@ mobile: memory until the screen closes). It reads only what
 totals, goals and goal history, prices from entries and edit dates) and never
 the identity fields. It appears as a docked box or "Ask" pill on the reading
 pages of web and an "Ask" pill on the reading tabs of mobile, never on Log.
-Consent is the `consent.ledgerChatOptIn` settings key, and the server refuses
+Consent is the `consent.ledgerChatOptIn` settings key, which stores the notice version the reader agreed to (`LEDGER_CHAT_NOTICE_VERSION`) or `false`, and the server refuses
 when the reader's legal consent is out of date; the processor is named in the
 privacy policy.
+
+### Notice version
+`LEDGER_CHAT_NOTICE_VERSION` in `src/domain/ledgerChat/notice.ts`: the date of the
+words a reader sees before turning Ask the ledger on. The opt-in stores it, so
+only an opt-in to the current words counts as consent; a changed notice asks
+everyone again. A test pins a hash of the notice text to the version so the bump
+cannot be forgotten.
 
 ### Chat scope
 The one list, `src/domain/ledgerChat/scope.ts`, of what Ask the ledger may read

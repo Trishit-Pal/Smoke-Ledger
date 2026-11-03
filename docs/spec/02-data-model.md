@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: 8398559
+last_verified_commit: 467615f
 status: current
 ---
 
@@ -172,7 +172,7 @@ User-defined targets evaluated against the logs.
 | `id` | text | NOT NULL | — | PK |
 | `user_id` | uuid | NOT NULL | — | FK → `auth.users.id` ON DELETE CASCADE |
 | `type` | text | NOT NULL | — | CHECK `goals_type_check`: `daily_cap`, `spend_cap_daily`, `no_smoke_window`, `reduction_target`, `weekly_target`, `quit_date`, `taper` (`taper` added by `20261103000000_adaptive_goals.sql`) |
-| `target_value` | float8 | NOT NULL | — | CHECK: > 0 and ≤ 1000 |
+| `target_value` | float8 | NOT NULL | — | CHECK `goals_target_value_check`: > 0 and ≤ 100000 for `spend_cap_daily`, ≤ 1000 for every other type (`20261105100000_goal_target_by_unit.sql`; was a flat 1000). `scripts/sql/smoke.sql` fails CI if the constraint stops bounding spend caps at 100000 |
 | `current_baseline` | float8 | NULL | — | Locked baseline at goal creation (used by `reduction_target`) |
 | `start_date` | text | NOT NULL | — | `YYYY-MM-DD` |
 | `end_date` | text | NULL | — | `YYYY-MM-DD`; null means open-ended |
@@ -558,6 +558,7 @@ These rules must never break:
 ## Open gaps
 
 - **The V3 migrations are not applied anywhere yet.** `20261104100000` to `20261104140000` are proven by source-level tests (`src/tests/erase-auth-metadata.test.ts`, `retention-purge.test.ts`, `export-complete-migration.test.ts`, `health-consent-migration.test.ts`, `erase-profile-leftovers-migration.test.ts`) and `smoke.sql` checks the purge job in CI, but the owner applies them to the live project after review. If pg_cron is absent the purge never runs; `npm run verify:backend` prints the manual `cron.job` check.
+- **`20261105100000_goal_target_by_unit.sql` is not applied yet either.** Until the owner applies it, the live `goals_target_value_check` still caps every type at 1000, so a weekly or monthly spend cap above 1000 is accepted by the app and refused on save. It is proven by `src/tests/goal-target-by-unit-migration.test.ts` and the `smoke.sql` check in CI, and is idempotent (drop, then add).
 - **`smoke_seed` tables have RLS disabled**. The Supabase advisor flags `smoke_seed.brand_catalog`, `smoke_seed.smoking_facts`, and `smoke_seed.health_milestones` as critical. In practice, these tables have `REVOKE ALL … FROM PUBLIC` and are not directly reachable by PostgREST, but the belt-and-suspenders posture would be to add `ENABLE ROW LEVEL SECURITY` with no policies (which makes them default-deny) or to move them fully outside PostgREST's reach.
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
 - **`goals.completed_at` is NULL for goals finished before `20261103000000_adaptive_goals.sql`**, and for any goal that is active or paused. Readers must treat NULL as "date unknown" (the Done list prints the bare word), not as "never finished". No automated test exercises the trigger itself; `src/tests/session-goals.test.ts` covers the store's local mirror of the stamp.

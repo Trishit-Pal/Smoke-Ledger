@@ -4,7 +4,7 @@
       "id": "glossary",
       "file": "00-glossary.md",
       "sources": [],
-      "last_verified_commit": "27c86cb",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "27c86cb",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -30,7 +30,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "8398559",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -72,7 +72,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "27c86cb",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -115,7 +115,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "b4d45ae",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -167,7 +167,7 @@
         "web/app/consent/**",
         "web/lib/privacy/**"
       ],
-      "last_verified_commit": "27c86cb",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {

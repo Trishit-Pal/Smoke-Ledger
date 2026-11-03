@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: b4d45ae
+last_verified_commit: 467615f
 status: current
 ---
 
@@ -152,9 +152,18 @@ it is first adjusted. A taper's `meta.finalTarget` is its floor.
 
 **Validation.** Every `createGoal` call runs the input through `GoalSchema` before
 touching the database (`src/db/repositories/goals.ts:70`). The Zod schema
-(`src/lib/validation.ts:151`) enforces `targetValue > 0` up to 1 000,
-`endDate >= startDate`, and validates `type` against the enum, which now includes
-`taper`; the database CHECK carries the same list. `ImportGoalSchema` accepts an
+(`src/lib/validation.ts`) enforces `targetValue > 0` and bounds it per unit:
+sticks up to `MAX_STICK_TARGET` (1 000), spend caps up to `MAX_MONEY_TARGET`
+(100 000), through `maxTargetFor(type)`. A weekly or monthly spend cap is money per
+period (a day at 200 is 1 260 a week), so one flat limit used to accept a proposal
+the database then refused on save. `GoalPatchSchema` and `ImportGoalSchema` carry
+no type, so they stop at the wider 100 000 and leave the per-type bound to the
+database CHECK `goals_target_value_check` (`20261105100000_goal_target_by_unit.sql`),
+which uses the same two numbers; a test keeps the constants and the SQL equal.
+The schema also enforces `endDate >= startDate` and validates `type` against the
+enum, which now includes `taper`; the database CHECK carries the same list. The
+create form says so before the schema does: `buildGoalPayload` returns "Enter a
+target no higher than N" past the type's limit. `ImportGoalSchema` accepts an
 optional `completedAt` so an export round-trips.
 
 **Evaluation: `evaluateGoal` (`src/domain/goals.ts:54`).** A pure function that
@@ -272,8 +281,13 @@ The maths, with `avg14` the mean sticks per day over the 14 days ending
 | Start, `quit_date` | a date 42 days from today (`QUIT_DATE_PROPOSAL_DAYS`) |
 | Next, sticks | `round(avg7)` over the 7 days ending yesterday, held between the floor and `cap - 1`; the floor is `finalTarget` for a taper and 1 otherwise; none when already at the floor |
 | Next, spend | the smaller of `cap x 0.9` and the 7-day average spend, rounded **down** to the step; none when it would be 0 or not below the cap |
-| Re-anchor, sticks | `ceil(avg7)` over the 7 days ending **today**, at most 1 000; none when it would not be above the current cap |
-| Re-anchor, spend | the 7-day average spend rounded **up** to the step, at most 1 000; none when not above the cap |
+| Re-anchor, sticks | `ceil(avg7)` over the 7 days ending **today**; none when it would not be above the current cap or is above the 1 000 limit |
+| Re-anchor, spend | the 7-day average spend rounded **up** to the step; none when not above the cap or above the 100 000 limit |
+
+A proposal the schema and the database would refuse is not offered at all:
+`proposeStart` returns none for a value above `maxTargetFor(type)`, and a
+re-anchor past the limit is dropped rather than clamped, so the reader is never
+shown a number that is not the real one.
 
 Next and re-anchor only exist for cap-like goals. A weekly or monthly spend cap
 and a weekly stick cap therefore get a start proposal on the create form but never
