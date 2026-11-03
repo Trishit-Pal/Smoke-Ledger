@@ -326,6 +326,11 @@ test.describe('responsive · logged-in pages (local Supabase only)', () => {
       // headline numerals, and a masked heading over an unmasked axis is a leak.
       for (const route of ['/dashboard', '/trends']) {
         await gotoSettled(fresh, route);
+        // Trends charts load client-side (ssr: false) behind a placeholder, so
+        // `networkidle` can fire before any chart, and its sr-only table, exists.
+        if (route === '/trends') {
+          await expect(fresh.locator('#main-content table.sr-only').first()).toBeAttached({ timeout: 60_000 });
+        }
         const { tableCount } = await expectNoLedgerMoney(fresh);
         // Not vacuous: Trends renders chart data tables, so the digit check had something to scan.
         if (route === '/trends') expect(tableCount).toBeGreaterThan(0);
