@@ -1,4 +1,11 @@
-import { isAskPillVisible, isLedgerChatEnabled, tabBarHeight } from '@/lib/askPill';
+import {
+  ASK_PILL_CLEARANCE,
+  ASK_PILL_TARGET,
+  isAskPillVisible,
+  isLedgerChatEnabled,
+  scrollBottomPadding,
+  tabBarHeight,
+} from '@/lib/askPill';
 
 describe('isLedgerChatEnabled', () => {
   it('is on only for the exact string "true"', () => {
@@ -24,6 +31,17 @@ describe('isAskPillVisible', () => {
   it('hides everywhere when the flag is not "true"', () => {
     expect(isAskPillVisible('/trends', undefined)).toBe(false);
     expect(isAskPillVisible('/trends', 'false')).toBe(false);
+  });
+});
+
+describe('scrollBottomPadding', () => {
+  it('keeps the base padding when the flag is off', () => {
+    expect(scrollBottomPadding('false')).toBe(48);
+    expect(scrollBottomPadding(undefined)).toBe(48);
+  });
+  it('clears the whole pill (gap above the bar plus its height) when the flag is on', () => {
+    expect(ASK_PILL_CLEARANCE).toBeGreaterThanOrEqual(ASK_PILL_TARGET + 8);
+    expect(scrollBottomPadding('true')).toBeGreaterThanOrEqual(ASK_PILL_CLEARANCE);
   });
 });
 

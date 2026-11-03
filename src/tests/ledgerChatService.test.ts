@@ -8,6 +8,7 @@ import {
   historyFor,
   readLedgerChatOptIn,
   setLedgerChatOptIn,
+  resolveWebBaseUrl,
   type ChatTurn,
 } from '@/services/ledgerChat';
 
@@ -83,7 +84,7 @@ describe('askLedger', () => {
     [401, 'unauthorized', 'signed_out'],
     [403, 'consent_required', 'consent_required'],
     [403, 'consent_outdated', 'consent_outdated'],
-    [403, 'forbidden', 'consent_outdated'],
+    [403, 'forbidden', 'unavailable'],
     [429, 'rate_limited', 'rate_limited'],
     [400, 'validation_error', 'unavailable'],
     [500, 'internal_error', 'unavailable'],
@@ -116,6 +117,35 @@ describe('askLedger', () => {
       expect(spy).not.toHaveBeenCalled();
       spy.mockRestore();
     }
+  });
+});
+
+describe('base URL', () => {
+  it('trims and strips trailing slashes', () => {
+    expect(resolveWebBaseUrl('  https://example.test///  ')).toBe('https://example.test');
+  });
+
+  it('falls back to production only when unset', () => {
+    expect(resolveWebBaseUrl(undefined)).toBe('https://smokeledger.app');
+  });
+
+  it('is null when set but blank', () => {
+    expect(resolveWebBaseUrl('')).toBeNull();
+    expect(resolveWebBaseUrl('   /  ')).toBeNull();
+  });
+
+  it('a trailing slash in the env never produces a double slash in the request', async () => {
+    process.env.EXPO_PUBLIC_WEB_BASE_URL = 'https://example.test/';
+    fetchMock.mockReturnValueOnce(reply(200, STATE));
+    await getChatState();
+    expect(fetchMock.mock.calls[0][0]).toBe('https://example.test/api/ledger-chat');
+  });
+
+  it('a blank env is unavailable and never calls fetch', async () => {
+    process.env.EXPO_PUBLIC_WEB_BASE_URL = '';
+    expect(await getChatState()).toEqual({ ok: false, reason: 'unavailable' });
+    expect(await askLedger('q', [])).toEqual({ ok: false, reason: 'unavailable' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

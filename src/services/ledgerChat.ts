@@ -21,6 +21,16 @@ export const LEDGER_CHAT_OPT_IN_KEY = 'consent.ledgerChatOptIn';
 const REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_WEB_BASE_URL = 'https://smokeledger.app';
 
+/**
+ * The web origin the route lives on. Unset falls back to production (as legal.ts
+ * does); set but blank is a misconfiguration, so it yields null rather than a
+ * relative URL that fetch would reject as a "network" problem.
+ */
+export function resolveWebBaseUrl(raw: string | undefined): string | null {
+  if (raw === undefined) return DEFAULT_WEB_BASE_URL;
+  return raw.trim().replace(/\/+$/, '') || null;
+}
+
 export type ChatFailure =
   | 'disabled'
   | 'signed_out'
@@ -51,8 +61,7 @@ function failureFor(status: number, error: ChatErrorCode | undefined): ChatFailu
   if (status === 503 || error === 'feature_disabled') return 'disabled';
   if (status === 401 || error === 'unauthorized') return 'signed_out';
   if (error === 'consent_required') return 'consent_required';
-  // `forbidden` is a missing or stale required consent: the same way out.
-  if (error === 'consent_outdated' || error === 'forbidden') return 'consent_outdated';
+  if (error === 'consent_outdated') return 'consent_outdated';
   if (status === 429 || error === 'rate_limited') return 'rate_limited';
   return 'unavailable';
 }
@@ -61,11 +70,12 @@ async function request<T>(
   init: { method: 'GET' } | { method: 'POST'; body: unknown },
   isValid: (body: unknown) => body is T,
 ): Promise<ChatResult<T>> {
+  const base = resolveWebBaseUrl(process.env.EXPO_PUBLIC_WEB_BASE_URL);
+  if (base === null) return { ok: false, reason: 'unavailable' };
   const { data } = await getSupabase().auth.getSession();
   const token = data.session?.access_token;
   if (!token) return { ok: false, reason: 'signed_out' };
 
-  const base = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? DEFAULT_WEB_BASE_URL;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {

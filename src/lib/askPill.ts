@@ -18,6 +18,17 @@ export function isAskPillVisible(
   return isLedgerChatEnabled(flag) && PILL_PATHS.has(pathname);
 }
 
+/** The pill's touch target, and the gap between it and the tab bar. */
+export const ASK_PILL_TARGET = 44;
+export const ASK_PILL_GAP = spacing.sm;
+/** Height the pill takes above the tab bar, plus a breath, so scrolled content ends clear of it. */
+export const ASK_PILL_CLEARANCE = ASK_PILL_TARGET + ASK_PILL_GAP + spacing.sm;
+
+/** Bottom padding of a scrolling screen: the pill's clearance when the feature is on. */
+export function scrollBottomPadding(flag: string | undefined = process.env.EXPO_PUBLIC_LEDGER_CHAT_ENABLED): number {
+  return Math.max(spacing.xxxl, isLedgerChatEnabled(flag) ? ASK_PILL_CLEARANCE : 0);
+}
+
 const BAR_HEIGHT = 56;
 const BAR_HEIGHT_SHORT = 50;
 

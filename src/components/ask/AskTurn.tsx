@@ -6,7 +6,7 @@ import { spacing, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import type { Row } from '@/domain/ledgerChat/types';
 import { maskNumbers } from '@/lib/discreet';
-import { isRowMaskable, rowDisplay } from '@/lib/askView';
+import { proseMasked as isProseMasked, rowDisplay, rowMasked } from '@/lib/askView';
 import type { CurrencyCode } from '@/lib/regions';
 
 export interface AskTurnData {
@@ -38,9 +38,7 @@ export function AskTurn({ turn, hidden, currency, locale }: AskTurnProps) {
   const reveal = (key: string) => setRevealed((prev) => new Set(prev).add(key));
 
   const proseKey = 'answer';
-  // Only wrap the paragraph in a tap-to-reveal when masking would change it.
-  const hasFigures = maskNumbers(turn.answer, true) !== turn.answer;
-  const proseMasked = hidden && hasFigures && !revealed.has(proseKey);
+  const proseMasked = isProseMasked(turn.answer, hidden, revealed.has(proseKey));
   const paragraphs = turn.answer
     .split(/\n+/)
     .filter((p) => p.trim().length > 0)
@@ -60,7 +58,7 @@ export function AskTurn({ turn, hidden, currency, locale }: AskTurnProps) {
       {turn.rows.length > 0 ? (
         <View accessibilityRole="list">
           {turn.rows.map((row, i) => {
-            const masked = hidden && isRowMaskable(row) && !revealed.has(row.id);
+            const masked = rowMasked(row, hidden, revealed);
             const display = rowDisplay(row, masked, { currency, locale });
             const label = masked ? `${row.label} hidden, double tap to reveal` : `${row.label} ${display}`;
             return (

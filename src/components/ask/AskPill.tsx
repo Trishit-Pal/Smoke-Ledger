@@ -7,10 +7,8 @@ import { AnalyticsEvents } from '@/constants/events';
 import { fonts, radius, spacing } from '@/constants/theme';
 import { useLayout } from '@/hooks/useLayout';
 import { useTheme } from '@/hooks/useTheme';
-import { isAskPillVisible, tabBarHeight } from '@/lib/askPill';
+import { ASK_PILL_GAP, ASK_PILL_TARGET, isAskPillVisible, tabBarHeight } from '@/lib/askPill';
 import { track } from '@/services/analytics';
-
-const MIN_TARGET = 44;
 
 /** "home" for the index tab, else the route name ("trends", "goals"…); never question text. */
 function pageOf(pathname: string): string {
@@ -45,9 +43,9 @@ export function AskPill() {
       style={{
         position: 'absolute',
         right: spacing.lg + insets.right,
-        bottom: tabBarHeight(insets.bottom, isShort) + spacing.sm,
-        minHeight: MIN_TARGET,
-        minWidth: MIN_TARGET,
+        bottom: tabBarHeight(insets.bottom, isShort) + ASK_PILL_GAP,
+        minHeight: ASK_PILL_TARGET,
+        minWidth: ASK_PILL_TARGET,
         paddingHorizontal: spacing.lg,
         alignItems: 'center',
         justifyContent: 'center',

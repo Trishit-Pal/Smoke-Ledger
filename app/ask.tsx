@@ -11,7 +11,7 @@ import { ConsentNotice } from '@/components/ask/ConsentNotice';
 import { spacing, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { CHAT_QUESTION_MAX, type ChatStateResponse } from '@/domain/ledgerChat/types';
-import { ASK_COPY, FAILURE_COPY } from '@/lib/askView';
+import { ASK_COPY, FAILURE_COPY, isHidden, takeWaitingQuestion } from '@/lib/askView';
 import { isLedgerChatEnabled } from '@/lib/askPill';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -49,6 +49,8 @@ export default function AskScreen() {
   const [pending, setPending] = useState<string | null>(null);
   const [failure, setFailure] = useState<ChatFailure | null>(enabled ? null : 'disabled');
   const [turningOn, setTurningOn] = useState(false);
+  // The question typed before opting in is sent once, right after the opt-in is saved.
+  const waitingTaken = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -119,14 +121,18 @@ export default function AskScreen() {
     void getChatState().then((r) => {
       if (mounted.current && r.ok) setState(r.data);
     });
-    if (draft.trim()) void send(draft);
+    const waiting = takeWaitingQuestion(draft, waitingTaken.current);
+    if (waiting) {
+      waitingTaken.current = true;
+      void send(waiting);
+    }
   };
 
   const busy = pending !== null;
   const blocked = failure !== null && BLOCKING.has(failure);
   const needsConsent = state !== null && !state.consented && !blocked;
   const canAsk = state?.consented === true && !blocked;
-  const hidden = state ? state.hideTotals : true;
+  const hidden = isHidden(state);
   const starters = state?.starters ?? [];
 
   return (
@@ -230,7 +236,7 @@ export default function AskScreen() {
                   {FAILURE_COPY[failure]}
                 </Text>
                 {failure === 'consent_outdated' ? (
-                  <Button title="Review agreements" variant="secondary" onPress={() => router.push('/consent')} />
+                  <Button title="Review agreements" variant="secondary" onPress={() => router.replace('/consent')} />
                 ) : null}
                 {state === null && (failure === 'network' || failure === 'unavailable') ? (
                   <Button title="Try again" variant="secondary" onPress={retryState} />
@@ -240,7 +246,7 @@ export default function AskScreen() {
           </View>
         </ScrollView>
 
-        {canAsk ? (
+        {canAsk || needsConsent ? (
           <View style={{ gap: spacing.sm, padding: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: theme.rule }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md }}>
               <Input
@@ -249,15 +255,15 @@ export default function AskScreen() {
                 onChangeText={setDraft}
                 placeholder="Ask your ledger…"
                 maxLength={CHAT_QUESTION_MAX}
-                editable={!busy}
+                editable={!busy && !turningOn}
                 returnKeyType="send"
-                onSubmitEditing={() => void send(draft)}
+                onSubmitEditing={() => canAsk && void send(draft)}
                 accessibilityLabel="Ask your ledger"
               />
-              <Button title="Ask" onPress={() => void send(draft)} disabled={busy || draft.trim().length === 0} />
+              <Button title="Ask" onPress={() => void send(draft)} disabled={!canAsk || busy || draft.trim().length === 0} />
             </View>
             <Text variant="caption" muted style={{ fontStyle: 'italic' }}>
-              {ASK_COPY.footnote}
+              {needsConsent ? ASK_COPY.waiting : ASK_COPY.footnote}
             </Text>
           </View>
         ) : null}

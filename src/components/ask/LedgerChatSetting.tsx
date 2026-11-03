@@ -5,6 +5,7 @@ import { spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
 import { LEDGER_CHAT_SETTINGS_SUBLABEL } from '@/domain/ledgerChat/notice';
 import { describeError } from '@/lib/errors';
+import { ASK_COPY } from '@/lib/askView';
 import { readLedgerChatOptIn, setLedgerChatOptIn } from '@/services/ledgerChat';
 import { ConsentNotice } from './ConsentNotice';
 
@@ -36,6 +37,10 @@ function LinkButton({ label, onPress, disabled }: { label: string; onPress: () =
 export function LedgerChatSetting() {
   const theme = useTheme();
   const [on, setOn] = useState(false);
+  // Unknown until a read succeeds: a failed read must not pass for "off".
+  const [known, setKnown] = useState(false);
+  const [readFailed, setReadFailed] = useState(false);
+  const [reads, setReads] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,15 +49,18 @@ export function LedgerChatSetting() {
     let mounted = true;
     readLedgerChatOptIn()
       .then((value) => {
-        if (mounted) setOn(value);
+        if (!mounted) return;
+        setOn(value);
+        setKnown(true);
+        setReadFailed(false);
       })
       .catch(() => {
-        // Unreadable counts as off; the switch can still be used.
+        if (mounted) setReadFailed(true);
       });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reads]);
 
   const save = async (value: boolean) => {
     setBusy(true);
@@ -85,13 +93,13 @@ export function LedgerChatSetting() {
         <Switch
           value={on || confirming}
           onValueChange={onToggle}
-          disabled={busy}
+          disabled={busy || !known}
           trackColor={{ false: theme.rule, true: theme.accent }}
           thumbColor={on || confirming ? theme.bg : theme.textFaint}
           ios_backgroundColor={theme.rule}
           accessibilityLabel={LABEL}
           accessibilityRole="switch"
-          accessibilityState={{ checked: on, disabled: busy }}
+          accessibilityState={{ checked: on, disabled: busy || !known }}
         />
       </View>
       {confirming ? (
@@ -101,6 +109,14 @@ export function LedgerChatSetting() {
             <LinkButton label="Turn on" onPress={() => void save(true)} disabled={busy} />
             <LinkButton label="Not now" onPress={() => setConfirming(false)} disabled={busy} />
           </View>
+        </View>
+      ) : null}
+      {readFailed ? (
+        <View style={{ gap: spacing.xs }}>
+          <Text variant="small" color={theme.warnEarth}>
+            {ASK_COPY.readFailed}
+          </Text>
+          <LinkButton label="Try again" onPress={() => setReads((n) => n + 1)} />
         </View>
       ) : null}
       {error ? (
