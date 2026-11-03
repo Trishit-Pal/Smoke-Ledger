@@ -1,6 +1,6 @@
 import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context';
 import { TOOL_DEFS, runTool } from '@/domain/ledgerChat/tools';
-import { chatRequestSchema } from '@/domain/ledgerChat/types';
+import { TEXT_FIELD_MAX_CHARS, chatRequestSchema } from '@/domain/ledgerChat/types';
 import { goalTypeLabel } from '@/domain/goalForm';
 import { dayShift, round2 } from '@/domain/calc';
 import { dailyAdherence, goalState, holdStatus } from '@/domain/goalAdherence';
@@ -170,6 +170,35 @@ describe('recent_entries', () => {
       expect(e).not.toHaveProperty('notes');
       expect(String(e.brand)).toMatch(/^Brand [A-Z]$/);
     }
+  });
+
+  it('caps brand, variant, trigger, mood and context text and strips control characters', () => {
+    const huge = `Evil\n\u0000${'x'.repeat(100_000)}`;
+    const c = ctx({
+      logs: [
+        log({
+          localDate: '2026-06-21',
+          brandNameSnap: huge,
+          variantSnap: huge as never,
+          triggerTag: huge as never,
+          moodBefore: huge as never,
+          moodAfter: huge as never,
+          contextTag: huge as never,
+        }),
+      ],
+    });
+    const data = okData('recent_entries', { days: 30 }, c) as { entries: Record<string, string>[] };
+    for (const key of ['brand', 'trigger', 'moodBefore', 'moodAfter', 'context']) {
+      expect(data.entries[0][key].length).toBeLessThanOrEqual(TEXT_FIELD_MAX_CHARS);
+      expect(data.entries[0][key]).not.toMatch(/[\u0000-\u001f]/);
+    }
+    expect(JSON.stringify(okData('brand_mix', {}, c)).length).toBeLessThan(2_000);
+  });
+
+  it('leaves discreet aliases such as "Brand A" intact', () => {
+    const c = ctx({ profile: { ...profile, discreetMode: true }, logs: [log({ localDate: '2026-06-21', brandNameSnap: 'y'.repeat(5_000) })] });
+    const data = okData('recent_entries', { days: 30 }, c) as { entries: Record<string, unknown>[] };
+    expect(data.entries[0].brand).toBe('Brand A');
   });
 
   it('slices to 200 rows however many logs the route loads, so the model input does not grow', () => {

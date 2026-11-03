@@ -67,6 +67,22 @@ function toolUsesOf(message: Anthropic.Message): Anthropic.ToolUseBlock[] {
   return message.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');
 }
 
+const baseId = (id: string): string => id.replace(/#\d+$/, '');
+
+/**
+ * Row ids are constants per tool, so a second call to one tool ("September vs
+ * October" = two totals_in_window calls) must not collide: an exact repeat is
+ * dropped, a different result gets `#2`, `#3`. The panel keys React lists and its
+ * reveal-on-tap state by id, so ids stay unique and, being call-ordered, stable.
+ */
+function addRow(rows: Row[], r: Row): void {
+  const same = (x: Row) => baseId(x.id) === r.id && x.label === r.label && x.value === r.value && x.unit === r.unit;
+  if (rows.some(same)) return;
+  let id = r.id;
+  for (let n = 2; rows.some((x) => x.id === id); n++) id = `${r.id}#${n}`;
+  rows.push(id === r.id ? r : { ...r, id });
+}
+
 function retryInstruction(figures: string[]): string {
   return `Your reply stated ${figures.join(', ')}, which is not in the tool results. Rewrite it without stating any numbers; the reader sees the figures as rows.`;
 }
@@ -130,7 +146,7 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
       if (outcome.ok) {
         outcomes.push(outcome);
         if (!toolsUsed.includes(tu.name)) toolsUsed.push(tu.name);
-        for (const r of outcome.rows) if (!rows.some((x) => x.id === r.id)) rows.push(r);
+        for (const r of outcome.rows) addRow(rows, r);
         return { type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(outcome.data) };
       }
       return { type: 'tool_result', tool_use_id: tu.id, is_error: true, content: JSON.stringify({ error: outcome.error }) };

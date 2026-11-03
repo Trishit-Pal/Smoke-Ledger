@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { ToolContext } from './context';
-import { NOTE_MAX_CHARS, RECENT_MAX_DAYS, RECENT_MAX_ROWS, type Row, type RowUnit } from './types';
+import { RECENT_MAX_DAYS, RECENT_MAX_ROWS, type Row, type RowUnit } from './types';
 import {
   brandSpendMix,
   dayShift,
@@ -392,10 +392,6 @@ function insights(_input: unknown, ctx: ToolContext): ToolOutcome {
   };
 }
 
-function cleanNote(note: string): string {
-  return note.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, NOTE_MAX_CHARS);
-}
-
 function recentEntries(input: z.infer<typeof recentEntriesInput>, ctx: ToolContext): ToolOutcome {
   const startYmd = dayShift(ctx.today, -(input.days - 1));
   const inWindow = ctx.logs.filter((l) => l.localDate >= startYmd && l.localDate <= ctx.today);
@@ -411,8 +407,8 @@ function recentEntries(input: z.infer<typeof recentEntriesInput>, ctx: ToolConte
       context: l.contextTag,
       brand: l.brandNameSnap,
     };
-    const note = l.notes ? cleanNote(l.notes) : '';
-    return note ? { ...base, notes: note } : base;
+    // Notes were bounded and cleaned in buildToolContext, like every other text field.
+    return l.notes ? { ...base, notes: l.notes } : base;
   });
   return {
     ok: true,
