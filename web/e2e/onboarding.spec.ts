@@ -7,6 +7,7 @@ import { canSeed, countAuditEvents, listGoalStatuses, readOnboardingStep } from 
 async function stampAndContinue(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/onboarding\/privacy/);
   await page.getByRole('button', { name: 'Stamp all consents' }).click();
+  await page.getByRole('checkbox', { name: /explicitly consent/ }).check();
   const cont = page.getByRole('button', { name: /Continue/ });
   await expect(cont).toBeEnabled();
   await cont.click();

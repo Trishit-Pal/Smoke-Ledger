@@ -102,7 +102,7 @@ describe('consentsCurrent', () => {
 
 describe('submitConsentStep', () => {
   it('records consents + step in one profile write and audits once for a fresh user', async () => {
-    await submitConsentStep({ alreadyConsented: false, analyticsOptIn: true });
+    await submitConsentStep({ alreadyConsented: false, analyticsOptIn: true, healthDataConsent: true });
 
     expect(profileRepo.saveComplianceConsents).toHaveBeenCalledTimes(1);
     const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
@@ -126,17 +126,34 @@ describe('submitConsentStep', () => {
     expect(auditOrder).toBeLessThan(writeOrder);
   });
 
+  it('stamps the explicit health-data consent with the other consents, and only then', async () => {
+    await submitConsentStep({ alreadyConsented: false, analyticsOptIn: false, healthDataConsent: true });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(patch.healthDataConsentAt).toBeTruthy();
+    // Analytics off must not stop the health consent being recorded, and vice versa.
+    expect(patch.dataProcessingConsentAt).toBeTruthy();
+  });
+
+  it('refuses to continue without the health-data consent, writing and auditing nothing', async () => {
+    await expect(
+      submitConsentStep({ alreadyConsented: false, analyticsOptIn: true, healthDataConsent: false }),
+    ).rejects.toThrow(/health/i);
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(settingsRepo.setSetting).not.toHaveBeenCalled();
+  });
+
   it('a failed audit aborts before any consent column is written', async () => {
     mocked(recordAuditEvent).mockRejectedValueOnce(new Error('audit down'));
     await expect(
-      submitConsentStep({ alreadyConsented: false, analyticsOptIn: true }),
+      submitConsentStep({ alreadyConsented: false, analyticsOptIn: true, healthDataConsent: true }),
     ).rejects.toThrow('audit down');
     expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
     expect(settingsRepo.setSetting).not.toHaveBeenCalled();
   });
 
   it('a re-tick at the same versions writes no consent columns and no audit, only the preference', async () => {
-    await submitConsentStep({ alreadyConsented: true, analyticsOptIn: false });
+    await submitConsentStep({ alreadyConsented: true, analyticsOptIn: false, healthDataConsent: true });
 
     expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
     expect(recordAuditEvent).not.toHaveBeenCalled();

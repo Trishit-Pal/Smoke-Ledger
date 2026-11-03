@@ -55,6 +55,14 @@ import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
+import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import {
+  WITHDRAW_DELETE_LABEL,
+  WITHDRAW_ERASE_LABEL,
+  WITHDRAW_EXPLANATION,
+  WITHDRAW_ROW_LABEL,
+  WITHDRAW_ROW_SUBLABEL,
+} from '@/lib/healthConsent';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
@@ -319,6 +327,10 @@ export function SettingsClient({
   const [exportWarning, setExportWarning] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<BusyAction>(null);
+  // Withdraw-consent panel. `withdrawing` marks an Erase/Delete as the end of a
+  // withdrawal (so it emits consent_revoked); the plain rows in "Your data" do not.
+  const [showWithdraw, setShowWithdraw] = React.useState(false);
+  const [withdrawing, setWithdrawing] = React.useState(false);
   // 'delete-resume' is the second confirmation after the re-auth detour: a
   // fresh sign-in alone must never delete an account.
   const [confirmAction, setConfirmAction] = React.useState<
@@ -411,7 +423,8 @@ export function SettingsClient({
     setBusy('toggle-analytics');
     setError(null);
     try {
-      await setSetting('consent.analyticsOptIn', value);
+      // Off also deletes the usage events already recorded.
+      await saveAnalyticsOptIn(value);
       const {
         data: { user },
       } = await getSupabase().auth.getUser();
@@ -714,6 +727,7 @@ export function SettingsClient({
     setBusy('erase-all');
     setError(null);
     try {
+      if (withdrawing) await recordConsentWithdrawal('erase');
       await eraseAllUserData();
       // "Everything" includes the on-device chat transcript, first-suggestion stamp,
       // lock state and the cached brand list (the lifecycle registry's erase row).
@@ -724,6 +738,7 @@ export function SettingsClient({
     } finally {
       setBusy(null);
       setConfirmAction(null);
+      setWithdrawing(false);
     }
   };
 
@@ -738,6 +753,7 @@ export function SettingsClient({
     // keeps the dialog open so there is no flash before navigation lands.
     let isReauthRedirect = false;
     try {
+      if (withdrawing) await recordConsentWithdrawal('delete');
       // The brand cache is tagged by the signed-in user, so flush it while the session still
       // exists; after the account is gone the server action can no longer tell whose it is.
       await revalidateBrands();
@@ -769,7 +785,10 @@ export function SettingsClient({
       }
     } finally {
       setBusy(null);
-      if (!isReauthRedirect) setConfirmAction(null);
+      if (!isReauthRedirect) {
+        setConfirmAction(null);
+        setWithdrawing(false);
+      }
     }
   };
 
@@ -1140,6 +1159,58 @@ export function SettingsClient({
                 />
               }
             />
+            <PrefRow
+              label={WITHDRAW_ROW_LABEL}
+              sublabel={WITHDRAW_ROW_SUBLABEL}
+              control={
+                <TextLink
+                  onClick={() => setShowWithdraw((open) => !open)}
+                  disabled={busy != null}
+                  ariaLabel={showWithdraw ? 'Hide withdraw consent' : WITHDRAW_ROW_LABEL}
+                >
+                  {showWithdraw ? 'Hide' : WITHDRAW_ROW_LABEL}
+                </TextLink>
+              }
+            />
+            {showWithdraw ? (
+              <div className="py-sm flex flex-col gap-sm" role="region" aria-label="Withdraw consent">
+                <p className="text-small" style={{ color: 'var(--text-muted)' }}>
+                  {WITHDRAW_EXPLANATION}
+                </p>
+                <div className="flex flex-wrap items-center gap-md">
+                  <TextLink
+                    onClick={() => void onExportJson()}
+                    disabled={busy != null}
+                    busy={busy === 'export-json'}
+                    ariaLabel="Export a copy first"
+                  >
+                    {busy === 'export-json' ? 'Exporting…' : 'Export a copy first'}
+                  </TextLink>
+                  <TextLink
+                    onClick={() => {
+                      setWithdrawing(true);
+                      setConfirmAction('erase');
+                    }}
+                    disabled={busy != null}
+                    destructive
+                    ariaLabel={WITHDRAW_ERASE_LABEL}
+                  >
+                    {WITHDRAW_ERASE_LABEL}
+                  </TextLink>
+                  <TextLink
+                    onClick={() => {
+                      setWithdrawing(true);
+                      setConfirmAction('delete');
+                    }}
+                    disabled={busy != null}
+                    destructive
+                    ariaLabel={WITHDRAW_DELETE_LABEL}
+                  >
+                    {WITHDRAW_DELETE_LABEL}
+                  </TextLink>
+                </div>
+              </div>
+            ) : null}
           </dl>
           <ConfirmDialog
             open={confirmLedgerChat}
@@ -1540,7 +1611,11 @@ export function SettingsClient({
         destructive
         loading={busy === 'erase-all'}
         onConfirm={() => void onEraseAll()}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setConfirmAction(null);
+          setWithdrawing(false);
+        }}
       />
       <ConfirmDialog
         open={confirmAction === 'delete'}
@@ -1553,6 +1628,7 @@ export function SettingsClient({
         onOpenChange={(open) => {
           if (open || busy === 'delete-account') return;
           setConfirmAction(null);
+          setWithdrawing(false);
         }}
       />
       {/* After the re-auth detour. Dismissing must say so: the user has just

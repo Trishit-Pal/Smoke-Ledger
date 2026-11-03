@@ -32,6 +32,7 @@ type ProfileRow = {
   privacy_version: string | null;
   health_disclaimer_version: string | null;
   data_processing_consent_at: string | null;
+  health_data_consent_at: string | null;
   marketing_consent_at: string | null;
   full_name: string | null;
   date_of_birth: string | null;
@@ -91,6 +92,7 @@ function mapProfile(row: ProfileRow): UserProfile {
     privacyVersion: row.privacy_version,
     healthDisclaimerVersion: row.health_disclaimer_version,
     dataProcessingConsentAt: row.data_processing_consent_at,
+    healthDataConsentAt: row.health_data_consent_at,
     marketingConsentAt: row.marketing_consent_at,
     fullName: row.full_name,
     dateOfBirth: row.date_of_birth,

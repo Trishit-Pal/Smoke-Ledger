@@ -79,7 +79,9 @@ export async function login(page: Page, user: { email: string; password: string 
 export async function completeOnboarding(page: Page, opts: { baseline?: string } = {}): Promise<void> {
   await expect(page).toHaveURL(/\/onboarding\/privacy/);
   await page.getByRole('button', { name: 'Stamp all consents' }).click();
-  // "Stamp all" sets the 5 required consents on staggered timers (~520ms) and
+  // The explicit health-data consent is its own decision: "Stamp all" never ticks it.
+  await page.getByRole('checkbox', { name: /explicitly consent/ }).check();
+  // "Stamp all" sets the 5 acknowledgements on staggered timers (~520ms) and
   // Continue is disabled until all land — wait for enabled before clicking.
   const privacyContinue = page.getByRole('button', { name: /Continue/ });
   await expect(privacyContinue).toBeEnabled();

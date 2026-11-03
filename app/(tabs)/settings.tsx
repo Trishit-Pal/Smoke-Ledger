@@ -24,11 +24,19 @@ import { ledgerCurrency, ledgerMoney } from '@/lib/ledgerMoney';
 import { parseDecimal } from '@/lib/format';
 import { useSession } from '@/store/session';
 import { updateProfile } from '@/db/repositories/profile';
-import { getSetting, setSetting } from '@/db/repositories/settings';
+import { getSetting } from '@/db/repositories/settings';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
+import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import {
+  WITHDRAW_DELETE_LABEL,
+  WITHDRAW_ERASE_LABEL,
+  WITHDRAW_EXPLANATION,
+  WITHDRAW_ROW_LABEL,
+  WITHDRAW_ROW_SUBLABEL,
+} from '@/lib/healthConsent';
 import { getSupabase } from '@/lib/supabase';
 import { EXPORT_FILE_PREFIX, clearNativeDevice, deleteExportFile } from '@/lib/privacy/clearDeviceNative';
 import {
@@ -502,6 +510,7 @@ export default function Settings() {
   const [busy, setBusy] = useState<BusyAction>(null);
   const [error, setError] = useState<string | null>(null);
   const [exportWarning, setExportWarning] = useState<string | null>(null);
+  const [showWithdraw, setShowWithdraw] = useState(false);
 
   // Brand form
   const [showAddBrand, setShowAddBrand] = useState(false);
@@ -622,7 +631,8 @@ export default function Settings() {
     setBusy('toggle-analytics');
     setError(null);
     try {
-      await setSetting('consent.analyticsOptIn', value);
+      // Off also deletes the usage events already recorded.
+      await saveAnalyticsOptIn(value);
       const {
         data: { user },
       } = await getSupabase().auth.getUser();
@@ -810,7 +820,8 @@ export default function Settings() {
   // the user back here at DELETE_RESUME_PATH). A fresh sign-in alone must never
   // delete an account, and cancelling must say that nothing was deleted —
   // otherwise "it made me sign in again" reads as "it's done".
-  const deleteAccount = (variant: 'first' | 'resume' = 'first') => {
+  // `withdraw` marks the deletion as the end of a consent withdrawal (emits consent_revoked).
+  const deleteAccount = (variant: 'first' | 'resume' = 'first', withdraw = false) => {
     Alert.alert(
       variant === 'resume'
         ? 'Signed in again. Delete your account now?'
@@ -834,6 +845,7 @@ export default function Settings() {
             setError(null);
             let isReauthRedirect = false;
             try {
+              if (withdraw) await recordConsentWithdrawal('delete');
               await deleteUserAccount({
                 // After the detour a further reauth_required is shown as an
                 // error, never another redirect: no silent login ↔ Settings loop.
@@ -883,7 +895,8 @@ export default function Settings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action]);
 
-  const eraseAll = () => {
+  // `withdraw` marks the erase as the end of a consent withdrawal (emits consent_revoked).
+  const eraseAll = (withdraw = false) => {
     Alert.alert(
       'Erase all app data?',
       'This keeps your login and re-seeds default brands. All your logs, goals, and custom data will be erased and cannot be recovered.',
@@ -896,6 +909,7 @@ export default function Settings() {
             setBusy('erase-all');
             setError(null);
             try {
+              if (withdraw) await recordConsentWithdrawal('erase');
               await eraseAllUserData();
               // Notifications, export file, lock state and first-suggestion stamp (registry's erase row).
               await clearNativeDevice('erase');
@@ -1102,6 +1116,52 @@ export default function Settings() {
                 />
               }
             />
+            <PrefRow
+              label={WITHDRAW_ROW_LABEL}
+              sublabel={WITHDRAW_ROW_SUBLABEL}
+              control={
+                <TextLink
+                  onPress={() => setShowWithdraw((open) => !open)}
+                  disabled={busy !== null}
+                  accessibilityLabel={showWithdraw ? 'Hide withdraw consent' : WITHDRAW_ROW_LABEL}
+                >
+                  {showWithdraw ? 'Hide' : WITHDRAW_ROW_LABEL}
+                </TextLink>
+              }
+            />
+            {showWithdraw ? (
+              <View style={{ paddingVertical: spacing.sm, gap: spacing.sm }}>
+                <Text variant="small" muted>
+                  {WITHDRAW_EXPLANATION}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
+                  <TextLink
+                    onPress={() => void exportData()}
+                    busy={busy === 'export-json'}
+                    disabled={busy !== null}
+                    accessibilityLabel="Export a copy first"
+                  >
+                    Export a copy first
+                  </TextLink>
+                  <TextLink
+                    onPress={() => eraseAll(true)}
+                    disabled={busy !== null}
+                    destructive
+                    accessibilityLabel={WITHDRAW_ERASE_LABEL}
+                  >
+                    {WITHDRAW_ERASE_LABEL}
+                  </TextLink>
+                  <TextLink
+                    onPress={() => deleteAccount('first', true)}
+                    disabled={busy !== null}
+                    destructive
+                    accessibilityLabel={WITHDRAW_DELETE_LABEL}
+                  >
+                    {WITHDRAW_DELETE_LABEL}
+                  </TextLink>
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
       </Stage>
@@ -1452,7 +1512,7 @@ export default function Settings() {
               sublabel="Removes every cigarette log, goal, and custom brand. Your account and login stay."
               control={
                 <TextLink
-                  onPress={eraseAll}
+                  onPress={() => eraseAll()}
                   busy={busy === 'erase-all'}
                   disabled={busy !== null}
                   destructive
@@ -1508,7 +1568,7 @@ export default function Settings() {
               sublabel="All your logs, preferences, and audit history are erased. This is permanent."
               control={
                 <TextLink
-                  onPress={deleteAccount}
+                  onPress={() => deleteAccount()}
                   busy={busy === 'delete-account'}
                   disabled={busy !== null}
                   destructive

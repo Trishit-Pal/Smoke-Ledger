@@ -51,6 +51,11 @@ export interface ConsentStepInput {
    */
   alreadyConsented: boolean;
   analyticsOptIn: boolean;
+  /**
+   * The separate, unticked-by-default health-data consent (GDPR Art 9(2)(a)).
+   * Required: without it the step refuses to continue. Independent of analytics.
+   */
+  healthDataConsent: boolean;
 }
 
 /**
@@ -61,7 +66,11 @@ export interface ConsentStepInput {
 export async function submitConsentStep({
   alreadyConsented,
   analyticsOptIn,
+  healthDataConsent,
 }: ConsentStepInput): Promise<void> {
+  if (!healthDataConsent) {
+    throw new AppError('validation_error', 'Validation failed: health-data consent is required');
+  }
   const now = new Date().toISOString();
   if (!alreadyConsented) {
     // Audit first. If the profile write then fails the user retries and a
@@ -81,6 +90,7 @@ export async function submitConsentStep({
         privacyVersion: LEGAL_VERSIONS.privacy,
         healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
         dataProcessingConsentAt: now,
+        healthDataConsentAt: now,
         onboardingStep: 'usage',
       });
   await Promise.all([

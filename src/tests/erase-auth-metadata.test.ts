@@ -1,27 +1,14 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { newestFunction } from './helpers/newestMigrationFunction';
 
-const MIGRATIONS_DIR = join(__dirname, '../../supabase/migrations');
 const NAME = '20261104100000_erase_auth_metadata.sql';
 
-function read(name: string): string {
-  return readFileSync(join(MIGRATIONS_DIR, name), 'utf8').replace(/\r\n/g, '\n');
-}
+// Later migrations copy erase_account_data forward, so these checks follow the
+// newest definition: a copy that drops one of Task 1's fixes fails here.
+describe(`erase_account_data (introduced by ${NAME})`, () => {
+  const { file, body: erase } = newestFunction('erase_account_data');
 
-function eraseBody(sql: string): string {
-  return sql.split('CREATE OR REPLACE FUNCTION public.erase_account_data')[1] ?? '';
-}
-
-describe(NAME, () => {
-  const sql = read(NAME);
-  const erase = eraseBody(sql);
-
-  it('is the newest definition of erase_account_data', () => {
-    const defining = readdirSync(MIGRATIONS_DIR)
-      .filter((f) => /^\d+_.*\.sql$/.test(f))
-      .filter((f) => /FUNCTION public\.erase_account_data/.test(read(f)))
-      .sort();
-    expect(defining[defining.length - 1]).toBe(NAME);
+  it('is defined at or after the auth-metadata migration', () => {
+    expect(file >= NAME).toBe(true);
   });
 
   it('removes name, DOB and gender from the sign-in record for this user only', () => {

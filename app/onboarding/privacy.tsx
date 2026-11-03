@@ -13,9 +13,19 @@ import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { useSession } from '@/store/session';
 import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
+import {
+  HEALTH_CONSENT_LABEL,
+  HEALTH_CONSENT_SUB,
+  HEALTH_DECLINE_LABEL,
+  HEALTH_DECLINE_NOTE,
+} from '@/lib/healthConsent';
 
 // Stagger between stamps when "Acknowledge all" is pressed (a visual beat, not a save).
 const STAMP_STAGGER_MS = 120;
+
+// "Acknowledge all" covers only these five. The health-data consent (Art 9) and the
+// optional analytics switch are separate decisions the reader makes.
+const STAMPABLE_IDS = ['age', 'terms', 'privacy', 'medical', 'dataProcessing'];
 
 interface ConsentItem {
   id: string;
@@ -53,6 +63,12 @@ const CONSENT_ROWS: ConsentItem[] = [
     required: true,
   },
   {
+    id: 'health',
+    label: HEALTH_CONSENT_LABEL,
+    sub: HEALTH_CONSENT_SUB,
+    required: true,
+  },
+  {
     id: 'analytics',
     label: 'Optional — allow first-party product analytics.',
     sub: 'No third-party trackers, ever.',
@@ -83,22 +99,26 @@ export default function Privacy() {
     privacy: consents.privacy ?? false,
     medical: consents.medical ?? false,
     dataProcessing: consents.dataProcessing ?? false,
+    health: consents.health ?? false,
     analytics: consents.analytics ?? false,
   };
   const analyticsOptIn = values.analytics;
+  const healthDataConsent = values.health;
+  const healthDeclined = consents.healthDeclined ?? false;
 
   const required = CONSENT_ROWS.filter((r) => r.required);
   const canContinue = required.every((r) => values[r.id]);
   const ackCount = Object.values(values).filter(Boolean).length;
 
   const stampAll = () => {
-    required.forEach((row, i) => {
-      setTimeout(() => setConsent(row.id, true), i * STAMP_STAGGER_MS);
+    STAMPABLE_IDS.forEach((id, i) => {
+      setTimeout(() => setConsent(id, true), i * STAMP_STAGGER_MS);
     });
-    // Land the optional tick together with the last required one: Continue
-    // enables the moment the required rows are in, so nothing may still be
-    // pending after that.
-    setTimeout(() => setConsent('analytics', true), (required.length - 1) * STAMP_STAGGER_MS);
+  };
+
+  const setHealthConsent = (given: boolean) => {
+    setConsent('health', given);
+    setConsent('healthDeclined', !given);
   };
 
   const onContinue = async () => {
@@ -109,6 +129,7 @@ export default function Privacy() {
       await submitConsentStep({
         alreadyConsented: savedRef.current || consentsCurrent(profile),
         analyticsOptIn,
+        healthDataConsent,
       });
       savedRef.current = true;
       await refreshProfile();
@@ -177,11 +198,28 @@ export default function Privacy() {
                 sub={row.sub}
                 required={row.required}
                 value={checked}
-                onChange={(v) => setConsent(row.id, v)}
+                onChange={(v) => (row.id === 'health' ? setHealthConsent(v) : setConsent(row.id, v))}
                 showBottomRule={!isLast}
               />
             );
           })}
+        </View>
+      </FadeSlideIn>
+
+      {/* Decline: as easy as accepting, and it says plainly what happens. */}
+      <FadeSlideIn index={5}>
+        <View style={{ gap: spacing.xs }}>
+          <Button
+            title={HEALTH_DECLINE_LABEL}
+            size="md"
+            variant="ghost"
+            onPress={() => setHealthConsent(false)}
+          />
+          {healthDeclined ? (
+            <Text variant="small" muted accessibilityLiveRegion="polite">
+              {HEALTH_DECLINE_NOTE}
+            </Text>
+          ) : null}
         </View>
       </FadeSlideIn>
 
@@ -202,7 +240,7 @@ export default function Privacy() {
             <Text variant="caption" color={canContinue ? theme.accent : theme.textFaint}>
               {ackCount} / {CONSENT_ROWS.length} acknowledged
             </Text>
-            {!canContinue ? (
+            {!STAMPABLE_IDS.every((id) => values[id]) ? (
               <Button
                 title="Acknowledge all"
                 size="sm"

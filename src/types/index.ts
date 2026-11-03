@@ -114,6 +114,8 @@ export interface UserProfile {
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
+  /** When the reader ticked the explicit health-data consent (Art 9(2)(a)). Null = never given. */
+  healthDataConsentAt?: string | null;
   /** Always null: no marketing opt-in exists (CHECK in migration 20261102120000). */
   marketingConsentAt?: string | null;
   // Identity — collected at signup, immutable once set (enforced in the DB).
