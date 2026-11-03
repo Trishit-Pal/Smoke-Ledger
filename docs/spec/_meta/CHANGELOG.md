@@ -4,6 +4,14 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-03 — 27c86cb
+- security-privacy: Ask the ledger rewritten for web and mobile. New gates and shapes: `consent_outdated` (403) in the profile gate; `GET /api/ledger-chat` (own `ledger_chat_state` bucket, no model, returns only `{ consented, discreet, hideTotals, currency, locale, starters }`). `scope.ts` is the one list of what the chat may read and never reads, rendered into the prompt and the notice; the tool context is built from an allowlist (identity-leak test). Twelve tools (goal history, price history from entries, entry edit dates added). Number words count as figures and are blocked outright in discreet mode. Where it appears: the web dock (five pages, not Log, minimise as the device preference `sl_chat_dock_minimised`) and the mobile pill and `/ask` screen; mobile keeps the conversation in memory only. New invariants 19 and a longer 9 and 11, the CI specs, and an honest open gap: built but off, owner steps in owner-actions section 8.
+- architecture: the `(app)` layout mounts the dock with the server flag only; mobile registers the `/ask` modal.
+- identity-profile: Settings › Privacy holds the mobile opt-in switch for Ask the ledger; identity rows are outside the chat allowlist.
+- infra-ops: the `responsive-e2e` job runs with `LEDGER_CHAT_ENABLED` and a functional step for the chat, dock, consent and goals specs; the mobile build flag and the blank `EXPO_PUBLIC_WEB_BASE_URL` in `eas.json`.
+- celebrations: verified only; the Dashboard no longer carries its own Ask link (the layout dock replaced it). No celebration behaviour changed.
+- glossary: Ledger Chat updated; Chat scope and Ask dock and Ask pill added.
+
 ## 2026-11-03 — 8398559
 - data-model: erase also clears `mobile_changed_at` and old `deleted_at` stamps (`20261104140000_erase_profile_leftovers.sql`); country and currency kept as regional settings; the unapplied-migrations gap now runs to 140000.
 - auth: post-auth routing honours an exempt next (the `/settings` delete-resume) when consents are outdated; "outdated" means older, not different.

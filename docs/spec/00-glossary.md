@@ -1,8 +1,8 @@
 ---
 section: glossary
 sources: []
-last_verified_commit: b4d45ae
-status: manual
+last_verified_commit: 27c86cb
+status: current
 ---
 
 # Glossary
@@ -176,9 +176,30 @@ read-only tools in `src/domain/ledgerChat/tools.ts`, which wrap the same domain
 functions the screens use, and renders as a row beside the narration. A
 provenance check (`src/domain/ledgerChat/guard.ts`) rejects any figure the
 tools did not produce. It never writes data, never coaches, never gives medical
-advice, and keeps the conversation on the device only. Consent is the
-`consent.ledgerChatOptIn` settings key; the processor is named in the privacy
-policy.
+advice, and keeps the conversation on the device only (web: browser storage;
+mobile: memory until the screen closes). It reads only what
+`src/domain/ledgerChat/scope.ts` lists as in scope (the reader's entries,
+totals, goals and goal history, prices from entries and edit dates) and never
+the identity fields. It appears as a docked box or "Ask" pill on the reading
+pages of web and an "Ask" pill on the reading tabs of mobile, never on Log.
+Consent is the `consent.ledgerChatOptIn` settings key, and the server refuses
+when the reader's legal consent is out of date; the processor is named in the
+privacy policy.
+
+### Chat scope
+The one list, `src/domain/ledgerChat/scope.ts`, of what Ask the ledger may read
+(`IN_SCOPE`) and what it never loads and declines to discuss (`OUT_OF_SCOPE`).
+The system prompt renders it verbatim and the consent notice renders its
+summary, so the promise and the model's instructions cannot drift apart. The
+context the model gets is built from an allowlist, so identity fields cannot
+reach it.
+
+### Ask dock and Ask pill
+The launchers for Ledger Chat. On web, `AskLedgerDock` is a docked text box on
+desktop and an "Ask" pill above the bottom nav on a phone, on every reading page
+but Log. On mobile, `AskPill` floats above the tab bar on the reading tabs and
+opens the `/ask` screen. The web dock can be minimised; that choice is the
+device preference `sl_chat_dock_minimised`.
 
 ### Pepper
 A server-only secret (`AUDIT_PEPPER`) mixed into a user ID before it is hashed
