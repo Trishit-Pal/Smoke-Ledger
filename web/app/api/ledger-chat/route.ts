@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildToolContext } from '@/domain/ledgerChat/context';
-import { chatRequestSchema, type ChatErrorCode, type ChatResponse } from '@/domain/ledgerChat/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context';
+import { starterQuestions } from '@/domain/ledgerChat/starters';
+import {
+  chatRequestSchema,
+  type ChatErrorCode,
+  type ChatResponse,
+  type ChatStateResponse,
+} from '@/domain/ledgerChat/types';
 import { hasRequiredConsents, isOnboarded } from '@/lib/compliance';
+import { consentsOutdated } from '@/lib/onboardingSteps';
+import type { UserProfile } from '@/types';
 import { daysAgoInZone, todayInZone } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
 import { checkRateLimits } from '@web/lib/auth/rateLimit';
@@ -63,20 +72,13 @@ export async function POST(request: Request) {
     if (!parsed.success) return fail('validation_error', 400);
 
     // Consent fails closed, and is checked before anything is loaded or sent.
-    const { data: consent, error: consentError } = await db
-      .from('settings_kv')
-      .select('value_json')
-      .eq('user_id', userId)
-      .eq('key', CONSENT_KEY)
-      .maybeSingle();
-    if (consentError || consent?.value_json !== true) return fail('consent_required', 403);
+    if (!(await readChatOptIn(db, userId))) return fail('consent_required', 403);
 
     // The middleware carve-out skipped the age, consent and onboarded gates for
     // this route; re-apply them here, before a daily token is spent and before
     // any ledger data is loaded or sent.
-    const profile = await loadProfile(db, userId);
-    if (!profile) return fail('unauthorized', 401);
-    if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return fail('forbidden', 403);
+    const gate = await gatedProfile(db, userId);
+    if (!gate.ok) return gate.response;
 
     const allowed = await checkRateLimits([
       { kind: 'ledger_chat_user', key: userId, max: envInt('LEDGER_CHAT_DAILY_CAP_USER', DEFAULT_USER_CAP), windowSec: DAY_SECONDS },
@@ -84,29 +86,7 @@ export async function POST(request: Request) {
     ]);
     if (!allowed) return fail('rate_limited', 429);
 
-    const zone = timezoneForCountry(profile.country);
-    const today = todayInZone(zone);
-    // Floor the summary at onboarding, exactly as the dashboard does.
-    const yearAgo = daysAgoInZone(SUMMARY_WINDOW_DAYS, zone);
-    const onboardYmd = profile.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
-    const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
-
-    // ponytail: one page of up to GOAL_WINDOW_LOG_LIMIT (2000) rows, like Home; the 90-day window
-    // holds ~22 entries a day under that ceiling. recent_entries still hands the model only 200.
-    const [logsPage, summary, goals] = await Promise.all([
-      loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: GOAL_WINDOW_LOG_LIMIT }),
-      loadDailySummary(db, { from: summarySinceYmd, to: today }),
-      loadGoals(db, userId, { activeOnly: true }),
-    ]);
-
-    const ctx = buildToolContext({
-      profile,
-      logs: logsPage.logs,
-      rows: summary.map(toDailySummaryRow),
-      goals,
-      today,
-      summarySinceYmd,
-    });
+    const ctx = await loadLedgerContext(db, userId, gate.profile);
 
     const anthropic = new Anthropic({ apiKey, timeout: UPSTREAM_TIMEOUT_MS, maxRetries: 0 });
     const model = cleanEnvValue(process.env.LEDGER_CHAT_MODEL) || DEFAULT_MODEL;
@@ -132,4 +112,84 @@ export async function POST(request: Request) {
     serverLog('error', 'api.ledger_chat.failed', { name: error instanceof Error ? error.name : 'unknown' });
     return fail('internal_error', 500);
   }
+}
+
+/**
+ * Panel state for the dock: opt-in, discreet, currency and starter questions.
+ * Same flag, caller and profile gates as POST; it never calls the model, needs
+ * no model key and spends no daily ask.
+ */
+export async function GET(request: Request) {
+  try {
+    if (!isLedgerChatEnabled()) return fail('feature_disabled', 503);
+    const resolved = await resolveChatCaller(request);
+    if (!resolved.ok) return fail(resolved.error, resolved.status);
+    const { userId, db } = resolved.caller;
+
+    const gate = await gatedProfile(db, userId);
+    if (!gate.ok) return gate.response;
+
+    const [consented, ctx] = await Promise.all([readChatOptIn(db, userId), loadLedgerContext(db, userId, gate.profile)]);
+    const body: ChatStateResponse = {
+      consented,
+      discreet: ctx.discreet,
+      currency: ctx.currency,
+      starters: starterQuestions(ctx).map((s) => s.text),
+    };
+    return NextResponse.json(body);
+  } catch (error) {
+    serverLog('error', 'api.ledger_chat.state_failed', { name: error instanceof Error ? error.name : 'unknown' });
+    return fail('internal_error', 500);
+  }
+}
+
+/** The reader's own opt-in switch; any read error counts as off. */
+async function readChatOptIn(db: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('settings_kv')
+    .select('value_json')
+    .eq('user_id', userId)
+    .eq('key', CONSENT_KEY)
+    .maybeSingle();
+  return !error && data?.value_json === true;
+}
+
+type ProfileGate = { ok: true; profile: UserProfile } | { ok: false; response: NextResponse };
+
+/** Signed-up, consented on the current legal versions, and onboarded; or the refusal to send. */
+async function gatedProfile(db: SupabaseClient, userId: string): Promise<ProfileGate> {
+  const profile = await loadProfile(db, userId);
+  if (!profile) return { ok: false, response: fail('unauthorized', 401) };
+  if (!hasRequiredConsents(profile) || !isOnboarded(profile)) return { ok: false, response: fail('forbidden', 403) };
+  // Fails closed on an old terms, privacy or medical version, or a missing
+  // health-data consent: mobile's own gate has gaps, so the server holds the line.
+  if (consentsOutdated(profile)) return { ok: false, response: fail('consent_outdated', 403) };
+  return { ok: true, profile };
+}
+
+/** The reader's own rows for one turn, loaded in parallel under RLS. */
+async function loadLedgerContext(db: SupabaseClient, userId: string, profile: UserProfile): Promise<ToolContext> {
+  const zone = timezoneForCountry(profile.country);
+  const today = todayInZone(zone);
+  // Floor the summary at onboarding, exactly as the dashboard does.
+  const yearAgo = daysAgoInZone(SUMMARY_WINDOW_DAYS, zone);
+  const onboardYmd = profile.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
+  const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
+
+  // ponytail: one page of up to GOAL_WINDOW_LOG_LIMIT (2000) rows, like Home; the 90-day window
+  // holds ~22 entries a day under that ceiling. recent_entries still hands the model only 200.
+  const [logsPage, summary, goals] = await Promise.all([
+    loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: GOAL_WINDOW_LOG_LIMIT }),
+    loadDailySummary(db, { from: summarySinceYmd, to: today }),
+    loadGoals(db, userId, { activeOnly: true }),
+  ]);
+
+  return buildToolContext({
+    profile,
+    logs: logsPage.logs,
+    rows: summary.map(toDailySummaryRow),
+    goals,
+    today,
+    summarySinceYmd,
+  });
 }
