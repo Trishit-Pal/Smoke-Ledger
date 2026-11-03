@@ -55,8 +55,8 @@ export function maskNotes(notes: string | null | undefined, discreet: boolean): 
   return discreet ? 'Hidden in discreet mode' : notes;
 }
 
-/** Figures inside prose (grouped, decimal, or plain) become '•••'; words and currency marks stay. */
-const PROSE_NUMBER = /\d+(?:[,   ]\d{2,3})*(?:\.\d+)?/g;
+/** Figures inside prose (grouped, decimal, or plain; digits of any script, "५००") become '•••'; words and currency marks stay. */
+const PROSE_NUMBER = /\p{Nd}+(?:[,   ]\p{Nd}{2,3})*(?:\.\p{Nd}+)?/gu;
 
 export function maskNumbers(text: string, discreet: boolean): string {
   if (!discreet || !text) return text;

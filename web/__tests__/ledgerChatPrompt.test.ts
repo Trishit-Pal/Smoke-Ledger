@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { buildToolContext } from '@/domain/ledgerChat/context';
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
-import { userContextBlock } from '@web/lib/server/ledgerChat/prompt';
+import { SYSTEM_PROMPT, userContextBlock } from '@web/lib/server/ledgerChat/prompt';
 
 const TODAY = '2026-06-21';
 
@@ -67,6 +67,23 @@ function goalsLine(g: Goal, logs: CigaretteLog[]): string {
     .split('\n')
     .find((l) => l.startsWith('- Active goals'))!;
 }
+
+// The guard's number words are English and Hinglish only, so a discreet reply in Hindi
+// ("bees", "पाँच") or French ("quinze") would pass it; the prompt keeps discreet replies English.
+describe('discreet reply language', () => {
+  test('the system prompt asks for English in discreet mode, whatever the question language', () => {
+    expect(SYSTEM_PROMPT).toContain(
+      '- When brand names are aliases (discreet mode), reply in English, whatever language the question is in.',
+    );
+  });
+
+  test('the context block tells the model when discreet mode is on', () => {
+    const ctx = buildToolContext({
+      profile: { ...profile, discreetMode: true }, logs: [], rows: [], goals: [], today: TODAY, summarySinceYmd: '2025-06-22',
+    });
+    expect(userContextBlock(ctx)).toContain('- Brand names in the data are aliases: yes (discreet mode');
+  });
+});
 
 describe('userContextBlock goal line', () => {
   test('lists state and a next-step note for a met goal with a suggestion, with no figures', () => {

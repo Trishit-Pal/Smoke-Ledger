@@ -9,6 +9,10 @@ describe('maskNumbers', () => {
     );
   });
 
+  it('masks digits in any script, mixed ones included', () => {
+    expect(maskNumbers('आपने ५०० रुपये, ₹१,2०० और ８ sticks', true)).toBe('आपने ••• रुपये, ₹••• और ••• sticks');
+  });
+
   it('leaves prose untouched when masking is off', () => {
     const text = 'Down 21.3% on last week.';
     expect(maskNumbers(text, false)).toBe(text);
