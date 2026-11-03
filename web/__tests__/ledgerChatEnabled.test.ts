@@ -4,9 +4,19 @@ import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 const OLD_PRIVACY = '2026-11-02';
 const NEW_PRIVACY = '2026-11-03';
 
+/** Sets the variable, or removes it when undefined (stubEnv would store the string "undefined"). */
+function setEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    vi.stubEnv(name, '');
+    delete process.env[name];
+  } else {
+    vi.stubEnv(name, value);
+  }
+}
+
 function stub(flag: string | undefined, vercelEnv: string | undefined) {
-  vi.stubEnv('LEDGER_CHAT_ENABLED', flag as string);
-  vi.stubEnv('VERCEL_ENV', vercelEnv as string);
+  setEnv('LEDGER_CHAT_ENABLED', flag);
+  setEnv('VERCEL_ENV', vercelEnv);
 }
 
 describe('isLedgerChatEnabled release gate', () => {
@@ -14,6 +24,11 @@ describe('isLedgerChatEnabled release gate', () => {
 
   it('is off in Production while the privacy policy is the undisclosed version', () => {
     stub('true', 'production');
+    expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(false);
+  });
+
+  it('reads VERCEL_ENV through cleanEnvValue, so stray whitespace cannot open the gate', () => {
+    stub('true', ' production\n');
     expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(false);
   });
 
@@ -29,7 +44,7 @@ describe('isLedgerChatEnabled release gate', () => {
 
   it('is on where VERCEL_ENV is unset (CI, next dev)', () => {
     stub('true', undefined);
-    delete process.env.VERCEL_ENV;
+    expect(process.env.VERCEL_ENV).toBeUndefined();
     expect(isLedgerChatEnabled(OLD_PRIVACY)).toBe(true);
   });
 
@@ -38,11 +53,14 @@ describe('isLedgerChatEnabled release gate', () => {
       stub('false', env);
       expect(isLedgerChatEnabled(NEW_PRIVACY)).toBe(false);
     }
+    stub(undefined, 'preview');
+    expect(isLedgerChatEnabled(NEW_PRIVACY)).toBe(false);
   });
 
   it('defaults to the shipped privacy version', () => {
     stub('true', 'production');
-    // LEGAL_VERSIONS.privacy is still 2026-11-02 until the owner names the EU representative.
+    // Reads the live LEGAL_VERSIONS.privacy (still '2026-11-02' until the owner names the EU
+    // representative). When the owner bumps it, this expectation must flip to true.
     expect(isLedgerChatEnabled()).toBe(false);
   });
 });

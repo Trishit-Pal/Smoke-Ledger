@@ -4,15 +4,18 @@ import { spacing } from '@/constants/theme';
 import { isChatPolicyLive, LEGAL_VERSIONS } from '@/lib/legal';
 
 /**
- * Build-time switch (EXPO_PUBLIC_LEDGER_CHAT_ENABLED); off unless exactly "true" and the privacy
- * policy that describes the chat is live. Mobile has no Preview, so the gate is unconditional here;
- * the web route enforces it for mobile requests too.
+ * Build-time switch (EXPO_PUBLIC_LEDGER_CHAT_ENABLED); off unless exactly "true" and either the
+ * privacy policy that describes the chat is live or this is a development build. The dev exemption
+ * is what lets the owner check mobile against the Preview deployment before the bump; release
+ * builds (store and EAS preview) stay gated, and the web route refuses Production regardless.
+ * `__DEV__` is guarded so jest and node, where it is not defined, do not throw.
  */
 export function isLedgerChatEnabled(
   flag: string | undefined = process.env.EXPO_PUBLIC_LEDGER_CHAT_ENABLED,
   privacy: string = LEGAL_VERSIONS.privacy,
+  isDev: boolean = typeof __DEV__ !== 'undefined' && __DEV__,
 ): boolean {
-  return flag === 'true' && isChatPolicyLive(privacy);
+  return flag === 'true' && (isDev || isChatPolicyLive(privacy));
 }
 
 // Reading tabs only. Log is deliberately absent, and so is every non-tab route

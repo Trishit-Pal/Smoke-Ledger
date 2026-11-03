@@ -19,9 +19,20 @@ describe('isLedgerChatEnabled', () => {
     }
   });
 
-  it('stays off while the privacy policy is the undisclosed version, flag or not', () => {
-    expect(isLedgerChatEnabled('true', CHAT_UNDISCLOSED_PRIVACY)).toBe(false);
-    expect(isLedgerChatEnabled('true')).toBe(false);
+  it('stays off in a release build while the privacy policy is the undisclosed version', () => {
+    expect(isLedgerChatEnabled('true', CHAT_UNDISCLOSED_PRIVACY, false)).toBe(false);
+    // The default-argument case reads the live LEGAL_VERSIONS.privacy (still '2026-11-02'). When the
+    // owner bumps it, this expectation must flip to true.
+    expect(isLedgerChatEnabled('true', undefined, false)).toBe(false);
+  });
+
+  it('is on in a development build with the old policy, so mobile can be checked before the bump', () => {
+    expect(isLedgerChatEnabled('true', CHAT_UNDISCLOSED_PRIVACY, true)).toBe(true);
+  });
+
+  it('a development build still needs the flag', () => {
+    expect(isLedgerChatEnabled('false', CHAT_UNDISCLOSED_PRIVACY, true)).toBe(false);
+    expect(isLedgerChatEnabled(undefined, CHAT_UNDISCLOSED_PRIVACY, true)).toBe(false);
   });
 });
 

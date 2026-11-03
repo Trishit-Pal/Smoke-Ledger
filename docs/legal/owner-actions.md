@@ -84,7 +84,7 @@ Take this list to one short consultation. None of these blocks the release; the 
 
 Ask the ledger is built on web and mobile and is **off everywhere** until you do this. The server switch is `LEDGER_CHAT_ENABLED`; the mobile switch is a build-time flag. Both default to off, so shipping the code turns nothing on. Do the steps in order.
 
-- [ ] **1. Finish section 1 and section 2 first, including the `LEGAL_VERSIONS` bump.** Why: the consent notice and the privacy page now list goal history, prices from entries and edit dates, and the page says the feature is on web and mobile. An opt-in recorded before the bump rests on the old text. The route also refuses a reader whose consent is outdated (`consent_outdated`), so the bump must be live before anyone can use it. The code also enforces this: in Production the chat refuses to start, whatever `LEDGER_CHAT_ENABLED` says, until `LEGAL_VERSIONS.privacy` is later than `2026-11-02` (Preview and local runs are not gated, so step 3 still tests there first).
+- [ ] **1. Finish section 1 and section 2 first, including the `LEGAL_VERSIONS` bump.** Why: the consent notice and the privacy page now list goal history, prices from entries and edit dates, and the page says the feature is on web and mobile. An opt-in recorded before the bump rests on the old text. The route also refuses a reader whose consent is outdated (`consent_outdated`), so the bump must be live before anyone can use it. The code also enforces this: in Production the chat refuses to start, whatever `LEDGER_CHAT_ENABLED` says, until `LEGAL_VERSIONS.privacy` is later than `2026-11-02` (Preview and local runs on web, and mobile development builds, are not gated, so steps 3 and 7 still test there first; mobile release and EAS preview builds stay gated until the bump).
 - [ ] **2. Redeploy `audit-record`.** Why: the opt-in toggle writes the event `ledger_chat_consent_toggled`. If the deployed allowlist does not have it, the switch still works but leaves no record. Where: `supabase functions deploy audit-record`, then `npm run verify:backend`.
 - [ ] **3. Add the web environment variables in Vercel, Preview first.** Where: Vercel project settings, Environment Variables.
   - `ANTHROPIC_API_KEY`: the key from an account under the Commercial Terms (section 3). Set a monthly spend limit on it in the Anthropic console; that is the hard money cap.
@@ -104,7 +104,7 @@ Ask the ledger is built on web and mobile and is **off everywhere** until you do
   - `EXPO_PUBLIC_LEDGER_CHAT_ENABLED=true`.
   - `EXPO_PUBLIC_WEB_BASE_URL` set to the production web origin. `eas.json` currently ships this as an empty string, and an empty value is treated as a misconfiguration (the Ask screen says it is unavailable) rather than falling back to the default. Fill it in or remove the key.
   - Ship the mobile build only after the web steps above, together with the build that carries the `LEGAL_VERSIONS` bump.
-- [ ] **7. Check mobile by hand** (an Expo dev build or the preview build against the Preview deployment):
+- [ ] **7. Check mobile by hand** (use an Expo dev build against the Preview deployment; an EAS preview or release build keeps the chat off until the `LEGAL_VERSIONS` bump):
   - The "Ask" pill shows on Home, Trends, History, Goals and Settings, and **not** on Log.
   - First open shows the consent notice; the Settings › Privacy toggle does the same job. Turning it off clears the conversation.
   - A question returns an answer labelled "Written by AI" with rows; closing the screen and reopening it starts empty.
