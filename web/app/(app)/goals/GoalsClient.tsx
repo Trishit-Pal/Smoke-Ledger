@@ -414,7 +414,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
   async function handleSubmit() {
     setFormError(null);
     if (editing) {
-      const result = buildGoalPatch(formState, logs, today, editing);
+      const result = buildGoalPatch(formState, logs, today, editing, localeForCountry(profile.country));
       if (!result.ok) { setFormError(result.error); return; }
       setBusy('submit');
       try {
@@ -435,7 +435,7 @@ export function GoalsClient({ goals, logs, today, profile }: GoalsClientProps) {
         );
         return;
       }
-      const result = buildGoalPayload(formState, logs, today);
+      const result = buildGoalPayload(formState, logs, today, localeForCountry(profile.country));
       if (!result.ok) { setFormError(result.error); return; }
       setBusy('submit');
       try {

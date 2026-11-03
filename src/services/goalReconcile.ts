@@ -2,7 +2,6 @@
 // injected writer, so it never imports a repository.
 
 import type { CigaretteLog, Goal } from '@/types';
-import type { GoalPatchInput } from '@/lib/validation';
 import {
   applyGoalTransitions,
   planGoalTransitions,
@@ -10,8 +9,10 @@ import {
 } from '@/domain/goalTransitions';
 
 export interface GoalWriter {
-  setGoalStatus: (id: string, status: Goal['status']) => Promise<void>;
-  updateGoal: (id: string, patch: GoalPatchInput) => Promise<unknown>;
+  /** Completes the goal only while it is still active; false when no row changed. */
+  completeIfActive: (id: string) => Promise<boolean>;
+  /** Marks a cap met on the current row; false when the goal is gone, inactive, or its cap moved. */
+  markMet: (id: string, metOn: string, targetValue: number) => Promise<boolean>;
 }
 
 export interface ReconcileFailure {
@@ -21,18 +22,21 @@ export interface ReconcileFailure {
 export interface ReconcileResult {
   goals: Goal[];
   applied: GoalTransition[];
+  /** Planned from a stale snapshot: the server refused (goal changed elsewhere). Not an error, no moment. */
+  skipped: GoalTransition[];
   failed: ReconcileFailure[];
 }
 
-function write(writer: GoalWriter, t: GoalTransition): Promise<unknown> {
+function write(writer: GoalWriter, t: GoalTransition, goal: Goal): Promise<boolean> {
   return t.kind === 'auto_complete'
-    ? writer.setGoalStatus(t.goalId, 'completed')
-    : writer.updateGoal(t.goalId, { meta: { ...t.meta } }); // spread: GoalMeta is an interface, not assignable to Record<string, unknown>
+    ? writer.completeIfActive(t.goalId)
+    : writer.markMet(t.goalId, t.meta.metOn ?? '', goal.targetValue);
 }
 
 /**
  * Writes each due transition in order. A rejected write stays out of `applied` and
- * is reported in `failed`, so one failure never blocks the rest or throws.
+ * is reported in `failed`, so one failure never blocks the rest or throws. A write the
+ * server declines (the goal changed on another device) lands in `skipped`, not `applied`.
  */
 export async function reconcileGoals(
   goals: Goal[],
@@ -42,17 +46,19 @@ export async function reconcileGoals(
   nowIso: string = new Date().toISOString(),
 ): Promise<ReconcileResult> {
   const applied: GoalTransition[] = [];
+  const skipped: GoalTransition[] = [];
   const failed: ReconcileFailure[] = [];
   for (const t of planGoalTransitions(goals, logs, today)) {
+    const goal = goals.find((g) => g.id === t.goalId);
+    if (!goal) continue;
     try {
-      await write(writer, t);
-      applied.push(t);
+      (await write(writer, t, goal) ? applied : skipped).push(t);
     } catch (error: unknown) {
       // ponytail: failures are reported, not dropped; no retry queue, the next reconcile re-plans them.
       failed.push({ transition: t, error });
     }
   }
-  return { goals: applyGoalTransitions(goals, applied, nowIso), applied, failed };
+  return { goals: applyGoalTransitions(goals, applied, nowIso), applied, skipped, failed };
 }
 
 /** The quiet moment to show when a goal completes; null when there is nothing to say. */

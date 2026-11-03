@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Divider } from '@/components/ui/Divider';
 import { spacing, fonts, radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
-import { useSession, ledgerToday } from '@/store/session';
+import { useSession, ledgerToday, ledgerTimeZone } from '@/store/session';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { evaluateGoal } from '@/domain/goals';
 import { acceptProposalPatch, dismissProposalPatch, goalTypeLabel } from '@/domain/goalForm';
@@ -256,7 +256,7 @@ export default function GoalsTab() {
             <Text variant="small" muted>{explanation}</Text>
           </>
         ) : (
-          <Text variant="small" muted>{doneLabel(goal.status, goal.completedAt, formatIndianDate)}</Text>
+          <Text variant="small" muted>{doneLabel(goal.status, goal.completedAt, ledgerTimeZone())}</Text>
         )}
 
         {proposal && copy && dismissKind ? (

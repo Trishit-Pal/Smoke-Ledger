@@ -149,9 +149,22 @@ describe('buildGoalPayload', () => {
     });
     expect(buildGoalPayload(form({ type: 'weekly_target', target: '1000' }), [], TODAY).ok).toBe(true);
     expect(buildGoalPayload(form({ type: 'spend_cap_daily', target: '100001' }), [], TODAY)).toEqual({
-      ok: false, error: 'Enter a target no higher than 100,000.',
+      ok: false, error: 'Enter a target no higher than 1,00,000.',
     });
     expect(buildGoalPayload(form({ type: 'spend_cap_daily', target: '100000' }), [], TODAY).ok).toBe(true);
+  });
+
+  it('groups the max in the message by the reader locale', () => {
+    const over = form({ type: 'spend_cap_daily', target: '100001' });
+    expect(buildGoalPayload(over, [], TODAY, 'en-IN')).toEqual({
+      ok: false, error: 'Enter a target no higher than 1,00,000.',
+    });
+    expect(buildGoalPayload(over, [], TODAY, 'de-DE')).toEqual({
+      ok: false, error: 'Enter a target no higher than 100.000.',
+    });
+    expect(buildGoalPatch(over, [], TODAY, undefined, 'de-DE')).toEqual({
+      ok: false, error: 'Enter a target no higher than 100.000.',
+    });
   });
 
   it('rejects a non-positive scalar target', () => {

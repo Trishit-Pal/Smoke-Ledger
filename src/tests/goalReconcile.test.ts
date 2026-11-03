@@ -45,8 +45,8 @@ const mkLog = (date: string): CigaretteLog => ({
 });
 
 const mkWriter = (): jest.Mocked<GoalWriter> => ({
-  setGoalStatus: jest.fn().mockResolvedValue(undefined),
-  updateGoal: jest.fn().mockResolvedValue(undefined),
+  completeIfActive: jest.fn().mockResolvedValue(true),
+  markMet: jest.fn().mockResolvedValue(true),
 });
 
 const heldCap = (id: string): Goal =>
@@ -54,13 +54,13 @@ const heldCap = (id: string): Goal =>
 const heldLogs = Array.from({ length: 14 }, (_, i) => mkLog(dayShift(TODAY, -(1 + i))));
 
 describe('reconcileGoals', () => {
-  it('writes auto_complete via setGoalStatus and mark_met via updateGoal', async () => {
+  it('completes via completeIfActive and marks met via markMet', async () => {
     const writer = mkWriter();
     const goals = [mkGoal({ id: 'q' }), heldCap('c')];
     const res = await reconcileGoals(goals, heldLogs, TODAY, writer, NOW);
 
-    expect(writer.setGoalStatus).toHaveBeenCalledWith('q', 'completed');
-    expect(writer.updateGoal).toHaveBeenCalledWith('c', { meta: { metOn: TODAY } });
+    expect(writer.completeIfActive).toHaveBeenCalledWith('q');
+    expect(writer.markMet).toHaveBeenCalledWith('c', TODAY, 5);
     expect(res.applied).toHaveLength(2);
     expect(res.failed).toEqual([]);
     expect(res.goals[0]).toMatchObject({ status: 'completed', completedAt: NOW });
@@ -69,7 +69,7 @@ describe('reconcileGoals', () => {
 
   it('skips a rejected write, still applies the next, and does not throw', async () => {
     const writer = mkWriter();
-    writer.setGoalStatus.mockRejectedValueOnce(new Error('offline'));
+    writer.completeIfActive.mockRejectedValueOnce(new Error('offline'));
     const goals = [mkGoal({ id: 'q' }), heldCap('c')];
     const res = await reconcileGoals(goals, heldLogs, TODAY, writer, NOW);
 
@@ -81,13 +81,35 @@ describe('reconcileGoals', () => {
     expect(res.goals[1].meta).toEqual({ metOn: TODAY });
   });
 
+  it('does not apply a completion that matched 0 rows (set aside or deleted elsewhere), so no moment', async () => {
+    const writer = mkWriter();
+    writer.completeIfActive.mockResolvedValueOnce(false);
+    const res = await reconcileGoals([mkGoal({ id: 'q' }), heldCap('c')], heldLogs, TODAY, writer, NOW);
+
+    expect(res.applied.map((t) => t.goalId)).toEqual(['c']);
+    expect(res.applied.some((t) => completionMoment(t) !== null)).toBe(false);
+    expect(res.skipped.map((t) => t.goalId)).toEqual(['q']);
+    expect(res.failed).toEqual([]);
+    expect(res.goals[0]).toMatchObject({ status: 'active', completedAt: null });
+  });
+
+  it('does not apply a met mark the server refused (the cap changed meanwhile)', async () => {
+    const writer = mkWriter();
+    writer.markMet.mockResolvedValueOnce(false);
+    const res = await reconcileGoals([heldCap('c')], heldLogs, TODAY, writer, NOW);
+
+    expect(res.applied).toEqual([]);
+    expect(res.skipped).toHaveLength(1);
+    expect(res.goals[0].meta).toBeNull();
+  });
+
   it('makes zero writer calls when nothing is due', async () => {
     const writer = mkWriter();
     const goals = [mkGoal({ endDate: dayShift(TODAY, 3) })];
     const res = await reconcileGoals(goals, [], TODAY, writer, NOW);
 
-    expect(writer.setGoalStatus).not.toHaveBeenCalled();
-    expect(writer.updateGoal).not.toHaveBeenCalled();
+    expect(writer.completeIfActive).not.toHaveBeenCalled();
+    expect(writer.markMet).not.toHaveBeenCalled();
     expect(res.applied).toEqual([]);
     expect(res.failed).toEqual([]);
     expect(res.goals).toEqual(goals);

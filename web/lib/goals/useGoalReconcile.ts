@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { safeRevalidateAppViews as revalidateAppViews } from '@web/lib/safeRevalidate';
-import { setGoalStatus, updateGoal } from '@/db/repositories/goals';
+import { completeGoalIfActive, markGoalMet } from '@/db/repositories/goals';
 import { planGoalTransitions } from '@/domain/goalTransitions';
 import { completionMoment, reconcileGoals } from '@/services/goalReconcile';
 import { track } from '@/services/analytics';
@@ -19,7 +19,7 @@ export interface GoalReconcile {
   failedNotice: string | null;
 }
 
-const WRITER = { setGoalStatus, updateGoal };
+const WRITER = { completeIfActive: completeGoalIfActive, markMet: markGoalMet };
 
 /**
  * Safe to mount on two pages at once (Home and Goals): the writes are idempotent (a fixed
@@ -50,8 +50,9 @@ export function useGoalReconcile(goals: Goal[], logs: CigaretteLog[], today: str
     lastKey.current = key;
     if (planned.length === 0) return;
     void (async () => {
-      const { applied, failed } = await reconcileGoals(goals, logs, today, WRITER);
-      setFailedIds(new Set(failed.map((f) => f.transition.goalId)));
+      const { applied, skipped, failed } = await reconcileGoals(goals, logs, today, WRITER);
+      // A skipped write means the goal changed elsewhere: keep it as stored until the refresh below.
+      setFailedIds(new Set([...failed.map((f) => f.transition.goalId), ...skipped.map((t) => t.goalId)]));
       setFailedNotice(failed.length > 0 ? RECONCILE_FAILED_NOTICE : null);
       for (const t of applied) {
         const moment = completionMoment(t);
@@ -60,7 +61,7 @@ export function useGoalReconcile(goals: Goal[], logs: CigaretteLog[], today: str
         dispatchGoalCompletion(moment);
         void track(AnalyticsEvents.GOAL_AUTO_COMPLETED, { type: goal.type, reason: t.reason });
       }
-      if (applied.length === 0) return;
+      if (applied.length === 0 && skipped.length === 0) return;
       await revalidateAppViews();
       router.refresh();
     })();

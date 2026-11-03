@@ -8,8 +8,7 @@ import type { GoalState } from '@/domain/goalAdherence';
 import type { DismissKind } from '@/domain/goalMeta';
 import type { Proposal } from '@/domain/goalProposals';
 import { formatMoney } from '@/lib/format';
-import { formatIndianDate } from '@/lib/date';
-import { localeForCountry } from '@/lib/regions';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
 import { ProgressRing } from '@web/components/ui/ProgressRing';
@@ -112,7 +111,7 @@ export function GoalCard({
       </div>
 
       {isDone ? (
-        <p className="text-small text-text-muted">{doneLabel(goal.status, goal.completedAt, formatIndianDate)}</p>
+        <p className="text-small text-text-muted">{doneLabel(goal.status, goal.completedAt, timezoneForCountry(profile.country))}</p>
       ) : (
         <p className="text-small text-text-muted">
           {explanation}

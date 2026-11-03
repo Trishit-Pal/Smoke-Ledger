@@ -3,6 +3,7 @@
 import { creatableGoalTypes, type GoalFormState } from '@/domain/goalForm';
 import type { SpendPeriod } from '@/domain/goalMeta';
 import type { ProposalKind } from '@/domain/goalProposals';
+import { formatIndianDate, IST, toLocalDate } from '@/lib/date';
 import type { CurrencyCode } from '@/lib/regions';
 import type { Goal, GoalType } from '@/types';
 
@@ -41,14 +42,14 @@ export function proposalRowLabel(kind: ProposalKind): 'Next step' | 'Re-anchor' 
   return kind === 'next' ? 'Next step' : 'Re-anchor';
 }
 
-/** Done-section line: the outcome and, when the DB stamped one, its date. */
-export function doneLabel(
-  status: Goal['status'],
-  completedAt: string | null,
-  formatDate: (d: string) => string,
-): string {
+/**
+ * Done-section line: the outcome and, when the DB stamped one, its date. `completedAt` is a UTC
+ * instant, so the day is read in the reader's ledger `zone` (not the runtime's, which would
+ * mismatch between server render and browser and name the wrong day near midnight).
+ */
+export function doneLabel(status: Goal['status'], completedAt: string | null, zone: string = IST): string {
   const word = status === 'abandoned' ? 'Set aside' : 'Completed';
-  return completedAt ? `${word} ${formatDate(completedAt)}` : word;
+  return completedAt ? `${word} ${formatIndianDate(toLocalDate(completedAt, zone))}` : word;
 }
 
 /** Active goal types not yet reported, each once (a type has at most one live goal, but stay safe). */

@@ -56,8 +56,8 @@ interface Reconciled {
 async function reconcileLoaded(goals: Goal[], logs: CigaretteLog[], today: string): Promise<Reconciled> {
   try {
     const r = await reconcileGoals(goals, logs, today, {
-      setGoalStatus: goalsRepo.setGoalStatus,
-      updateGoal: goalsRepo.updateGoal,
+      completeIfActive: goalsRepo.completeGoalIfActive,
+      markMet: goalsRepo.markGoalMet,
     });
     return { goals: r.goals, applied: r.applied, failed: r.failed.length > 0 };
   } catch {

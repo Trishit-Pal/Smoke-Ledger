@@ -6,6 +6,7 @@ import type { CigaretteLog, Goal, GoalType } from '@/types';
 import { maxTargetFor, type GoalPatchInput } from '@/lib/validation';
 import { rollingAvgSticks } from './calc';
 import { daysUntil, todayIst } from '@/lib/date';
+import { localeForCountry } from '@/lib/regions';
 import {
   appendStep,
   capOn,
@@ -154,6 +155,7 @@ export function buildGoalPayload(
   form: GoalFormState,
   logs: CigaretteLog[],
   today: string = todayIst(),
+  locale: string = localeForCountry(null),
 ): GoalPayloadResult {
   switch (form.type) {
     case 'daily_cap':
@@ -162,8 +164,8 @@ export function buildGoalPayload(
       const v = Number(form.target);
       if (!Number.isFinite(v) || v <= 0) return { ok: false, error: 'Enter a target greater than 0.' };
       const max = maxTargetFor(form.type);
-      // en-US grouping: the form has no currency, and the max is a bare count or amount.
-      if (v > max) return { ok: false, error: `Enter a target no higher than ${max.toLocaleString('en-US')}.` };
+      // The max is a bare count or amount, so only the reader's digit grouping applies (en-IN: 1,00,000).
+      if (v > max) return { ok: false, error: `Enter a target no higher than ${max.toLocaleString(locale)}.` };
       if (form.type === 'spend_cap_daily') {
         return { ok: true, payload: { type: form.type, targetValue: v, meta: { period: form.period } } };
       }
@@ -241,8 +243,9 @@ export function buildGoalPatch(
   logs: CigaretteLog[],
   today: string = todayIst(),
   existing?: Goal,
+  locale?: string,
 ): GoalPatchResult {
-  const result = buildGoalPayload(form, logs, today);
+  const result = buildGoalPayload(form, logs, today, locale);
   if (!result.ok) return result;
   const { type: _type, startDate: _startDate, ...patch } = result.payload;
   if (!existing) return { ok: true, patch };

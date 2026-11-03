@@ -11,6 +11,8 @@ jest.mock('@/db/repositories/goals', () => ({
   listAllGoals: jest.fn(),
   setGoalStatus: jest.fn(),
   updateGoal: jest.fn(),
+  completeGoalIfActive: jest.fn(),
+  markGoalMet: jest.fn(),
   createGoal: jest.fn(),
 }));
 jest.mock('@/db/repositories/profile', () => ({ getProfile: jest.fn().mockResolvedValue(null) }));
@@ -28,7 +30,7 @@ import type { Goal, UserProfile } from '@/types';
 
 const getProfile = profileRepo.getProfile as jest.Mock;
 const listAllGoals = goalsRepo.listAllGoals as jest.Mock;
-const setGoalStatus = goalsRepo.setGoalStatus as jest.Mock;
+const completeIfActive = goalsRepo.completeGoalIfActive as jest.Mock;
 const createGoal = goalsRepo.createGoal as jest.Mock;
 
 // A quit date long past: the planner wants it auto-completed.
@@ -48,19 +50,28 @@ const dueGoal = (): Goal => ({
 describe('session goals reconcile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    setGoalStatus.mockResolvedValue(undefined);
+    completeIfActive.mockResolvedValue(true);
     useSession.getState().reset();
   });
 
   it('boot completes a due goal and queues its moment once', async () => {
     listAllGoals.mockResolvedValue([dueGoal()]);
     await useSession.getState().boot();
-    expect(setGoalStatus).toHaveBeenCalledWith('g1', 'completed');
+    expect(completeIfActive).toHaveBeenCalledWith('g1');
     expect(useSession.getState().goals[0].status).toBe('completed');
     expect(useSession.getState().goalsReconcileFailed).toBe(false);
 
     const moments = useSession.getState().consumeGoalMoments();
     expect(moments).toEqual([{ goalId: 'g1', kind: 'auto_complete', reason: 'quit_date' }]);
+    expect(useSession.getState().consumeGoalMoments()).toEqual([]);
+  });
+
+  it('a completion the server declines (goal set aside elsewhere) queues no moment and stays as stored', async () => {
+    listAllGoals.mockResolvedValue([dueGoal()]);
+    completeIfActive.mockResolvedValue(false);
+    await useSession.getState().boot();
+    expect(useSession.getState().goals[0].status).toBe('active');
+    expect(useSession.getState().goalsReconcileFailed).toBe(false);
     expect(useSession.getState().consumeGoalMoments()).toEqual([]);
   });
 
@@ -80,7 +91,7 @@ describe('session goals reconcile', () => {
   it('refreshGoals does not re-announce once the write has landed', async () => {
     listAllGoals.mockResolvedValue([{ ...dueGoal(), status: 'completed' }]);
     await useSession.getState().refreshGoals();
-    expect(setGoalStatus).not.toHaveBeenCalled();
+    expect(completeIfActive).not.toHaveBeenCalled();
     expect(useSession.getState().consumeGoalMoments()).toEqual([]);
   });
 
@@ -92,7 +103,7 @@ describe('session goals reconcile', () => {
 
   it('records a failed write, leaves the goal as stored, and never throws', async () => {
     listAllGoals.mockResolvedValue([dueGoal()]);
-    setGoalStatus.mockRejectedValue(new Error('offline'));
+    completeIfActive.mockRejectedValue(new Error('offline'));
     await expect(useSession.getState().boot()).resolves.toBeUndefined();
     expect(useSession.getState().goals[0].status).toBe('active');
     expect(useSession.getState().goalsReconcileFailed).toBe(true);
@@ -101,7 +112,7 @@ describe('session goals reconcile', () => {
 
   it('clears the failure flag on a later clean refresh', async () => {
     listAllGoals.mockResolvedValue([dueGoal()]);
-    setGoalStatus.mockRejectedValueOnce(new Error('offline'));
+    completeIfActive.mockRejectedValueOnce(new Error('offline'));
     await useSession.getState().refreshGoals();
     expect(useSession.getState().goalsReconcileFailed).toBe(true);
     await useSession.getState().refreshGoals();
@@ -123,7 +134,7 @@ describe('boot reconcile uses the loaded profile zone', () => {
     getProfile.mockResolvedValue({ country: 'FR' } as UserProfile);
     listAllGoals.mockResolvedValue([{ ...dueGoal(), endDate: '2026-11-01' }]);
     await useSession.getState().boot();
-    expect(setGoalStatus).not.toHaveBeenCalled();
+    expect(completeIfActive).not.toHaveBeenCalled();
     expect(useSession.getState().goals[0].status).toBe('active');
   });
 });
