@@ -19,9 +19,54 @@ export interface DonutProps {
   centerValue?: string;
   /** Names the chart for assistive tech (caption of its data table). */
   title?: string;
+  /** Formats slice values (tooltip + table), e.g. discreet masking. Default: String. */
+  formatValue?: (v: number) => string;
+  /** Formats slice names (tooltip + table), e.g. brand aliasing. Default: identity. */
+  formatLabel?: (label: string, index: number) => string;
 }
 
-export function Donut({ slices, size = 140, centerLabel, centerValue, title = 'Share by category' }: DonutProps) {
+/** Recharts tooltip formatter for the donut. Reads the slice index stamped on each
+ *  datum (`sliceIndex`) so duplicate labels get their own alias; when a label
+ *  formatter is given but the index is missing, it fails closed (never the raw name). */
+export function donutTooltipFormatter(
+  formatValue?: (v: number) => string,
+  formatLabel?: (label: string, index: number) => string,
+) {
+  return (value: unknown, name: unknown, item?: { payload?: { sliceIndex?: number } }): [string, string] => {
+    const label = String(name);
+    const index = item?.payload?.sliceIndex;
+    return [
+      formatValue ? formatValue(Number(value)) : String(value),
+      formatLabel ? formatLabel(label, typeof index === 'number' ? index : -1) : label,
+    ];
+  };
+}
+
+/** The slices Recharts draws. Recharts copies each slice name onto its SVG
+ *  `<path name="…">`, so the name must already be formatted (masked) here;
+ *  formatting only in the tooltip and table left a discreet reader's brand in the DOM. */
+export function donutPieData(
+  slices: readonly DonutSlice[],
+  formatLabel?: (label: string, index: number) => string,
+): Array<DonutSlice & { sliceIndex: number }> {
+  return slices
+    .filter((s) => s.value > 0)
+    .map((s, sliceIndex) => ({
+      ...s,
+      label: formatLabel ? formatLabel(s.label, sliceIndex) : s.label,
+      sliceIndex,
+    }));
+}
+
+export function Donut({
+  slices,
+  size = 140,
+  centerLabel,
+  centerValue,
+  title = 'Share by category',
+  formatValue,
+  formatLabel,
+}: DonutProps) {
   const reduced = useReduceMotion();
   const safeSlices = slices.filter((s) => s.value > 0);
   const inner = Math.round(size * 0.6);
@@ -33,7 +78,7 @@ export function Donut({ slices, size = 140, centerLabel, centerValue, title = 'S
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={safeSlices}
+            data={donutPieData(safeSlices, formatLabel)}
             dataKey="value"
             nameKey="label"
             innerRadius={inner / 2}
@@ -43,16 +88,20 @@ export function Donut({ slices, size = 140, centerLabel, centerValue, title = 'S
           >
             {safeSlices.map((slice, idx) => (
               <Cell
-                key={`${slice.label}-${idx}`}
+                key={idx}
                 fill={slice.color ?? CHART_SERIES[idx % CHART_SERIES.length]}
               />
             ))}
           </Pie>
-          <Tooltip contentStyle={chartTooltipStyle} />
+          <Tooltip
+            contentStyle={chartTooltipStyle}
+            // Names arrive pre-formatted from donutPieData; only values need formatting here.
+            formatter={donutTooltipFormatter(formatValue)}
+          />
         </PieChart>
       </ResponsiveContainer>
       </div>
-      <ChartDataTable caption={title} rows={safeSlices} />
+      <ChartDataTable caption={title} rows={safeSlices} formatValue={formatValue} formatLabel={formatLabel} />
       {(centerLabel || centerValue) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           {centerValue ? (

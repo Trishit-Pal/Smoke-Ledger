@@ -35,11 +35,13 @@ import { track } from '@/services/analytics';
 import { recordAuditEvent } from '@/services/audit';
 import type { UserProfile } from '@/types';
 import { INPUT_STYLE } from '@web/lib/auth/inputStyle';
+import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
 import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
 import {
+  clearTranscript,
   loadTranscript,
   saveTranscript,
   type TranscriptTurn,
@@ -93,7 +95,14 @@ function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): st
 export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLedgerPanelProps) {
   const inputId = React.useId();
   const [userId, setUserId] = React.useState<string | null>(null);
-  const [turns, setTurns] = React.useState<TranscriptTurn[]>([]);
+  const [turns, setTurnsState] = React.useState<TranscriptTurn[]>([]);
+  // send() awaits the network; it must append to the turns as they are when the
+  // answer lands, not as they were when it started, or a Clear in between is undone.
+  const turnsRef = React.useRef<TranscriptTurn[]>([]);
+  const setTurns = React.useCallback((next: TranscriptTurn[]) => {
+    turnsRef.current = next;
+    setTurnsState(next);
+  }, []);
   const [status, setStatus] = React.useState<Status>('idle');
   const [pending, setPending] = React.useState<Pending | null>(null);
   const [draft, setDraft] = React.useState('');
@@ -111,14 +120,11 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
   React.useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void getSupabase()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (cancelled) return;
-        const id = data.session?.user.id ?? null;
-        setUserId(id);
-        setTurns(id ? loadTranscript(id) : []);
-      });
+    void sessionUserId(() => getSupabase().auth.getSession()).then((id) => {
+      if (cancelled) return;
+      setUserId(id);
+      setTurns(id ? loadTranscript(id) : []);
+    });
     return () => {
       cancelled = true;
     };
@@ -134,18 +140,19 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         const res = await fetch('/api/ledger-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q, history: historyFor(turns) }),
+          body: JSON.stringify({ question: q, history: historyFor(turnsRef.current) }),
         });
         if (res.ok) {
           const body = (await res.json()) as ChatResponse;
+          const current = turnsRef.current;
           const turn: TranscriptTurn = {
-            id: `${Date.now().toString(36)}-${turns.length}`,
+            id: `${Date.now().toString(36)}-${current.length}`,
             question: q,
             answer: body.answer,
             rows: body.rows,
             at: new Date().toISOString(),
           };
-          const next = [...turns, turn];
+          const next = [...current, turn];
           setTurns(userId ? saveTranscript(userId, next) : next);
           setPending(null);
           setDraft('');
@@ -167,7 +174,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
         setStatus('error');
       }
     },
-    [turns, userId],
+    [setTurns, userId],
   );
 
   const onTurnOnAndAsk = async () => {
@@ -202,6 +209,13 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
     void send(draft, false);
   };
 
+  // Plain and confirm-free: the only thing lost is something the reader can ask again.
+  const onClear = () => {
+    clearTranscript(userId ?? undefined);
+    setTurns([]);
+    setRevealed(new Set());
+  };
+
   const reveal = (key: string) => setRevealed((prev) => new Set(prev).add(key));
 
   return (
@@ -217,6 +231,16 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
               <Dialog.Description asChild>
                 <p className="max-w-[40ch] text-small text-text-muted">{COPY.description}</p>
               </Dialog.Description>
+              {turns.length > 0 && !busy ? (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className={`${LINK_BUTTON} self-start text-small text-text-muted hover:text-text`}
+                  style={{ textDecorationColor: 'var(--rule-strong)' }}
+                >
+                  Clear conversation
+                </button>
+              ) : null}
             </div>
             <Dialog.Close asChild>
               <button
@@ -299,6 +323,7 @@ export function AskLedgerPanel({ open, onOpenChange, profile, starters }: AskLed
                 ) : (
                   paragraphs
                 )}
+                <p className="editorial-caption text-text-faint">Written by AI</p>
               </article>
               );
             })}

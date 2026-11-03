@@ -160,6 +160,12 @@ BEGIN
     IF NOT scheduled THEN
       RAISE EXCEPTION 'pg_cron is installed but purge-rate-limit-counters is not scheduled';
     END IF;
+
+    EXECUTE $q$SELECT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'purge-expired-records')$q$
+      INTO scheduled;
+    IF NOT scheduled THEN
+      RAISE EXCEPTION 'pg_cron is installed but purge-expired-records is not scheduled';
+    END IF;
   END IF;
 END $$;
 

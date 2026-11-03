@@ -2,10 +2,13 @@ import React from 'react';
 import { View, LayoutChangeEvent } from 'react-native';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '@/hooks/useTheme';
+import { capStepPath } from '@/domain/capLine';
 
 export interface LineDatum {
   label: string;
   value: number;
+  /** The goal cap in force that day; null/absent draws nothing. */
+  cap?: number | null;
 }
 
 export interface LineChartProps {
@@ -21,7 +24,7 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
   const onLayout = (e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width);
 
   if (!data.length) return <View style={{ height }} />;
-  const max = Math.max(1, ...data.map((d) => d.value));
+  const max = Math.max(1, ...data.map((d) => Math.max(d.value, d.cap ?? 0)));
   const min = 0;
   const padL = 28;
   const padR = 8;
@@ -33,8 +36,10 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
   const points = data.map((d, i) => {
     const x = padL + (chartW * i) / Math.max(1, data.length - 1);
     const y = padT + chartH - ((d.value - min) / (max - min || 1)) * chartH;
-    return { x, y, d };
+    const capY = typeof d.cap === 'number' ? padT + chartH - ((d.cap - min) / (max - min || 1)) * chartH : null;
+    return { x, y, capY, d };
   });
+  const capPath = capStepPath(points.map((p) => ({ x: p.x, y: p.capY })));
   const path = points
     .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
     .join(' ');
@@ -57,6 +62,9 @@ export function LineChart({ data, height = 160, formatY, strokeColor }: LineChar
           <SvgText x={4} y={padT + 10} fill={theme.text} fontSize={10}>
             {formatY ? formatY(max) : String(max)}
           </SvgText>
+          {capPath ? (
+            <Path d={capPath} fill="none" stroke={theme.ruleStrong} strokeWidth={1.5} strokeDasharray="4,4" />
+          ) : null}
           <Path d={path} fill="none" stroke={strokeColor ?? theme.accent} strokeWidth={2} />
           {points.map((p, i) => (
             <Circle key={i} cx={p.x} cy={p.y} r={2.5} fill={strokeColor ?? theme.accent} />

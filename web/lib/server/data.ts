@@ -32,6 +32,7 @@ type ProfileRow = {
   privacy_version: string | null;
   health_disclaimer_version: string | null;
   data_processing_consent_at: string | null;
+  health_data_consent_at: string | null;
   marketing_consent_at: string | null;
   full_name: string | null;
   date_of_birth: string | null;
@@ -52,6 +53,7 @@ type GoalRow = {
   status: Goal['status'];
   meta_json: Record<string, unknown> | string | null;
   created_at: string;
+  completed_at: string | null;
 };
 
 type BrandRow = {
@@ -90,6 +92,7 @@ function mapProfile(row: ProfileRow): UserProfile {
     privacyVersion: row.privacy_version,
     healthDisclaimerVersion: row.health_disclaimer_version,
     dataProcessingConsentAt: row.data_processing_consent_at,
+    healthDataConsentAt: row.health_data_consent_at,
     marketingConsentAt: row.marketing_consent_at,
     fullName: row.full_name,
     dateOfBirth: row.date_of_birth,
@@ -124,6 +127,7 @@ function mapGoal(row: GoalRow): Goal {
     status: row.status,
     meta,
     createdAt: row.created_at,
+    completedAt: row.completed_at ?? null,
   };
 }
 
@@ -160,6 +164,8 @@ export const getServerProfile = cache(async (): Promise<UserProfile> => {
 
 /** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
 const SERVER_LOGS_PAGE_SIZE = 200;
+/** Row limit for goal-consuming loaders (adherence, holds, proposals); see getDashboardData. */
+export const GOAL_WINDOW_LOG_LIMIT = 2000;
 
 export interface LogCursor {
   ts: string;
@@ -329,7 +335,7 @@ export function brandsCacheTag(userId: string): string {
 }
 
 /** Brand data changes rarely; cache it cross-request and let mutations bust the tag. */
-const BRANDS_CACHE_TTL_SECONDS = 600;
+export const BRANDS_CACHE_TTL_SECONDS = 600;
 
 async function loadBrandsWithVariants(
   supabase: SupabaseClient,
@@ -428,8 +434,10 @@ export async function getDashboardData() {
   const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
   // Raw logs (60-day) still power quick-log inference, insights, and the week strip.
   const fromDate = daysAgoInZone(60, zone);
-  const [logs, goals, brands, summary] = await Promise.all([
-    getServerLogs({ fromDate }),
+  // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
+  // ceiling. If nextCursor is ever non-null, page until it is null.
+  const [{ logs }, goals, brands, summary] = await Promise.all([
+    getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
     getServerGoals(),
     getServerBrandsWithVariants(),
     getServerDailySummary({ from: summarySinceYmd, to: today }),
@@ -516,11 +524,12 @@ export async function getTrendsPageData() {
   const fromDate90 = daysAgoInZone(90, zone);
   const fromDate365 = daysAgoInZone(365, zone);
   const today = todayInZone(zone);
-  const [logs, dailySummary] = await Promise.all([
+  const [logs, dailySummary, goals] = await Promise.all([
     getServerLogs({ fromDate: fromDate90 }),    // raw logs, 90-day capped at 200 — for hour/dow/brand/mood charts
     getServerDailySummary({ from: fromDate365, to: today }),  // 365 daily rows — for sticks/spend time series
+    getServerGoals(),                           // active goals (request-cached) — the cap line
   ]);
-  return { profile, logs, dailySummary, ledgerChatEnabled: isLedgerChatEnabled() };
+  return { profile, logs, dailySummary, goals, ledgerChatEnabled: isLedgerChatEnabled() };
 }
 
 export async function getNewLogPageData() {
@@ -537,9 +546,11 @@ export async function getGoalsPageData() {
   const today = todayInZone(zone);
   // 60-day raw logs power evaluateGoal's daily/weekly/rolling-average reads.
   const fromDate = daysAgoInZone(60, zone);
-  const [goals, logs] = await Promise.all([
+  // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
+  // ceiling. If nextCursor is ever non-null, page until it is null.
+  const [goals, { logs }] = await Promise.all([
     getServerAllGoals(),
-    getServerLogs({ fromDate }),
+    getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
   ]);
   return { profile, goals, logs, today };
 }

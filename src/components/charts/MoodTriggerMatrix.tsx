@@ -9,6 +9,8 @@ import type { CigaretteLog } from '@/types';
 export interface MoodTriggerMatrixProps {
   logs: CigaretteLog[];
   money: (amount: number) => string;
+  /** Pair and cell counts; callers mask them in discreet mode. */
+  formatCount?: (n: number) => string;
 }
 
 const PRETTY = (s: string) => s.replace(/_/g, ' ');
@@ -16,7 +18,7 @@ const PRETTY = (s: string) => s.replace(/_/g, ' ');
 // which clipped labels under large text and wasted width on tablets.
 const LABEL_COL = { flex: 1.6, minWidth: 64, paddingRight: spacing.xs } as const;
 
-export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
+export function MoodTriggerMatrixView({ logs, money, formatCount = String }: MoodTriggerMatrixProps) {
   const theme = useTheme();
   const m = moodTriggerMatrix(logs, 5);
 
@@ -45,7 +47,7 @@ export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
               {PRETTY(p.mood)} → {PRETTY(p.trigger)}
             </Text>
             <Text variant="small" muted>
-              {p.count}× {p.avgUnitPriceInr != null ? `· ${money(p.avgUnitPriceInr)}` : ''}
+              {formatCount(p.count)}× {p.avgUnitPriceInr != null ? `· ${money(p.avgUnitPriceInr)}` : ''}
             </Text>
           </View>
         ))}
@@ -86,7 +88,7 @@ export function MoodTriggerMatrixView({ logs, money }: MoodTriggerMatrixProps) {
                   >
                     {v > 0 ? (
                       <Text variant="caption" color={intensity > 0.5 ? theme.bgElevated : theme.text}>
-                        {v}
+                        {formatCount(v)}
                       </Text>
                     ) : null}
                   </View>

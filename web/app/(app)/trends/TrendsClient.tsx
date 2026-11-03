@@ -52,7 +52,7 @@ import {
 import { todayInZone, daysAgoInZone, dateRange } from '@/lib/date';
 import { formatDelta, formatMoney } from '@/lib/format';
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
-import { isDiscreetMode, maskCount, maskInr } from '@/lib/discreet';
+import { isDiscreetMode, maskBrandAt, maskCount, maskInr } from '@/lib/discreet';
 
 import { LineChart, BarChart, Donut } from '@web/components/charts/dynamic';
 import { BarChart3D } from '@web/components/charts/BarChart3D';
@@ -63,8 +63,11 @@ import { Reveal } from '@web/components/anim/dynamic';
 import { SectionLabel, ChoiceRun } from '@web/components/visual';
 import { AskLedgerLauncher } from '@web/components/chat/AskLedgerLauncher';
 import type { DailySummaryRow } from '@/domain/periodSummary';
-import type { CigaretteLog, DailyStat, UserProfile } from '@/types';
+import { goalTypeLabel } from '@/domain/goalForm';
+import { hasCapLine, pickCapGoal, withCapLine } from '@web/lib/goals/capLine';
+import type { CigaretteLog, DailyStat, Goal, UserProfile } from '@/types';
 import type { DailySummary } from '@web/lib/server/data';
+import { brandRows } from '@web/lib/trends/brandRows';
 
 type WindowDays = 1 | 7 | 30 | 365;
 
@@ -85,6 +88,8 @@ export interface TrendsClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
   dailySummary: DailySummary[];
+  /** Active goals: the first daily cap or taper is drawn as a dashed line on Daily sticks. */
+  goals: Goal[];
   /** Server flag for Ask the ledger; the launcher stays hidden while false. */
   ledgerChatEnabled: boolean;
 }
@@ -157,14 +162,14 @@ function headlineDeck(opts: {
   return `${opts.sticks} ${opts.sticks === 1 ? 'cigarette' : 'cigarettes'} across ${opts.windowDays} days. Average ${opts.avg.toFixed(1)} per day, ${delta} vs the period before.`;
 }
 
-export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }: TrendsClientProps) {
+export function TrendsClient({ profile, logs, dailySummary, goals, ledgerChatEnabled }: TrendsClientProps) {
   const discreet = isDiscreetMode(profile);
   const [windowDays, setWindowDays] = React.useState<WindowDays>(30);
 
   const zone = timezoneForCountry(profile.country);
   const today = todayInZone(zone);
   // The launcher derives its starter questions from the same per-day rows the
-  // dashboard engine reads; Trends has no goals loaded, so none are passed.
+  // dashboard engine reads.
   const summaryRows = React.useMemo<DailySummaryRow[]>(
     () =>
       dailySummary.map((d) => ({
@@ -199,13 +204,16 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
     [dailySummary, previousStart, previousEnd],
   );
 
+  const capGoal = React.useMemo(() => pickCapGoal(goals), [goals]);
   const sticksLine = React.useMemo(
     () =>
-      currentStats.map((s) => ({
-        label: s.date.slice(5),
-        value: s.sticks,
-      })),
-    [currentStats],
+      withCapLine(
+        currentStats.map((s) => ({ label: s.date.slice(5), value: s.sticks })),
+        capGoal,
+        currentStats.map((s) => s.date),
+        true, // every window plots one point per day (summaryStats), so a daily cap is comparable
+      ),
+    [currentStats, capGoal],
   );
 
   const spendBars = React.useMemo(
@@ -251,6 +259,8 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
       })),
     [brandMix],
   );
+
+  const brandList = React.useMemo(() => brandRows(brandMix, discreet), [brandMix, discreet]);
 
   const totalSpend = React.useMemo(
     () => brandMix.reduce((acc, b) => acc + b.spendInr, 0),
@@ -438,6 +448,11 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                     ? 'A sparse week — most days quiet.'
                     : `Around ${maskCount(summary.avgSticksPerDay.toFixed(1), discreet)} a day, on average.`}
               </p>
+              {capGoal && hasCapLine(sticksLine) ? (
+                <p className="text-caption text-text-faint italic">
+                  — dashed line: your {goalTypeLabel(capGoal.type).toLowerCase()}
+                </p>
+              ) : null}
             </section>
 
             {/* ─────────────── Daily spend — bars ─────────────── */}
@@ -476,7 +491,12 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <Heatmap logs={logs} startYmd={startYmd} endYmd={today} />
+                <Heatmap
+                  logs={logs}
+                  startYmd={startYmd}
+                  endYmd={today}
+                  formatCount={(n) => maskCount(n, discreet)}
+                />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 The grid reads top-down by weekday, left-right by hour. Dark
@@ -500,7 +520,13 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart title="Sticks by hour of day" data={hourBars} height={160} />
+                <BarChart
+                  title="Sticks by hour of day"
+                  data={hourBars}
+                  height={160}
+                  formatY={(v) => maskCount(v, discreet)}
+                  showYAxis={false}
+                />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 Mornings and evenings tend to spike. Quiet hours are the ones
@@ -524,7 +550,7 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                 </span>
               </div>
               <Reveal dependencyKey={dependencyKey}>
-                <BarChart3D data={dowBars} />
+                <BarChart3D data={dowBars} formatValue={(v) => maskCount(v, discreet)} />
               </Reveal>
               <p className="text-small text-text-muted italic max-w-[48ch]">
                 The shape of your week. Weekends and weekdays rarely match.
@@ -589,6 +615,8 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                         title="Spend by brand"
                         slices={donutSlices}
                         size={160}
+                        formatValue={(v) => maskInr(v, discreet, (n) => money(n, { compact: true }))}
+                        formatLabel={(l, i) => maskBrandAt(l, i, discreet)}
                         centerLabel="TOTAL"
                         centerValue={maskInr(totalSpend, discreet, (n) =>
                           money(n, { compact: true }),
@@ -597,7 +625,7 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                       <ul className="flex-1 w-full flex flex-col">
                         {brandMix.map((b, i) => (
                           <li
-                            key={b.brand}
+                            key={brandList[i]!.key}
                             className="flex items-center justify-between py-sm"
                             style={{
                               borderTop: i === 0 ? 'none' : '1px solid var(--ink-surface-rule)',
@@ -615,7 +643,7 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                                 className="text-small truncate"
                                 style={{ color: 'var(--ink-surface-text)' }}
                               >
-                                {b.brand}
+                                {brandList[i]!.name}
                               </span>
                             </div>
                             <span
@@ -626,7 +654,7 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                                 money(n, { compact: true }),
                               )}
                               <span style={{ color: 'var(--ink-surface-muted)' }}> · </span>
-                              {Math.round(b.share * 100)}%
+                              {brandList[i]!.shareText}
                             </span>
                           </li>
                         ))}
@@ -660,7 +688,7 @@ export function TrendsClient({ profile, logs, dailySummary, ledgerChatEnabled }:
                 profile={profile}
                 logs={logs}
                 rows={summaryRows}
-                goals={[]}
+                goals={goals}
                 today={today}
               />
             </div>

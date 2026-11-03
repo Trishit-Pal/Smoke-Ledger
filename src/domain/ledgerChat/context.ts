@@ -6,6 +6,7 @@
 
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import type { DailySummaryRow } from '@/domain/periodSummary';
+import { brandAlias } from '@/lib/discreet';
 import { localeForCountry, timezoneForCountry, type CurrencyCode } from '@/lib/regions';
 
 export interface ToolContext {
@@ -30,12 +31,6 @@ export interface BuildToolContextInput {
   goals: Goal[];
   today: string;
   summarySinceYmd: string;
-}
-
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-function brandAlias(index: number): string {
-  return index < ALPHABET.length ? `Brand ${ALPHABET[index]}` : `Brand ${index + 1}`;
 }
 
 /** New log objects with brands aliased by first-seen order and free text removed. */

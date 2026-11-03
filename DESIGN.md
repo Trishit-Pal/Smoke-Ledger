@@ -97,5 +97,17 @@ overlap.
 (`src/lib/discreet.ts`) are pure helpers; nothing masks at the data source. Every new place a
 money amount or stick count is rendered — headline, chart axis, tooltip, matrix cell, model prose —
 passes through them. A masked heading over an unmasked axis is a leak (Trends money and stick
-counts, fixed 2026-11-01). The responsive e2e checks currency only; counts are reviewed by hand.
+counts, fixed 2026-11-01). The render site is every channel a reader or screen reader can reach,
+not just the drawn pixels: the visually hidden `sr-only` chart data table, the chart's
+`aria-label`, SVG `<title>` hover text, tooltips, visible bar values, and React keys. Charts take a
+formatter prop and forward it to every channel the chart has (tooltip, sr table, and the
+`aria-label`/`title` where present; Line/Bar are `aria-hidden`). Nothing changes with discreet off: the
+hour-of-day chart keeps its hidden Y axis (`showYAxis={false}`), and the donut's tooltip and table show
+compact money. Brand names under discreet mode become distinct
+aliases by list position (`maskBrandAt` / `brandAlias`: "Brand A", "Brand B"…), never one shared
+"Brand hidden" label, so rows stay readable and keys unique. The Home last-entry label drops the
+variant under discreet (`lastEntryLabel`). A clock time ("busiest at 15:00") is a
+pattern, not a count, and stays. The responsive e2e scans for currency, digits in sr-only table
+cells and chart aria-labels, and a seeded brand name (CI only); `web/__tests__/chartMasking.test.ts`
+pins each chart except the mood × trigger matrix.
 `KpiCard` takes a pre-masked `value: ReactNode`; do not add a raw-number prop.

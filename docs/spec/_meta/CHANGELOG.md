@@ -4,6 +4,49 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-03 — 8398559
+- data-model: erase also clears `mobile_changed_at` and old `deleted_at` stamps (`20261104140000_erase_profile_leftovers.sql`); country and currency kept as regional settings; the unapplied-migrations gap now runs to 140000.
+- auth: post-auth routing honours an exempt next (the `/settings` delete-resume) when consents are outdated; "outdated" means older, not different.
+- identity-profile: erase clears the mobile-change lock and old erase stamps; `acceptChangedTerms` never writes a version lower than the stored one.
+- security-privacy: versions compare as ISO dates (same or newer is current) so web/mobile skew cannot loop; every null web session clears the localStorage stores while only `SIGNED_OUT` expires the auth cookies; erase leftovers; five unapplied migrations.
+
+## 2026-11-03 — b4d45ae
+- security-privacy: privacy V3 recorded. New subsections for retention (daily `purge_expired_records`, the `RETENTION` numbers, the pg_cron checks), error-log redaction, the lifecycle registry that drives web and mobile device clears, and consent (health-data consent, the re-consent gate and why it cannot loop, withdrawal, analytics-off deleting usage events, `legalEntity.ts` and the promises list). Erase now removes the three identity keys from the sign-in record, deletes the user's own error reports, no longer sets `deleted_at`, clears `health_data_consent_at` and is followed by a session refresh; the export is version 3 with the account block and error reports; per-user rate-limit keys are hashed; the erasure-proof row and a post-erase export are described correctly (the old "empty auditEvents" claim was wrong). Chat gains "Written by AI" and Clear conversation. Five new invariants, the V3 tests, and honest open gaps (migrations unapplied, `LEGAL_VERSIONS` unbumped behind the EU-representative gate, `discreetOn` not routed through the registry, lawyer questions). Sources add the privacy, consent and logger files.
+- data-model: `health_data_consent_at`; `deleted_at` no longer set by erase; `delete_my_usage_events()` and `purge_expired_records()`; export version 3; retention notes on `audit_events`, `error_events` (redacted) and `usage_events`; hashed `rate_limit_counters` identities; audit rows survive erase for 12 months, not forever.
+- identity-profile: erase reaches the sign-in record and refreshes the session; the health-data consent row and `acceptChangedTerms` beside `submitConsentStep`; re-consent now reaches onboarded users (the old open gap said it did not); locked fields explained in the policy.
+- auth: post-sign-in routing and the middleware send outdated consents to `/consent`; `consentGateRedirect` exemptions; the wiring test.
+- architecture: privacy modules in the layout, the native device clear on an explicit `SIGNED_OUT`, the shared `SESSION_STORAGE_KEY`, the exported brand-cache TTL, and retention/redaction notes in the table list.
+- goals-insights: the first-suggestion "Not now" stamp is a registered device store, cleared on sign-out, erase, delete and withdrawal.
+- glossary: Health-data consent, Re-consent, Retention tier, Erasure proof, Lifecycle registry.
+
+## 2026-11-03 — 798a45b
+- security-privacy: corrected the chat-alias claim (only the alias format is shared with Trends; the chat aliases by first appearance in its log page, Trends by spend rank); chart formatter wording now covers each chart's own channels (Line/Bar are aria-hidden); chartMasking covers every chart except the mood x trigger matrix and not the Line/Bar tooltips; BarChart `showYAxis` keeps the hour chart's axis hidden; donut tooltip and table show compact money with discreet off; Home last-entry label drops the variant under discreet (`lastEntryLabel`); heatmap titles read "1 log" with discreet off.
+- celebrations: re-stamped; the diff touched mobile Home's last-entry label only, no celebration behavior changed.
+- DESIGN.md: masking rule updated to match.
+
+## 2026-11-02 — 13fe5cf
+- celebrations: full re-verify against the code. Fixed stale line references, the "only test is age.test.ts" claim (now also achievements and milestone-overlay-styles tests), the web modal's scrolling overlay, onboarding burst counts and goal summary wording, and the mobile login's deleted-account notice; sources now list every file the section describes (mobile login, web MilestoneCelebration). Re-stamped current.
+- security-privacy: new "Discreet mode: masking at the render site" subsection and invariant (sr-only tables, aria-labels, SVG titles, tooltips, brand aliases via `src/lib/discreet.ts`); chat log window is now one page of up to 2000 rows (model's `recent_entries` still 200); panel session lookup never rejects; open gaps record the visible heatmap peak hour, digit-free mobile captions, untested mobile chart wiring and the CI-only discreet e2e. Sources add `src/lib/discreet.ts` and `web/components/charts/**`.
+- goals-insights: chat reads the 2000-row goal window; mood x trigger counts mask; the unmasked-sr-only-tables gap is closed (replaced by the known remaining items).
+- architecture: `GOAL_WINDOW_LOG_LIMIT` is exported and shared with the chat route.
+- DESIGN.md: the masking rule now names sr-only tables, aria-labels, SVG titles, tooltips, keys and brand aliasing.
+
+## 2026-11-02 — 256c296
+- goals-insights: met is live (`metOn` and a standing hold, else on_track; next step needs the hold too); Home "Off track." for goals with no over days; log window ceiling (one page of up to 2000 rows for goal loaders, web and mobile).
+- architecture: dashboard and mobile boot/refreshLogs read goal windows in one page of up to 2000 rows (`getServerLogsPage`, `listLogsPage`).
+
+## 2026-11-02 — 9d24456
+- architecture: the session store reconciles goals on boot and refresh in the reader's zone and holds `pendingGoalMoments` / `goalsReconcileFailed`; web reconciles through `useGoalReconcile` on Home and /goals; `getTrendsPageData` loads active goals; goal engine in `src/domain`, `src/services` in the layout; `goals` table row updated.
+- identity-profile: the goal step's fourth card "Suggest one later" (default while no goal type is chosen, hidden once a goal exists, Continue skips, done page wording).
+- celebrations: only the GoalMoment passage was updated (it now also fires on automatic completion, "Quit day." / "Tapered.", once, from reconcile's applied list). The rest of the section was not re-verified (login page, AccountDeletedNotice, MilestoneCelebration, OnboardingDoneClient and the non-goal parts of Home changed since 1a40fb0), so it stays at 1a40fb0, status drifting, and needs a full re-verify.
+- security-privacy: export carries `completedAt` per goal; chat reader-context lists goal state words; grant note for `goals_stamp_completed_at`. Re-verified and re-stamped.
+- infra-ops: `goals.spec.ts` joins the authenticated e2e suite note. Re-verified and re-stamped.
+
+## 2026-11-02 — 1a4c025
+- goals-insights: rewrote the Goals subsection for adaptive goals — seven types (taper, spend-cap period), `readGoalMeta` and step history, the four-state vocabulary (rolling last 7 days, window clipped to the goal's start), holds (14 days, 10 logged), proposals and their maths, 14-day snooze, discreet masking, client-side reconcile on load (web hook, mobile store, failed writes surfaced), `completed_at`, Home line, first-goal suggestion, onboarding "Suggest one later", Trends cap line, chat `goal_status`. Replaced the stale "no goals management screen" and "only goals[0]" text; new invariants; sources widened to the new modules and screens; open gaps record the unmasked sr-only tables and mobile "Around X a day", no proposals for week/month caps, and completion on the next visit.
+- data-model: `goals.completed_at`, trigger `goals_stamp_completed_at`, `taper` in the type CHECK, `meta_json` keys, export `completedAt`; corrected the `quit_date` `target_value` description (days, not an epoch day).
+- glossary: Goal now lists seven types and the state; added Met, Taper, Proposal, Re-anchor.
+
 ## 2026-11-02 — b9ac848
 - architecture, data-model, auth, identity-profile, logging, security-privacy: re-stamped after merging main (Ask the ledger, PR #103) into the onboarding re-entry branch; the security-privacy invariants now run 1–12 (the re-auth invariant is 12, the chat invariants keep 9–11). Settings gained the chat consent switch beside the analytics one (documented under security-privacy); no behaviour the other sections describe changed. celebrations stays drifting: its files come from the chat branch and were not re-verified.
 

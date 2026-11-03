@@ -5,7 +5,7 @@ import { useSession } from '@/store/session';
 import { useAuth } from '@/store/auth';
 import { useTheme } from '@/hooks/useTheme';
 import { isOnboarded } from '@/lib/compliance';
-import { resumeOnboardingRoute } from '@/lib/onboardingSteps';
+import { CONSENT_ROUTE, consentsOutdated, resumeOnboardingRoute } from '@/lib/onboardingSteps';
 
 export default function IndexRedirect() {
   const session = useAuth((s) => s.session);
@@ -36,5 +36,7 @@ export default function IndexRedirect() {
 
   // Mid-wizard sign-in resumes at the saved step (privacy until consented).
   if (!isOnboarded(profile)) return <Redirect href={resumeOnboardingRoute(profile)} />;
+  // Consents older than the current terms (or no health-data consent yet) ask again once.
+  if (consentsOutdated(profile)) return <Redirect href={CONSENT_ROUTE} />;
   return <Redirect href="/(tabs)" />;
 }

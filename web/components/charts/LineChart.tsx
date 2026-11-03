@@ -12,10 +12,11 @@ import {
   Tooltip,
 } from 'recharts';
 import { ChartDataTable } from '@web/components/charts/ChartDataTable';
+import { hasCapLine } from '@web/lib/goals/capLine';
 import { CHART, CHART_SERIES, chartAxisTick, ChartTooltip } from '@web/components/charts/chartTheme';
 
 export interface LineChartProps {
-  data: { label: string; value: number }[];
+  data: { label: string; value: number; cap?: number | null }[];
   height?: number;
   formatY?: (v: number) => string;
   strokeColor?: string;
@@ -30,6 +31,7 @@ export function LineChart({ data, height = 160, formatY, strokeColor, title = 'L
   // the passed height.
   const isDesktop = useIsDesktop();
   const h = isDesktop ? Math.round(height * 1.25) : height;
+  const showCap = hasCapLine(data);
 
   return (
     <>
@@ -56,21 +58,36 @@ export function LineChart({ data, height = 160, formatY, strokeColor, title = 'L
           )}
           <Tooltip
             cursor={{ stroke: CHART.cursor, strokeDasharray: '4 4' }}
-            content={<ChartTooltip formatValue={formatY} />}
+            content={<ChartTooltip formatValue={formatY} showNames={showCap} />}
           />
           <Line
             type="monotone"
             dataKey="value"
+            name="Value"
             stroke={stroke}
             strokeWidth={2.25}
             dot={{ r: 2.5, fill: stroke, stroke }}
             activeDot={{ r: 4.5 }}
             isAnimationActive={!reduced}
           />
+          {showCap ? (
+            <Line
+              type="stepAfter"
+              dataKey="cap"
+              name="Cap"
+              stroke="var(--rule-strong)"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={false}
+              isAnimationActive={!reduced}
+              connectNulls={false}
+            />
+          ) : null}
         </RLineChart>
       </ResponsiveContainer>
     </div>
-    <ChartDataTable caption={title} rows={data} />
+    <ChartDataTable caption={title} rows={data} formatValue={formatY} />
     </>
   );
 }

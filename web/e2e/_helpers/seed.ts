@@ -17,6 +17,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
+import { LEGAL_VERSIONS } from '../../../src/lib/legal';
 
 export interface SeededUser {
   id: string;
@@ -122,6 +123,36 @@ export async function seedLogs(userId: string, specs: LogSpec[]): Promise<void> 
   if (error) throw new Error(`seed: insert logs failed: ${error.message}`);
 }
 
+export interface GoalSpec {
+  type: string;
+  targetValue: number;
+  /** YYYY-MM-DD. */
+  startDate: string;
+  endDate?: string;
+  meta?: Record<string, unknown>;
+  status?: 'active' | 'paused' | 'completed' | 'abandoned';
+}
+
+/** Insert one goal directly (service role). Returns its id. */
+export async function seedGoal(userId: string, spec: GoalSpec): Promise<string> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const id = `gol_${randomUUID().slice(0, 12)}`;
+  const { error } = await a.from('goals').insert({
+    id,
+    user_id: userId,
+    type: spec.type,
+    target_value: spec.targetValue,
+    start_date: spec.startDate,
+    end_date: spec.endDate ?? null,
+    status: spec.status ?? 'active',
+    meta_json: spec.meta ?? null,
+    created_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`seed: insert goal failed: ${error.message}`);
+  return id;
+}
+
 /** The IST calendar date `n` days ago as YYYY-MM-DD (matches the app's todayIst bucketing). */
 export function istYmdDaysAgo(n: number): string {
   const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -149,15 +180,47 @@ export async function markOnboarded(
       onboarded_at: opts.onboardedAt ?? now,
       onboarding_step: 'done',
       age_confirmed_at: now,
-      terms_version: '1',
-      privacy_version: '1',
-      health_disclaimer_version: '1',
+      // Current versions + the health consent, so the re-consent gate leaves a seeded
+      // user alone. markConsentOutdated() makes one stale on purpose.
+      terms_version: LEGAL_VERSIONS.terms,
+      privacy_version: LEGAL_VERSIONS.privacy,
+      health_disclaimer_version: LEGAL_VERSIONS.medicalDisclaimer,
       data_processing_consent_at: now,
+      health_data_consent_at: now,
       baseline_per_day: opts.baselinePerDay ?? 10,
       baseline_window_days: 30,
     })
     .eq('id', userId);
   if (error) throw new Error(`seed: markOnboarded failed: ${error.message}`);
+}
+
+/**
+ * Make an onboarded user's consents stale, the way every live user is before they
+ * accept the rewrite: an older terms version and no health-data consent.
+ */
+export async function markConsentOutdated(userId: string): Promise<void> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { error } = await a
+    .from('user_profiles')
+    .update({ terms_version: '2020-01-01', health_data_consent_at: null })
+    .eq('id', userId);
+  if (error) throw new Error(`seed: markConsentOutdated failed: ${error.message}`);
+}
+
+/** The consent columns the re-consent screen writes, read back with the service role. */
+export async function readConsentState(
+  userId: string,
+): Promise<{ terms_version: string | null; health_data_consent_at: string | null }> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { data, error } = await a
+    .from('user_profiles')
+    .select('terms_version,health_data_consent_at')
+    .eq('id', userId)
+    .single();
+  if (error) throw new Error(`seed: readConsentState failed: ${error.message}`);
+  return data as { terms_version: string | null; health_data_consent_at: string | null };
 }
 
 /** The saved onboarding step pointer (what the middleware gates on). */

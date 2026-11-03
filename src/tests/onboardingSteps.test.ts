@@ -1,5 +1,8 @@
+import { LEGAL_VERSIONS } from '@/lib/legal';
 import {
   canAccessOnboardingStep,
+  consentGateRedirect,
+  consentsOutdated,
   earliestOnboardingRoute,
   effectiveOnboardingStep,
   onboardingRouteIndex,
@@ -101,6 +104,7 @@ describe('resumeProfileFromRow (shared by middleware + post-auth routing)', () =
         privacy_version: 'p',
         health_disclaimer_version: 'h',
         data_processing_consent_at: 'd',
+        health_data_consent_at: 'x',
       }),
     ).toEqual({
       onboardingStep: 'goal',
@@ -109,6 +113,7 @@ describe('resumeProfileFromRow (shared by middleware + post-auth routing)', () =
       privacyVersion: 'p',
       healthDisclaimerVersion: 'h',
       dataProcessingConsentAt: 'd',
+      healthDataConsentAt: 'x',
     });
   });
 
@@ -128,5 +133,125 @@ describe('resumeProfileFromRow (shared by middleware + post-auth routing)', () =
     });
     expect(canAccessOnboardingStep(effectiveOnboardingStep(p), resumeOnboardingRoute(p))).toBe(true);
     expect(resumeOnboardingRoute(p)).toBe('/onboarding/usage');
+  });
+});
+
+const current = {
+  ageConfirmedAt: '2026-01-01T00:00:00.000Z',
+  termsVersion: LEGAL_VERSIONS.terms,
+  privacyVersion: LEGAL_VERSIONS.privacy,
+  healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
+  dataProcessingConsentAt: '2026-01-01T00:00:00.000Z',
+  healthDataConsentAt: '2026-01-01T00:00:00.000Z',
+};
+
+describe('consentsOutdated', () => {
+  it('is false when every version is current and the health consent exists', () => {
+    expect(consentsOutdated(current)).toBe(false);
+  });
+
+  it.each([
+    ['terms', { termsVersion: '2020-01-01' }],
+    ['privacy', { privacyVersion: '2020-01-01' }],
+    ['medical disclaimer', { healthDisclaimerVersion: '2020-01-01' }],
+  ])('is true when the stored %s version is older', (_name, over) => {
+    expect(consentsOutdated({ ...current, ...over })).toBe(true);
+  });
+
+  it('is true for a live user whose health_data_consent_at is NULL', () => {
+    expect(consentsOutdated({ ...current, healthDataConsentAt: null })).toBe(true);
+    expect(consentsOutdated({ ...current, healthDataConsentAt: undefined })).toBe(true);
+  });
+
+  it('is false for someone who never consented: onboarding asks them, not /consent', () => {
+    expect(consentsOutdated(null)).toBe(false);
+    expect(consentsOutdated({})).toBe(false);
+    expect(consentsOutdated({ ...current, dataProcessingConsentAt: null })).toBe(false);
+  });
+
+  it('is false when a stored version is newer than this build knows (web/mobile skew cannot loop)', () => {
+    expect(
+      consentsOutdated({
+        ...current,
+        termsVersion: '2099-01-01',
+        privacyVersion: '2099-01-01',
+        healthDisclaimerVersion: '2099-01-01',
+      }),
+    ).toBe(false);
+  });
+
+  it('treats a legacy non-date version such as "1" as outdated', () => {
+    expect(consentsOutdated({ ...current, termsVersion: '1' })).toBe(true);
+    expect(consentsOutdated({ ...current, privacyVersion: '9' })).toBe(true);
+  });
+
+  it('resumeProfileFromRow carries health_data_consent_at into the check', () => {
+    const row = {
+      age_confirmed_at: 'a',
+      terms_version: LEGAL_VERSIONS.terms,
+      privacy_version: LEGAL_VERSIONS.privacy,
+      health_disclaimer_version: LEGAL_VERSIONS.medicalDisclaimer,
+      data_processing_consent_at: 'd',
+    };
+    expect(consentsOutdated(resumeProfileFromRow(row))).toBe(true);
+    expect(consentsOutdated(resumeProfileFromRow({ ...row, health_data_consent_at: 'h' }))).toBe(false);
+  });
+});
+
+describe('consentGateRedirect', () => {
+  const outdated = { ...current, termsVersion: '2020-01-01' };
+  const nullHealth = { ...current, healthDataConsentAt: null };
+
+  it('sends an onboarded user with outdated consents to /consent from any app page', () => {
+    for (const path of ['/dashboard', '/log', '/trends', '/onboarding/done', '/onboarding/usage']) {
+      expect(consentGateRedirect(path, outdated, true)).toBe('/consent');
+      expect(consentGateRedirect(path, nullHealth, true)).toBe('/consent');
+    }
+  });
+
+  it('does not redirect a current user, and sends /consent home', () => {
+    expect(consentGateRedirect('/dashboard', current, true)).toBeNull();
+    expect(consentGateRedirect('/consent', current, true)).toBe('/dashboard');
+    expect(consentGateRedirect('/consent', current, true, '/(tabs)')).toBe('/(tabs)');
+  });
+
+  it('never loops: the destination is itself never redirected', () => {
+    for (const p of [outdated, nullHealth, current]) {
+      const first = consentGateRedirect('/dashboard', p, true);
+      if (first) expect(consentGateRedirect(first, p, true)).not.toBe(first);
+    }
+    expect(consentGateRedirect('/consent', outdated, true)).toBeNull();
+  });
+
+  it('keeps legal, settings (export / withdraw), auth, recovery and API paths reachable', () => {
+    for (const path of [
+      '/privacy',
+      '/terms',
+      '/support',
+      '/settings',
+      '/auth/callback',
+      '/auth/confirm',
+      '/reset-password',
+      '/api/audit',
+      '/api/ledger-chat',
+    ]) {
+      expect(consentGateRedirect(path, outdated, true)).toBeNull();
+    }
+    // Prefix lookalikes are not exempt.
+    expect(consentGateRedirect('/settingsx', outdated, true)).toBe('/consent');
+    expect(consentGateRedirect('/apix', outdated, true)).toBe('/consent');
+  });
+
+  it('leaves users who are not onboarded to the onboarding gates, outdated or not', () => {
+    expect(consentGateRedirect('/dashboard', outdated, false)).toBeNull();
+    expect(consentGateRedirect('/consent', outdated, false)).toBeNull();
+    expect(consentGateRedirect('/dashboard', null, true)).toBeNull();
+  });
+
+  it('is pure: it does not read or return an onboarding step', () => {
+    const withStep = { ...outdated, onboardingStep: 'brands' as const };
+    const before = JSON.stringify(withStep);
+    consentGateRedirect('/dashboard', withStep, true);
+    expect(JSON.stringify(withStep)).toBe(before);
   });
 });

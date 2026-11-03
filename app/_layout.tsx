@@ -23,6 +23,7 @@ import { spacing } from '@/constants/theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { clearNativeDevice } from '@/lib/privacy/clearDeviceNative';
 import { MilestoneCelebration } from '@/components/character/MilestoneCelebration';
 import { LogoutFarewell } from '@/components/character/LogoutFarewell';
 import { GoalMoment } from '@/components/character/GoalMoment';
@@ -95,6 +96,10 @@ export default function RootLayout() {
       setSession(session);
       if (event === 'SIGNED_OUT' || !session) {
         resetSession();
+        // Only an explicit SIGNED_OUT clears device stores: INITIAL_SESSION also arrives with a
+        // null session on a cold or offline start, and wiping the stored session then would
+        // sign the reader out for good.
+        if (event === 'SIGNED_OUT') void clearNativeDevice('signOut');
         setReady(true);
         return;
       }

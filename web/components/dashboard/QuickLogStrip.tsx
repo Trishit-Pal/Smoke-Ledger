@@ -24,7 +24,7 @@
 import * as React from 'react';
 import { formatMoney } from '@/lib/format';
 import { localeForCountry } from '@/lib/regions';
-import { maskBrandName, maskInr } from '@/lib/discreet';
+import { lastEntryLabel, maskBrandName, maskInr } from '@/lib/discreet';
 import type { Brand, BrandVariant, CigaretteLog, UserProfile } from '@/types';
 import { CategoryTabs } from '@web/components/brands/CategoryTabs';
 import { useBrandCategoryFilter } from '@web/components/brands/categoryFilter';
@@ -72,9 +72,7 @@ export function QuickLogStrip({
   const canRepeatLast = Boolean(lastLog?.brandId);
 
   const lastBrandLabel = lastLog
-    ? `${maskBrandName(lastLog.brandNameSnap ?? 'Unknown', discreet)}${
-        lastLog.variantSnap ? ` · ${lastLog.variantSnap}` : ''
-      }`
+    ? lastEntryLabel(lastLog.brandNameSnap, lastLog.variantSnap, discreet)
     : null;
 
   const lastPrice =

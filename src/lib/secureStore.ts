@@ -77,6 +77,9 @@ function loadAsyncStorage(): AsyncStorageLike | null {
   return cachedAsync;
 }
 
+/** Where the Supabase client persists the signed-in session (src/lib/supabase.ts). */
+export const SESSION_STORAGE_KEY = 'sl.supabase.auth';
+
 /** Keys — keep them stable across releases, namespaced. */
 export const SecureKeys = {
   PIN_HASH: 'sl.pin.hash.v2',
@@ -289,7 +292,7 @@ export async function writeLastLockTime(epochMs: number): Promise<void> {
 
 /* ---------- Full erasure (used by privacy.eraseAllData) ---------- */
 
-async function deleteKeyFromAllStores(key: string): Promise<void> {
+export async function deleteKeyFromAllStores(key: string): Promise<void> {
   const s = loadSecureStore();
   if (s) {
     try {

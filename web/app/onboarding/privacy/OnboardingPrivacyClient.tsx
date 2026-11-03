@@ -1,70 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Stamp } from '@web/components/onboarding/Stamp';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { submitConsentStep } from '@/services/onboarding';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
-import { LEGAL_LINKS } from '@web/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
+import {
+  ConsentCheckRow,
+  HealthConsentRow,
+  REQUIRED_ROWS,
+  type RequiredKey,
+} from '@web/components/onboarding/ConsentRows';
 
-type RequiredKey = 'age' | 'terms' | 'privacy' | 'medical' | 'dataProcessing';
-
-interface ConsentRow {
-  id: RequiredKey;
-  label: React.ReactNode;
-  sub?: string;
-}
-
-const REQUIRED_ROWS: ConsentRow[] = [
-  {
-    id: 'age',
-    label: 'I confirm I am 18 or older.',
-    sub: 'Smoke Ledger is for adults. Required by law.',
-  },
-  {
-    id: 'terms',
-    label: (
-      <>
-        I agree to the{' '}
-        <Link
-          href={LEGAL_LINKS.terms}
-          style={{ color: 'var(--accent-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-        >
-          Terms of Service
-        </Link>
-        .
-      </>
-    ),
-  },
-  {
-    id: 'privacy',
-    label: (
-      <>
-        I acknowledge the{' '}
-        <Link
-          href={LEGAL_LINKS.privacy}
-          style={{ color: 'var(--accent-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-        >
-          Privacy Policy
-        </Link>
-        .
-      </>
-    ),
-  },
-  {
-    id: 'medical',
-    label: 'I understand this app does not provide medical advice.',
-    sub: 'For health decisions, please consult a clinician.',
-  },
-  {
-    id: 'dataProcessing',
-    label: 'I consent to processing my data for account, sync, and security.',
-  },
-];
-
+// "Stamp all" covers only the five acknowledgements above. The health-data consent
+// (Art 9) and the optional analytics tick are separate decisions the reader makes.
 // Stagger between stamps when "stamp all" is pressed (a visual beat, not a save).
 const STAMP_STAGGER_MS = 130;
 
@@ -97,32 +48,33 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
     }
   }, [router]);
 
-  const values: Record<RequiredKey | 'analytics', boolean> = {
+  const values: Record<RequiredKey | 'health' | 'analytics', boolean> = {
     age: consents.age ?? false,
     terms: consents.terms ?? false,
     privacy: consents.privacy ?? false,
     medical: consents.medical ?? false,
     dataProcessing: consents.dataProcessing ?? false,
+    health: consents.health ?? false,
     analytics: consents.analytics ?? false,
   };
   const analyticsOptIn = values.analytics;
+  const healthDataConsent = values.health;
+  const healthDeclined = consents.healthDeclined ?? false;
 
-  const canContinue = REQUIRED_ROWS.every((row) => values[row.id]);
-  const allOn = canContinue && analyticsOptIn;
+  const acknowledged = REQUIRED_ROWS.every((row) => values[row.id]);
+  const canContinue = acknowledged && healthDataConsent;
   const ackCount = Object.values(values).filter(Boolean).length;
-  const totalRows = REQUIRED_ROWS.length + 1;
+  const totalRows = REQUIRED_ROWS.length + 2;
 
   const stampAll = () => {
     REQUIRED_ROWS.forEach((row, i) => {
       setTimeout(() => setConsent(row.id, true), i * STAMP_STAGGER_MS);
     });
-    // Land the optional tick together with the last required one: Continue
-    // enables the moment the required rows are in, so nothing may still be
-    // pending after that.
-    setTimeout(
-      () => setConsent('analytics', true),
-      (REQUIRED_ROWS.length - 1) * STAMP_STAGGER_MS,
-    );
+  };
+
+  const setHealthConsent = (given: boolean) => {
+    setConsent('health', given);
+    setConsent('healthDeclined', !given);
   };
 
   const onContinue = async () => {
@@ -133,6 +85,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
       await submitConsentStep({
         alreadyConsented: savedRef.current || alreadyConsented,
         analyticsOptIn,
+        healthDataConsent,
       });
       savedRef.current = true;
       router.push('/onboarding/usage');
@@ -168,66 +121,22 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
       />
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {REQUIRED_ROWS.map((row, i) => {
-          const checked = values[row.id];
-          return (
-            <label
-              key={row.id}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 14,
-                padding: '14px 0',
-                borderBottom: '1px solid var(--rule)',
-                cursor: 'pointer',
-                transition: 'background 160ms ease',
-              }}
-            >
-              <input
-                type="checkbox"
-                className="ed-checkbox focus-ring"
-                checked={checked}
-                onChange={(e) => setConsent(row.id, e.target.checked)}
-                style={{ marginTop: 2 }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
-                  {row.label}
-                </span>
-                {row.sub ? (
-                  <span style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                    {row.sub}
-                  </span>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  minWidth: 96,
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
-                  minHeight: 22,
-                }}
-              >
-                <Stamp show={checked} rotate={-6 + (i % 2 === 0 ? -2 : 3)}>
-                  Acknowledged
-                </Stamp>
-              </div>
-              <span
-                className="editorial-caption-tight nums-tabular"
-                style={{
-                  color: checked ? 'var(--accent)' : 'var(--text-faint)',
-                  marginTop: 4,
-                  minWidth: 22,
-                  textAlign: 'right',
-                  transition: 'color 200ms ease',
-                }}
-              >
-                {String(i + 1).padStart(2, '0')}
-              </span>
-            </label>
-          );
-        })}
+        {REQUIRED_ROWS.map((row, i) => (
+          <ConsentCheckRow
+            key={row.id}
+            row={row}
+            index={i}
+            checked={values[row.id]}
+            onChange={(v) => setConsent(row.id, v)}
+          />
+        ))}
+
+        <HealthConsentRow
+          checked={healthDataConsent}
+          declined={healthDeclined}
+          onChange={setHealthConsent}
+          number="06"
+        />
 
         <label
           style={{
@@ -277,7 +186,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
               textAlign: 'right',
             }}
           >
-            06
+            07
           </span>
         </label>
       </div>
@@ -327,29 +236,29 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           <button
             type="button"
             onClick={stampAll}
-            disabled={allOn}
+            disabled={acknowledged}
             className="focus-ring hit-target"
             style={{
               background: 'transparent',
               border: 'none',
-              cursor: allOn ? 'default' : 'pointer',
+              cursor: acknowledged ? 'default' : 'pointer',
               fontSize: 12,
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: allOn ? 'var(--text-faint)' : 'var(--accent)',
-              textDecoration: allOn ? 'none' : 'underline',
+              color: acknowledged ? 'var(--text-faint)' : 'var(--accent)',
+              textDecoration: acknowledged ? 'none' : 'underline',
               textUnderlineOffset: 4,
               padding: 0,
-              opacity: allOn ? 0.5 : 1,
+              opacity: acknowledged ? 0.5 : 1,
               transition: 'all 200ms ease',
             }}
             aria-label="Stamp all consents"
           >
-            {allOn ? 'all acknowledged' : 'stamp all'}
+            {acknowledged ? 'stamped' : 'stamp all'}
           </button>
           <span
             className="editorial-caption-tight nums-tabular"
-            style={{ color: allOn ? 'var(--accent)' : 'var(--text-faint)' }}
+            style={{ color: canContinue ? 'var(--accent)' : 'var(--text-faint)' }}
           >
             {ackCount} / {totalRows} acknowledged
           </span>

@@ -6,6 +6,10 @@ import { z } from 'zod';
 export const CHAT_QUESTION_MAX = 500;
 export const CHAT_HISTORY_MAX_TURNS = 10;
 export const CHAT_HISTORY_TEXT_MAX = 600;
+/** recent_entries limits: the only raw entries the model can receive. */
+export const RECENT_MAX_DAYS = 30;
+export const RECENT_MAX_ROWS = 200;
+export const NOTE_MAX_CHARS = 120;
 
 export const chatHistoryTurnSchema = z
   .object({

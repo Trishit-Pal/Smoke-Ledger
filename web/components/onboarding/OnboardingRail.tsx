@@ -106,7 +106,7 @@ export function OnboardingRail() {
             >
               Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent-ink)' }}> Ledger</span>
             </span>
-            <span className="editorial-caption">Vol. I · Onboarding</span>
+            <span className="editorial-caption">V3 · Onboarding</span>
           </div>
           <ThemeToggle placement="inline" />
         </div>

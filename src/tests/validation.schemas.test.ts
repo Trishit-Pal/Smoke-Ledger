@@ -1,4 +1,4 @@
-import { YmdSchema, IdSchema, GoalSchema } from '@/lib/validation';
+import { YmdSchema, IdSchema, GoalSchema, GoalTypeSchema, ImportGoalSchema } from '@/lib/validation';
 
 describe('YmdSchema', () => {
   it('accepts valid calendar dates', () => {
@@ -35,5 +35,33 @@ describe('GoalSchema', () => {
         startDate: '2025-04-01',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('taper goal type and completedAt', () => {
+  const base = {
+    id: 'goal_1',
+    type: 'taper',
+    targetValue: 5,
+    currentBaseline: null,
+    startDate: '2025-04-01',
+    endDate: null,
+    status: 'active',
+    meta: null,
+    createdAt: '2025-04-01T00:00:00.000Z',
+  };
+
+  it('GoalTypeSchema accepts taper', () => {
+    expect(GoalTypeSchema.safeParse('taper').success).toBe(true);
+  });
+
+  it('ImportGoalSchema accepts a taper goal with completedAt', () => {
+    expect(
+      ImportGoalSchema.safeParse({ ...base, completedAt: '2025-05-01T00:00:00.000Z' }).success,
+    ).toBe(true);
+  });
+
+  it('ImportGoalSchema accepts a goal without completedAt', () => {
+    expect(ImportGoalSchema.safeParse(base).success).toBe(true);
   });
 });

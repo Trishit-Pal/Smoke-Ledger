@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/immutability -- Reanimated SharedValue is a mutable box; writing `.value` in press handlers is its documented API */
 import React, { memo, useEffect } from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -17,7 +17,7 @@ import { useLayout } from '@/hooks/useLayout';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
 import { isOnboarded } from '@/lib/compliance';
-import { resumeOnboardingRoute } from '@/lib/onboardingSteps';
+import { consentGateRedirect, resumeOnboardingRoute } from '@/lib/onboardingSteps';
 
 // Derive the tab-bar prop type from expo-router's own Tabs so it always matches
 // expo-router's vendored react-navigation types (avoids cross-package type drift).
@@ -195,6 +195,7 @@ export default function TabsLayout() {
   const initialized = useAuth((s) => s.initialized);
   const profile = useSession((s) => s.profile);
   const booted = useSession((s) => s.booted);
+  const pathname = usePathname();
   const theme = useTheme();
 
   if (!initialized || !booted) {
@@ -208,6 +209,10 @@ export default function TabsLayout() {
   if (!session) return <Redirect href="/login" />;
   // Mid-wizard sign-in resumes at the saved step (privacy until consented).
   if (!isOnboarded(profile)) return <Redirect href={resumeOnboardingRoute(profile)} />;
+  // Re-consent gate. Settings stays reachable (export / withdraw live there) so
+  // "Not now" cannot loop; /consent itself is outside the tabs.
+  const consentRedirect = consentGateRedirect(pathname, profile, true);
+  if (consentRedirect) return <Redirect href={consentRedirect} />;
 
   return (
     <Tabs tabBar={(props) => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>

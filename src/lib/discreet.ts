@@ -26,6 +26,30 @@ export function maskBrandName(name: string | null | undefined, discreet: boolean
   return discreet ? 'Brand hidden' : name;
 }
 
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/** Distinct stand-in for the nth brand: "Brand A".."Brand Z", then "Brand 27"… */
+export function brandAlias(index: number): string {
+  if (!Number.isInteger(index) || index < 0) return 'Brand hidden';
+  return index < ALPHABET.length ? `Brand ${ALPHABET[index]}` : `Brand ${index + 1}`;
+}
+
+/** Brand at list position `index`: its own alias when discreet, so rows stay distinct. */
+export function maskBrandAt(name: string | null | undefined, index: number, discreet: boolean): string {
+  if (!name) return '—';
+  return discreet ? brandAlias(index) : name;
+}
+
+/** Home "last entry" label. Discreet hides the variant too: it can identify the brand. */
+export function lastEntryLabel(
+  brand: string | null | undefined,
+  variant: string | null | undefined,
+  discreet: boolean,
+): string {
+  const name = maskBrandName(brand ?? 'Unknown', discreet);
+  return variant && !discreet ? `${name} · ${variant}` : name;
+}
+
 export function maskNotes(notes: string | null | undefined, discreet: boolean): string | null {
   if (!notes) return null;
   return discreet ? 'Hidden in discreet mode' : notes;

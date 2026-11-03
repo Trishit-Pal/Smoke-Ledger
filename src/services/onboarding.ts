@@ -15,6 +15,7 @@
 import type { Goal, GoalType, UserProfile } from '@/types';
 import { AppError } from '@/lib/errors';
 import { LEGAL_VERSIONS } from '@/lib/legal';
+import { newerVersion, versionAtLeast } from '@/lib/onboardingSteps';
 import { OnboardingUsageSchema, parseOrThrow, type OnboardingUsageInput } from '@/lib/validation';
 import {
   getProfile,
@@ -32,14 +33,14 @@ import type { PurchasePref } from '@/store/onboardingDraft';
 
 /* ---------- Step 01 · consent ---------- */
 
-/** True when the profile already holds every required consent at the current legal versions. */
+/** True when the profile already holds every required consent at the current (or a newer) legal version. */
 export function consentsCurrent(profile: UserProfile | null | undefined): boolean {
   return Boolean(
     profile?.ageConfirmedAt &&
       profile?.dataProcessingConsentAt &&
-      profile?.termsVersion === LEGAL_VERSIONS.terms &&
-      profile?.privacyVersion === LEGAL_VERSIONS.privacy &&
-      profile?.healthDisclaimerVersion === LEGAL_VERSIONS.medicalDisclaimer,
+      versionAtLeast(profile?.termsVersion, LEGAL_VERSIONS.terms) &&
+      versionAtLeast(profile?.privacyVersion, LEGAL_VERSIONS.privacy) &&
+      versionAtLeast(profile?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer),
   );
 }
 
@@ -51,6 +52,11 @@ export interface ConsentStepInput {
    */
   alreadyConsented: boolean;
   analyticsOptIn: boolean;
+  /**
+   * The separate, unticked-by-default health-data consent (GDPR Art 9(2)(a)).
+   * Required: without it the step refuses to continue. Independent of analytics.
+   */
+  healthDataConsent: boolean;
 }
 
 /**
@@ -61,7 +67,11 @@ export interface ConsentStepInput {
 export async function submitConsentStep({
   alreadyConsented,
   analyticsOptIn,
+  healthDataConsent,
 }: ConsentStepInput): Promise<void> {
+  if (!healthDataConsent) {
+    throw new AppError('validation_error', 'Validation failed: health-data consent is required');
+  }
   const now = new Date().toISOString();
   if (!alreadyConsented) {
     // Audit first. If the profile write then fails the user retries and a
@@ -81,6 +91,7 @@ export async function submitConsentStep({
         privacyVersion: LEGAL_VERSIONS.privacy,
         healthDisclaimerVersion: LEGAL_VERSIONS.medicalDisclaimer,
         dataProcessingConsentAt: now,
+        healthDataConsentAt: now,
         onboardingStep: 'usage',
       });
   await Promise.all([
@@ -91,6 +102,49 @@ export async function submitConsentStep({
     setSetting('consent.analyticsOptIn', analyticsOptIn),
   ]);
   invalidateAnalyticsConsentCache();
+}
+
+export interface AcceptChangedTermsInput {
+  /** The profile has no `health_data_consent_at`: ask for it, and stamp it. */
+  needsHealthConsent: boolean;
+  healthDataConsent: boolean;
+}
+
+/**
+ * The /consent screen for someone who already consented and is onboarded: stamp
+ * the current versions (and the health-data consent if it was never given) and
+ * audit once. Deliberately a separate write from `submitConsentStep`: it carries
+ * no `onboardingStep`, so asking again can never move the wizard, and it leaves
+ * the analytics preference alone.
+ */
+export async function acceptChangedTerms({
+  needsHealthConsent,
+  healthDataConsent,
+}: AcceptChangedTermsInput): Promise<void> {
+  if (needsHealthConsent && !healthDataConsent) {
+    throw new AppError('validation_error', 'Validation failed: health-data consent is required');
+  }
+  // Never stamp a version lower than the stored one: an older build (a store
+  // binary, a stale tab) accepting must not undo a newer build's acceptance.
+  const stored = await getProfile();
+  const versions = {
+    termsVersion: newerVersion(stored?.termsVersion, LEGAL_VERSIONS.terms),
+    privacyVersion: newerVersion(stored?.privacyVersion, LEGAL_VERSIONS.privacy),
+    healthDisclaimerVersion: newerVersion(stored?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer),
+  };
+  await recordAuditEvent('consent_accepted', 'compliance', {
+    termsVersion: versions.termsVersion,
+    privacyVersion: versions.privacyVersion,
+  });
+  await Promise.all([
+    saveComplianceConsents({
+      ...versions,
+      ...(needsHealthConsent ? { healthDataConsentAt: new Date().toISOString() } : {}),
+    }),
+    setSetting('consent.termsVersion', LEGAL_VERSIONS.terms),
+    setSetting('consent.privacyVersion', LEGAL_VERSIONS.privacy),
+    setSetting('consent.medicalDisclaimerVersion', LEGAL_VERSIONS.medicalDisclaimer),
+  ]);
 }
 
 /* ---------- Step 02 · baseline ---------- */

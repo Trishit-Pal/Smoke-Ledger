@@ -53,18 +53,27 @@ import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
-import { wipeSecureStore } from '@/lib/secureStore';
 import { exportAccountData } from '@/services/exportAccountData';
 import { setSetting } from '@/db/repositories/settings';
+import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import {
+  WITHDRAW_DELETE_LABEL,
+  WITHDRAW_ERASE_LABEL,
+  WITHDRAW_EXPLANATION,
+  WITHDRAW_ROW_LABEL,
+  WITHDRAW_ROW_SUBLABEL,
+} from '@/lib/healthConsent';
 import { recordAuditEvent } from '@/services/audit';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { clearTranscript } from '@web/components/chat/transcriptStore';
+import { clearWebDevice } from '@web/lib/privacy/clearDevice';
 import { LEDGER_CHAT_NOTICE_TEXT, LEDGER_CHAT_SETTINGS_SUBLABEL } from '@web/components/chat/notice';
 import { describeError, isAppError } from '@/lib/errors';
 import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH } from '@/lib/reauth';
 import { invalidateAnalyticsConsentCache, primeAnalyticsConsentCache } from '@/services/analytics';
 import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/repositories/brands';
 import { MIN_PRICE_INR, MAX_PRICE_INR } from '@/lib/validation';
+import { DELETE_ACCOUNT_NOTE } from '@/lib/privacy/retention';
 import { computeAge } from '@/domain/age';
 import {
   normalizeIndianMobile,
@@ -319,6 +328,10 @@ export function SettingsClient({
   const [exportWarning, setExportWarning] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<BusyAction>(null);
+  // Withdraw-consent panel. `withdrawing` marks an Erase/Delete as the end of a
+  // withdrawal (so it emits consent_revoked); the plain rows in "Your data" do not.
+  const [showWithdraw, setShowWithdraw] = React.useState(false);
+  const [withdrawing, setWithdrawing] = React.useState(false);
   // 'delete-resume' is the second confirmation after the re-auth detour: a
   // fresh sign-in alone must never delete an account.
   const [confirmAction, setConfirmAction] = React.useState<
@@ -411,7 +424,8 @@ export function SettingsClient({
     setBusy('toggle-analytics');
     setError(null);
     try {
-      await setSetting('consent.analyticsOptIn', value);
+      // Off also deletes the usage events already recorded.
+      await saveAnalyticsOptIn(value);
       const {
         data: { user },
       } = await getSupabase().auth.getUser();
@@ -596,8 +610,9 @@ export function SettingsClient({
         dispatchFarewell();
         await new Promise((r) => setTimeout(r, 1600));
       }
-      clearTranscript();
+      // Sign out first: it revokes the session using the auth cookies the cleanup then expires.
       await getSupabase().auth.signOut();
+      await clearWebDevice('signOut');
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
     } finally {
@@ -613,8 +628,9 @@ export function SettingsClient({
     setBusy('return-home');
     setError(null);
     try {
-      clearTranscript();
+      // Sign out first: it revokes the session using the auth cookies the cleanup then expires.
       await getSupabase().auth.signOut();
+      await clearWebDevice('signOut');
       router.replace('/');
     } catch (e) {
       setError(describeError(e, 'authentication_error'));
@@ -687,8 +703,11 @@ export function SettingsClient({
     setError(null);
     setCountryError(null);
     try {
-      if (reset) await resetLedgerForRegion(country);
-      else await setRegion(country);
+      if (reset) {
+        await resetLedgerForRegion(country);
+        // The reset empties the brand list; drop the per-user cached copy too.
+        await revalidateBrands();
+      } else await setRegion(country);
       setConfirmRegionReset(false);
       flashToast(reset ? 'Ledger reset for the new country.' : 'Country saved.');
       await revalidateAppViews();
@@ -709,16 +728,18 @@ export function SettingsClient({
     setBusy('erase-all');
     setError(null);
     try {
+      if (withdrawing) await recordConsentWithdrawal('erase');
       await eraseAllUserData();
-      // "Everything" includes the on-device chat transcript.
-      clearTranscript();
-      await wipeSecureStore();
+      // "Everything" includes the on-device chat transcript, first-suggestion stamp,
+      // lock state and the cached brand list (the lifecycle registry's erase row).
+      await clearWebDevice('erase');
       router.replace('/onboarding/privacy');
     } catch (e) {
       setError(describeError(e, 'dependency_failure'));
     } finally {
       setBusy(null);
       setConfirmAction(null);
+      setWithdrawing(false);
     }
   };
 
@@ -733,6 +754,10 @@ export function SettingsClient({
     // keeps the dialog open so there is no flash before navigation lands.
     let isReauthRedirect = false;
     try {
+      if (withdrawing) await recordConsentWithdrawal('delete');
+      // The brand cache is tagged by the signed-in user, so flush it while the session still
+      // exists; after the account is gone the server action can no longer tell whose it is.
+      await revalidateBrands();
       await deleteUserAccount({
         onReauthRequired: resume
           ? undefined
@@ -746,8 +771,7 @@ export function SettingsClient({
       // Best-effort local cleanup; the account is already gone server-side, so
       // never block the homepage redirect on it.
       try {
-        clearTranscript();
-        await wipeSecureStore();
+        await clearWebDevice('delete');
       } catch {
         // Ignore — deletion already succeeded; the redirect must still happen.
       }
@@ -762,7 +786,10 @@ export function SettingsClient({
       }
     } finally {
       setBusy(null);
-      if (!isReauthRedirect) setConfirmAction(null);
+      if (!isReauthRedirect) {
+        setConfirmAction(null);
+        setWithdrawing(false);
+      }
     }
   };
 
@@ -1125,14 +1152,77 @@ export function SettingsClient({
               label="Ask the ledger"
               sublabel={LEDGER_CHAT_SETTINGS_SUBLABEL}
               control={
-                <EditorialSwitch
-                  checked={ledgerChatOptIn}
-                  onChange={onToggleLedgerChat}
-                  disabled={busy != null}
-                  ariaLabel="Ask the ledger"
-                />
+                <div className="flex items-center gap-md">
+                  <TextLink
+                    onClick={() => {
+                      clearTranscript();
+                      flashToast('Conversation cleared from this device.');
+                    }}
+                    disabled={busy != null}
+                  >
+                    Clear conversation
+                  </TextLink>
+                  <EditorialSwitch
+                    checked={ledgerChatOptIn}
+                    onChange={onToggleLedgerChat}
+                    disabled={busy != null}
+                    ariaLabel="Ask the ledger"
+                  />
+                </div>
               }
             />
+            <PrefRow
+              label={WITHDRAW_ROW_LABEL}
+              sublabel={WITHDRAW_ROW_SUBLABEL}
+              control={
+                <TextLink
+                  onClick={() => setShowWithdraw((open) => !open)}
+                  disabled={busy != null}
+                  ariaLabel={showWithdraw ? 'Hide withdraw consent' : WITHDRAW_ROW_LABEL}
+                >
+                  {showWithdraw ? 'Hide' : WITHDRAW_ROW_LABEL}
+                </TextLink>
+              }
+            />
+            {showWithdraw ? (
+              <div className="py-sm flex flex-col gap-sm" role="region" aria-label="Withdraw consent">
+                <p className="text-small" style={{ color: 'var(--text-muted)' }}>
+                  {WITHDRAW_EXPLANATION}
+                </p>
+                <div className="flex flex-wrap items-center gap-md">
+                  <TextLink
+                    onClick={() => void onExportJson()}
+                    disabled={busy != null}
+                    busy={busy === 'export-json'}
+                    ariaLabel="Export a copy first"
+                  >
+                    {busy === 'export-json' ? 'Exporting…' : 'Export a copy first'}
+                  </TextLink>
+                  <TextLink
+                    onClick={() => {
+                      setWithdrawing(true);
+                      setConfirmAction('erase');
+                    }}
+                    disabled={busy != null}
+                    destructive
+                    ariaLabel={WITHDRAW_ERASE_LABEL}
+                  >
+                    {WITHDRAW_ERASE_LABEL}
+                  </TextLink>
+                  <TextLink
+                    onClick={() => {
+                      setWithdrawing(true);
+                      setConfirmAction('delete');
+                    }}
+                    disabled={busy != null}
+                    destructive
+                    ariaLabel={WITHDRAW_DELETE_LABEL}
+                  >
+                    {WITHDRAW_DELETE_LABEL}
+                  </TextLink>
+                </div>
+              </div>
+            ) : null}
           </dl>
           <ConfirmDialog
             open={confirmLedgerChat}
@@ -1425,7 +1515,7 @@ export function SettingsClient({
           <SectionHead
             id="account-heading"
             caption="Account"
-            deck="How the ledger looks, and how you leave it: appearance, return to the home page, sign out of this device, or close the account entirely. The DPDP deletion record is retained for compliance."
+            deck="How the ledger looks, and how you leave it: appearance, return to the home page, sign out of this device, or close the account entirely."
           />
           <dl className="flex flex-col">
             {/* The only theme control inside the app shell (the global fixed
@@ -1466,7 +1556,7 @@ export function SettingsClient({
             />
             <PrefRow
               label="Delete account permanently"
-              sublabel="All your logs, preferences, and audit history are erased. The audit-deletion record itself is retained per DPDP for compliance."
+              sublabel={DELETE_ACCOUNT_NOTE}
               control={
                 /* Accessible name "Delete account — permanent" carries the
                  * consequence for screen-reader users; the visible label
@@ -1533,7 +1623,11 @@ export function SettingsClient({
         destructive
         loading={busy === 'erase-all'}
         onConfirm={() => void onEraseAll()}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setConfirmAction(null);
+          setWithdrawing(false);
+        }}
       />
       <ConfirmDialog
         open={confirmAction === 'delete'}
@@ -1546,6 +1640,7 @@ export function SettingsClient({
         onOpenChange={(open) => {
           if (open || busy === 'delete-account') return;
           setConfirmAction(null);
+          setWithdrawing(false);
         }}
       />
       {/* After the re-auth detour. Dismissing must say so: the user has just

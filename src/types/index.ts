@@ -78,7 +78,8 @@ export type GoalType =
   | 'no_smoke_window'
   | 'reduction_target'
   | 'weekly_target'
-  | 'quit_date';
+  | 'quit_date'
+  | 'taper';
 
 export interface Goal {
   id: string;
@@ -90,6 +91,7 @@ export interface Goal {
   status: 'active' | 'paused' | 'completed' | 'abandoned';
   meta: Record<string, unknown> | null; // e.g., window start/end hours
   createdAt: string;
+  completedAt: string | null; // set by the DB when status becomes completed/abandoned
 }
 
 export type OnboardingStep = 'privacy' | 'usage' | 'setup' | 'baseline' | 'brands' | 'goal' | 'done';
@@ -112,6 +114,8 @@ export interface UserProfile {
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
+  /** When the reader ticked the explicit health-data consent (Art 9(2)(a)). Null = never given. */
+  healthDataConsentAt?: string | null;
   /** Always null: no marketing opt-in exists (CHECK in migration 20261102120000). */
   marketingConsentAt?: string | null;
   // Identity — collected at signup, immutable once set (enforced in the DB).

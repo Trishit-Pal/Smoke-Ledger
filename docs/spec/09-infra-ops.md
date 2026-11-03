@@ -10,7 +10,7 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: fbd177e
+last_verified_commit: 9d24456
 status: current
 ---
 
@@ -156,7 +156,7 @@ The rules here that must not quietly break:
 
 ## Open gaps
 
-**No E2E coverage for the authenticated web flows in CI unless secrets are set.** The full Playwright suite (`web/e2e/authenticated-flows.spec.ts`, `web/e2e/data-export-and-deletion.spec.ts`) only runs when `E2E_LOGIN_EMAIL` and `E2E_LOGIN_PASSWORD` are present. CI currently only guarantees the unauthenticated smoke tests. Any regression in authenticated dashboard, export, or deletion flows will not be caught by CI unless those secrets are configured.
+**No E2E coverage for the authenticated web flows in CI unless secrets are set.** The full Playwright suite (`web/e2e/authenticated-flows.spec.ts`, `web/e2e/data-export-and-deletion.spec.ts`, and `web/e2e/goals.spec.ts`, which is also in the `test:e2e:authed` script and skips unless the service-role seed environment is set) only runs when `E2E_LOGIN_EMAIL` and `E2E_LOGIN_PASSWORD` are present. CI currently only guarantees the unauthenticated smoke tests. Any regression in authenticated dashboard, export, or deletion flows will not be caught by CI unless those secrets are configured.
 
 **No iOS distribution.** `eas.json` configures only `android` build types at all three profiles. The `ios` block in `app.config.js` sets a bundle identifier (`app.smokeledger.india`) but no EAS submit config exists for iOS. Apple Developer Program enrollment and TestFlight setup are prerequisites that are not yet done.
 

@@ -84,6 +84,7 @@ export const DEMO_GOAL: Goal = {
   status: 'active',
   meta: null,
   createdAt: dayShift(DEMO_TODAY, -14),
+  completedAt: null,
 };
 
 export const DEMO_LAST_SMOKE_ISO =

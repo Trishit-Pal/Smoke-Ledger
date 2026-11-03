@@ -27,6 +27,8 @@ import { login } from './_helpers/fixtures';
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support', '/login', '/signup', '/reset'];
 const APP_ROUTES = ['/dashboard', '/history', '/trends', '/goals', '/settings', '/log/new'];
 const ONBOARDING_ROUTES = ['/onboarding', '/onboarding/privacy'];
+/** Seeded brand: distinctive so its absence under discreet mode proves masking, not a miss. */
+const SEEDED_BRAND = 'Zyxwv Reserve';
 
 /** Desktop engines sweep every class; device projects keep their own viewport + its landscape. */
 const SWEEP = [
@@ -207,13 +209,32 @@ async function expectNoLedgerMoney(page: Page) {
   if ((await main.locator('.recharts-responsive-container').count()) > 0) {
     await expect(main.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toBeVisible();
   }
-  const leaked = await main.evaluate((root) => {
+  const { money, tableDigits, labelDigits, brandHits, tableCount } = await main.evaluate((root, brand) => {
     const clone = root.cloneNode(true) as HTMLElement;
     clone.querySelectorAll('[aria-label="Did you know facts"]').forEach((n) => n.remove());
     const m = (clone.textContent ?? '').match(/[₹€]\s?\d[\d,.]*|\d[\d,.]*\s?[₹€]/);
-    return m ? m[0] : null;
-  });
-  expect(leaked, `discreet mode leaked "${leaked}" on ${new URL(page.url()).pathname}`).toBeNull();
+    // Chart data tables are sr-only: screen readers would read raw figures aloud.
+    const tables = Array.from(clone.querySelectorAll('table.sr-only'));
+    const tableDigits = tables.flatMap((t) =>
+      Array.from(t.querySelectorAll('td'))
+        .map((td) => td.textContent ?? '')
+        .filter((txt) => /\d/.test(txt)),
+    );
+    // Chart wrappers only, so dates and nav labels are not caught. A clock time
+    // ("at 15:00", the heatmap's busiest hour) is not a count; strip it first.
+    const labelDigits = Array.from(clone.querySelectorAll('[role="img"][aria-label], svg [aria-label]'))
+      .map((el) => (el.getAttribute('aria-label') ?? '').replace(/\b\d{1,2}:\d{2}\b/g, ''))
+      .filter((txt) => /\d/.test(txt));
+    // innerHTML also covers title/aria-label attributes, not just visible text.
+    const brandHits = clone.innerHTML.split(brand).length - 1;
+    return { money: m ? m[0] : null, tableDigits, labelDigits, brandHits, tableCount: tables.length };
+  }, SEEDED_BRAND);
+  const where = new URL(page.url()).pathname;
+  expect(money, `discreet mode leaked "${money}" on ${where}`).toBeNull();
+  expect(tableDigits, `sr-only chart table cells leaked digits on ${where}`).toEqual([]);
+  expect(labelDigits, `chart aria-labels leaked digits on ${where}`).toEqual([]);
+  expect(brandHits, `seeded brand name leaked ${brandHits}x on ${where}`).toBe(0);
+  return { tableCount };
 }
 
 test.beforeAll(async ({ playwright }, info) => {
@@ -276,6 +297,7 @@ test.describe('responsive · logged-in pages (local Supabase only)', () => {
         quantity: 1 + (d % 4),
         totalPriceInr: 18 * (1 + (d % 4)),
         localHour: 8 + (d % 12),
+        brandNameSnap: SEEDED_BRAND,
       })),
     );
     fresh = await createConfirmedUser('resp-fresh');
@@ -304,7 +326,14 @@ test.describe('responsive · logged-in pages (local Supabase only)', () => {
       // headline numerals, and a masked heading over an unmasked axis is a leak.
       for (const route of ['/dashboard', '/trends']) {
         await gotoSettled(fresh, route);
-        await expectNoLedgerMoney(fresh);
+        // Trends charts load client-side (ssr: false) behind a placeholder, so
+        // `networkidle` can fire before any chart, and its sr-only table, exists.
+        if (route === '/trends') {
+          await expect(fresh.locator('#main-content table.sr-only').first()).toBeAttached({ timeout: 60_000 });
+        }
+        const { tableCount } = await expectNoLedgerMoney(fresh);
+        // Not vacuous: Trends renders chart data tables, so the digit check had something to scan.
+        if (route === '/trends') expect(tableCount).toBeGreaterThan(0);
       }
     } finally {
       await fresh.close();

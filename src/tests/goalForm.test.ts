@@ -6,8 +6,15 @@ import {
   buildGoalPayload,
   buildGoalPatch,
   blockingSameTypeGoal,
+  creatableGoalTypes,
+  goalTypeLabel,
+  acceptProposalPatch,
+  dismissProposalPatch,
+  proposalToForm,
+  capSeries,
   type GoalFormState,
 } from '@/domain/goalForm';
+import type { Proposal } from '@/domain/goalProposals';
 import { daysUntil } from '@/lib/date';
 import type { CigaretteLog, Goal } from '@/types';
 
@@ -56,11 +63,28 @@ describe('daysUntil', () => {
 });
 
 describe('GOAL_TYPE_META', () => {
-  it('covers all six goal types once', () => {
+  it('covers all seven goal types once', () => {
     const types = GOAL_TYPE_META.map((m) => m.type).sort();
     expect(types).toEqual(
-      ['daily_cap', 'no_smoke_window', 'quit_date', 'reduction_target', 'spend_cap_daily', 'weekly_target'].sort(),
+      ['daily_cap', 'no_smoke_window', 'quit_date', 'reduction_target', 'spend_cap_daily', 'taper', 'weekly_target'].sort(),
     );
+  });
+
+  it('orders the picker daily_cap, taper, quit_date, spend, weekly, window, reduction', () => {
+    expect(GOAL_TYPE_META.map((m) => m.type)).toEqual([
+      'daily_cap', 'taper', 'quit_date', 'spend_cap_daily', 'weekly_target', 'no_smoke_window', 'reduction_target',
+    ]);
+  });
+
+  it('creatableGoalTypes excludes reduction_target only', () => {
+    const types = creatableGoalTypes().map((m) => m.type);
+    expect(types).not.toContain('reduction_target');
+    expect(types).toHaveLength(6);
+  });
+
+  it('labels taper and spend with the new copy', () => {
+    expect(goalTypeLabel('taper')).toBe('Taper');
+    expect(goalTypeLabel('spend_cap_daily')).toBe('Spend cap');
   });
 });
 
@@ -77,10 +101,46 @@ describe('deriveReductionBaseline', () => {
 
 describe('buildGoalPayload', () => {
   it('maps scalar-cap types to a targetValue', () => {
-    for (const type of ['daily_cap', 'weekly_target', 'spend_cap_daily'] as const) {
+    for (const type of ['daily_cap', 'weekly_target'] as const) {
       const r = buildGoalPayload(form({ type, target: '5' }), [], TODAY);
       expect(r).toEqual({ ok: true, payload: { type, targetValue: 5 } });
     }
+  });
+
+  it('spend cap payload carries the period', () => {
+    const r = buildGoalPayload(form({ type: 'spend_cap_daily', target: '500', period: 'week' }), [], TODAY);
+    expect(r).toEqual({ ok: true, payload: { type: 'spend_cap_daily', targetValue: 500, meta: { period: 'week' } } });
+  });
+
+  it('taper payload seeds a start step and a derived baseline', () => {
+    const logs = [mkLog({ localDate: TODAY, quantity: 30 })]; // baseline 1.0
+    const r = buildGoalPayload(form({ type: 'taper', target: '8', finalTarget: '2' }), logs, TODAY);
+    expect(r).toEqual({
+      ok: true,
+      payload: {
+        type: 'taper',
+        targetValue: 8,
+        currentBaseline: 1,
+        meta: { finalTarget: 2, steps: [{ cap: 8, from: TODAY, reason: 'start' }] },
+      },
+    });
+  });
+
+  it('taper payload has a null baseline when none can be derived', () => {
+    const r = buildGoalPayload(form({ type: 'taper', target: '8', finalTarget: '2' }), [], TODAY);
+    expect(r.ok && r.payload.currentBaseline).toBeNull();
+  });
+
+  it('taper rejects a bad start cap, final target, or final not below start', () => {
+    expect(buildGoalPayload(form({ type: 'taper', target: '0', finalTarget: '2' }), [], TODAY)).toEqual({
+      ok: false, error: 'Enter a starting cap greater than 0.',
+    });
+    expect(buildGoalPayload(form({ type: 'taper', target: '8', finalTarget: '' }), [], TODAY)).toEqual({
+      ok: false, error: 'Enter a final target greater than 0.',
+    });
+    expect(buildGoalPayload(form({ type: 'taper', target: '8', finalTarget: '8' }), [], TODAY)).toEqual({
+      ok: false, error: 'The final target should be below the starting cap.',
+    });
   });
 
   it('rejects a non-positive scalar target', () => {
@@ -152,6 +212,7 @@ function mkGoal(overrides: Partial<Goal>): Goal {
     status: overrides.status ?? 'active',
     meta: overrides.meta ?? null,
     createdAt: overrides.createdAt ?? '2025-03-01T00:00:00.000Z',
+    completedAt: overrides.completedAt ?? null,
   };
 }
 
@@ -165,7 +226,7 @@ describe('goalToFormState (edit prefill round-trip)', () => {
   it('round-trips a spend_cap_daily', () => {
     const goal = mkGoal({ type: 'spend_cap_daily', targetValue: 250 });
     const r = buildGoalPatch(goalToFormState(goal), [], TODAY);
-    expect(r).toEqual({ ok: true, patch: { targetValue: 250 } });
+    expect(r).toEqual({ ok: true, patch: { targetValue: 250, meta: { period: 'day' } } });
   });
 
   it('round-trips a reduction_target keeping target below baseline', () => {
@@ -222,6 +283,147 @@ describe('buildGoalPatch', () => {
 
   it('propagates validation failures', () => {
     expect(buildGoalPatch(form({ type: 'daily_cap', target: '-1' }), [], TODAY).ok).toBe(false);
+  });
+
+  it('editing a daily cap seeds the start step, appends an edit step, and clears metOn', () => {
+    const goal = mkGoal({ type: 'daily_cap', targetValue: 5, meta: { metOn: '2025-03-20' } });
+    const r = buildGoalPatch(form({ type: 'daily_cap', target: '4' }), [], TODAY, goal);
+    expect(r).toEqual({
+      ok: true,
+      patch: {
+        targetValue: 4,
+        meta: {
+          steps: [
+            { cap: 5, from: '2025-03-01', reason: 'start' },
+            { cap: 4, from: TODAY, reason: 'edit' },
+          ],
+        },
+      },
+    });
+    expect(r.ok && r.patch.meta).not.toHaveProperty('metOn');
+  });
+
+  it('editing without changing the target leaves steps and metOn alone', () => {
+    const goal = mkGoal({ type: 'daily_cap', targetValue: 5, meta: { metOn: '2025-03-20' } });
+    const r = buildGoalPatch(form({ type: 'daily_cap', target: '5' }), [], TODAY, goal);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 5, meta: { metOn: '2025-03-20' } } });
+  });
+
+  it('editing preserves unrelated meta such as dismissals', () => {
+    const goal = mkGoal({ type: 'daily_cap', targetValue: 5, meta: { dismissals: { next: '2025-03-10' } } });
+    const r = buildGoalPatch(form({ type: 'daily_cap', target: '4' }), [], TODAY, goal);
+    expect(r.ok && r.patch.meta).toMatchObject({ dismissals: { next: '2025-03-10' } });
+  });
+
+  it('editing a weekly target never writes steps', () => {
+    const goal = mkGoal({ type: 'weekly_target', targetValue: 30 });
+    const r = buildGoalPatch(form({ type: 'weekly_target', target: '25' }), [], TODAY, goal);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 25 } });
+  });
+
+  it('editing a spend cap round-trips the period and steps only for a daily period', () => {
+    const week = mkGoal({ type: 'spend_cap_daily', targetValue: 500, meta: { period: 'week' } });
+    const rw = buildGoalPatch(goalToFormState(week), [], TODAY, week);
+    expect(rw).toEqual({ ok: true, patch: { targetValue: 500, meta: { period: 'week' } } });
+
+    const day = mkGoal({ type: 'spend_cap_daily', targetValue: 100 });
+    const rd = buildGoalPatch(form({ type: 'spend_cap_daily', target: '80', period: 'day' }), [], TODAY, day);
+    expect(rd.ok && rd.patch.meta).toMatchObject({ period: 'day', steps: [{ cap: 100 }, { cap: 80, reason: 'edit' }] });
+  });
+
+  it('editing a taper keeps its steps (no fresh start step) and appends an edit step', () => {
+    const steps = [
+      { cap: 8, from: '2025-03-01', reason: 'start' },
+      { cap: 6, from: '2025-03-15', reason: 'next' },
+    ];
+    const goal = mkGoal({ type: 'taper', targetValue: 6, currentBaseline: 9, meta: { finalTarget: 2, steps } });
+    const r = buildGoalPatch(goalToFormState(goal), [], TODAY, goal);
+    expect(r).toEqual({ ok: true, patch: { targetValue: 6, meta: { finalTarget: 2, steps } } });
+
+    const r2 = buildGoalPatch(form({ type: 'taper', target: '5', finalTarget: '2' }), [], TODAY, goal);
+    expect(r2.ok && r2.patch.meta?.['steps']).toEqual([...steps, { cap: 5, from: TODAY, reason: 'edit' }]);
+    expect(r2.ok && r2.patch).not.toHaveProperty('currentBaseline');
+  });
+});
+
+describe('goalToFormState (adaptive fields)', () => {
+  it('reads taper target, finalTarget and spend period', () => {
+    const taper = goalToFormState(mkGoal({ type: 'taper', targetValue: 6, meta: { finalTarget: 2 } }));
+    expect(taper).toMatchObject({ type: 'taper', target: '6', finalTarget: '2', period: 'day' });
+    const spend = goalToFormState(mkGoal({ type: 'spend_cap_daily', targetValue: 500, meta: { period: 'month' } }));
+    expect(spend).toMatchObject({ target: '500', period: 'month', finalTarget: '' });
+  });
+
+  it('emptyGoalForm defaults period and finalTarget', () => {
+    expect(emptyGoalForm()).toMatchObject({ period: 'day', finalTarget: '' });
+  });
+});
+
+describe('proposal patches', () => {
+  const goal = mkGoal({
+    type: 'daily_cap',
+    targetValue: 5,
+    meta: { metOn: '2025-03-25', dismissals: { reanchor: '2025-03-01' } },
+  });
+  const next: Proposal = { kind: 'next', type: 'daily_cap', value: 4, unit: 'sticks', basisAvg: 3, heldDays: 14 };
+
+  it('accepting a next step sets the target, appends a step, and removes metOn', () => {
+    const patch = acceptProposalPatch(goal, next, TODAY);
+    expect(patch).toEqual({
+      targetValue: 4,
+      meta: {
+        dismissals: { reanchor: '2025-03-01' },
+        steps: [
+          { cap: 5, from: '2025-03-01', reason: 'start' },
+          { cap: 4, from: TODAY, reason: 'next' },
+        ],
+      },
+    });
+    expect(patch.meta).not.toHaveProperty('metOn');
+  });
+
+  it('accepting a reanchor records the reanchor reason', () => {
+    const patch = acceptProposalPatch(goal, { ...next, kind: 'reanchor', value: 9, overDays: 5 }, TODAY);
+    expect(patch.meta?.['steps']).toEqual([
+      { cap: 5, from: '2025-03-01', reason: 'start' },
+      { cap: 9, from: TODAY, reason: 'reanchor' },
+    ]);
+  });
+
+  it('dismissing stamps today under the kind and keeps other dismissals', () => {
+    expect(dismissProposalPatch(goal, 'next', TODAY)).toEqual({
+      meta: { metOn: '2025-03-25', dismissals: { reanchor: '2025-03-01', next: TODAY } },
+    });
+  });
+
+  it('does not mutate the goal', () => {
+    const before = JSON.stringify(goal);
+    acceptProposalPatch(goal, next, TODAY);
+    dismissProposalPatch(goal, 'next', TODAY);
+    expect(JSON.stringify(goal)).toBe(before);
+  });
+
+  it('proposalToForm maps a quit date proposal', () => {
+    const p: Proposal = { kind: 'start', type: 'quit_date', value: 42, unit: 'sticks', date: '2025-05-11', basisAvg: 2 };
+    expect(proposalToForm(p)).toEqual({ type: 'quit_date', target: '42', period: 'day', quitDate: '2025-05-11' });
+  });
+
+  it('proposalToForm maps a spend proposal with its period', () => {
+    const p: Proposal = { kind: 'start', type: 'spend_cap_daily', value: 450, unit: 'money', period: 'week', basisAvg: 70 };
+    expect(proposalToForm(p)).toEqual({ type: 'spend_cap_daily', target: '450', period: 'week', quitDate: '' });
+  });
+});
+
+describe('capSeries', () => {
+  it('returns the cap in force per date, null before start', () => {
+    const goal = mkGoal({
+      startDate: '2025-03-10',
+      targetValue: 4,
+      meta: { steps: [{ cap: 6, from: '2025-03-10', reason: 'start' }, { cap: 4, from: '2025-03-20', reason: 'next' }] },
+    });
+    expect(capSeries(goal, ['2025-03-09', '2025-03-10', '2025-03-19', '2025-03-20', '2025-03-21'])).toEqual([
+      null, 6, 6, 4, 4,
+    ]);
   });
 });
 

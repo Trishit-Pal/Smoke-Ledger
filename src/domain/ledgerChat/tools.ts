@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { ToolContext } from './context';
-import type { Row, RowUnit } from './types';
+import { NOTE_MAX_CHARS, RECENT_MAX_DAYS, RECENT_MAX_ROWS, type Row, type RowUnit } from './types';
 import {
   brandSpendMix,
   dayShift,
@@ -14,7 +14,9 @@ import {
   round2,
 } from '@/domain/calc';
 import { moodTriggerMatrix } from '@/domain/correlations';
+import { dailyAdherence, goalState, holdStatus } from '@/domain/goalAdherence';
 import { goalTypeLabel } from '@/domain/goalForm';
+import { proposalFor } from '@/domain/goalProposals';
 import { evaluateGoal } from '@/domain/goals';
 import { generateInsights } from '@/domain/insights';
 import { periodWithTrend, savedAllTime, totalsForWindow, weightedAvgUnitPrice } from '@/domain/periodSummary';
@@ -54,9 +56,6 @@ export type ToolOutcome =
 
 /** Raw-log window the Trends screen uses; tool numbers must match it. */
 const LOG_WINDOW_DAYS = 90;
-const RECENT_MAX_DAYS = 30;
-const RECENT_MAX_ROWS = 200;
-const NOTE_MAX_CHARS = 120;
 const BRAND_MIX_TOP = 5;
 const PEAK_HOURS = 3;
 const PEAK_WEEKDAYS = 2;
@@ -123,7 +122,8 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   },
   {
     name: 'goal_status',
-    description: 'Progress on each active goal. Use for "how am I doing on my goal".',
+    description:
+      'Progress and state (on track, at risk, off track, met) on each active goal, plus any suggested next step. Use for "how am I doing on my goal".',
     strict: true,
     input_schema: schema({}),
   },
@@ -251,8 +251,8 @@ function savings(_input: unknown, ctx: ToolContext): ToolOutcome {
 
 function spendOutlook(_input: unknown, ctx: ToolContext): ToolOutcome {
   // The daily rate comes from the daily summary (uncapped, the screens' source of
-  // truth), never from the 200-row log page, which a heavy logger fills in under
-  // a month. ponytail: annualised = 30-day daily average × 365, inline.
+  // truth), never from the capped log page (2000 rows, which a heavy logger can
+  // fill within the window). ponytail: annualised = 30-day daily average × 365, inline.
   const perDay = round2(totalsForWindow(ctx.rows, 30, ctx.today).spendInr / 30);
   const perMonth = round2(perDay * 30);
   const perYear = round2(perDay * 365);
@@ -324,15 +324,30 @@ function goalUnit(unit: 'sticks' | 'inr' | 'days' | 'percent'): RowUnit {
 function goalStatus(_input: unknown, ctx: ToolContext): ToolOutcome {
   const money = { currency: ctx.currency, locale: ctx.locale };
   const active = ctx.goals.filter((g) => g.status === 'active');
-  const progress = active.map((g) => evaluateGoal(g, ctx.logs, ctx.today, money));
+  const detail = active.map((g) => {
+    const state = goalState(g, ctx.logs, ctx.today);
+    const proposal = proposalFor(g, ctx.logs, ctx.today, state, { currency: ctx.currency });
+    return {
+      ...evaluateGoal(g, ctx.logs, ctx.today, money),
+      state,
+      overDaysLast7: dailyAdherence(g, ctx.logs, ctx.today).filter((d) => d.over).length,
+      heldDays: holdStatus(g, ctx.logs, ctx.today).runDays,
+      proposal: proposal && { kind: proposal.kind, value: proposal.value },
+      proposalUnit: proposal?.unit,
+    };
+  });
   return {
     ok: true,
-    data: { goals: progress.map(({ goalId: _goalId, ...rest }) => rest) },
+    data: { goals: detail.map(({ goalId: _goalId, proposalUnit: _unit, ...rest }) => rest) },
     // The row label is the goal's type, never evaluateGoal's label, which embeds
     // the target ("Daily spend cap: ₹500") and would print it past the mask.
-    rows: progress.map((p, i) =>
-      row(`goal.${i}`, goalTypeLabel(active[i].type), p.valueCurrent, goalUnit(p.unit), p.isOnTrack ? 'accent' : 'warn'),
-    ),
+    rows: detail.flatMap((p, i) => {
+      const tone = p.state === 'on_track' || p.state === 'met' ? 'accent' : 'warn';
+      const goalRow = row(`goal.${i}`, goalTypeLabel(active[i].type), p.valueCurrent, goalUnit(p.unit), tone);
+      if (!p.proposal || !p.proposalUnit) return [goalRow];
+      const label = p.proposal.kind === 'reanchor' ? 'Suggested re-anchor' : 'Suggested next cap';
+      return [goalRow, row(`goal.${i}.proposal`, label, p.proposal.value, p.proposalUnit)];
+    }),
   };
 }
 

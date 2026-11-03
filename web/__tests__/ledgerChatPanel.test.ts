@@ -14,6 +14,12 @@ const settings = readFileSync(join(__dirname, '..', 'app', '(app)', 'settings', 
 const authProvider = readFileSync(join(__dirname, '..', 'components', 'providers', 'AuthProvider.tsx'), 'utf8');
 
 describe('AskLedgerPanel', () => {
+  test('reads the signed-in user through sessionUserId, never an unguarded getSession chain', () => {
+    expect(panel).toContain('sessionUserId(');
+    expect(panel).not.toMatch(/getSession\(\)\s*\.then\(/);
+    expect(panel).not.toMatch(/auth\.getSession\(\)\s*\.then\(/);
+  });
+
   test('renders figures through MetricRow and masks at the render site with the shared helpers', () => {
     expect(panel).toMatch(/import \{[^}]*MetricRow[^}]*\} from '@web\/components\/visual'/);
     expect(panel).toContain('isHomeTotalsHidden(');
@@ -58,6 +64,33 @@ describe('AskLedgerPanel', () => {
   });
 });
 
+describe('AI label and Clear conversation', () => {
+  test('each answer carries a Written by AI caption', () => {
+    expect(panel).toContain('Written by AI');
+  });
+
+  test('the header has a plain Clear conversation control that clears storage and in-memory turns', () => {
+    expect(panel).toContain('Clear conversation');
+    expect(panel).toMatch(/clearTranscript\(userId/);
+    expect(panel).toMatch(/setTurns\(\[\]\)/);
+    expect(panel).not.toMatch(/ConfirmDialog|window\.confirm/);
+  });
+
+  test('an answer in flight cannot undo a clear: send appends to the live turns, and Clear is hidden while busy', () => {
+    // The stale closure over `turns` is what resurrected cleared turns.
+    expect(panel).not.toMatch(/\[\.\.\.turns, turn\]/);
+    expect(panel).toContain('turnsRef.current');
+    expect(panel).toMatch(/const next = \[\.\.\.current, turn\]/);
+    const send = panel.slice(panel.indexOf('const send = React.useCallback'), panel.indexOf('const onTurnOnAndAsk'));
+    expect(send).not.toMatch(/\bturns\b/);
+    expect(panel).toMatch(/turns\.length > 0 && !busy/);
+  });
+
+  test('Settings Ask-the-ledger row offers the same control and says it was done', () => {
+    expect(settings).toMatch(/clearTranscript\(\);\s*flashToast\('Conversation cleared from this device\.'\)/);
+  });
+});
+
 describe('AskLedgerLauncher and its mount points', () => {
   test('renders nothing while the feature is off', () => {
     expect(launcher).toMatch(/if \(!enabled\) return null/);
@@ -77,24 +110,26 @@ describe('AskLedgerLauncher and its mount points', () => {
 });
 
 describe('Settings integration', () => {
-  test('has the off switch and clears the device transcript on sign-out, erase, delete, and entering discreet mode', () => {
+  test('has the off switch, and clears the device transcript on discreet-on and through the lifecycle registry on sign-out, erase and delete', () => {
     expect(settings).toContain("setSetting('consent.ledgerChatOptIn'");
-    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    // Discreet-on and consent-off keep their direct call; the other events go through the registry.
+    expect(settings.match(/clearTranscript\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     const discreet = settings.indexOf('await updateProfile({ discreetMode: value })');
     const discreetClear = settings.indexOf('clearTranscript()', discreet);
     expect(discreet).toBeGreaterThan(-1);
     expect(discreetClear - discreet).toBeLessThan(300);
     // Erase and delete both promise that everything goes; the device transcript is part of everything.
     const erase = settings.indexOf('await eraseAllUserData()');
-    const eraseClear = settings.indexOf('clearTranscript()', erase);
+    const eraseClear = settings.indexOf("clearWebDevice('erase')", erase);
     const del = settings.indexOf('await deleteUserAccount(');
-    const delClear = settings.indexOf('clearTranscript()', del);
+    const delClear = settings.indexOf("clearWebDevice('delete')", del);
     expect(erase).toBeGreaterThan(-1);
     expect(eraseClear).toBeGreaterThan(erase);
-    expect(eraseClear - erase).toBeLessThan(200);
+    expect(eraseClear - erase).toBeLessThan(400);
     expect(del).toBeGreaterThan(-1);
     expect(delClear).toBeGreaterThan(del);
     expect(delClear - del).toBeLessThan(700);
+    expect(settings.match(/clearWebDevice\('signOut'\)/g)?.length ?? 0).toBe(2);
   });
 
   test('turning the switch on shows the same notice as the panel before saving', () => {
@@ -103,7 +138,23 @@ describe('Settings integration', () => {
   });
 
   test('any sign-out event clears the device transcript, including session expiry and deletion', () => {
-    expect(authProvider).toContain("from '@web/components/chat/transcriptStore'");
-    expect(authProvider).toContain('clearTranscript()');
+    expect(authProvider).toContain("from '@web/lib/privacy/clearDevice'");
+    expect(authProvider).toContain("clearWebDevice('signOut')");
+  });
+});
+
+describe('chat consent notice', () => {
+  test('discloses what the route sends, as the privacy policy does (O4)', async () => {
+    const { LEDGER_CHAT_NOTICE } = await import('@web/components/chat/notice');
+    const { LEGAL_ENTITY } = await import('@/lib/legalEntity');
+    expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 10 earlier turns of this conversation (your questions and its replies)');
+    expect(LEDGER_CHAT_NOTICE.sent).toMatch(/context line: today’s date, your time zone, currency and locale/);
+    expect(LEDGER_CHAT_NOTICE.sent).toContain('the kind and state of your active goals, and whether discreet mode is on.');
+    expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 200 of your entries from the last 30 days');
+    expect(LEDGER_CHAT_NOTICE.sent).toContain('first 120 characters of your note');
+    expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.anthropicRetention);
+    for (const exit of ['Clear conversation', 'turn this off', 'turn discreet mode on', 'sign out']) {
+      expect(LEDGER_CHAT_NOTICE.device).toContain(exit);
+    }
   });
 });

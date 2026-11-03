@@ -7,7 +7,7 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 
 export interface ProgressBarProps {
   value: number;
-  tone?: 'default' | 'warn' | 'danger' | 'success';
+  tone?: 'default' | 'warn' | 'warnEarth' | 'danger' | 'success';
   height?: number;
 }
 
@@ -25,6 +25,7 @@ export function ProgressBar({ value, tone = 'default', height = 6 }: ProgressBar
 
   const color =
     tone === 'warn'    ? theme.warn
+    : tone === 'warnEarth' ? theme.warnEarth
     : tone === 'danger'  ? theme.danger
     : tone === 'success' ? theme.success
     : theme.accent;

@@ -3,14 +3,16 @@
  * route; it is now shared by the callback (PKCE code) and the confirm page's
  * server action (token_hash), so the two paths cannot drift.
  */
+import { LEGAL_VERSIONS } from '@/lib/legal';
 import { nextPathForLink, postAuthDestination } from '../../web/lib/auth/postAuthDestination';
 
 const CONSENTED = {
   age_confirmed_at: 't',
-  terms_version: '1',
-  privacy_version: '1',
-  health_disclaimer_version: '1',
+  terms_version: LEGAL_VERSIONS.terms,
+  privacy_version: LEGAL_VERSIONS.privacy,
+  health_disclaimer_version: LEGAL_VERSIONS.medicalDisclaimer,
   data_processing_consent_at: 't',
+  health_data_consent_at: 't',
 };
 const ONBOARDED = { ...CONSENTED, onboarded_at: 't' };
 
@@ -53,6 +55,30 @@ describe('postAuthDestination', () => {
   it('honours next for an onboarded user, else the dashboard', () => {
     expect(postAuthDestination(ONBOARDED, 'magiclink', '/log?ref=widget')).toBe('/log?ref=widget');
     expect(postAuthDestination(ONBOARDED, 'magiclink', null)).toBe('/dashboard');
+  });
+});
+
+describe('postAuthDestination re-consent', () => {
+  it('sends an onboarded user with older versions or no health consent to /consent, ahead of next', () => {
+    expect(postAuthDestination({ ...ONBOARDED, terms_version: '2020-01-01' }, null, '/log')).toBe('/consent');
+    expect(postAuthDestination({ ...ONBOARDED, health_data_consent_at: null }, 'magiclink', null)).toBe(
+      '/consent',
+    );
+  });
+
+  it('honours an exempt next (the /settings delete-resume) instead of detouring through /consent', () => {
+    const next = '/settings?resume=delete';
+    expect(postAuthDestination({ ...ONBOARDED, health_data_consent_at: null }, 'magiclink', next)).toBe(next);
+    expect(postAuthDestination({ ...ONBOARDED, terms_version: '2020-01-01' }, null, '/privacy')).toBe('/privacy');
+  });
+
+  it('still lets recovery through, and leaves a mid-wizard user in the wizard', () => {
+    expect(
+      postAuthDestination({ ...ONBOARDED, health_data_consent_at: null }, null, '/reset-password'),
+    ).toBe('/reset-password');
+    expect(
+      postAuthDestination({ ...CONSENTED, health_data_consent_at: null, onboarding_step: 'goal' }, null, null),
+    ).toBe('/onboarding/goal');
   });
 });
 

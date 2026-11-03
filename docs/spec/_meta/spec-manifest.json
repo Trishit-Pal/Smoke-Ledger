@@ -4,7 +4,7 @@
       "id": "glossary",
       "file": "00-glossary.md",
       "sources": [],
-      "last_verified_commit": "fcabb85",
+      "last_verified_commit": "b4d45ae",
       "status": "current"
     },
     {
@@ -20,7 +20,7 @@
         "app/_layout.tsx",
         "metro.config.js"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "b4d45ae",
       "status": "current"
     },
     {
@@ -30,7 +30,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "8398559",
       "status": "current"
     },
     {
@@ -49,7 +49,7 @@
         "src/lib/emailOtpType.ts",
         "src/lib/onboardingSteps.ts"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "8398559",
       "status": "current"
     },
     {
@@ -72,7 +72,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "8398559",
       "status": "current"
     },
     {
@@ -96,9 +96,26 @@
         "src/domain/correlations.ts",
         "src/domain/health.ts",
         "src/domain/savings.ts",
-        "src/db/repositories/goals.ts"
+        "src/db/repositories/goals.ts",
+        "src/domain/goalMeta.ts",
+        "src/domain/goalAdherence.ts",
+        "src/domain/goalProposals.ts",
+        "src/domain/goalTransitions.ts",
+        "src/domain/goalForm.ts",
+        "src/domain/goalFormView.ts",
+        "src/domain/goalCardModel.ts",
+        "src/domain/goalReconcileView.ts",
+        "src/domain/goalStepView.ts",
+        "src/domain/capLine.ts",
+        "src/domain/firstSuggestion.ts",
+        "src/services/goalReconcile.ts",
+        "src/lib/goals/**",
+        "web/lib/goals/**",
+        "web/app/(app)/goals/**",
+        "app/(tabs)/goals.tsx",
+        "app/goals/**"
       ],
-      "last_verified_commit": "c3ec7a1",
+      "last_verified_commit": "b4d45ae",
       "status": "current"
     },
     {
@@ -112,9 +129,15 @@
         "web/components/character/**",
         "src/lib/achievements.ts",
         "app/(tabs)/index.tsx",
-        "web/app/(app)/dashboard/**"
+        "web/app/(app)/dashboard/**",
+        "app/onboarding/done.tsx",
+        "web/app/onboarding/done/**",
+        "web/app/(auth)/login/page.tsx",
+        "web/components/marketing/AccountDeletedNotice.tsx",
+        "web/components/character/MilestoneCelebration.tsx",
+        "app/(auth)/login.tsx"
       ],
-      "last_verified_commit": "1a40fb0",
+      "last_verified_commit": "798a45b",
       "status": "current"
     },
     {
@@ -130,9 +153,21 @@
         "web/app/api/**",
         "web/lib/server/ledgerChat/**",
         "src/domain/ledgerChat/**",
-        "docs/security/**"
+        "src/lib/discreet.ts",
+        "web/components/charts/**",
+        "docs/security/**",
+        "src/lib/privacy/**",
+        "src/lib/logger.ts",
+        "src/lib/legalEntity.ts",
+        "src/lib/healthConsent.ts",
+        "src/lib/reconsentCopy.ts",
+        "src/services/consentWithdrawal.ts",
+        "src/services/cloudErase.ts",
+        "app/consent.tsx",
+        "web/app/consent/**",
+        "web/lib/privacy/**"
       ],
-      "last_verified_commit": "b9ac848",
+      "last_verified_commit": "8398559",
       "status": "current"
     },
     {
@@ -149,7 +184,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "fbd177e",
+      "last_verified_commit": "9d24456",
       "status": "current"
     }
   ]

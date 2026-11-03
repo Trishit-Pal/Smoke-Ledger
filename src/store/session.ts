@@ -14,6 +14,10 @@ import { useOnboardingDraft } from '@/store/onboardingDraft';
 import type { DailySummaryRow as PeriodRow } from '@/domain/periodSummary';
 import { daysAgoInZone, daysAgoIst, todayInZone, todayIst } from '@/lib/date';
 import { timezoneForCountry } from '@/lib/regions';
+import { reconcileGoals } from '@/services/goalReconcile';
+import { track } from '@/services/analytics';
+import { AnalyticsEvents } from '@/constants/events';
+import type { GoalTransition } from '@/domain/goalTransitions';
 
 /** Earliest day "saved" should count from: onboarding, floored at the RPC's 366-day cap. */
 function summarySinceFor(profile: UserProfile | null): string {
@@ -38,10 +42,51 @@ async function fetchSummary(): Promise<PeriodRow[]> {
   return rows.map(toPeriodRow);
 }
 
+interface Reconciled {
+  goals: Goal[];
+  applied: GoalTransition[];
+  failed: boolean;
+}
+
+/**
+ * Writes any goal transition that has come due and returns the goals as they now stand.
+ * Idempotent (the planner returns nothing once a write has landed) and never throws, so
+ * boot cannot be blocked by it; `today` is the reader's ledger date; a failed write leaves the goal as stored and sets `failed`.
+ */
+async function reconcileLoaded(goals: Goal[], logs: CigaretteLog[], today: string): Promise<Reconciled> {
+  try {
+    const r = await reconcileGoals(goals, logs, today, {
+      setGoalStatus: goalsRepo.setGoalStatus,
+      updateGoal: goalsRepo.updateGoal,
+    });
+    return { goals: r.goals, applied: r.applied, failed: r.failed.length > 0 };
+  } catch {
+    return { goals, applied: [], failed: true };
+  }
+}
+
+/** Append moments, skipping any already queued (two overlapping reconciles can plan the same one). */
+function withMoments(queued: GoalTransition[], applied: GoalTransition[]): GoalTransition[] {
+  const fresh = applied.filter((a) => !queued.some((q) => q.goalId === a.goalId && q.kind === a.kind));
+  return fresh.length === 0 ? queued : [...queued, ...fresh];
+}
+
 // Initial hydration window. Trends/history screens fetch their own deeper
 // windows on demand so we keep the boot payload small.
 const LOG_LOOKBACK_DAYS = 90;
 export const HISTORY_LOG_LOOKBACK_DAYS = 365;
+// ponytail: one page of up to 2000 rows; the 90-day window holds >= 22 entries a day under that
+// ceiling. If nextCursor is ever non-null, page until it is null.
+const GOAL_WINDOW_LOG_LIMIT = 2000;
+
+async function loadGoalWindowLogs() {
+  const { logs } = await logsRepo.listLogsPage({
+    fromDate: daysAgoIst(LOG_LOOKBACK_DAYS),
+    toDate: todayIst(),
+    limit: GOAL_WINDOW_LOG_LIMIT,
+  });
+  return logs;
+}
 
 interface SessionState {
   booted: boolean;
@@ -58,6 +103,10 @@ interface SessionState {
   // only and zeroed in reset(), so it naturally resets per login. See
   // `@/lib/achievements` for the suppression rule.
   achievementDismissCount: number;
+  // Goal transitions applied by reconcile that the goals tab has yet to announce.
+  pendingGoalMoments: GoalTransition[];
+  // True when the last reconcile could not save a due goal update; the goals tab says so.
+  goalsReconcileFailed: boolean;
 
   boot: () => Promise<void>;
   reset: () => void;
@@ -68,12 +117,17 @@ interface SessionState {
   refreshSummary: () => Promise<void>;
   refreshAll: () => Promise<void>;
   incrementAchievementDismiss: () => void;
+  /** Returns the queued goal moments and clears the queue. */
+  consumeGoalMoments: () => GoalTransition[];
 
   addLog: (draft: logsRepo.LogDraft) => Promise<CigaretteLog>;
   updateLog: (id: string, patch: Partial<CigaretteLog>) => Promise<void>;
   removeLog: (id: string) => Promise<void>;
 
-  addGoal: (input: Parameters<typeof goalsRepo.createGoal>[0]) => Promise<Goal>;
+  addGoal: (
+    input: Parameters<typeof goalsRepo.createGoal>[0],
+    opts?: { fromProposal?: boolean },
+  ) => Promise<Goal>;
   updateGoal: (id: string, patch: GoalPatchInput) => Promise<Goal>;
   setGoalStatus: (id: string, status: Goal['status']) => Promise<void>;
   removeGoal: (id: string) => Promise<void>;
@@ -88,6 +142,8 @@ export const useSession = create<SessionState>((set, get) => ({
   summary: [],
   summarySinceYmd: daysAgoIst(365),
   achievementDismissCount: 0,
+  pendingGoalMoments: [],
+  goalsReconcileFailed: false,
 
   reset: () => {
     // Clear the in-memory onboarding draft on logout so a different user does
@@ -102,6 +158,8 @@ export const useSession = create<SessionState>((set, get) => ({
       summary: [],
       summarySinceYmd: daysAgoIst(365),
       achievementDismissCount: 0,
+      pendingGoalMoments: [],
+      goalsReconcileFailed: false,
     });
   },
 
@@ -114,36 +172,42 @@ export const useSession = create<SessionState>((set, get) => ({
     await maybeSyncDefaultBrandCatalog(catalogStorage).catch(() => undefined);
     const [profile, logs, brands, goals, summary] = await Promise.all([
       profileRepo.getProfile(),
-      logsRepo.listLogs({ fromDate: daysAgoIst(LOG_LOOKBACK_DAYS), toDate: todayIst() }),
+      loadGoalWindowLogs(),
       brandsRepo.listBrandsWithVariants(),
       goalsRepo.listAllGoals(),
       fetchSummary(),
     ]);
-    set({
+    // The store's profile is not set yet at boot, so read the zone from the profile just loaded.
+    const today = todayInZone(timezoneForCountry(profile?.country));
+    const reconciled = await reconcileLoaded(goals, logs, today);
+    set((s) => ({
       booted: true,
       profile,
       logs,
       brands,
-      goals,
+      goals: reconciled.goals,
+      pendingGoalMoments: withMoments(s.pendingGoalMoments, reconciled.applied),
+      goalsReconcileFailed: reconciled.failed,
       summary,
       summarySinceYmd: summarySinceFor(profile),
-    });
+    }));
   },
 
   refreshLogs: async () => {
-    const logs = await logsRepo.listLogs({
-      fromDate: daysAgoIst(LOG_LOOKBACK_DAYS),
-      toDate: todayIst(),
-    });
-    set({ logs });
+    set({ logs: await loadGoalWindowLogs() });
   },
   refreshBrands: async () => {
     const brands = await brandsRepo.listBrandsWithVariants();
     set({ brands });
   },
   refreshGoals: async () => {
-    const goals = await goalsRepo.listAllGoals();
-    set({ goals });
+    const loaded = await goalsRepo.listAllGoals();
+    const reconciled = await reconcileLoaded(loaded, get().logs, ledgerToday());
+    set((s) => ({
+      goals: reconciled.goals,
+      pendingGoalMoments: withMoments(s.pendingGoalMoments, reconciled.applied),
+      goalsReconcileFailed: reconciled.failed,
+    }));
   },
   refreshProfile: async () => {
     const profile = await profileRepo.getProfile();
@@ -175,6 +239,12 @@ export const useSession = create<SessionState>((set, get) => ({
   incrementAchievementDismiss: () =>
     set((s) => ({ achievementDismissCount: s.achievementDismissCount + 1 })),
 
+  consumeGoalMoments: () => {
+    const moments = get().pendingGoalMoments;
+    if (moments.length > 0) set({ pendingGoalMoments: [] });
+    return moments;
+  },
+
   addLog: async (draft) => {
     // Every native log comes through here: stamp local_date / local_hour in the
     // ledger's zone (the profile country; IST when there is none).
@@ -195,9 +265,13 @@ export const useSession = create<SessionState>((set, get) => ({
     await get().refreshSummary();
   },
 
-  addGoal: async (input) => {
+  addGoal: async (input, opts) => {
     const created = await goalsRepo.createGoal(input);
     set((s) => ({ goals: [created, ...s.goals] }));
+    void track(AnalyticsEvents.GOAL_CREATED, {
+      type: created.type,
+      from_proposal: opts?.fromProposal ?? false,
+    });
     return created;
   },
   updateGoal: async (id, patch) => {
@@ -207,7 +281,9 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   setGoalStatus: async (id, status) => {
     await goalsRepo.setGoalStatus(id, status);
-    set((s) => ({ goals: s.goals.map((g) => (g.id === id ? { ...g, status } : g)) }));
+    // The DB stamps completed_at on completed/abandoned; mirror it locally until the next load.
+    const completedAt = status === 'completed' || status === 'abandoned' ? new Date().toISOString() : null;
+    set((s) => ({ goals: s.goals.map((g) => (g.id === id ? { ...g, status, completedAt } : g)) }));
   },
   removeGoal: async (id) => {
     await goalsRepo.deleteGoal(id);

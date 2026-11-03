@@ -8,6 +8,10 @@ export interface HeatmapProps {
   startYmd: string;
   endYmd: string;
   height?: number;
+  /** Formats a cell count (titles + aria-label), e.g. discreet masking. Default: String. */
+  formatCount?: (n: number) => string;
+  /** Initial container width in px (before the first measurement). Default 0. */
+  initialWidth?: number;
 }
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -39,18 +43,19 @@ function buildGrid(logs: CigaretteLog[], startYmd: string, endYmd: string) {
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /** One-sentence text alternative: where the activity peaks. */
-function heatmapSummary(grid: number[][], max: number): string {
+function heatmapSummary(grid: number[][], max: number, formatCount: (n: number) => string): string {
   if (max <= 0) return 'Smoking activity heatmap: no logs in this period.';
   for (let r = 0; r < grid.length; r++) {
     const c = grid[r]!.indexOf(max);
-    if (c >= 0) return `Smoking activity heatmap by weekday and hour: busiest ${DAY_NAMES[r]} at ${c}:00, ${max} logs.`;
+    if (c >= 0) return `Smoking activity heatmap by weekday and hour: busiest ${DAY_NAMES[r]} at ${c}:00, ${formatCount(max)} logs.`;
   }
   return 'Smoking activity heatmap.';
 }
 
-export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) {
+export function Heatmap({ logs, startYmd, endYmd, height = 180, formatCount, initialWidth = 0 }: HeatmapProps) {
+  const fmt = formatCount ?? String;
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = React.useState(0);
+  const [width, setWidth] = React.useState(initialWidth);
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -89,7 +94,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
     // drawWidth > width) adds its own height below the SVG instead of clipping it.
     <div ref={containerRef} className="w-full overflow-x-auto overflow-y-hidden" style={{ minHeight: height }}>
       {width > 0 ? (
-        <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max)}>
+        <svg width={drawWidth} height={height} role="img" aria-label={heatmapSummary(grid, max, fmt)}>
           {DAY_LABELS.map((label, row) => (
             <text
               key={`day-${row}`}
@@ -117,7 +122,7 @@ export function Heatmap({ logs, startYmd, endYmd, height = 180 }: HeatmapProps) 
                   fill={count > 0 ? 'var(--chart-series-1)' : 'var(--chart-grid)'}
                   fillOpacity={count > 0 ? opacity : 0.5}
                 >
-                  <title>{`${count} log${count === 1 ? '' : 's'} — ${DAY_LABELS[r]} ${c}:00`}</title>
+                  <title>{`${fmt(count)} log${fmt(count) === '1' ? '' : 's'} — ${DAY_LABELS[r]} ${c}:00`}</title>
                 </rect>
               );
             }),

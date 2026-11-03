@@ -10,7 +10,14 @@ import { serverLog } from '@web/lib/log';
 import { resolveChatCaller } from '@web/lib/server/ledgerChat/auth';
 import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 import { runLedgerChatTurn } from '@web/lib/server/ledgerChat/turn';
-import { loadDailySummary, loadGoals, loadLogsPage, loadProfile, toDailySummaryRow } from '@web/lib/server/data';
+import {
+  GOAL_WINDOW_LOG_LIMIT,
+  loadDailySummary,
+  loadGoals,
+  loadLogsPage,
+  loadProfile,
+  toDailySummaryRow,
+} from '@web/lib/server/data';
 import { cleanEnvValue } from '@web/lib/supabase/env';
 
 // Two model calls plus four parallel reads fit well inside this; Hobby allows 300s.
@@ -27,7 +34,6 @@ const DEFAULT_GLOBAL_CAP = 500;
 const DAY_SECONDS = 86_400;
 /** Same windows the screens load, so tool figures equal screen figures. */
 const LOG_WINDOW_DAYS = 90;
-const LOG_ROW_CAP = 200;
 const SUMMARY_WINDOW_DAYS = 365;
 const UPSTREAM_TIMEOUT_MS = 20_000;
 /** Whole-turn budget, inside maxDuration so a slow upstream yields a calm 502, not a platform 504. */
@@ -85,8 +91,10 @@ export async function POST(request: Request) {
     const onboardYmd = profile.onboardedAt ? profile.onboardedAt.slice(0, 10) : null;
     const summarySinceYmd = onboardYmd && onboardYmd > yearAgo ? onboardYmd : yearAgo;
 
+    // ponytail: one page of up to GOAL_WINDOW_LOG_LIMIT (2000) rows, like Home; the 90-day window
+    // holds ~22 entries a day under that ceiling. recent_entries still hands the model only 200.
     const [logsPage, summary, goals] = await Promise.all([
-      loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: LOG_ROW_CAP }),
+      loadLogsPage(db, userId, { fromDate: daysAgoInZone(LOG_WINDOW_DAYS, zone), limit: GOAL_WINDOW_LOG_LIMIT }),
       loadDailySummary(db, { from: summarySinceYmd, to: today }),
       loadGoals(db, userId, { activeOnly: true }),
     ]);

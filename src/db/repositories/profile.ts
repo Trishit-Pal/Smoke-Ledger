@@ -23,6 +23,7 @@ type Row = {
   privacy_version?: string | null;
   health_disclaimer_version?: string | null;
   data_processing_consent_at?: string | null;
+  health_data_consent_at?: string | null;
   marketing_consent_at?: string | null;
   full_name?: string | null;
   date_of_birth?: string | null;
@@ -49,6 +50,7 @@ function rowToProfile(r: Row): UserProfile {
     privacyVersion: r.privacy_version ?? null,
     healthDisclaimerVersion: r.health_disclaimer_version ?? null,
     dataProcessingConsentAt: r.data_processing_consent_at ?? null,
+    healthDataConsentAt: r.health_data_consent_at ?? null,
     marketingConsentAt: r.marketing_consent_at ?? null,
     fullName: r.full_name ?? null,
     dateOfBirth: r.date_of_birth ?? null,
@@ -170,6 +172,7 @@ export interface ComplianceConsentPatch {
   privacyVersion?: string | null;
   healthDisclaimerVersion?: string | null;
   dataProcessingConsentAt?: string | null;
+  healthDataConsentAt?: string | null;
   /** Advance the step in the same UPDATE as the consent columns. */
   onboardingStep?: OnboardingStep;
 }
@@ -188,6 +191,9 @@ export async function saveComplianceConsents(patch: ComplianceConsentPatch): Pro
   }
   if (patch.dataProcessingConsentAt !== undefined) {
     row.data_processing_consent_at = patch.dataProcessingConsentAt;
+  }
+  if (patch.healthDataConsentAt !== undefined) {
+    row.health_data_consent_at = patch.healthDataConsentAt;
   }
 
   if (!Object.keys(row).length) return;

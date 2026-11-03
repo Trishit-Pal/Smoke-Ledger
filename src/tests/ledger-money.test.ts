@@ -10,6 +10,7 @@ jest.mock('@/db/repositories/goals', () => ({}));
 jest.mock('@/db/repositories/profile', () => ({}));
 jest.mock('@/lib/catalogSync', () => ({ maybeSyncDefaultBrandCatalog: jest.fn() }));
 jest.mock('@/lib/catalogStorageNative', () => ({ makeNativeCatalogStorage: jest.fn() }));
+jest.mock('@/services/analytics', () => ({ track: jest.fn() }));
 
 import { ledgerCurrency, ledgerMoney } from '@/lib/ledgerMoney';
 import { useSession } from '@/store/session';

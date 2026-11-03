@@ -2,7 +2,8 @@
 
 import type { CigaretteLog, Goal } from '@/types';
 import { rollingAvgSticks, sticksOn, spendOn, dayShift } from './calc';
-import { startOfWeekIst, todayIst, daysBetween } from '@/lib/date';
+import { startOfWeekIst, startOfMonthIst, todayIst, daysBetween } from '@/lib/date';
+import { readGoalMeta, spendPeriod, type SpendPeriod } from './goalMeta';
 import { formatMoney } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/regions';
 
@@ -34,6 +35,17 @@ export interface GoalProgress {
 const WEEK_DAYS = 7;
 const REDUCTION_BASELINE_WINDOW = 30; // days
 
+const SPEND_WINDOW_START: Record<SpendPeriod, (today: string) => string> = {
+  day: (today) => today,
+  week: startOfWeekIst,
+  month: startOfMonthIst,
+};
+const SPEND_PERIOD_WORD: Record<SpendPeriod, { label: string; phrase: string }> = {
+  day: { label: 'Daily', phrase: 'today' },
+  week: { label: 'Weekly', phrase: 'this week' },
+  month: { label: 'Monthly', phrase: 'this month' },
+};
+
 function clampPercent(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
@@ -46,13 +58,18 @@ export function evaluateGoal(
   money?: EvaluateGoalMoney,
 ): GoalProgress {
   switch (goal.type) {
+    case 'taper':
     case 'daily_cap': {
       const used = sticksOn(logs, today);
       const target = goal.targetValue;
       const percent = target > 0 ? clampPercent((used / target) * 100) : 0;
+      const isTaper = goal.type === 'taper';
+      const meta = readGoalMeta(goal);
+      const stepNo = Math.max(1, meta.steps?.length ?? 0);
+      const finalSuffix = meta.finalTarget != null ? ` → ${meta.finalTarget}` : '';
       return {
         goalId: goal.id,
-        label: `Daily cap: ${target}/day`,
+        label: isTaper ? `Taper: ${target}/day${finalSuffix}` : `Daily cap: ${target}/day`,
         valueCurrent: used,
         valueTarget: target,
         unit: 'sticks',
@@ -60,12 +77,17 @@ export function evaluateGoal(
         isOnTrack: used <= target,
         atRisk: used >= target * 0.8 && used < target,
         remaining: Math.max(0, target - used),
-        explanation: `You have smoked ${used} of ${target} today.`,
+        explanation: isTaper
+          ? `Step ${stepNo}: ${used} of ${target} today.`
+          : `You have smoked ${used} of ${target} today.`,
       };
     }
 
     case 'spend_cap_daily': {
-      const used = spendOn(logs, today);
+      const period = spendPeriod(goal);
+      const from = SPEND_WINDOW_START[period](today);
+      let used = 0;
+      for (let cur = from; cur <= today; cur = dayShift(cur, 1)) used += spendOn(logs, cur);
       const target = goal.targetValue;
       const percent = target > 0 ? clampPercent((used / target) * 100) : 0;
       const currency = money?.currency ?? 'INR';
@@ -73,7 +95,7 @@ export function evaluateGoal(
       const usedLabel = formatMoney(used, currency, { locale: money?.locale });
       return {
         goalId: goal.id,
-        label: `Daily spend cap: ${targetLabel}`,
+        label: `${SPEND_PERIOD_WORD[period].label} spend cap: ${targetLabel}`,
         valueCurrent: used,
         valueTarget: target,
         unit: 'inr',
@@ -81,7 +103,7 @@ export function evaluateGoal(
         isOnTrack: used <= target,
         atRisk: used >= target * 0.8 && used < target,
         remaining: Math.max(0, target - used),
-        explanation: `You have spent ${usedLabel} of ${targetLabel} today.`,
+        explanation: `You have spent ${usedLabel} of ${targetLabel} ${SPEND_PERIOD_WORD[period].phrase}.`,
       };
     }
 
