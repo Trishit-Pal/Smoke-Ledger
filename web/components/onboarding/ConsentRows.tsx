@@ -9,6 +9,7 @@ import {
   HEALTH_CONSENT_SUB,
   HEALTH_DECLINE_LABEL,
   HEALTH_DECLINE_NOTE,
+  HEALTH_DECLINE_NOTE_EXISTING,
 } from '@/lib/healthConsent';
 
 // The consent rows, shared by the onboarding privacy step and the /consent
@@ -139,10 +140,12 @@ export interface HealthConsentRowProps {
   onChange: (given: boolean) => void;
   /** The printed row number, e.g. "06". */
   number: string;
+  /** True on the re-consent screen, where the reader already has a ledger. */
+  existingLedger?: boolean;
 }
 
 /** The unticked Art 9 row, with a decline control the same size as the accept one. */
-export function HealthConsentRow({ checked, declined, onChange, number }: HealthConsentRowProps) {
+export function HealthConsentRow({ checked, declined, onChange, number, existingLedger = false }: HealthConsentRowProps) {
   return (
     <div style={{ borderBottom: '1px solid var(--rule)' }}>
       <label
@@ -213,7 +216,7 @@ export function HealthConsentRow({ checked, declined, onChange, number }: Health
             role="status"
             style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.55 }}
           >
-            {HEALTH_DECLINE_NOTE}
+            {existingLedger ? HEALTH_DECLINE_NOTE_EXISTING : HEALTH_DECLINE_NOTE}
           </p>
         ) : null}
       </div>

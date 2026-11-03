@@ -1,3 +1,4 @@
+import { HEALTH_DECLINE_NOTE, HEALTH_DECLINE_NOTE_EXISTING } from '../lib/healthConsent';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -35,5 +36,22 @@ describe.each([
 
   it('passes the health consent to the service, and gates Continue on it', () => {
     expect(src).toMatch(/healthDataConsent/);
+  });
+});
+
+describe('re-consent decline note', () => {
+  it('the existing-ledger note never says nothing has been saved, and points to export and delete', () => {
+    expect(HEALTH_DECLINE_NOTE_EXISTING).not.toMatch(/nothing has been saved/i);
+    expect(HEALTH_DECLINE_NOTE_EXISTING).toMatch(/export/i);
+    expect(HEALTH_DECLINE_NOTE_EXISTING).toMatch(/delete/i);
+    expect(HEALTH_DECLINE_NOTE).toMatch(/nothing has been saved/i); // onboarding, new users: still true
+  });
+
+  it('the /consent screens use the existing-ledger note, not the onboarding one', () => {
+    const mobile = read('app/consent.tsx');
+    expect(mobile).toContain('HEALTH_DECLINE_NOTE_EXISTING');
+    expect(mobile).not.toMatch(/HEALTH_DECLINE_NOTE/);
+    expect(read('web/app/consent/ConsentClient.tsx')).toMatch(/existingLedger/);
+    expect(read('web/components/onboarding/ConsentRows.tsx')).toContain('HEALTH_DECLINE_NOTE_EXISTING');
   });
 });

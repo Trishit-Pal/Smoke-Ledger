@@ -152,6 +152,7 @@ export function ConsentClient({ needsHealthConsent }: ConsentClientProps) {
             declined={healthDeclined}
             onChange={setHealthConsent}
             number={String(VERSIONED_ROWS.length + 1).padStart(2, '0')}
+            existingLedger
           />
         ) : null}
       </section>

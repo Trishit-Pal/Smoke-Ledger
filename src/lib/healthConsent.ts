@@ -14,6 +14,10 @@ export const HEALTH_DECLINE_LABEL = "I don't consent";
 export const HEALTH_DECLINE_NOTE =
   "Nothing has been saved. Without this consent we can't keep a ledger, so we can't go further. Tick the box above whenever you change your mind.";
 
+/** Re-consent screens: the reader already has a ledger, so nothing is lost by declining. */
+export const HEALTH_DECLINE_NOTE_EXISTING =
+  "Your ledger stays exactly as it is. Without this consent we can't keep it going, so we can't go further. You can export or delete it from Settings, or tick the box above whenever you change your mind.";
+
 export const WITHDRAW_ROW_LABEL = 'Withdraw consent';
 export const WITHDRAW_ROW_SUBLABEL =
   'Take back your consent to keep a ledger of your health information.';

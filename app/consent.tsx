@@ -14,7 +14,7 @@ import { isOnboarded } from '@/lib/compliance';
 import { LEGAL_URLS } from '@/lib/legal';
 import { toSafeErrorMessage } from '@/lib/errors';
 import { consentGateRedirect, resumeOnboardingRoute } from '@/lib/onboardingSteps';
-import { HEALTH_CONSENT_LABEL, HEALTH_CONSENT_SUB, HEALTH_DECLINE_LABEL, HEALTH_DECLINE_NOTE } from '@/lib/healthConsent';
+import { HEALTH_CONSENT_LABEL, HEALTH_CONSENT_SUB, HEALTH_DECLINE_LABEL, HEALTH_DECLINE_NOTE_EXISTING } from '@/lib/healthConsent';
 import {
   RECONSENT_ACCEPT_LABEL,
   RECONSENT_CAPTION,
@@ -170,7 +170,7 @@ export default function Consent() {
           <Button title={HEALTH_DECLINE_LABEL} size="md" variant="ghost" onPress={() => setHealthConsent(false)} />
           {healthDeclined ? (
             <Text variant="small" muted accessibilityLiveRegion="polite">
-              {HEALTH_DECLINE_NOTE}
+              {HEALTH_DECLINE_NOTE_EXISTING}
             </Text>
           ) : null}
         </View>
