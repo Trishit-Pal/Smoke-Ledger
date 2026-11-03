@@ -143,10 +143,10 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(() => new Set());
 
   const [state, setState] = React.useState<ChatStateResponse | null>(null);
-  // Set once the session and (on first open) the GET state have both landed for this open.
+  // Set once the session and the GET state have both landed for this open.
   const [ready, setReady] = React.useState(false);
-  const fetchedRef = React.useRef(false);
-  // The in-flight GET, shared by a StrictMode re-run so the state cap is spent once.
+  // This open's GET, shared by a StrictMode re-run so the state cap is spent once per open.
+  // Cleared on close, never in the effect cleanup, or the re-run would fetch twice.
   const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
   const consumedRef = React.useRef(false);
 
@@ -161,28 +161,26 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const busy = status === 'loading';
 
   // The transcript key needs the user id: getSession() reads the local session,
-  // no network round-trip. The panel state is read from GET once per mount.
+  // no network round-trip. The panel state is read from GET on every open: the dock
+  // outlives Settings changes (Hide totals, discreet, country), so a kept copy goes stale.
   React.useEffect(() => {
     if (!open) {
       setReady(false);
       consumedRef.current = false;
+      stateLoadRef.current = null;
+      // Unknown state masks every figure, and a figure the reader revealed stays revealed only for that open.
+      setState(null);
+      setRevealed(new Set());
       return;
     }
     let cancelled = false;
-    let stateLoad: Promise<LoadedState | null> = Promise.resolve(null);
-    if (!fetchedRef.current) {
-      stateLoadRef.current ??= loadChatState();
-      stateLoad = stateLoadRef.current;
-    }
-    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoad]).then(([id, loaded]) => {
+    stateLoadRef.current ??= loadChatState();
+    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoadRef.current]).then(([id, loaded]) => {
       if (cancelled) return;
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
-      if (loaded) {
-        fetchedRef.current = true;
-        setState(loaded.state);
-        if (loaded.blocked) setStatus(loaded.blocked);
-      }
+      setState(loaded.state);
+      if (loaded.blocked) setStatus(loaded.blocked);
       setReady(true);
     });
     return () => {

@@ -93,10 +93,10 @@ describe('AI label and Clear conversation', () => {
 });
 
 describe('state from GET and the initial question', () => {
-  test('reads panel state from GET /api/ledger-chat once, not from page props', () => {
+  test('reads panel state from GET /api/ledger-chat on every open, not from page props', () => {
     expect(panel).toMatch(/fetch\('\/api\/ledger-chat', \{ method: 'GET' \}\)/);
     expect(panel).not.toMatch(/profile: UserProfile/);
-    expect(panel).toContain('fetchedRef.current');
+    expect(panel).not.toContain('fetchedRef');
   });
 
   test('an initial question is sent once when consented, and waits behind the consent notice when not', () => {
@@ -118,8 +118,12 @@ describe('state from GET and the initial question', () => {
     expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*if \(loaded\.state\) setState\(loaded\.state\);/);
   });
 
-  test('one GET per first open, even when an effect re-runs, and no second send while one is in flight', () => {
+  test('one GET per open, even when an effect re-runs, and no second send while one is in flight', () => {
     expect(panel).toContain('stateLoadRef.current ??= loadChatState()');
+    // The shared load is dropped on close, not in the effect cleanup (that would double the StrictMode GET).
+    const effect = panel.slice(panel.indexOf('if (!open) {'), panel.indexOf('}, [open, setTurns])'));
+    expect(effect.indexOf('stateLoadRef.current = null')).toBeLessThan(effect.indexOf('return;'));
+    expect(effect.slice(effect.indexOf('return () =>'))).not.toContain('stateLoadRef');
     expect(panel).toContain("if (status === 'loading') return;");
   });
 
