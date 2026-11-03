@@ -8,7 +8,22 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { ACCOUNT_DELETED_PARAM, DELETE_RESUME_PATH, isReauthRequest } from '@/lib/reauth';
+import {
+  ACCOUNT_DELETED_PARAM,
+  DELETE_INTENT_TTL_MS,
+  DELETE_RESUME_PATH,
+  decodeDeleteIntent,
+  encodeDeleteIntent,
+  isReauthRequest,
+} from '@/lib/reauth';
+import { beginDeleteDetour, takeDeleteResume } from '@/lib/deleteIntent';
+import { readDeleteIntent, removeDeleteIntent, writeDeleteIntent } from '@/lib/secureStore';
+
+jest.mock('@/lib/secureStore', () => ({
+  readDeleteIntent: jest.fn(),
+  writeDeleteIntent: jest.fn(),
+  removeDeleteIntent: jest.fn(),
+}));
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (...parts: string[]): string =>
@@ -78,7 +93,7 @@ describe('the re-auth detour resumes the pending deletion on both platforms', ()
   it('mobile Settings resumes from ?action=delete with a distinct confirmation', () => {
     expect(mobileSettings).toMatch(/useLocalSearchParams</);
     expect(mobileSettings).toMatch(/action [!=]== 'delete'/);
-    expect(mobileSettings).toContain("deleteAccount('resume')");
+    expect(mobileSettings).toContain("deleteAccount('resume', intent.withdraw)");
     expect(mobileSettings).toContain('Signed in again. Delete your account now?');
   });
 
@@ -105,6 +120,92 @@ describe('the re-auth detour resumes the pending deletion on both platforms', ()
     expect(mobileSettings).toContain("router.replace(`/login?${ACCOUNT_DELETED_PARAM}=1`)");
     expect(mobileLogin).toContain('Your account and all its data have been deleted.');
     expect(webSettings).toContain('router.replace(`/?${ACCOUNT_DELETED_PARAM}=1`)');
+  });
+});
+
+/**
+ * A crafted smokeledger://settings?action=delete link must not open the delete
+ * prompt: only a detour this device started (one-time, short-lived record in
+ * SecureStore) may resume it. The record is consumed whether or not it is valid.
+ */
+describe('delete resume needs a detour this device started', () => {
+  const NOW = 1_800_000_000_000;
+  const store = { value: null as string | null };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    store.value = null;
+    (writeDeleteIntent as jest.Mock).mockImplementation(async (raw: string) => {
+      store.value = raw;
+    });
+    (readDeleteIntent as jest.Mock).mockImplementation(async () => store.value);
+    (removeDeleteIntent as jest.Mock).mockImplementation(async () => {
+      store.value = null;
+    });
+  });
+
+  describe('decodeDeleteIntent', () => {
+    it('accepts a fresh record and carries the withdraw flag', () => {
+      expect(decodeDeleteIntent(encodeDeleteIntent(true, NOW), NOW + 1000)).toEqual({ withdraw: true });
+      expect(decodeDeleteIntent(encodeDeleteIntent(false, NOW), NOW + 1000)).toEqual({ withdraw: false });
+    });
+
+    it('rejects an expired record, at the boundary too', () => {
+      const raw = encodeDeleteIntent(false, NOW);
+      expect(decodeDeleteIntent(raw, NOW + DELETE_INTENT_TTL_MS - 1)).not.toBeNull();
+      expect(decodeDeleteIntent(raw, NOW + DELETE_INTENT_TTL_MS)).toBeNull();
+    });
+
+    it.each([
+      ['nothing stored', null],
+      ['not JSON', 'smokeledger'],
+      ['wrong shape', '{"withdraw":true}'],
+      ['non-boolean withdraw', JSON.stringify({ expiresAt: NOW + 1000, withdraw: 'yes' })],
+      ['non-numeric expiry', JSON.stringify({ expiresAt: 'soon', withdraw: false })],
+      ['expiry far beyond the TTL', JSON.stringify({ expiresAt: NOW + DELETE_INTENT_TTL_MS * 10, withdraw: false })],
+    ])('rejects %s', (_label, raw) => {
+      expect(decodeDeleteIntent(raw, NOW)).toBeNull();
+    });
+  });
+
+  it('a crafted link with no stored record opens nothing', async () => {
+    await expect(takeDeleteResume(NOW)).resolves.toBeNull();
+  });
+
+  it('an expired record opens nothing and is consumed', async () => {
+    await beginDeleteDetour(false, NOW);
+    await expect(takeDeleteResume(NOW + DELETE_INTENT_TTL_MS + 1)).resolves.toBeNull();
+    expect(store.value).toBeNull();
+  });
+
+  it('a valid record opens the prompt once, then is gone (a replayed link does nothing)', async () => {
+    await beginDeleteDetour(false, NOW);
+    await expect(takeDeleteResume(NOW + 5000)).resolves.toEqual({ withdraw: false });
+    await expect(takeDeleteResume(NOW + 6000)).resolves.toBeNull();
+  });
+
+  it('the withdraw flag survives the detour', async () => {
+    await beginDeleteDetour(true, NOW);
+    await expect(takeDeleteResume(NOW + 5000)).resolves.toEqual({ withdraw: true });
+  });
+
+  it('a storage failure fails closed: no prompt on read, and beginning reports it', async () => {
+    (readDeleteIntent as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
+    await expect(takeDeleteResume(NOW)).resolves.toBeNull();
+    (writeDeleteIntent as jest.Mock).mockRejectedValueOnce(new Error('keystore'));
+    await expect(beginDeleteDetour(false, NOW)).resolves.toBe(false);
+  });
+
+  it('mobile Settings wires it: record before the redirect, take on resume, audit only after success', () => {
+    const settings = read('app', '(tabs)', 'settings.tsx');
+    const resume = settings.slice(settings.indexOf('const resumeHandled'), settings.indexOf('const eraseAll'));
+    expect(resume).toContain('takeDeleteResume()');
+    expect(resume).toContain("deleteAccount('resume', intent.withdraw)");
+    expect(settings).toMatch(/beginDeleteDetour\(withdraw\)[\s\S]{0,200}router\.replace\('\/login\?reason=reauth'\)/);
+    // No withdrawal row is written ahead of the erase/delete it describes.
+    expect(settings).not.toMatch(/await recordConsentWithdrawal\(/);
+    expect(settings).toContain("recordWithdrawalAfter(withdraw, 'delete'");
+    expect(settings).toContain("recordWithdrawalAfter(withdraw, 'erase'");
   });
 });
 

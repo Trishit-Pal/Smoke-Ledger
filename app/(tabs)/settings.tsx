@@ -29,7 +29,8 @@ import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/reposi
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
-import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import { recordWithdrawalAfter, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import { beginDeleteDetour, takeDeleteResume } from '@/lib/deleteIntent';
 import {
   WITHDRAW_DELETE_LABEL,
   WITHDRAW_ERASE_LABEL,
@@ -848,18 +849,28 @@ export default function Settings() {
             setError(null);
             let isReauthRedirect = false;
             try {
-              if (withdraw) await recordConsentWithdrawal('delete');
-              await deleteUserAccount({
-                // After the detour a further reauth_required is shown as an
-                // error, never another redirect: no silent login ↔ Settings loop.
-                onReauthRequired:
-                  variant === 'resume'
-                    ? undefined
-                    : () => {
-                        isReauthRedirect = true;
-                        router.replace('/login?reason=reauth');
-                      },
-              });
+              // consent_revoked is written only once the account is really gone, so a
+              // cancelled detour or a failed call leaves no row claiming a withdrawal.
+              // ponytail: the session is cleared by then, so audit-record rejects it
+              // (swallowed + logged); a durable row needs the server to take `withdraw`.
+              await recordWithdrawalAfter(withdraw, 'delete', () =>
+                deleteUserAccount({
+                  // After the detour a further reauth_required is shown as an
+                  // error, never another redirect: no silent login ↔ Settings loop.
+                  onReauthRequired:
+                    variant === 'resume'
+                      ? undefined
+                      : () => {
+                          // Mark the detour (and the withdraw intent) before leaving: the
+                          // resume honours ?action=delete only against this record.
+                          isReauthRedirect = true;
+                          void beginDeleteDetour(withdraw).then((started) => {
+                            if (started) router.replace('/login?reason=reauth');
+                            else setError('Could not start the sign-in step. Your account has not been deleted.');
+                          });
+                        },
+                }),
+              );
               // Best-effort local cleanup; never block the redirect on it.
               try {
                 await clearNativeDevice('delete');
@@ -886,14 +897,18 @@ export default function Settings() {
 
   // Re-auth resume: the login screen returns here with ?action=delete after
   // the fresh sign-in the server demanded. Clear the param so a later visit
-  // does not re-open the prompt, then re-confirm.
+  // does not re-open the prompt, then re-confirm. The param alone is not proof:
+  // any link can carry it, so it is honoured only against the record this device
+  // wrote before the detour (consumed here either way), which also restores `withdraw`.
   const { action } = useLocalSearchParams<{ action?: string }>();
   const resumeHandled = useRef(false);
   useEffect(() => {
     if (resumeHandled.current || action !== 'delete') return;
     resumeHandled.current = true;
     router.setParams({ action: '' });
-    deleteAccount('resume');
+    void takeDeleteResume().then((intent) => {
+      if (intent) deleteAccount('resume', intent.withdraw);
+    });
     // deleteAccount is a stable closure over state setters; run once per resume.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action]);
@@ -912,8 +927,7 @@ export default function Settings() {
             setBusy('erase-all');
             setError(null);
             try {
-              if (withdraw) await recordConsentWithdrawal('erase');
-              await eraseAllUserData();
+              await recordWithdrawalAfter(withdraw, 'erase', eraseAllUserData);
               // Notifications, export file, lock state and first-suggestion stamp (registry's erase row).
               await clearNativeDevice('erase');
               await boot();

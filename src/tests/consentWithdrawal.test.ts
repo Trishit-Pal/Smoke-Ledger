@@ -2,7 +2,11 @@ import { getSupabase } from '@/lib/supabase';
 import { recordAuditEvent } from '@/services/audit';
 import { logClientError } from '@/lib/logger';
 import { setSetting } from '@/db/repositories/settings';
-import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import {
+  recordConsentWithdrawal,
+  recordWithdrawalAfter,
+  saveAnalyticsOptIn,
+} from '@/services/consentWithdrawal';
 
 jest.mock('@/lib/supabase', () => ({ getSupabase: jest.fn() }));
 jest.mock('@/services/audit', () => ({ recordAuditEvent: jest.fn() }));
@@ -28,6 +32,43 @@ describe('recordConsentWithdrawal', () => {
     (recordAuditEvent as jest.Mock).mockRejectedValueOnce(new Error('audit down'));
     await expect(recordConsentWithdrawal('erase')).resolves.toBeUndefined();
     expect(logClientError).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The audit row describes an erase/delete that happened. Writing it first left a
+ * "consent withdrawn" row behind (one per retry) when the re-auth detour was
+ * cancelled or the network failed and nothing was actually removed.
+ */
+describe('recordWithdrawalAfter', () => {
+  it.each(['erase', 'delete'] as const)('writes consent_revoked only after the %s succeeded', async (outcome) => {
+    const action = jest.fn().mockResolvedValue(undefined);
+    await recordWithdrawalAfter(true, outcome, action);
+    expect(recordAuditEvent).toHaveBeenCalledTimes(1);
+    expect(recordAuditEvent).toHaveBeenCalledWith('consent_revoked', 'compliance', {
+      reason: `health_data_withdrawn_then_${outcome}`,
+    });
+    expect(action.mock.invocationCallOrder[0]).toBeLessThan(
+      (recordAuditEvent as jest.Mock).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('writes nothing when the action fails (cancel, re-auth redirect, network) and rethrows', async () => {
+    const action = jest.fn().mockRejectedValue(new Error('reauth_required'));
+    await expect(recordWithdrawalAfter(true, 'delete', action)).rejects.toThrow('reauth_required');
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing for an ordinary erase/delete that is not a withdrawal', async () => {
+    await recordWithdrawalAfter(false, 'erase', jest.fn().mockResolvedValue(undefined));
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it('an audit failure after a successful action does not turn it into a failure', async () => {
+    (recordAuditEvent as jest.Mock).mockRejectedValueOnce(new Error('audit down'));
+    await expect(
+      recordWithdrawalAfter(true, 'erase', jest.fn().mockResolvedValue(undefined)),
+    ).resolves.toBeUndefined();
   });
 });
 
