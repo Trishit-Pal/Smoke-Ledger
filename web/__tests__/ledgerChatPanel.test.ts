@@ -87,6 +87,17 @@ describe('AI label and Clear conversation', () => {
     expect(panel).toMatch(/turns\.length > 0 && !busy/);
   });
 
+  test('a late answer is dropped, not saved, when the transcript was cleared or the panel closed meanwhile', () => {
+    const send = panel.slice(panel.indexOf('const send = React.useCallback'), panel.indexOf('const onTurnOnAndAsk'));
+    // Compared against the store's clear count taken before the POST; the check sits before the save.
+    expect(send.indexOf('const clearsAtStart = transcriptClearCount()')).toBeLessThan(send.indexOf('await fetch('));
+    expect(send.indexOf('transcriptClearCount() !== clearsAtStart')).toBeLessThan(send.indexOf('saveTranscript('));
+    // A close during the consent writes stops before the send.
+    const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
+    expect(panel).toMatch(/openEpochRef\.current \+= 1/);
+    expect(turnOn.indexOf('openEpochRef.current !== openEpoch')).toBeLessThan(turnOn.indexOf('await send('));
+  });
+
   test('Settings Ask-the-ledger row offers the same control and says it was done', () => {
     expect(settings).toMatch(/clearTranscript\(\);\s*flashToast\('Conversation cleared from this device\.'\)/);
   });
@@ -128,10 +139,12 @@ describe('state from GET and the initial question', () => {
   });
 
   test('a fresh open drops a stale GET refusal, and the post-consent re-read cannot land after a close or reopen', () => {
-    expect(panel).toMatch(/loaded\.blocked \?\? \(loaded\.state && STALE_ON_CLEAN_GET\.has\(prev\) \? 'idle' : prev\)/);
+    expect(panel).toMatch(/if \(loaded\.blocked\) return loaded\.blocked;/);
+    expect(panel).toMatch(/STALE_ON_CLEAN_GET\.has\(prev\)/);
     expect(panel).toMatch(/STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set\(\['disabled', 'outdated', 'error'\]\)/);
-    // A kept consent card is stale once the fresh state says consented; loading is never reset.
-    expect(panel).toMatch(/status === 'consent' && state\?\.consented\) \{\s*setStatus\('idle'\);\s*setPending\(null\);/);
+    // A kept consent card is stale once the GET (not the optimistic flag) says consented; loading is never reset.
+    expect(panel).toMatch(/prev === 'consent' && loaded\.state\.consented\)\) return 'idle'/);
+    expect(panel).not.toMatch(/status === 'consent' && state\?\.consented/);
     expect(panel).not.toMatch(/STALE_ON_CLEAN_GET[^;]*'loading'/);
     const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
     expect(turnOn.indexOf('const openLoad = stateLoadRef.current')).toBeLessThan(turnOn.indexOf('await send('));

@@ -136,6 +136,50 @@ test.describe('ask dock', () => {
     await expect(errorNotice).toHaveCount(0);
   });
 
+  test('an answer that lands after Clear conversation is dropped, never saved back', async ({ page, onboarded }) => {
+    // The dock outlives navigation, so the answer can land while the reader is on Settings clearing the device.
+    let releaseAnswer: () => void = () => {};
+    const answerHeld = new Promise<void>((resolve) => {
+      releaseAnswer = resolve;
+    });
+    let answerSent = false;
+    await page.route(CHAT_ROUTE, async (route: Route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill(json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }));
+      }
+      await answerHeld;
+      answerSent = true;
+      return route.fulfill(json(200, ANSWER));
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByRole('status')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+
+    await page.getByRole('link', { name: 'Settings' }).first().click();
+    await expect(page).toHaveURL(/\/settings/);
+    await page.getByText('Clear conversation', { exact: true }).click();
+
+    releaseAnswer();
+    await expect.poll(() => answerSent).toBe(true);
+    // Let the panel handle the response before looking at the device.
+    await page.waitForTimeout(500);
+    const saved = await page.evaluate(() =>
+      Object.keys(window.localStorage)
+        .filter((k) => k.startsWith('ledger-chat:v1:'))
+        .map((k) => window.localStorage.getItem(k)),
+    );
+    expect(saved.filter((v) => v && v !== '[]')).toEqual([]);
+
+    await dockBox(page).press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(ANSWER.answer)).toHaveCount(0);
+  });
+
   test('never covers History’s New log button, on a phone or a desktop', async ({ page, onboarded }) => {
     await login(page, onboarded);
     for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {

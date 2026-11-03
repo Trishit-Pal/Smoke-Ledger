@@ -47,6 +47,7 @@ import {
   clearTranscript,
   loadTranscript,
   saveTranscript,
+  transcriptClearCount,
   type TranscriptTurn,
 } from '@web/components/chat/transcriptStore';
 
@@ -152,6 +153,8 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   // Cleared on close, never in the effect cleanup, or the re-run would fetch twice.
   const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
   const consumedRef = React.useRef(false);
+  // Bumped on every close, so a consent-then-send that was started in an earlier open stops there.
+  const openEpochRef = React.useRef(0);
 
   // Until the state is read, figures stay masked: the safe default.
   const hidden = state ? state.hideTotals : true;
@@ -171,6 +174,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       setReady(false);
       consumedRef.current = false;
       stateLoadRef.current = null;
+      openEpochRef.current += 1;
       // Unknown state masks every figure, and a figure the reader revealed stays revealed only for that open.
       setState(null);
       setRevealed(new Set());
@@ -184,8 +188,17 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       setTurns(id ? loadTranscript(id) : []);
       setState(loaded.state);
       // A refusal or error from an earlier open is stale once this GET is clean (the reader may have
-      // just reviewed the agreements); loading, rate_limited and consent are left alone here.
-      setStatus((prev) => loaded.blocked ?? (loaded.state && STALE_ON_CLEAN_GET.has(prev) ? 'idle' : prev));
+      // just reviewed the agreements); loading and rate_limited are left alone here. A consent card
+      // from an earlier open is moot once the server says consented (opted in elsewhere, e.g.
+      // Settings). That is decided here, on the GET alone: the optimistic consented flag set by
+      // onTurnOnAndAsk must never drop the card when the POST then answers consent_required.
+      // The stale pending question stays hidden (it only shows while status is not idle) and the next send replaces it.
+      setStatus((prev) => {
+        if (loaded.blocked) return loaded.blocked;
+        if (!loaded.state) return prev;
+        if (STALE_ON_CLEAN_GET.has(prev) || (prev === 'consent' && loaded.state.consented)) return 'idle';
+        return prev;
+      });
       setReady(true);
     });
     return () => {
@@ -193,21 +206,13 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     };
   }, [open, setTurns]);
 
-  // The consent card kept from an earlier open is moot once the fresh state says consented
-  // (opted in elsewhere, e.g. Settings): drop it and its pending question, never a send in flight.
-  React.useEffect(() => {
-    if (status === 'consent' && state?.consented) {
-      setStatus('idle');
-      setPending(null);
-    }
-  }, [status, state?.consented]);
-
   const send = React.useCallback(
     async (question: string, starter: boolean) => {
       const q = question.trim();
       if (!q) return;
       setPending({ question: q, starter });
       setStatus('loading');
+      const clearsAtStart = transcriptClearCount();
       try {
         const res = await fetch('/api/ledger-chat', {
           method: 'POST',
@@ -216,6 +221,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
         });
         if (res.ok) {
           const body = (await res.json()) as ChatResponse;
+          // Cleared while the answer was in flight (Clear, sign-out, discreet on, chat turned off):
+          // the policy says those empty the device, so the late answer is dropped, never saved.
+          if (transcriptClearCount() !== clearsAtStart) {
+            setTurns([]);
+            setPending(null);
+            setStatus('idle');
+            return;
+          }
           const current = turnsRef.current;
           const turn: TranscriptTurn = {
             id: `${Date.now().toString(36)}-${current.length}`,
@@ -264,6 +277,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const onTurnOnAndAsk = async () => {
     if (!pending) return;
     const openLoad = stateLoadRef.current;
+    const openEpoch = openEpochRef.current;
     setStatus('loading');
     try {
       // The notice version, not `true`: the consent covers only the words shown here.
@@ -282,6 +296,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     } catch {
       // Consent is already saved. The audit row is best-effort here: the edge
       // allowlist may lag a deploy, and that must never block the answer.
+    }
+    // Closed during the consent writes: the consent is saved, but the panel is gone, so no question
+    // is sent and nothing is written to it. The reader asks again on the next open.
+    // ponytail: resets status even if the panel was reopened meanwhile; that open re-derives it from its own GET.
+    if (openEpochRef.current !== openEpoch) {
+      setStatus('idle');
+      setPending(null);
+      return;
     }
     setState((prev) => (prev ? { ...prev, consented: true } : prev));
     await send(pending.question, pending.starter);

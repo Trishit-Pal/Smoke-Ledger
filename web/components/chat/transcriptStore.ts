@@ -68,8 +68,19 @@ export function saveTranscript(
   return kept;
 }
 
+// Bumped by every clear. An answer in flight compares it to the value it started with and,
+// if it moved, is dropped instead of saved: Clear conversation, sign-out, discreet-on and
+// opting out all route through clearTranscript, so one counter covers them wherever they run.
+// ponytail: this tab only; a clear in another tab is not seen (add a `storage` event if that matters).
+let clearCount = 0;
+
+export function transcriptClearCount(): number {
+  return clearCount;
+}
+
 /** One user's transcript, or every chat transcript on the device when no user is given. */
 export function clearTranscript(userId?: string, store: Storage | null = defaultStorage()): void {
+  clearCount += 1;
   if (!store) return;
   if (userId) {
     store.removeItem(keyFor(userId));
