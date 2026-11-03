@@ -138,4 +138,4 @@ The app locks these once they are set (decision O7). The privacy policy says a r
 ## 10. Code follow-ups from review (not legal)
 
 - [ ] **`ImportEnvelopeSchema` cannot parse a real export.** Fix before any import UI is built. Until then, export is one-way and the policy must not promise import.
-- [ ] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.
+- [x] **Mobile `app/log/new` and `app/goals/new` are not behind the consent gate.** The guard belongs in the root `app/_layout.tsx`, so every route is covered. Fix before the mobile release, since a reader who has not accepted the new consent could otherwise reach them by deep link.

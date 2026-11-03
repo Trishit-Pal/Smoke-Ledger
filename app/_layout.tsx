@@ -10,8 +10,8 @@ import {
 } from '@expo-google-fonts/dm-sans';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { Stack, usePathname, useRootNavigationState, useRouter } from 'expo-router';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSession } from '@/store/session';
 import { useAuth } from '@/store/auth';
 import { useTheme } from '@/hooks/useTheme';
@@ -23,6 +23,7 @@ import { spacing } from '@/constants/theme';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { routeGuardRedirect } from '@/lib/routeGuard';
 import { clearNativeDevice } from '@/lib/privacy/clearDeviceNative';
 import { MilestoneCelebration } from '@/components/character/MilestoneCelebration';
 import { LogoutFarewell } from '@/components/character/LogoutFarewell';
@@ -56,6 +57,27 @@ export default function RootLayout() {
   const setSession = useAuth((s) => s.setSession);
   const setAuthInitialized = useAuth((s) => s.setInitialized);
   const theme = useTheme();
+
+  // The one guard for every route (tabs, modals, deep links). Redirects from an
+  // effect, not <Redirect>: the Stack below must stay mounted so router.replace
+  // has a navigator, and <Redirect> needs a focused screen.
+  const router = useRouter();
+  const pathname = usePathname();
+  const navReady = Boolean(useRootNavigationState()?.key);
+  const session = useAuth((s) => s.session);
+  const authInitialized = useAuth((s) => s.initialized);
+  const profile = useSession((s) => s.profile);
+  const booted = useSession((s) => s.booted);
+  const guardTarget = routeGuardRedirect({
+    pathname,
+    hasSession: Boolean(session),
+    profile,
+    // A signed-out reader has no profile to wait for.
+    loading: !ready || !authInitialized || (Boolean(session) && !booted),
+  });
+  useEffect(() => {
+    if (navReady && guardTarget) router.replace(guardTarget);
+  }, [navReady, guardTarget, router]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -194,6 +216,15 @@ export default function RootLayout() {
           <Stack.Screen name="ask" options={{ presentation: 'modal' }} />
         </Stack>
         </ErrorBoundary>
+        {/* Cover the screen (and its touches) for the frame before the guard's
+            redirect lands, so a deep link never shows or saves from a gated route. */}
+        {guardTarget ? (
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }]}
+          >
+            <ActivityIndicator color={theme.accent} />
+          </View>
+        ) : null}
         {/* Character listeners — mounted once at the root so dispatchMilestone()
             and dispatchFarewell() reach them from any screen. They render
             nothing until their event fires. */}

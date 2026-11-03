@@ -318,6 +318,7 @@ export function ConsentRow({ index, label, sub, required, value, onChange, showB
 
         {/* Switch */}
         <Switch
+          accessibilityLabel={label}
           value={value}
           onValueChange={onChange}
           trackColor={{ false: theme.border, true: theme.accent }}

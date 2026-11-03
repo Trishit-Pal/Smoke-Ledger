@@ -24,10 +24,17 @@ describe('re-consent gate wiring', () => {
   it('post-auth routing and the Expo entry points use the same check', () => {
     expect(read('web', 'lib', 'auth', 'postAuthDestination.ts')).toContain('consentGateRedirect(nextPathname');
     expect(read('app', 'index.tsx')).toContain('consentsOutdated(profile)');
+    // One mobile guard in the root layout covers every route, modals included.
+    const root = read('app', '_layout.tsx');
+    expect(root).toContain('routeGuardRedirect({');
+    expect(root).toContain('router.replace(guardTarget');
+    // ...and it is the only place: the tabs layout no longer repeats the checks.
     const tabs = read('app', '(tabs)', '_layout.tsx');
-    expect(tabs).toContain('consentGateRedirect(pathname, profile, true)');
+    expect(tabs).not.toMatch(/consentGateRedirect|resumeOnboardingRoute|<Redirect/);
     // After the not-onboarded redirect, so a mid-wizard user never reaches /consent.
-    expect(tabs.indexOf('resumeOnboardingRoute(profile)')).toBeLessThan(tabs.indexOf('consentGateRedirect('));
+    const guard = read('src', 'lib', 'routeGuard.ts');
+    expect(guard).toContain('consentGateRedirect(pathname, profile, true');
+    expect(guard.indexOf('resumeOnboardingRoute(profile)')).toBeLessThan(guard.indexOf('consentGateRedirect('));
   });
 
   it('the accept path writes no onboarding step', () => {
