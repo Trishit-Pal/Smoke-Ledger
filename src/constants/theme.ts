@@ -68,7 +68,7 @@ export const lightTheme: Theme = {
   border:         '#E1E5EB',
   text:           '#0B0F14',
   textMuted:      '#5A6673',
-  textFaint:      '#A9B3BF',
+  textFaint:      '#64707D', // AA; mirrors web --text-faint (web/app/globals.css)
   accent:         '#2FA39B',
   accentSoft:     '#E4F3F1',
   accentGlow:     'rgba(47, 163, 155, 0.25)',
@@ -94,7 +94,7 @@ export const darkTheme: Theme = {
   border:         '#232B35',
   text:           '#E6EAEF',
   textMuted:      '#A9B3BF',
-  textFaint:      '#5A6673',
+  textFaint:      '#7D8896', // AA; mirrors web --text-faint (web/app/globals.css)
   accent:         '#2FA39B',
   accentSoft:     '#163230',
   accentGlow:     'rgba(47, 163, 155, 0.18)',

@@ -13,11 +13,13 @@ the hierarchy.
 ## Color
 
 Semantic tokens are CSS variables that swap by theme (`.dark`). All pairings verified for
-WCAG AA in both themes.
+WCAG AA in both themes. Mobile (`src/constants/theme.ts`) and web share the same
+`text-faint` values (light `#64707D`, dark `#7D8896`), both ≥ 4.5:1 on bg/card/elevated; mobile is pinned by
+`src/tests/themeContrast.test.ts`, web by `web/__tests__/tokenContrast.test.ts`.
 
 ### Light
 - `--bg` `#F6F7F9` (cool near-white) · `--bg-elevated` / `--card` `#FFFFFF`
-- `--text` `#0B0F14` · `--text-muted` `#5A6673` · `--text-faint` `#A9B3BF`
+- `--text` `#0B0F14` · `--text-muted` `#5A6673` · `--text-faint` `#64707D`
 - `--border` `#E1E5EB` · `--rule` `#D6DBE2` · `--rule-strong` `#B9C1CC`
 - `--accent` `#2FA39B` (teal) — reserved for genuinely positive states; ≤10% of surface
 - `--warn-earth` `#B86A4A` (terracotta) — concern / up-trend, **not** alarm-red
@@ -25,7 +27,7 @@ WCAG AA in both themes.
 
 ### Dark (default)
 - `--bg` `#0B0F14` · `--bg-elevated` `#11161D` · `--card` `#1A2029`
-- `--text` `#E6EAEF` · `--text-muted` `#A9B3BF` · `--text-faint` `#5A6673`
+- `--text` `#E6EAEF` · `--text-muted` `#A9B3BF` · `--text-faint` `#7D8896`
 - `--rule` `#2A333F` · `--rule-strong` `#3A4452`
 - `--accent` `#2FA39B` · `--warn-earth` `#D08267` (lightened for the dark surface)
 
