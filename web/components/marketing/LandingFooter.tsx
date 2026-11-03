@@ -43,7 +43,7 @@ export function LandingFooter() {
           }}
         >
           Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent-ink)' }}> Ledger</span>{' '}
-          · Vol. I · Est. 2026
+          V3 · Est. 2026
         </p>
         <div
           aria-hidden
