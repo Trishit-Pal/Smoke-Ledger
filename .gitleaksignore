@@ -1,0 +1,7 @@
+# Reviewed gitleaks false positives. One fingerprint per line: <commit>:<file>:<rule>:<line>.
+# Add an entry only after confirming the match is not a real secret, and say why.
+
+# jwt.io's public sample token ({"sub":"1234567890"}) used as a redaction test fixture.
+1bb50a891d08d4b628c39274866ab5c8a568c8a6:src/tests/redact.test.ts:jwt:6
+# Prose in legal research notes ("access summary s.11, correction/...") matched the generic-api-key pattern.
+d33c9c30c03d3ee16921797fdcf39ee44bea9c68:docs/legal/research/2026-11-03/notes/india_dpdp.md:generic-api-key:125

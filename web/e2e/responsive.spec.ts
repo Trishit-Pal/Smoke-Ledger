@@ -223,7 +223,7 @@ async function expectNoLedgerMoney(page: Page) {
     // Chart wrappers only, so dates and nav labels are not caught. A clock time
     // ("at 15:00", the heatmap's busiest hour) is not a count; strip it first.
     const labelDigits = Array.from(clone.querySelectorAll('[role="img"][aria-label], svg [aria-label]'))
-      .map((el) => (el.getAttribute('aria-label') ?? '').replace(/\d{1,2}:\d{2}/g, ''))
+      .map((el) => (el.getAttribute('aria-label') ?? '').replace(/\b\d{1,2}:\d{2}\b/g, ''))
       .filter((txt) => /\d/.test(txt));
     // innerHTML also covers title/aria-label attributes, not just visible text.
     const brandHits = clone.innerHTML.split(brand).length - 1;

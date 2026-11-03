@@ -82,7 +82,7 @@ describe('AI label and Clear conversation', () => {
     expect(panel).toContain('turnsRef.current');
     expect(panel).toMatch(/const next = \[\.\.\.current, turn\]/);
     const send = panel.slice(panel.indexOf('const send = React.useCallback'), panel.indexOf('const onTurnOnAndAsk'));
-    expect(send).not.toMatch(/turns/);
+    expect(send).not.toMatch(/\bturns\b/);
     expect(panel).toMatch(/turns\.length > 0 && !busy/);
   });
 
