@@ -125,7 +125,9 @@ function deltaColor(tone: 'up' | 'down' | 'flat'): string {
 
 // Text-only variant: the shared deltaColor also feeds chart strokes, which keep the decorative token.
 function deltaTextColor(tone: 'up' | 'down' | 'flat'): string {
-  return tone === 'up' ? 'var(--warn-earth-ink)' : deltaColor(tone);
+  if (tone === 'up') return 'var(--warn-earth-ink)';
+  if (tone === 'down') return 'var(--accent-ink)';
+  return deltaColor(tone);
 }
 
 /** Editorial label for the masthead — pairs the static word "Trends" with the

@@ -15,7 +15,7 @@ export interface StampProps {
 export function Stamp({
   show,
   children,
-  color = 'var(--accent)',
+  color = 'var(--accent-ink)',
   rotate = -6,
   double = true,
   style,

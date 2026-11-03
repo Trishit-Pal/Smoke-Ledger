@@ -241,7 +241,7 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
                     style={{
                       fontFamily: 'var(--font-display)',
                       fontSize: 28,
-                      color: isSelected ? 'var(--accent)' : 'var(--text-faint)',
+                      color: isSelected ? 'var(--accent-ink)' : 'var(--text-faint)',
                       fontStyle: 'italic',
                       lineHeight: 1,
                       transition:
@@ -258,7 +258,7 @@ export function OnboardingGoalClient({ country }: { country: string | null }) {
                     style={{
                       fontSize: 16,
                       fontWeight: 600,
-                      color: isSelected ? 'var(--accent)' : 'var(--text)',
+                      color: isSelected ? 'var(--accent-ink)' : 'var(--text)',
                     }}
                   >
                     {g.label}

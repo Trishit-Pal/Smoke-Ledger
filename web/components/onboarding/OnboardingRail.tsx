@@ -127,14 +127,14 @@ export function OnboardingRail() {
                 gap: 14,
                 padding: '14px 0',
                 borderBottom: '1px solid var(--rule)',
-                color: active ? 'var(--accent)' : 'var(--text-muted)',
+                color: active ? 'var(--accent-ink)' : 'var(--text-muted)',
                 transition: 'color 200ms ease',
               }}
             >
               <span
                 className="editorial-caption-tight nums-tabular"
                 style={{
-                  color: active ? 'var(--accent)' : 'var(--text-faint)',
+                  color: active ? 'var(--accent-ink)' : 'var(--text-faint)',
                   minWidth: 22,
                 }}
               >

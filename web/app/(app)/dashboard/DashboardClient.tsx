@@ -419,7 +419,7 @@ export function DashboardClient({
   const deck = headlineDeck({ sticks, windowDays, deltaPct: period.stickDeltaPct, streak, hidden });
   const tTone = trendTone(period.stickDeltaPct);
   const trendColour =
-    tTone === 'up' ? 'var(--warn-earth-ink)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
+    tTone === 'up' ? 'var(--warn-earth-ink)' : tTone === 'down' ? 'var(--accent-ink)' : 'var(--text-muted)';
   const periodCap = WINDOWS.find((w) => w.days === windowDays)?.label ?? 'Day';
 
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);

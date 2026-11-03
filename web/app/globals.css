@@ -48,6 +48,7 @@
   --ink-surface-text: #E6EAEF;
   --ink-surface-muted: #8C95A1;
   --ink-surface-rule: #2A333F;
+  --ink-surface-accent: #33B0A8; /* teal text on the inverted surface (AA) */
   /* Softer ink for the second inversion slot — warm beige in light mode so the
      two ink surfaces step clearly (true ink → soft ink). */
   --ink-soft: #F2E9DD;
@@ -102,6 +103,7 @@
   --ink-surface-text: #0B0F14;
   --ink-surface-muted: #5A6673;
   --ink-surface-rule: #C7CED8;
+  --ink-surface-accent: #1C756E;
   /* Soft ink in dark mode: deep ink one step up from the page background. */
   --ink-soft: #1F2630;
   /* Data-viz palette — dark variants. Brighter series + ticks for legibility on

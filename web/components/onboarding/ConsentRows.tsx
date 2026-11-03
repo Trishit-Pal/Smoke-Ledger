@@ -120,7 +120,7 @@ export function ConsentCheckRow({ row, index, checked, onChange }: ConsentCheckR
       <span
         className="editorial-caption-tight nums-tabular"
         style={{
-          color: checked ? 'var(--accent)' : 'var(--text-faint)',
+          color: checked ? 'var(--accent-ink)' : 'var(--text-faint)',
           marginTop: 4,
           minWidth: 22,
           textAlign: 'right',
@@ -180,7 +180,7 @@ export function HealthConsentRow({ checked, declined, onChange, number, existing
         <span
           className="editorial-caption-tight nums-tabular"
           style={{
-            color: checked ? 'var(--accent)' : 'var(--text-faint)',
+            color: checked ? 'var(--accent-ink)' : 'var(--text-faint)',
             marginTop: 4,
             minWidth: 22,
             textAlign: 'right',

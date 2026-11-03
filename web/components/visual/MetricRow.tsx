@@ -40,7 +40,7 @@ export interface MetricRowProps {
 
 const TONE_COLOR: Record<MetricRowTone, string | undefined> = {
   neutral: undefined,
-  accent: 'var(--accent)',
+  accent: 'var(--accent-ink)',
   warn: 'var(--warn-earth-ink)',
 };
 

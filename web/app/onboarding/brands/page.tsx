@@ -195,7 +195,7 @@ export default function OnboardingBrandsPage() {
                   borderRadius: 999,
                   border: selected ? '1px solid var(--accent)' : '1px solid var(--rule)',
                   background: selected ? 'var(--accent-soft)' : 'var(--bg-elevated)',
-                  color: selected ? 'var(--accent)' : 'var(--text-muted)',
+                  color: selected ? 'var(--accent-ink)' : 'var(--text-muted)',
                   fontFamily: 'var(--font-sans)',
                   fontWeight: 500,
                   cursor: 'pointer',
@@ -268,7 +268,7 @@ export default function OnboardingBrandsPage() {
                 <span
                   className="editorial-caption-tight nums-tabular"
                   style={{
-                    color: selected ? 'var(--accent)' : 'var(--text-faint)',
+                    color: selected ? 'var(--accent-ink)' : 'var(--text-faint)',
                     paddingLeft: 8,
                   }}
                 >
