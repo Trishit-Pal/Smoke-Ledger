@@ -1,6 +1,9 @@
 /** What the ambient WebGL scene is allowed to cost on this device. */
 export type SceneTier = 'standard' | 'lite' | 'off';
 
+/** Brand surfaces draw `full`; app pages sit under a heavy veil and draw `quiet`. */
+export type SceneIntensity = 'full' | 'quiet';
+
 export interface SceneEnv {
   coarsePointer: boolean;
   hardwareConcurrency?: number;
@@ -40,6 +43,28 @@ export const QUIET_HAZE_FACTOR = 0.6;
 
 export function hazeCountFor(budget: SceneBudget, isQuiet: boolean): number {
   return Math.round(budget.hazeParticles * (isQuiet ? QUIET_HAZE_FACTOR : 1));
+}
+
+/** The quiet scene never draws more often than this (30 fps). */
+export const QUIET_FRAME_INTERVAL_MS = 33;
+
+export function frameIntervalFor({ intensity, budget }: { intensity: SceneIntensity; budget: SceneBudget }): number {
+  return intensity === 'quiet' ? Math.max(QUIET_FRAME_INTERVAL_MS, budget.frameIntervalMs) : budget.frameIntervalMs;
+}
+
+/** Dark-theme glass transmission on brand surfaces. */
+export const DARK_LOBE_TRANSMISSION = 0.9;
+
+/**
+ * Transmission costs an extra full-resolution HalfFloat pass every frame, and under the
+ * quiet veil, on the lite tier, or on a pale page it refracts only the flat clear colour.
+ */
+export function lobeTransmission(o: {
+  intensity: SceneIntensity;
+  tier: Exclude<SceneTier, 'off'>;
+  isLight: boolean;
+}): number {
+  return o.intensity === 'full' && o.tier === 'standard' && !o.isLight ? DARK_LOBE_TRANSMISSION : 0;
 }
 
 // ponytail: capability sniffing is a heuristic (cores/memory/pointer), not a benchmark;

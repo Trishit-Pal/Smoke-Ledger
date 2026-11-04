@@ -1,6 +1,6 @@
 import type * as THREE_NS from 'three';
 
-import type { SceneBudget } from '@web/lib/sceneTier';
+import { lobeTransmission, type SceneBudget, type SceneIntensity, type SceneTier } from '@web/lib/sceneTier';
 
 import type { DisposeBin } from './disposables';
 import {
@@ -25,8 +25,6 @@ export interface Lungs {
 }
 
 export const LOBE_OPACITY = { dark: 0.5, light: 0.3 } as const;
-// Light theme: soft and translucent, so the lungs read as a silhouette (not soot) and keep text contrast.
-const TRANSMISSION = { dark: 0.9, light: 0 } as const;
 export const AIRWAY_OPACITY = { dark: 0.8, light: 0.4 } as const;
 const TUBE_SEGMENTS = 10;
 const TUBE_RADIAL_SEGMENTS = 6;
@@ -69,6 +67,8 @@ export function buildLungs(
   tokens: SceneTokens,
   budget: SceneBudget,
   mergeVertices: MergeVertices,
+  intensity: SceneIntensity = 'full',
+  tier: Exclude<SceneTier, 'off'> = 'standard',
 ): Lungs {
   const group = new THREE.Group();
   const body = new THREE.Group();
@@ -78,7 +78,7 @@ export function buildLungs(
     new THREE.MeshPhysicalMaterial({
       roughness: 0.15,
       metalness: 0,
-      transmission: 0.9,
+      transmission: 0, // set by retheme
       thickness: 1.2,
       ior: 1.25,
       sheen: 1,
@@ -125,7 +125,7 @@ export function buildLungs(
     lobeMat.sheenColor.copy(edge);
     lobeMat.specularIntensity = t.isLight ? 0.2 : 1; // pale speculars would bleach the ink
     lobeMat.roughness = t.isLight ? 0.55 : 0.15;
-    const transmission = t.isLight ? TRANSMISSION.light : TRANSMISSION.dark;
+    const transmission = lobeTransmission({ intensity, tier, isLight: t.isLight });
     if ((transmission > 0) !== (lobeMat.transmission > 0)) lobeMat.needsUpdate = true; // shader variant changes
     lobeMat.transmission = transmission;
     lobeMat.opacity = (t.isLight ? LOBE_OPACITY.light : LOBE_OPACITY.dark) * dim;

@@ -28,7 +28,14 @@
 import * as React from 'react';
 import type * as THREE_NS from 'three'; // type-only: erased at build, no runtime cost
 
-import { hazeCountFor, pickSceneTier, SCENE_BUDGET, type SceneEnv } from '@web/lib/sceneTier';
+import {
+  frameIntervalFor,
+  hazeCountFor,
+  pickSceneTier,
+  SCENE_BUDGET,
+  type SceneEnv,
+  type SceneIntensity,
+} from '@web/lib/sceneTier';
 
 import { BLOOM_BREATH_LIFT, BLOOM_STRENGTH, buildBloom, type BloomPassLike, type Composer } from './scene/bloom';
 import { breathPhase, breathScale, hazeDensity, sceneClearStart } from './scene/breath';
@@ -44,7 +51,7 @@ const IDLE_CHECK_MS = 2_000;
 const LIGHT_ENV_INTENSITY = 0.25;
 const MAX_FRAME_DT_S = 0.1; // a long stall never makes the haze jump
 
-export type SceneIntensity = 'full' | 'quiet';
+export type { SceneIntensity };
 
 export interface SceneBackgroundProps {
   /** 'full' = brand (opacity + bloom + sign); 'quiet' = product (dim, no bloom). Default 'full'. */
@@ -173,7 +180,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       scene.add(ambient, key, rim, warm);
 
       // The chest, the haze and the sign. Discreet keeps only the haze.
-      const lungs = discreet ? null : buildLungs(THREE, bin, tokens, budget, mergeVertices);
+      const lungs = discreet ? null : buildLungs(THREE, bin, tokens, budget, mergeVertices, intensity, tier);
       const haze = buildHaze(THREE, bin, hazeCountFor(budget, intensity === 'quiet'), discreet, tokens);
       const sign = showSign ? buildSign(THREE, bin, tokens) : null;
       const world = new THREE.Group(); // lungs + haze share the placement
@@ -259,11 +266,12 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       let clockStart = performance.now();
       let elapsed = 0;
       let lastDraw = 0;
+      const frameIntervalMs = frameIntervalFor({ intensity, budget });
 
       const frame = () => {
         if (!running) return;
         const now = performance.now();
-        if (budget.frameIntervalMs && now - lastDraw < budget.frameIntervalMs) {
+        if (frameIntervalMs && now - lastDraw < frameIntervalMs) {
           raf = requestAnimationFrame(frame);
           return;
         }

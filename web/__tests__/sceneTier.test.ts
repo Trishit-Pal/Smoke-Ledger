@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { hazeCountFor, pickSceneTier, QUIET_HAZE_FACTOR, SCENE_BUDGET } from '@web/lib/sceneTier';
+import {
+  frameIntervalFor,
+  hazeCountFor,
+  lobeTransmission,
+  pickSceneTier,
+  QUIET_FRAME_INTERVAL_MS,
+  QUIET_HAZE_FACTOR,
+  SCENE_BUDGET,
+} from '@web/lib/sceneTier';
 
 const DESKTOP = { coarsePointer: false, hardwareConcurrency: 8, deviceMemory: 8, saveData: false };
 
@@ -67,5 +75,45 @@ describe('hazeCountFor', () => {
     expect(QUIET_HAZE_FACTOR).toBe(0.6);
     expect(hazeCountFor(SCENE_BUDGET.standard, true)).toBe(252);
     expect(hazeCountFor(SCENE_BUDGET.lite, true)).toBe(84);
+  });
+});
+
+describe('lobeTransmission', () => {
+  it('keeps the dark glass transmission on full intensity, standard tier', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'standard', isLight: false })).toBe(0.9);
+  });
+
+  it('is zero on the quiet tier, whatever the device or theme', () => {
+    for (const tier of ['standard', 'lite'] as const) {
+      for (const isLight of [false, true]) {
+        expect(lobeTransmission({ intensity: 'quiet', tier, isLight })).toBe(0);
+      }
+    }
+  });
+
+  it('is zero on the lite tier, even at full intensity', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'lite', isLight: false })).toBe(0);
+  });
+
+  it('is zero in the light theme', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'standard', isLight: true })).toBe(0);
+  });
+});
+
+describe('frameIntervalFor', () => {
+  it('caps the quiet scene at 30 fps even on the standard tier', () => {
+    expect(QUIET_FRAME_INTERVAL_MS).toBeGreaterThanOrEqual(33);
+    expect(frameIntervalFor({ intensity: 'quiet', budget: SCENE_BUDGET.standard })).toBeGreaterThanOrEqual(33);
+  });
+
+  it('never loosens the lite interval', () => {
+    expect(frameIntervalFor({ intensity: 'quiet', budget: SCENE_BUDGET.lite })).toBe(
+      Math.max(QUIET_FRAME_INTERVAL_MS, SCENE_BUDGET.lite.frameIntervalMs),
+    );
+  });
+
+  it('leaves the full intensity at the tier interval', () => {
+    expect(frameIntervalFor({ intensity: 'full', budget: SCENE_BUDGET.standard })).toBe(0);
+    expect(frameIntervalFor({ intensity: 'full', budget: SCENE_BUDGET.lite })).toBe(33);
   });
 });
