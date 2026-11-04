@@ -4,6 +4,12 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — 62902bc
+- goals-insights: goal percentages and state captions use the AA ink tones (`stateTextColor`); rings keep the stroke tones.
+- security-privacy: the chat's 403 `forbidden` is for readers not yet onboarded; onboarded readers who need a refresh get `consent_outdated`.
+- auth: a new reader who has not consented can open `/privacy`, `/terms` and `/support` (the Privacy step links to them).
+- identity-profile, celebrations: re-verified against the same commit (middleware and dashboard edits only).
+
 ## 2026-11-04 — c4fcc45
 - auth: sign-up is the first setup step (progress line, "Create account", "Use an email link instead"); sign-in carries no setup signals; wordmark home link on auth pages; onboarded readers are never routed into the wizard after sign-in.
 - identity-profile: `acceptChangedTerms` also stamps a missing age confirmation and data-processing consent, decided from the stored profile too.

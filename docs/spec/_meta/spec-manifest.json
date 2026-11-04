@@ -50,7 +50,7 @@
         "src/lib/emailOtpType.ts",
         "src/lib/onboardingSteps.ts"
       ],
-      "last_verified_commit": "c4fcc45",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -73,7 +73,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "c4fcc45",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -116,7 +116,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "e974a1e",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -138,7 +138,7 @@
         "web/components/character/MilestoneCelebration.tsx",
         "app/(auth)/login.tsx"
       ],
-      "last_verified_commit": "c4fcc45",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -174,7 +174,7 @@
         "src/lib/askView.ts",
         "web/components/chat/**"
       ],
-      "last_verified_commit": "c4fcc45",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {

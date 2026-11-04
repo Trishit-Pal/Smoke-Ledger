@@ -16,7 +16,7 @@ sources:
   - web/middleware.ts
   - web/app/onboarding/**
   - app/onboarding/**
-last_verified_commit: c4fcc45
+last_verified_commit: 62902bc
 status: current
 ---
 

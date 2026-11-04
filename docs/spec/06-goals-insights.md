@@ -24,7 +24,7 @@ sources:
   - web/app/(app)/goals/**
   - app/(tabs)/goals.tsx
   - app/goals/**
-last_verified_commit: 3d534c0
+last_verified_commit: 62902bc
 status: current
 ---
 
@@ -66,7 +66,9 @@ the user sees, from top to bottom:
 4. **Goal verse** — if at least one goal is active, the most recently created one
    shows its label, a percentage towards target, a thin progress bar or ring, and
    a plain explanation sentence. The colour is the accent teal when the goal is
-   on track or met and terracotta for any concern; never red or amber. Under it,
+   on track or met and terracotta for any concern; never red or amber. Text (the
+   percentage, the state caption) uses the AA ink tones (`stateTextColor`); the ring
+   or bar keeps the brighter stroke tones (`stateColor`). Under it,
    when there is something to say, one quiet sentence such as "Over once in the
    last 7 days." or "Held for 14 days. A next step is waiting on the goals page."
    With no active goal and a week or more of logging, a small "A first goal"
