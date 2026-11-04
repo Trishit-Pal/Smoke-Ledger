@@ -73,7 +73,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "22df03f",
+      "last_verified_commit": "42f5db1",
       "status": "current"
     },
     {
@@ -174,7 +174,7 @@
         "src/lib/askView.ts",
         "web/components/chat/**"
       ],
-      "last_verified_commit": "22df03f",
+      "last_verified_commit": "42f5db1",
       "status": "current"
     },
     {
@@ -191,7 +191,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "3d534c0",
+      "last_verified_commit": "42f5db1",
       "status": "current"
     }
   ]
