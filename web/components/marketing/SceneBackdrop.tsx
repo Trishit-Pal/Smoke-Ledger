@@ -13,8 +13,14 @@ import type { SceneIntensity } from './SceneBackground';
 
 const Scene = dynamic(() => import('./SceneBackground'), { ssr: false });
 
-export function SceneBackdrop({ intensity = 'full' }: { intensity?: SceneIntensity }) {
-  return <Scene intensity={intensity} />;
+export function SceneBackdrop({
+  intensity = 'full',
+  discreet = false,
+}: {
+  intensity?: SceneIntensity;
+  discreet?: boolean;
+}) {
+  return <Scene intensity={intensity} discreet={discreet} />;
 }
 
 export default SceneBackdrop;

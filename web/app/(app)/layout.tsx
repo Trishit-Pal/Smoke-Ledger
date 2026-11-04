@@ -23,8 +23,14 @@ import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 // controls (History's New log, its toast) clear of it; 0 when off and on Log.
 import { AskLedgerDock } from '@web/components/chat/AskLedgerDock';
 import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
+import { getServerProfile } from '@web/lib/server/data';
+import { isDiscreetMode } from '@/lib/discreet';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Discreet readers get a neutral haze only (no lungs, no sign). The loader is
+  // React-cached, so the page's own call shares this read and still performs
+  // any login redirect; the layout itself must never throw or redirect here.
+  const discreet = await getServerProfile().then(isDiscreetMode).catch(() => false);
   return (
     <div data-app-shell className="relative flex min-h-dvh bg-bg text-text">
       <a
@@ -33,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <SceneBackdrop intensity="quiet" />
+      <SceneBackdrop intensity="quiet" discreet={discreet} />
       <Sidebar />
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] md:short-landscape:pb-[var(--ask-dock-clear,0px)] md:pb-[var(--ask-dock-clear,0px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps
