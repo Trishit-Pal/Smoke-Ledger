@@ -37,7 +37,9 @@ import { todayInZone, daysAgoInZone, dayOfWeekShort, formatIndianDate } from '@/
 import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isBirthdayToday } from '@/domain/age';
 import { formatMoney, formatDelta, formatPerStick } from '@/lib/format';
-import { isHomeTotalsHidden, isDiscreetMode } from '@/lib/discreet';
+import { isHomeTotalsHidden, isDiscreetMode, maskInr } from '@/lib/discreet';
+import { jarFill, underBaselineYesterday } from '@web/components/marketing/scene/pull';
+import { publishHomeSignals } from '@web/components/marketing/scene/sceneSignals';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { AnalyticsEvents } from '@/constants/events';
 import { track } from '@/services/analytics';
@@ -210,6 +212,28 @@ export function DashboardClient({
     }));
   }, [logs, today, zone]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
+
+  // Tell the background scene what Home shows. The label goes through the same
+  // mask as the hero total, so hidden totals reach the scene as •••, never a figure;
+  // discreet mode publishes nothing (neutral haze). Cleared when Home unmounts.
+  const discreet = isDiscreetMode(profile);
+  const sceneLabel = maskInr(allTimeSaved.totalInr, hidden, (n) => money(n, { compact: true }));
+  const sceneFill = jarFill(allTimeSaved.totalInr, baseline, fallbackUnit);
+  // No rows yet = brand-new reader: no grain on day one.
+  const sceneUnder = summary.length > 0 && underBaselineYesterday(summary, baseline, today);
+  React.useEffect(() => {
+    if (discreet) {
+      publishHomeSignals(null);
+      return;
+    }
+    publishHomeSignals({
+      fill: sceneFill,
+      label: sceneLabel,
+      underBaselineYesterday: sceneUnder,
+      lastSmokeIso: last?.tsUtc ?? null,
+    });
+    return () => publishHomeSignals(null);
+  }, [discreet, sceneFill, sceneLabel, sceneUnder, last]);
   const insights = React.useMemo(
     () =>
       generateInsights(logs, today, (amount) =>
