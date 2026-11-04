@@ -24,7 +24,8 @@ async function mockChat(page: Page, consented: boolean) {
   );
 }
 
-const dockBox = (page: Page) => page.getByLabel('Ask the ledger', { exact: true });
+// By role: Settings also has a switch named "Ask the ledger" (the chat opt-in).
+const dockBox = (page: Page) => page.getByRole('textbox', { name: 'Ask the ledger', exact: true });
 
 test.describe('ask dock', () => {
   test.skip(!canSeed(), 'Set SUPABASE_SERVICE_ROLE_KEY + E2E_SUPABASE_URL/ANON_KEY to run.');
@@ -36,8 +37,9 @@ test.describe('ask dock', () => {
       await page.goto(path);
       await expect(dockBox(page), path).toBeVisible();
     }
-    await page.goto('/log');
-    await expect(page).toHaveURL(/\/log/);
+    // /log only redirects to /history (the Ledger, where the dock shows); the Log page is /log/new.
+    await page.goto('/log/new');
+    await expect(page).toHaveURL(/\/log\/new/);
     await page.waitForLoadState('networkidle');
     await expect(dockBox(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Show Ask the ledger' })).toHaveCount(0);

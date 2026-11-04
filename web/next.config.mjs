@@ -53,6 +53,13 @@ const config = {
   eslint: {
     dirs: ['app', 'components', 'hooks', 'lib'],
   },
+  // `next dev` only (ignored by builds). By default dev keeps 5 compiled pages for
+  // 60 s, so a 20-minute e2e run recompiles each route on every revisit and client
+  // navigations stall for seconds. The Playwright web server sets this flag to keep
+  // every page warm; ordinary local dev keeps the lighter default.
+  ...(process.env.NEXT_DEV_KEEP_PAGES === '1'
+    ? { onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 } }
+    : {}),
   async headers() {
     return [
       { source: '/(.*)', headers: baseSecurityHeaders },
