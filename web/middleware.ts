@@ -12,6 +12,7 @@ import {
   resumeOnboardingRoute,
   resumeProfileFromRow,
 } from '@/lib/onboardingSteps';
+import { serverLog } from '@web/lib/log';
 import { buildCsp, generateNonce } from '@web/lib/security/csp';
 import {
   applyAuthCookiePolicy,
@@ -24,7 +25,8 @@ import {
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 const AUTH_ROUTES = ['/login', '/signup', '/reset'];
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support'];
+const UNAVAILABLE_ROUTE = '/unavailable';
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support', UNAVAILABLE_ROUTE];
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -187,13 +189,37 @@ export async function middleware(request: NextRequest) {
     return finalize(NextResponse.redirect(loginUrl));
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
     .select(
       'onboarded_at, onboarding_step, age_confirmed_at, terms_version, privacy_version, health_disclaimer_version, data_processing_consent_at, health_data_consent_at',
     )
     .eq('id', user.id)
     .maybeSingle();
+
+  // A failed read (a missing column, an outage) is not "no row": a null profile
+  // would read as a new reader and send everyone to the wizard. Skip every
+  // onboarding and consent gate and say so, instead of guessing.
+  if (profileError) {
+    serverLog('error', 'middleware.profile_read_failed', { code: profileError.code });
+    // These answer for themselves (API handlers run their own checks) or must stay
+    // readable: the legal pages, password recovery, the unavailable page itself.
+    if (
+      isApiRoute(pathname) ||
+      (isPublicRoute(pathname) && pathname !== '/') ||
+      isRecoveryRoute(pathname)
+    ) {
+      return response;
+    }
+    // The URL stays as the reader typed it, so "Try again" reloads the same page.
+    const unavailable = NextResponse.rewrite(new URL(UNAVAILABLE_ROUTE, request.url), {
+      status: 503,
+      request: { headers: requestHeaders },
+    });
+    // Keep any session cookies getUser() just refreshed.
+    for (const cookie of response.cookies.getAll()) unavailable.cookies.set(cookie);
+    return finalize(unavailable);
+  }
 
   const onboarded = !!profile?.onboarded_at;
   // Step order + consent gate come from the shared helper so web, mobile and
