@@ -26,10 +26,9 @@
  */
 
 import * as React from 'react';
-import { useTheme } from 'next-themes';
 import type * as THREE_NS from 'three'; // type-only: erased at build, no runtime cost
 
-import { pickSceneTier, SCENE_BUDGET, type SceneEnv } from '@web/lib/sceneTier';
+import { hazeCountFor, pickSceneTier, SCENE_BUDGET, type SceneEnv } from '@web/lib/sceneTier';
 
 import { BLOOM_BREATH_LIFT, BLOOM_STRENGTH, buildBloom, type BloomPassLike, type Composer } from './scene/bloom';
 import { breathPhase, breathScale, hazeDensity, sceneClearStart } from './scene/breath';
@@ -90,9 +89,6 @@ function sessionClearStart(): number {
 
 export function SceneBackground({ intensity = 'full', discreet = false }: SceneBackgroundProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const { resolvedTheme } = useTheme();
-  // Set by the scene once mounted so the theme effect can re-resolve every token.
-  const rethemeRef = React.useRef<(() => void) | null>(null);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -158,6 +154,10 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       const currentBg = tokens.bg.clone();
       const targetBg = tokens.bg.clone();
       scene.fog = new THREE.Fog(currentBg.getHex(), 18, 46);
+      // Paint the page colour behind the scene. A transparent canvas composites as black, which on
+      // the light theme made ink sit on a dark ground (and the 85% page veil turned it grey).
+      scene.background = currentBg;
+      let isLight = false;
 
       // Lighting — soft ambient + key + accent rim + a faint terracotta fill.
       const ambient = new THREE.AmbientLight(undefined, 0.55);
@@ -171,7 +171,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
 
       // The chest, the haze and the sign. Discreet keeps only the haze.
       const lungs = discreet ? null : buildLungs(THREE, bin, tokens, budget, mergeVertices);
-      const haze = buildHaze(THREE, bin, budget.hazeParticles, discreet, tokens);
+      const haze = buildHaze(THREE, bin, hazeCountFor(budget, intensity === 'quiet'), discreet, tokens);
       const sign = showSign ? buildSign(THREE, bin, tokens) : null;
       const world = new THREE.Group(); // lungs + haze share the placement
       world.add(haze.points);
@@ -197,6 +197,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       const applyTheme = () => {
         const t = readTokens(THREE);
         const dim = baseDim * layout.dim;
+        isLight = t.isLight;
         targetBg.copy(t.bg);
         rim.color.copy(t.accent);
         warm.color.copy(t.warn);
@@ -213,7 +214,10 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         sign?.retheme(t, dim);
       };
       applyTheme();
-      rethemeRef.current = applyTheme;
+      // next-themes flips the <html> class in its own effect, after any child effect has
+      // run, so a [resolvedTheme] effect would read the OLD tokens. Watch the class itself.
+      const themeObserver = new MutationObserver(applyTheme);
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
       // Postprocessing — bloom on brand surfaces only. Product renders direct.
       const bloom = bloomKit ? buildBloom(THREE, bloomKit, renderer, scene, camera) : null;
@@ -274,7 +278,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         haze.update(dt, t, hazeDensity((Date.now() - clearStartMs) / 1000));
         world.rotation.y = Math.sin(t * 0.07) * 0.3;
         if (sign) sign.group.rotation.y = t * 0.15;
-        if (bloomPass) bloomPass.strength = BLOOM_STRENGTH + BLOOM_BREATH_LIFT * ((breathPhase(t) + 1) / 2);
+        // A pale page would bloom everywhere, so the glow is a dark-theme effect.
+        if (bloomPass) bloomPass.strength = isLight ? 0 : BLOOM_STRENGTH + BLOOM_BREATH_LIFT * ((breathPhase(t) + 1) / 2);
 
         // Mouse parallax + a very slow gravitational camera orbit (no spring).
         const orbitX = Math.sin(t * 0.04) * 1.6;
@@ -352,7 +357,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         for (const ev of WAKE_EVENTS) window.removeEventListener(ev, wake);
         reduce.removeEventListener('change', onReduceChange);
         canvas.removeEventListener('webglcontextlost', onContextLost);
-        rethemeRef.current = null;
+        themeObserver.disconnect();
         composer?.dispose();
         bloomPass?.dispose?.();
         envRT.dispose();
@@ -367,11 +372,6 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       cleanup();
     };
   }, [intensity, discreet]);
-
-  // Re-resolve every token when the theme flips (bg/fog, ink, accent, terracotta).
-  React.useEffect(() => {
-    rethemeRef.current?.();
-  }, [resolvedTheme]);
 
   return (
     <canvas

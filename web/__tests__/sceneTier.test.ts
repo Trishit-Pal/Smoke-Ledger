@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickSceneTier, SCENE_BUDGET } from '@web/lib/sceneTier';
+import { hazeCountFor, pickSceneTier, QUIET_HAZE_FACTOR, SCENE_BUDGET } from '@web/lib/sceneTier';
 
 const DESKTOP = { coarsePointer: false, hardwareConcurrency: 8, deviceMemory: 8, saveData: false };
 
@@ -54,5 +54,18 @@ describe('SCENE_BUDGET', () => {
     expect(lite.bloom).toBe(false);
     expect(lite.parallax).toBe(false);
     expect(lite.frameIntervalMs).toBeGreaterThan(standard.frameIntervalMs);
+  });
+});
+
+describe('hazeCountFor', () => {
+  it('keeps the full haze at full strength', () => {
+    expect(hazeCountFor(SCENE_BUDGET.standard, false)).toBe(420);
+    expect(hazeCountFor(SCENE_BUDGET.lite, false)).toBe(140);
+  });
+
+  it('thins the haze to 60% on the quiet tier, on every device tier', () => {
+    expect(QUIET_HAZE_FACTOR).toBe(0.6);
+    expect(hazeCountFor(SCENE_BUDGET.standard, true)).toBe(252);
+    expect(hazeCountFor(SCENE_BUDGET.lite, true)).toBe(84);
   });
 });

@@ -16,6 +16,6 @@ export interface Layout {
 
 // Desktop sits right and back so centred content stays clear; narrow viewports centre it, dimmer.
 export const LAYOUT: Record<'wide' | 'narrow', Layout> = {
-  wide: { lungs: [10, -0.3, -4], lungScale: 5.6, sign: [-13, 7.5, -10], signScale: 2, lookX: 4, dim: 1 },
+  wide: { lungs: [19, -0.5, -4], lungScale: 4.1, sign: [-13, 7.5, -10], signScale: 2, lookX: 4, dim: 1 },
   narrow: { lungs: [0, -1, -6], lungScale: 4.2, sign: [-3.4, 8.2, -10], signScale: 1.5, lookX: 0, dim: 0.65 },
 };

@@ -2,7 +2,7 @@ import type * as THREE_NS from 'three';
 
 import { exhaleWeight } from './breath';
 import type { DisposeBin } from './disposables';
-import { LOBE_HALF_AXES, insideLobe, lobeToPair, type LobeSide, type Vec3 } from './lungs';
+import { LOBE_HALF_AXES, LUNG_PLACEMENT, insideLobe, type LobeSide, type Vec3 } from './lungs';
 import type { SceneTokens, ThreeNs } from './tokens';
 
 export interface Haze {
@@ -36,24 +36,37 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/** Rejection-sample a point inside a random lobe, returned in lung-pair space. */
-function seedInLobes(): Vec3 {
-  const side: LobeSide = Math.random() < 0.5 ? 'left' : 'right';
+/**
+ * Rejection-sample a point inside a random lobe and write it, in lung-pair
+ * space, to out[at..at+2]. Allocation-free: respawns happen all through the loop.
+ */
+function seedInLobes(out: Float32Array, at: number): void {
+  const left = Math.random() < 0.5;
+  const side: LobeSide = left ? 'left' : 'right';
+  let x = 0;
+  let y = 0;
+  let z = 0;
   for (let tries = 0; tries < 40; tries++) {
-    const x = (Math.random() * 2 - 1) * LOBE_HALF_AXES.x;
-    const y = (Math.random() * 2 - 1) * LOBE_HALF_AXES.y;
-    const z = (Math.random() * 2 - 1) * LOBE_HALF_AXES.z;
-    if (insideLobe(side, x, y, z)) return lobeToPair(side, [x, y, z]);
+    const cx = (Math.random() * 2 - 1) * LOBE_HALF_AXES.x;
+    const cy = (Math.random() * 2 - 1) * LOBE_HALF_AXES.y;
+    const cz = (Math.random() * 2 - 1) * LOBE_HALF_AXES.z;
+    if (insideLobe(side, cx, cy, cz)) {
+      x = cx;
+      y = cy;
+      z = cz;
+      break;
+    }
   }
-  return lobeToPair(side, [0, 0, 0]);
+  // Lobe-local to pair space (the inverse of pairToLobe, inlined to skip its array).
+  out[at] = left ? LUNG_PLACEMENT.offsetX - x : x - LUNG_PLACEMENT.offsetX;
+  out[at + 1] = y + LUNG_PLACEMENT.centreY;
+  out[at + 2] = z;
 }
 
-function seedInCloud(): Vec3 {
-  return [
-    (Math.random() * 2 - 1) * CLOUD_HALF.x,
-    (Math.random() * 2 - 1) * CLOUD_HALF.y,
-    (Math.random() * 2 - 1) * CLOUD_HALF.z,
-  ];
+function seedInCloud(out: Float32Array, at: number): void {
+  out[at] = (Math.random() * 2 - 1) * CLOUD_HALF.x;
+  out[at + 1] = (Math.random() * 2 - 1) * CLOUD_HALF.y;
+  out[at + 2] = (Math.random() * 2 - 1) * CLOUD_HALF.z;
 }
 
 /** Soft round alpha falloff; white so the material colour tints it. */
@@ -92,7 +105,7 @@ export function buildHaze(
   const colors = new Float32Array(count * 4); // RGBA: alpha carries the fade
 
   const respawn = (i: number, startProgress: number) => {
-    seeds.set(seed(), i * 3);
+    seed(seeds, i * 3);
     progress[i] = startProgress;
     rate[i] = PROGRESS_PER_EXHALE_SECOND * (0.6 + Math.random() * 0.8);
   };
@@ -117,30 +130,30 @@ export function buildHaze(
   let tint = tokens.ink.clone();
   let opacity = 1;
 
+  /** Write the point `k` of the way from (ax, ay, az) to `to` into positions[at..]. */
+  const writeLerp = (at: number, ax: number, ay: number, az: number, to: Vec3, k: number): void => {
+    positions[at] = lerp(ax, to[0], k);
+    positions[at + 1] = lerp(ay, to[1], k);
+    positions[at + 2] = lerp(az, to[2], k);
+  };
+
+  // No per-frame arrays or objects: everything is written straight into `positions`.
   const place = (i: number, s: number): void => {
-    const sx = seeds[i * 3];
-    const sy = seeds[i * 3 + 1];
-    const sz = seeds[i * 3 + 2];
-    let x: number;
-    let y: number;
-    let z: number;
+    const at = i * 3;
+    const sx = seeds[at];
+    const sy = seeds[at + 1];
+    const sz = seeds[at + 2];
     if (discreet) {
-      x = sx + Math.sin(s * 6 + sy * 4) * 0.08;
-      y = sy + s * CLOUD_RISE;
-      z = sz;
+      positions[at] = sx + Math.sin(s * 6 + sy * 4) * 0.08;
+      positions[at + 1] = sy + s * CLOUD_RISE;
+      positions[at + 2] = sz;
     } else if (s < CARINA_AT) {
-      const k = smooth(0, 1, s / CARINA_AT);
-      [x, y, z] = [lerp(sx, CARINA[0], k), lerp(sy, CARINA[1], k), lerp(sz, CARINA[2], k)];
+      writeLerp(at, sx, sy, sz, CARINA, smooth(0, 1, s / CARINA_AT));
     } else if (s < TOP_AT) {
-      const k = (s - CARINA_AT) / (TOP_AT - CARINA_AT);
-      [x, y, z] = [lerp(CARINA[0], TRACHEA_TOP[0], k), lerp(CARINA[1], TRACHEA_TOP[1], k), lerp(CARINA[2], TRACHEA_TOP[2], k)];
+      writeLerp(at, CARINA[0], CARINA[1], CARINA[2], TRACHEA_TOP, (s - CARINA_AT) / (TOP_AT - CARINA_AT));
     } else {
-      const k = (s - TOP_AT) / (1 - TOP_AT);
-      [x, y, z] = [lerp(TRACHEA_TOP[0], OUT[0], k), lerp(TRACHEA_TOP[1], OUT[1], k), lerp(TRACHEA_TOP[2], OUT[2], k)];
+      writeLerp(at, TRACHEA_TOP[0], TRACHEA_TOP[1], TRACHEA_TOP[2], OUT, (s - TOP_AT) / (1 - TOP_AT));
     }
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
   };
 
   const update = (dt: number, t: number, density: number): void => {
@@ -162,7 +175,7 @@ export function buildHaze(
   };
 
   const retheme = (t: SceneTokens, dim: number) => {
-    tint = t.ink.clone();
+    tint.copy(t.ink);
     opacity = dim;
   };
 

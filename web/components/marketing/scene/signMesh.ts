@@ -11,7 +11,7 @@ export interface SignMesh {
 }
 
 const SIGN_OPACITY = 0.5;
-const SIGN_OPACITY_LIGHT = 0.7; // terracotta needs more body to read on pale grey
+const SIGN_OPACITY_LIGHT = 1; // terracotta needs more body to read on pale grey
 /** Keep the satin colour under the bloom threshold so the sign never glows. */
 const BLOOM_HEADROOM = 0.8;
 

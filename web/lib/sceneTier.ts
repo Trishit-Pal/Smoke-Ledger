@@ -35,6 +35,13 @@ export const SCENE_BUDGET: Record<Exclude<SceneTier, 'off'>, SceneBudget> = {
   },
 };
 
+/** The quiet (product) tier keeps this share of the haze particles. */
+export const QUIET_HAZE_FACTOR = 0.6;
+
+export function hazeCountFor(budget: SceneBudget, isQuiet: boolean): number {
+  return Math.round(budget.hazeParticles * (isQuiet ? QUIET_HAZE_FACTOR : 1));
+}
+
 // ponytail: capability sniffing is a heuristic (cores/memory/pointer), not a benchmark;
 // replace with a first-seconds frame-time probe if misclassified devices are reported.
 export function pickSceneTier(env: SceneEnv): SceneTier {

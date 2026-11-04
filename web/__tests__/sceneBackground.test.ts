@@ -70,6 +70,25 @@ describe('scene feature gating', () => {
   });
 });
 
+describe('scene theme resync and quiet tier', () => {
+  it('resyncs tokens from a class-attribute observer, not a [resolvedTheme] effect', () => {
+    // next-themes flips the <html> class in its own effect, after any child effect has run.
+    expect(component).toMatch(/new MutationObserver\(applyTheme\)/);
+    expect(component).toMatch(/observe\(document\.documentElement, \{ attributes: true, attributeFilter: \['class'\] \}\)/);
+    expect(component).toContain('themeObserver.disconnect()');
+    expect(component).not.toContain('useTheme');
+    expect(component).not.toContain('resolvedTheme]');
+  });
+
+  it('paints the page colour behind the scene so light-theme ink sits on a pale ground', () => {
+    expect(component).toContain('scene.background = currentBg;');
+  });
+
+  it('thins the haze on the quiet tier', () => {
+    expect(component).toMatch(/hazeCountFor\(budget, intensity === 'quiet'\)/);
+  });
+});
+
 describe('scene early returns', () => {
   it('still renders nothing under prefers-reduced-motion', () => {
     expect(component).toContain('(prefers-reduced-motion: reduce)');

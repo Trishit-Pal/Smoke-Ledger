@@ -24,10 +24,10 @@ export interface Lungs {
   retheme(tokens: SceneTokens, dim: number): void;
 }
 
-const LOBE_OPACITY = { dark: 0.5, light: 0.55 } as const;
+const LOBE_OPACITY = { dark: 0.5, light: 0.95 } as const;
 // Less see-through on the light theme, so the ink body shows against pale grey.
-const TRANSMISSION = { dark: 0.9, light: 0.2 } as const;
-const AIRWAY_OPACITY = 0.8;
+const TRANSMISSION = { dark: 0.9, light: 0 } as const;
+const AIRWAY_OPACITY = { dark: 0.8, light: 1 } as const;
 const TUBE_SEGMENTS = 10;
 const TUBE_RADIAL_SEGMENTS = 6;
 const AIRWAY_BEND = 0.035; // sideways bow of each airway, so the tree is not ruler-straight
@@ -97,8 +97,9 @@ export function buildLungs(
   }
 
   const airwayMat = bin.track(
-    new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0, transparent: true }),
+    new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0, transparent: true, depthWrite: false }),
   );
+  const airways: THREE_NS.Mesh[] = [];
   fitAirways(bronchialTree(budget.bronchiDepth)).forEach((branch, i) => {
     const [start, end] = [branch.points[0], branch.points[branch.points.length - 1]];
     const bow = AIRWAY_BEND * Math.sin(i * 2.1) * (branch.level === 0 ? 0 : 1);
@@ -111,7 +112,9 @@ export function buildLungs(
     const geo = bin.track(
       new THREE.TubeGeometry(curve, TUBE_SEGMENTS, branch.radius, TUBE_RADIAL_SEGMENTS, false),
     );
-    body.add(new THREE.Mesh(geo, airwayMat));
+    const airway = new THREE.Mesh(geo, airwayMat);
+    airways.push(airway);
+    body.add(airway);
   });
 
   const edge = new THREE.Color();
@@ -122,12 +125,16 @@ export function buildLungs(
     lobeMat.sheenColor.copy(edge);
     lobeMat.specularIntensity = t.isLight ? 0.2 : 1; // pale speculars would bleach the ink
     lobeMat.roughness = t.isLight ? 0.55 : 0.15;
-    lobeMat.transmission = t.isLight ? TRANSMISSION.light : TRANSMISSION.dark;
+    const transmission = t.isLight ? TRANSMISSION.light : TRANSMISSION.dark;
+    if ((transmission > 0) !== (lobeMat.transmission > 0)) lobeMat.needsUpdate = true; // shader variant changes
+    lobeMat.transmission = transmission;
     lobeMat.opacity = (t.isLight ? LOBE_OPACITY.light : LOBE_OPACITY.dark) * dim;
     airwayMat.color.copy(edge);
     airwayMat.emissive.copy(t.accent); // faint accent rim on the airways
     airwayMat.emissiveIntensity = t.isLight ? 0.05 : 0.18;
-    airwayMat.opacity = AIRWAY_OPACITY * dim;
+    // Light theme: draw the airways over the (near-opaque) lobes so they stay readable.
+    for (const a of airways) a.renderOrder = t.isLight ? 2 : 0;
+    airwayMat.opacity = (t.isLight ? AIRWAY_OPACITY.light : AIRWAY_OPACITY.dark) * dim;
   };
   retheme(tokens, 1);
 
