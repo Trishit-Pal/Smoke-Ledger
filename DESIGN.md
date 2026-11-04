@@ -82,6 +82,15 @@ Six theme-aware series (teal, terracotta, blue, violet, amber, green). Ticks dar
 - **Reduced motion:** all reveals degrade to crossfade / instant under
   `prefers-reduced-motion: reduce`.
 - **Materials:** transform / opacity primarily; paper-noise + `mix-blend-mode` for atmosphere.
+- **Ambient scene** (`web/components/marketing/SceneBackground.tsx`, builders in `scene/`)
+  - **What it shows.** Translucent glass lungs that breathe: one slow sine breath every 5.5 s, scale ±4%, no spring.
+  - **The haze.** A grey haze inside the lungs thins and never returns within a session. Its start time lives in `sessionStorage`, so the lungs read as recovering, never as damaged.
+  - **The sign.** A no-smoking sign appears on brand surfaces only (landing, auth) at `full` intensity. It is satin `--warn-earth`, never red, and sits below the bloom threshold.
+  - **Quiet strength.** App pages run at `quiet`: no bloom, 60% of the haze.
+  - **Discreet readers.** They get only a neutral haze: no lungs and no sign. That holds during loading (the Suspense fallback) and when the profile can't be read.
+  - **Colour.** Every colour comes from a CSS token and resyncs on a theme flip through a class `MutationObserver`. In light mode the scene paints the page colour behind itself and drops transmission and bloom, so the silhouette reads on `#F6F7F9`.
+  - **Fallbacks.** The scene renders nothing under reduced motion, without WebGL, or with save-data. It pauses after 20 s idle and on a hidden tab.
+  - **Source images.** The stock photos in `Images/` were reference only; the scene is drawn in code.
 
 ## Accessibility
 
