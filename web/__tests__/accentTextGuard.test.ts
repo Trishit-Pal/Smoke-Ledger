@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'fs';
 import path from 'path';
 import { describe, it, expect } from 'vitest';
+import * as authStyles from '@web/lib/auth/inputStyle';
 
 // `--accent` (#2FA39B) is ~2.9:1 on the light background: fine for borders, fills, rings and
 // chart strokes, never for text. Text uses `--accent-ink` (AA in both themes).
@@ -55,6 +56,20 @@ function violations(): string[] {
 describe('teal text uses --accent-ink, never --accent', () => {
   it('finds no text coloured with --accent', () => {
     expect(violations()).toEqual([]);
+  });
+
+  // White on --accent is ~3.1:1. A filled teal control carries text, so it is the
+  // --accent-ink / --on-accent pair (pinned AA in tokenContrast.test.ts).
+  it('shared auth button styles put --on-accent text on an --accent-ink fill', () => {
+    const teal = Object.entries(authStyles).filter(([, s]) => String(s.background).includes('--accent'));
+    expect(teal.map(([name]) => name)).toContain('PRIMARY_CTA_STYLE');
+    for (const [name, s] of teal) {
+      expect([name, s.background, s.color]).toEqual([name, 'var(--accent-ink)', 'var(--on-accent)']);
+    }
+    const source = readFileSync(path.join(WEB, 'lib/auth/inputStyle.ts'), 'utf8');
+    expect(source, 'hard-coded white text colour in inputStyle.ts').not.toMatch(
+      /(?:^|[^-\w])color:\s*['"]#f{3}(?:f{3})?['"]/im,
+    );
   });
 
   it('keeps the allowlist honest (every entry still points at a matching line)', () => {

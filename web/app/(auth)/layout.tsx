@@ -2,6 +2,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
+import { WordmarkHomeLink } from '@web/components/auth/WordmarkHomeLink';
 import { LEGAL_LINKS } from '@web/lib/legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -13,24 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       backdrop={<SceneBackdrop intensity="full" />}
       showGoHome={false}
     >
-      <Link
-        href="/"
-        aria-label="Smoke Ledger home"
-        className="focus-ring mb-lg inline-flex min-h-11 items-center self-start"
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 18,
-          letterSpacing: '-0.015em',
-          lineHeight: 1.05,
-          color: 'var(--text)',
-          textDecoration: 'none',
-        }}
-      >
-        {/* One flex child: as separate items the space before "Ledger" collapses. */}
-        <span>
-          Smoke<span style={{ fontStyle: 'italic', color: 'var(--accent-ink)' }}> Ledger</span>
-        </span>
-      </Link>
+      <WordmarkHomeLink />
       {children}
       <footer
         style={{

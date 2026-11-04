@@ -172,8 +172,8 @@ export default function OnboardingBrandsPage() {
             maxWidth: 520,
           }}
         >
-          Two or three is enough — you can always add more from Settings. Don&rsquo;t see yours?
-          Add a custom one later.
+          Two or three is enough. Favorites are picked only here, and you can still log any
+          brand in the catalog. Don&rsquo;t see yours? Add it in Settings after setup.
         </p>
       </header>
 

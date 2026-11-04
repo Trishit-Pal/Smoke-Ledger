@@ -29,14 +29,34 @@ describe('onboarding Welcome is a setup welcome, not the landing pitch', () => {
   });
 });
 
+describe('Brands step copy says what the app allows', () => {
+  // Favourites are set only in onboarding (setFavorite has no other caller); Settings
+  // adds custom brands, never favourites; Log lists every brand.
+  test.each([
+    ['web', ['app', 'onboarding', 'brands', 'page.tsx']],
+    ['mobile', ['..', 'app', 'onboarding', 'brands.tsx']],
+  ])('%s Brands step does not promise favourites from Settings', (_name, file) => {
+    const source = read(...file);
+    expect(source).not.toContain('add more from Settings');
+    expect(source).toContain('Favorites are picked only here');
+  });
+});
+
 describe('sign-in and sign-up are distinct entry pages', () => {
   const layout = read('app', '(auth)', 'layout.tsx');
   const signup = read('app', '(auth)', 'signup', 'page.tsx');
   const login = read('app', '(auth)', 'login', 'page.tsx');
 
-  test('auth pages carry a wordmark link home instead of the floating link', () => {
-    expect(layout).toContain('showGoHome={false}');
-    expect(layout).toMatch(/<Link\s+href="\/"/);
+  test.each([
+    ['(auth) layout', layout],
+    ['/auth/confirm', read('app', 'auth', 'confirm', 'page.tsx')],
+  ])('%s carries the wordmark link home instead of the floating link', (_name, source) => {
+    expect(source).toContain('showGoHome={false}');
+    expect(source).toContain('<WordmarkHomeLink />');
+  });
+
+  test('the wordmark links to /', () => {
+    expect(read('components', 'auth', 'WordmarkHomeLink.tsx')).toMatch(/<Link\s+href="\/"/);
   });
 
   test('sign-up names the account step and the onboarding steps that follow', () => {
