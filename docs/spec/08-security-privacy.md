@@ -156,7 +156,7 @@ Keeping the ledger is part of what a reader agrees to in order to use the app, s
 
 On `/consent` the way out is "Not now — export or delete my data". The one real choice is Ask the ledger, a Yes / No pair with nothing pre-selected:
 - It shows the full chat notice (web `LEDGER_CHAT_NOTICE` behind "Read the details"; mobile `mobileNoticeParagraphs()`).
-- It is asked only while the chat is enabled for the build and the reader has no stored `consent.ledgerChatOptIn` row (`shouldAskChat`, `web/lib/server/ledgerChat/askChat.ts` and `src/services/chatConsentAsk.ts`). A stored decline or an older version is never re-asked here.
+- It is asked only while the chat is enabled for the build and the reader has no stored `consent.ledgerChatOptIn` row (`shouldAskChat`, `web/lib/server/ledgerChat/askChat.ts` and `src/services/chatConsentAsk.ts`). A stored decline or an older version is never re-asked here. On mobile the check gives up after 4 s and doesn't ask, so a stalled connection never leaves Continue locked.
 - The answer is written after the consent write as `chatOptInValue(answer)`. Its audit is sent without waiting.
 - Continue unlocks through `canContinueConsent` (`src/lib/consentForm.ts`).
 
