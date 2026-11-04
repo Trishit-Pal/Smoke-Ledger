@@ -2,49 +2,62 @@
 
 /*
  * SceneBackground — a deferred, tokenized WebGL ambient scene pinned to the
- * viewport. Reconciled to the brand:
+ * viewport: a pair of glass lungs that breathe slowly, a grey haze that clears
+ * the longer the reader stays, and (brand surfaces only) a faint terracotta
+ * no-smoking sign. Reconciled to the brand:
  *   - three.js (+ its bundled addons) is loaded LAZILY inside the mount effect
  *     so it lands in a separate async chunk and never blocks first paint / LCP.
- *   - Colors read from the live CSS-var tokens (--accent, --bg) at construction.
- *     Only --bg/fog resyncs live on theme flip (next-themes) today — --accent
- *     is currently identical in both themes, so accent-derived materials
- *     (glass/knot/particles/rim light) don't need to; wire a resync for those
- *     too if --accent ever becomes theme-dependent.
- *   - Refractive glass shards (now with a real environment map for genuine
- *     reflection/refraction) + a faint wireframe knot + additive particle haze
- *     + mouse parallax + a very slow camera orbit. No low-poly human figures.
+ *   - Every colour comes from the live CSS-var tokens (--bg, --text-muted,
+ *     --accent, --warn-earth) via scene/tokens.ts and is re-resolved on a theme
+ *     flip (next-themes). No colour literals live in the scene.
+ *   - Geometry, haze and the sign are built in scene/*.ts; the pure maths
+ *     (breath, haze density, lobe shape, airway tree) is unit-tested there.
  *   - `position: fixed` so it stays put and keeps animating while the page
  *     scrolls over it (content rides a translucent veil above it — see callers).
  *   - `intensity` picks the tier:
- *       'full'  (brand: homepage, login) — full opacity + UnrealBloom glow.
- *       'quiet' (product: app pages)     — dimmed opacity, NO bloom pass
- *                                          (direct render → also cheaper).
+ *       'full'  (brand: homepage, login) — full opacity, bloom, the sign.
+ *       'quiet' (product: app pages)     — dimmed, NO bloom pass, no sign.
+ *   - `discreet` shows only a neutral haze: no lungs, airways or sign.
  *   - Renders nothing under prefers-reduced-motion or when WebGL is unavailable
- *     (progressive enhancement); pauses its RAF loop only when the tab is hidden.
+ *     (progressive enhancement); pauses its RAF loop when the tab is hidden or
+ *     the reader has been idle.
  *
  * The canvas is aria-hidden and pointer-events:none; it is pure atmosphere.
  */
 
 import * as React from 'react';
-import { useTheme } from 'next-themes';
 import type * as THREE_NS from 'three'; // type-only: erased at build, no runtime cost
 
-import { pickSceneTier, SCENE_BUDGET, type SceneEnv } from '@web/lib/sceneTier';
+import {
+  frameIntervalFor,
+  hazeCountFor,
+  pickSceneTier,
+  SCENE_BUDGET,
+  type SceneEnv,
+  type SceneIntensity,
+} from '@web/lib/sceneTier';
+
+import { BLOOM_BREATH_LIFT, BLOOM_STRENGTH, buildBloom, type BloomPassLike, type Composer } from './scene/bloom';
+import { breathPhase, breathScale, hazeDensity, sceneClearStart } from './scene/breath';
+import { DisposeBin } from './scene/disposables';
+import { buildHaze } from './scene/haze';
+import { LAYOUT, NARROW_ASPECT } from './scene/layout';
+import { buildLungs } from './scene/lungMeshes';
+import { buildSign } from './scene/signMesh';
+import { readTokens } from './scene/tokens';
 
 const IDLE_PAUSE_MS = 20_000; // stop drawing after this long with no user input
 const IDLE_CHECK_MS = 2_000;
+const LIGHT_ENV_INTENSITY = 0.25;
+const MAX_FRAME_DT_S = 0.1; // a long stall never makes the haze jump
 
-export type SceneIntensity = 'full' | 'quiet';
+export type { SceneIntensity };
 
 export interface SceneBackgroundProps {
-  /** 'full' = brand (opacity + bloom); 'quiet' = product (dim, no bloom). Default 'full'. */
+  /** 'full' = brand (opacity + bloom + sign); 'quiet' = product (dim, no bloom). Default 'full'. */
   intensity?: SceneIntensity;
-}
-
-function readVar(name: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
+  /** Neutral haze only: no lungs, airways or sign. Default false. */
+  discreet?: boolean;
 }
 
 function hasWebGL(): boolean {
@@ -72,11 +85,17 @@ function readSceneEnv(): SceneEnv {
   };
 }
 
-export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
+/** Epoch-ms the haze started clearing for this session (a reload never restarts it). */
+function sessionClearStart(): number {
+  try {
+    return sceneClearStart(window.sessionStorage, Date.now());
+  } catch {
+    return Date.now(); // storage blocked: the haze simply restarts each visit
+  }
+}
+
+export function SceneBackground({ intensity = 'full', discreet = false }: SceneBackgroundProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const { resolvedTheme } = useTheme();
-  // Set by the scene once mounted so the theme effect can retarget the fog color.
-  const setBgTargetRef = React.useRef<((hex: string) => void) | null>(null);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -87,14 +106,16 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
     const tier = pickSceneTier(readSceneEnv());
     if (tier === 'off') return; // data-saver: static page background only
     const budget = SCENE_BUDGET[tier];
-    const GLASS_COUNT = budget.shards;
-    const PARTICLE_COUNT = budget.particles;
 
-    const dim = intensity === 'quiet' ? 0.55 : 1; // opacity tier
+    const baseDim = intensity === 'quiet' ? 0.55 : 1; // opacity tier
     const useBloom = intensity === 'full' && budget.bloom; // boldness reserved for brand surfaces on capable devices
+    const showSign = intensity === 'full' && !discreet;
 
     let disposed = false;
     let cleanup = () => {};
+    // Hoisted so a build that throws part-way can still free what it made.
+    const bin = new DisposeBin();
+    let rendererToDispose: { dispose(): void } | null = null;
 
     // Resolve ALL dynamic imports up front, THEN build — so an unmount between
     // awaits can never leak a half-constructed renderer. three + its addons all
@@ -103,6 +124,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
     void (async () => {
       const THREE = await import('three');
       const { RoomEnvironment } = await import('three/examples/jsm/environments/RoomEnvironment.js');
+      const { mergeVertices } = await import('three/examples/jsm/utils/BufferGeometryUtils.js');
       const bloomKit = useBloom
         ? await Promise.all([
             import('three/examples/jsm/postprocessing/EffectComposer.js'),
@@ -112,10 +134,10 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         : null;
       if (disposed || !canvasRef.current) return;
 
-      const accent = new THREE.Color(readVar('--accent', '#2FA39B'));
-      const bg = new THREE.Color(readVar('--bg', '#0B0F14'));
+      const tokens = readTokens(THREE);
 
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      rendererToDispose = renderer;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, budget.dprCap));
       renderer.setSize(window.innerWidth, window.innerHeight, false); // false: CSS keeps 100%/100%
       // UnrealBloomPass requires tone mapping — without it, any pixel the
@@ -133,146 +155,84 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
       // once (PMREM), cheap thereafter. The RoomEnvironment scene itself is
       // only a one-shot bake source — dispose it right after so its ~10 box
       // geometries/materials don't linger.
-      const pmrem = new THREE.PMREMGenerator(renderer);
+      const pmrem = bin.track(new THREE.PMREMGenerator(renderer));
       const roomEnv = new RoomEnvironment();
-      const envRT = pmrem.fromScene(roomEnv, 0.04);
+      const envRT = bin.track(pmrem.fromScene(roomEnv, 0.04));
       roomEnv.dispose();
       scene.environment = envRT.texture;
 
-      const currentBg = bg.clone();
-      const targetBg = bg.clone();
+      const currentBg = tokens.bg.clone();
+      const targetBg = tokens.bg.clone();
       scene.fog = new THREE.Fog(currentBg.getHex(), 18, 46);
-      setBgTargetRef.current = (hex: string) => targetBg.set(hex);
+      // Paint the page colour behind the scene. A transparent canvas composites as black, which on
+      // the light theme made ink sit on a dark ground (and the 85% page veil turned it grey).
+      scene.background = currentBg;
+      let isLight = false;
 
-      // Lighting — key + accent rim + a faint warm fill.
-      scene.add(new THREE.AmbientLight(0x8899aa, 0.55));
-      const key = new THREE.DirectionalLight(0xffffff, 0.9);
+      // Lighting — soft ambient + key + accent rim + a faint terracotta fill.
+      const ambient = new THREE.AmbientLight(undefined, 0.55);
+      const key = new THREE.DirectionalLight(undefined, 0.9);
       key.position.set(6, 10, 12);
-      scene.add(key);
-      const rim = new THREE.PointLight(accent.getHex(), 2.4, 60);
+      const rim = new THREE.PointLight(tokens.accent, 2.4, 60);
       rim.position.set(10, -4, 6);
-      scene.add(rim);
-      const warm = new THREE.PointLight(0xffb26b, 0.6, 60);
+      const warm = new THREE.PointLight(tokens.warn, 0.6, 60);
       warm.position.set(-14, 6, 4);
-      scene.add(warm);
+      scene.add(ambient, key, rim, warm);
 
-      const geos: THREE_NS.BufferGeometry[] = [];
-      const mats: THREE_NS.Material[] = [];
+      // The chest, the haze and the sign. Discreet keeps only the haze.
+      const lungs = discreet ? null : buildLungs(THREE, bin, tokens, budget, mergeVertices, intensity, tier);
+      const haze = buildHaze(THREE, bin, hazeCountFor(budget, intensity === 'quiet'), discreet, tokens);
+      const sign = showSign ? buildSign(THREE, bin, tokens) : null;
+      const world = new THREE.Group(); // lungs + haze share the placement
+      world.add(haze.points);
+      if (lungs) world.add(lungs.group);
+      scene.add(world);
+      if (sign) scene.add(sign.group);
 
-      // Refractive glass shards — biased to the right so they clear the (centered,
-      // left-leaning) hero text, protecting contrast.
-      const glassGeo = new THREE.IcosahedronGeometry(1, 0);
-      geos.push(glassGeo);
-      const glass: THREE_NS.Mesh[] = [];
-      for (let i = 0; i < GLASS_COUNT; i++) {
-        const mat = new THREE.MeshPhysicalMaterial({
-          color: accent,
-          roughness: 0.12,
-          metalness: 0.05,
-          transmission: 0.9,
-          thickness: 1.4,
-          ior: 1.3,
-          envMapIntensity: 1.1,
-          transparent: true,
-          opacity: 0.42 * dim,
-          clearcoat: 1,
-          clearcoatRoughness: 0.1,
-        });
-        mats.push(mat);
-        const mesh = new THREE.Mesh(glassGeo, mat);
-        const s = THREE.MathUtils.randFloat(0.5, 1.6);
-        mesh.scale.setScalar(s);
-        mesh.position.set(
-          THREE.MathUtils.randFloatSpread(30) + 6,
-          THREE.MathUtils.randFloatSpread(20),
-          THREE.MathUtils.randFloatSpread(14) - 6,
-        );
-        mesh.userData.speed = THREE.MathUtils.randFloat(0.2, 0.6);
-        mesh.userData.offset = Math.random() * Math.PI * 2;
-        scene.add(mesh);
-        glass.push(mesh);
-      }
+      // Layout: right and back on desktop, centred and dimmer on narrow screens.
+      let layout = LAYOUT.wide;
+      const applyLayout = (): boolean => {
+        const next = window.innerWidth / window.innerHeight < NARROW_ASPECT ? LAYOUT.narrow : LAYOUT.wide;
+        const changed = next !== layout;
+        layout = next;
+        world.position.set(...layout.lungs);
+        world.scale.setScalar(layout.lungScale);
+        sign?.group.position.set(...layout.sign);
+        sign?.group.scale.setScalar(layout.signScale);
+        return changed;
+      };
+      applyLayout();
 
-      // Faint wireframe knot — the "journey" motif, kept very low opacity.
-      const knotGeo = new THREE.TorusKnotGeometry(6, 1.3, 140, 16);
-      const knotMat = new THREE.MeshBasicMaterial({ color: accent, wireframe: true, transparent: true, opacity: 0.06 * dim });
-      geos.push(knotGeo);
-      mats.push(knotMat);
-      const knot = new THREE.Mesh(knotGeo, knotMat);
-      knot.position.set(13, 2, -18);
-      scene.add(knot);
-
-      // Additive particle haze.
-      const positions = new Float32Array(PARTICLE_COUNT * 3);
-      const speeds = new Float32Array(PARTICLE_COUNT);
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        positions[i * 3 + 0] = THREE.MathUtils.randFloatSpread(60);
-        positions[i * 3 + 1] = THREE.MathUtils.randFloatSpread(40) - 10;
-        positions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(30) - 10;
-        speeds[i] = THREE.MathUtils.randFloat(0.01, 0.045);
-      }
-      const particleGeo = new THREE.BufferGeometry();
-      particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geos.push(particleGeo);
-
-      const spriteSize = 64;
-      const spriteCanvas = document.createElement('canvas');
-      spriteCanvas.width = spriteCanvas.height = spriteSize;
-      const sctx = spriteCanvas.getContext('2d');
-      if (sctx) {
-        const grad = sctx.createRadialGradient(spriteSize / 2, spriteSize / 2, 0, spriteSize / 2, spriteSize / 2, spriteSize / 2);
-        grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-        grad.addColorStop(0.4, 'rgba(255,255,255,0.35)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-        sctx.fillStyle = grad;
-        sctx.fillRect(0, 0, spriteSize, spriteSize);
-      }
-      const spriteTex = new THREE.CanvasTexture(spriteCanvas);
-      const particleMat = new THREE.PointsMaterial({
-        size: 0.32,
-        map: spriteTex,
-        transparent: true,
-        opacity: 0.28 * dim,
-        color: accent.clone().lerp(new THREE.Color('#ffffff'), 0.4),
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      });
-      mats.push(particleMat);
-      const particles = new THREE.Points(particleGeo, particleMat);
-      scene.add(particles);
+      // One path resolves every token: first build, theme flip, layout change.
+      const applyTheme = () => {
+        const t = readTokens(THREE);
+        const dim = baseDim * layout.dim;
+        isLight = t.isLight;
+        targetBg.copy(t.bg);
+        rim.color.copy(t.accent);
+        warm.color.copy(t.warn);
+        // The bright room env would wash dark ink out to white on the light theme.
+        // Dark fog melts distant shapes into the page; pale fog would bleach their ink, so thin it out.
+        const fog = scene.fog as THREE_NS.Fog;
+        fog.near = t.isLight ? 50 : 18;
+        fog.far = t.isLight ? 140 : 46;
+        scene.environmentIntensity = t.isLight ? LIGHT_ENV_INTENSITY : 1;
+        ambient.intensity = t.isLight ? 0.4 : 0.55;
+        key.intensity = t.isLight ? 0.5 : 0.9;
+        lungs?.retheme(t, dim);
+        haze.retheme(t, dim);
+        sign?.retheme(t, dim);
+      };
+      applyTheme();
+      // next-themes flips the <html> class in its own effect, after any child effect has
+      // run, so a [resolvedTheme] effect would read the OLD tokens. Watch the class itself.
+      const themeObserver = new MutationObserver(applyTheme);
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
       // Postprocessing — bloom on brand surfaces only. Product renders direct.
-      // EffectComposer is a three addon (not in the core types), so type it
-      // structurally by the members we use.
-      type Composer = {
-        render: () => void;
-        setSize: (w: number, h: number) => void;
-        dispose: () => void;
-        addPass: (pass: unknown) => void;
-      };
-      let composer: Composer | null = null;
-      let bloomPass: { dispose?: () => void } | null = null;
-      if (bloomKit) {
-        // Degrade to a plain direct render if the composer can't be built on
-        // this GPU, rather than blanking the whole scene.
-        try {
-          const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }] = bloomKit;
-          const c = new EffectComposer(renderer) as unknown as Composer;
-          c.addPass(new RenderPass(scene, camera));
-          const bp = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.65, // strength
-            0.85, // radius
-            0.82, // threshold — only the brightest accents/particles glow
-          );
-          c.addPass(bp);
-          composer = c;
-          bloomPass = bp as unknown as { dispose?: () => void };
-        } catch {
-          composer = null;
-          bloomPass = null;
-        }
-      }
+      const bloom = bloomKit ? buildBloom(THREE, bloomKit, renderer, scene, camera) : null;
+      const composer: Composer | null = bloom?.composer ?? null;
+      const bloomPass: BloomPassLike | null = bloom?.bloomPass ?? null;
 
       // Interaction + responsiveness.
       let mouseX = 0;
@@ -292,6 +252,7 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight, false);
           composer?.setSize(window.innerWidth, window.innerHeight);
+          if (applyLayout()) applyTheme(); // dim differs between layouts
         });
       };
       if (budget.parallax) window.addEventListener('mousemove', onMouse, { passive: true });
@@ -299,52 +260,47 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
 
       // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
       // scene is a fixed backdrop that must keep living through the whole scroll.)
+      const clearStartMs = sessionClearStart();
       let raf = 0;
       let running = true;
       let clockStart = performance.now();
       let elapsed = 0;
       let lastDraw = 0;
+      const frameIntervalMs = frameIntervalFor({ intensity, budget });
 
       const frame = () => {
         if (!running) return;
         const now = performance.now();
-        if (budget.frameIntervalMs && now - lastDraw < budget.frameIntervalMs) {
+        if (frameIntervalMs && now - lastDraw < frameIntervalMs) {
           raf = requestAnimationFrame(frame);
           return;
         }
         lastDraw = now;
-        elapsed += (now - clockStart) / 1000;
+        const dt = Math.min((now - clockStart) / 1000, MAX_FRAME_DT_S);
+        elapsed += dt;
         clockStart = now;
         const t = elapsed;
 
         currentBg.lerp(targetBg, 0.05);
         (scene.fog as THREE_NS.Fog).color.copy(currentBg);
 
-        for (const m of glass) {
-          const sp = m.userData.speed as number;
-          const off = m.userData.offset as number;
-          m.rotation.x = t * 0.15 * sp + off;
-          m.rotation.y = t * 0.2 * sp;
-          m.position.y += Math.sin(t * sp + off) * 0.004;
-        }
-        knot.rotation.x = t * 0.05;
-        knot.rotation.y = t * 0.07;
-
-        const arr = particleGeo.attributes.position.array as Float32Array;
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-          arr[i * 3 + 1] += speeds[i];
-          if (arr[i * 3 + 1] > 20) arr[i * 3 + 1] = -20;
-        }
-        particleGeo.attributes.position.needsUpdate = true;
+        // Slow breath (no spring), haze thinning with session time, a gentle sway.
+        lungs?.setBreath(breathScale(t));
+        haze.update(dt, t, hazeDensity((Date.now() - clearStartMs) / 1000));
+        world.rotation.y = Math.sin(t * 0.07) * 0.3;
+        if (sign) sign.group.rotation.y = t * 0.15;
+        // A pale page would bloom everywhere, so the glow is a dark-theme effect.
+        if (bloomPass) bloomPass.strength = isLight ? 0 : BLOOM_STRENGTH + BLOOM_BREATH_LIFT * ((breathPhase(t) + 1) / 2);
 
         // Mouse parallax + a very slow gravitational camera orbit (no spring).
         const orbitX = Math.sin(t * 0.04) * 1.6;
         const orbitY = Math.cos(t * 0.05) * 1.0;
         camera.position.x += (mouseX * 3 + orbitX - camera.position.x) * 0.03;
         camera.position.y += (-mouseY * 2 + orbitY - camera.position.y) * 0.03;
-        camera.lookAt(4, 0, -8);
+        camera.lookAt(layout.lookX, 0, -8);
 
-        if (composer) composer.render();
+        // The bloom blit tone-maps the page colour too; light has no bloom, so it renders direct.
+        if (composer && !isLight) composer.render();
         else renderer.render(scene, camera);
         raf = requestAnimationFrame(frame);
       };
@@ -413,28 +369,25 @@ export function SceneBackground({ intensity = 'full' }: SceneBackgroundProps) {
         for (const ev of WAKE_EVENTS) window.removeEventListener(ev, wake);
         reduce.removeEventListener('change', onReduceChange);
         canvas.removeEventListener('webglcontextlost', onContextLost);
-        setBgTargetRef.current = null;
+        themeObserver.disconnect();
         composer?.dispose();
         bloomPass?.dispose?.();
-        envRT.dispose();
-        pmrem.dispose();
-        spriteTex.dispose();
-        for (const g of geos) g.dispose();
-        for (const m of mats) m.dispose();
+        bin.disposeAll(); // every geometry, material, texture, env map and PMREM the scene built
         renderer.dispose();
       };
-    })();
+    })().catch(() => {
+      // A throwing build must not leak the renderer or reject unhandled: free it, blank the canvas.
+      cleanup();
+      bin.disposeAll();
+      rendererToDispose?.dispose();
+      canvas.style.visibility = 'hidden';
+    });
 
     return () => {
       disposed = true;
       cleanup();
     };
-  }, [intensity]);
-
-  // Retarget the fog/background color when the theme flips (accent is theme-stable).
-  React.useEffect(() => {
-    setBgTargetRef.current?.(readVar('--bg', '#0B0F14'));
-  }, [resolvedTheme]);
+  }, [intensity, discreet]);
 
   return (
     <canvas

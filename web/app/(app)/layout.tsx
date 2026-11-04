@@ -23,6 +23,7 @@ import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 // controls (History's New log, its toast) clear of it; 0 when off and on Log.
 import { AskLedgerDock } from '@web/components/chat/AskLedgerDock';
 import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
+import { SceneForReader } from '@web/components/marketing/SceneForReader';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,7 +34,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <SceneBackdrop intensity="quiet" />
+      {/* Haze-only fallback while the reader's discreet flag resolves, so a
+          discreet reader never sees lungs flash in. */}
+      <React.Suspense fallback={<SceneBackdrop intensity="quiet" discreet />}>
+        <SceneForReader />
+      </React.Suspense>
       <Sidebar />
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-dvh outline-none pb-[calc(5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] short-landscape:pb-[calc(3.5rem+env(safe-area-inset-bottom)+var(--ask-dock-clear,0px))] md:short-landscape:pb-[var(--ask-dock-clear,0px)] md:pb-[var(--ask-dock-clear,0px)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pl-0">
         {/* Translucent veil (z-1) over the fixed z-0 canvas so body text keeps

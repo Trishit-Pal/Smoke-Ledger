@@ -10,8 +10,8 @@ export interface EditorialPageShellProps {
   centered?: boolean;
   /**
    * Optional pinned backdrop (e.g. the fixed WebGL SceneBackground). Rendered
-   * behind everything; when present, the content column rides a translucent
-   * `--bg` veil so text keeps WCAG-AA contrast over the moving scene. Absent →
+   * behind everything; when present, a fixed full-bleed translucent
+   * `--bg` veil sits above it so text keeps WCAG-AA contrast over the moving scene. Absent →
    * the shell renders exactly as before (legal/static callers are unaffected).
    */
   backdrop?: React.ReactNode;
@@ -34,6 +34,20 @@ export function EditorialPageShell({
       }}
     >
       {backdrop}
+      {backdrop ? (
+        // Full-bleed veil over the fixed scene (same coverage as PublicPageShell), so text
+        // keeps its AA contrast and the scene never shows an edge beside the column.
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: 'none',
+            background: 'color-mix(in srgb, var(--bg) 85%, transparent)',
+          }}
+        />
+      ) : null}
       <div
         aria-hidden
         className="paper-noise"
@@ -50,8 +64,6 @@ export function EditorialPageShell({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: centered ? 'center' : 'flex-start',
-          // Veil the content column over the fixed scene (brand tier → 85%).
-          background: backdrop ? 'color-mix(in srgb, var(--bg) 85%, transparent)' : undefined,
         }}
       >
         <div

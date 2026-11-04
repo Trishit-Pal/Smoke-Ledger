@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { pickSceneTier, SCENE_BUDGET } from '@web/lib/sceneTier';
+import {
+  frameIntervalFor,
+  hazeCountFor,
+  lobeTransmission,
+  pickSceneTier,
+  QUIET_FRAME_INTERVAL_MS,
+  QUIET_HAZE_FACTOR,
+  SCENE_BUDGET,
+} from '@web/lib/sceneTier';
 
 const DESKTOP = { coarsePointer: false, hardwareConcurrency: 8, deviceMemory: 8, saveData: false };
 
@@ -27,13 +35,85 @@ describe('pickSceneTier', () => {
 });
 
 describe('SCENE_BUDGET', () => {
+  it('pins the exact budget of each tier', () => {
+    expect(SCENE_BUDGET.standard).toMatchObject({
+      dprCap: 2, hazeParticles: 420, bronchiDepth: 4, lobeSegments: 64,
+      bloom: true, parallax: true, frameIntervalMs: 0,
+    });
+    expect(SCENE_BUDGET.lite).toMatchObject({
+      dprCap: 1, hazeParticles: 140, bronchiDepth: 3, lobeSegments: 40,
+      bloom: false, parallax: false, frameIntervalMs: 33,
+    });
+  });
+
+  it('no longer carries the legacy shard and particle counts', () => {
+    for (const budget of Object.values(SCENE_BUDGET)) {
+      expect(budget).not.toHaveProperty('shards');
+      expect(budget).not.toHaveProperty('particles');
+    }
+  });
+
   it('lite is strictly cheaper than standard on every axis', () => {
     const { standard, lite } = SCENE_BUDGET;
     expect(lite.dprCap).toBeLessThan(standard.dprCap);
-    expect(lite.particles).toBeLessThan(standard.particles);
-    expect(lite.shards).toBeLessThan(standard.shards);
+    expect(lite.hazeParticles).toBeLessThan(standard.hazeParticles);
+    expect(lite.bronchiDepth).toBeLessThan(standard.bronchiDepth);
+    expect(lite.lobeSegments).toBeLessThan(standard.lobeSegments);
     expect(lite.bloom).toBe(false);
     expect(lite.parallax).toBe(false);
     expect(lite.frameIntervalMs).toBeGreaterThan(standard.frameIntervalMs);
+  });
+});
+
+describe('hazeCountFor', () => {
+  it('keeps the full haze at full strength', () => {
+    expect(hazeCountFor(SCENE_BUDGET.standard, false)).toBe(420);
+    expect(hazeCountFor(SCENE_BUDGET.lite, false)).toBe(140);
+  });
+
+  it('thins the haze to 60% on the quiet tier, on every device tier', () => {
+    expect(QUIET_HAZE_FACTOR).toBe(0.6);
+    expect(hazeCountFor(SCENE_BUDGET.standard, true)).toBe(252);
+    expect(hazeCountFor(SCENE_BUDGET.lite, true)).toBe(84);
+  });
+});
+
+describe('lobeTransmission', () => {
+  it('keeps the dark glass transmission on full intensity, standard tier', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'standard', isLight: false })).toBe(0.9);
+  });
+
+  it('is zero on the quiet tier, whatever the device or theme', () => {
+    for (const tier of ['standard', 'lite'] as const) {
+      for (const isLight of [false, true]) {
+        expect(lobeTransmission({ intensity: 'quiet', tier, isLight })).toBe(0);
+      }
+    }
+  });
+
+  it('is zero on the lite tier, even at full intensity', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'lite', isLight: false })).toBe(0);
+  });
+
+  it('is zero in the light theme', () => {
+    expect(lobeTransmission({ intensity: 'full', tier: 'standard', isLight: true })).toBe(0);
+  });
+});
+
+describe('frameIntervalFor', () => {
+  it('caps the quiet scene at 30 fps even on the standard tier', () => {
+    expect(QUIET_FRAME_INTERVAL_MS).toBeGreaterThanOrEqual(33);
+    expect(frameIntervalFor({ intensity: 'quiet', budget: SCENE_BUDGET.standard })).toBeGreaterThanOrEqual(33);
+  });
+
+  it('never loosens the lite interval', () => {
+    expect(frameIntervalFor({ intensity: 'quiet', budget: SCENE_BUDGET.lite })).toBe(
+      Math.max(QUIET_FRAME_INTERVAL_MS, SCENE_BUDGET.lite.frameIntervalMs),
+    );
+  });
+
+  it('leaves the full intensity at the tier interval', () => {
+    expect(frameIntervalFor({ intensity: 'full', budget: SCENE_BUDGET.standard })).toBe(0);
+    expect(frameIntervalFor({ intensity: 'full', budget: SCENE_BUDGET.lite })).toBe(33);
   });
 });

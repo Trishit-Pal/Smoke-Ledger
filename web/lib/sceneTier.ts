@@ -1,6 +1,9 @@
 /** What the ambient WebGL scene is allowed to cost on this device. */
 export type SceneTier = 'standard' | 'lite' | 'off';
 
+/** Brand surfaces draw `full`; app pages sit under a heavy veil and draw `quiet`. */
+export type SceneIntensity = 'full' | 'quiet';
+
 export interface SceneEnv {
   coarsePointer: boolean;
   hardwareConcurrency?: number;
@@ -11,8 +14,12 @@ export interface SceneEnv {
 
 export interface SceneBudget {
   dprCap: number;
-  particles: number;
-  shards: number;
+  /** Ambient haze particle count. */
+  hazeParticles: number;
+  /** Branching levels per side of the bronchial tree. */
+  bronchiDepth: number;
+  /** Radial/vertical segments of each lobe mesh. */
+  lobeSegments: number;
   /** Bloom still also requires the 'full' intensity (brand surfaces). */
   bloom: boolean;
   parallax: boolean;
@@ -21,9 +28,44 @@ export interface SceneBudget {
 }
 
 export const SCENE_BUDGET: Record<Exclude<SceneTier, 'off'>, SceneBudget> = {
-  standard: { dprCap: 2, particles: 500, shards: 7, bloom: true, parallax: true, frameIntervalMs: 0 },
-  lite: { dprCap: 1, particles: 150, shards: 3, bloom: false, parallax: false, frameIntervalMs: 33 },
+  standard: {
+    dprCap: 2, hazeParticles: 420, bronchiDepth: 4, lobeSegments: 64,
+    bloom: true, parallax: true, frameIntervalMs: 0,
+  },
+  lite: {
+    dprCap: 1, hazeParticles: 140, bronchiDepth: 3, lobeSegments: 40,
+    bloom: false, parallax: false, frameIntervalMs: 33,
+  },
 };
+
+/** The quiet (product) tier keeps this share of the haze particles. */
+export const QUIET_HAZE_FACTOR = 0.6;
+
+export function hazeCountFor(budget: SceneBudget, isQuiet: boolean): number {
+  return Math.round(budget.hazeParticles * (isQuiet ? QUIET_HAZE_FACTOR : 1));
+}
+
+/** The quiet scene never draws more often than this (30 fps). */
+export const QUIET_FRAME_INTERVAL_MS = 33;
+
+export function frameIntervalFor({ intensity, budget }: { intensity: SceneIntensity; budget: SceneBudget }): number {
+  return intensity === 'quiet' ? Math.max(QUIET_FRAME_INTERVAL_MS, budget.frameIntervalMs) : budget.frameIntervalMs;
+}
+
+/** Dark-theme glass transmission on brand surfaces. */
+export const DARK_LOBE_TRANSMISSION = 0.9;
+
+/**
+ * Transmission costs an extra full-resolution HalfFloat pass every frame, and under the
+ * quiet veil, on the lite tier, or on a pale page it refracts only the flat clear colour.
+ */
+export function lobeTransmission(o: {
+  intensity: SceneIntensity;
+  tier: Exclude<SceneTier, 'off'>;
+  isLight: boolean;
+}): number {
+  return o.intensity === 'full' && o.tier === 'standard' && !o.isLight ? DARK_LOBE_TRANSMISSION : 0;
+}
 
 // ponytail: capability sniffing is a heuristic (cores/memory/pointer), not a benchmark;
 // replace with a first-seconds frame-time probe if misclassified devices are reported.

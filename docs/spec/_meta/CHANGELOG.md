@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — 71634f2
+- security-privacy: the ambient backdrop is a discreet-mode render site (neutral haze in the Suspense fallback and on a failed read); "Turn on and ask" no longer awaits the consent audit (#110).
+- identity-profile: re-verified after the middleware Settings pass-through; no text change.
+
 ## 2026-11-04 — c9a710f
 - auth: every sign-in (password, phone OTP, callback, confirm) lands via `resolvePostSignInPath`; a failed profile read falls back to `next`/`/dashboard`; the e2e login-counter reset and route warm-up are recorded as a gotcha.
 - security-privacy: a failed middleware profile read answers a no-store 503 `/unavailable` page, never the wizard or `/consent`; chat tool results are escaped and `recent_entries` fenced; `totals_in_window` reports ranges outside the ledger.
