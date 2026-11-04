@@ -193,4 +193,50 @@ BEGIN
      OR NOT has_column_privilege('authenticated', 'public.cigarette_logs', 'ts_utc', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated lost UPDATE on editable cigarette_logs columns';
   END IF;
+
+  -- Goal targets are bounded per unit: spend caps to 100000, everything else to 1000.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'goals_target_value_check'
+      AND pg_get_constraintdef(oid) LIKE '%spend_cap_daily%'
+      AND pg_get_constraintdef(oid) LIKE '%100000%'
+  ) THEN
+    RAISE EXCEPTION 'goals_target_value_check must bound spend_cap_daily at 100000 (goal target by unit)';
+  END IF;
+
+  -- marketing_consent_at is nulled by trigger; the old CHECK made an older mobile
+  -- build's consent write fail with 23514.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_user_profiles_marketing_consent_null'
+      AND tgrelid = 'public.user_profiles'::regclass
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'missing trigger trg_user_profiles_marketing_consent_null on user_profiles';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_profiles_marketing_consent_unused'
+  ) THEN
+    RAISE EXCEPTION 'user_profiles_marketing_consent_unused CHECK must be gone (replaced by trigger)';
+  END IF;
+
+  -- Triggers that carry invariants the clients rely on: the onboarding step
+  -- never moves backwards, and a goal's completion date is stamped server-side.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_user_profiles_onboarding_step_monotonic'
+      AND tgrelid = 'public.user_profiles'::regclass
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'missing trigger trg_user_profiles_onboarding_step_monotonic on user_profiles';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'goals_stamp_completed_at'
+      AND tgrelid = 'public.goals'::regclass
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'missing trigger goals_stamp_completed_at on goals';
+  END IF;
 END $$;

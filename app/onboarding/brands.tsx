@@ -127,8 +127,8 @@ export default function BrandsPick() {
 
       <FadeSlideIn index={2}>
         <Text variant="body" muted>
-          Two or three is enough — you can always add more from Settings. Don't see yours?
-          Add a custom one later.
+          Two or three is enough. Favorites are picked only here, and you can still log any
+          brand in the catalog. Don't see yours? Add it in Settings after setup.
         </Text>
       </FadeSlideIn>
 

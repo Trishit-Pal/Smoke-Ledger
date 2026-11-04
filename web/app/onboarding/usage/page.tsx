@@ -362,7 +362,7 @@ export default function OnboardingUsagePage() {
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: selected ? 'var(--accent)' : 'var(--text)',
+                    color: selected ? 'var(--accent-ink)' : 'var(--text)',
                   }}
                 >
                   {opt.label}
@@ -392,7 +392,7 @@ export default function OnboardingUsagePage() {
                   borderRadius: 999,
                   border: selected ? '1px solid var(--accent)' : '1px solid var(--rule)',
                   background: selected ? 'var(--accent-soft)' : 'var(--bg-elevated)',
-                  color: selected ? 'var(--accent)' : 'var(--text-muted)',
+                  color: selected ? 'var(--accent-ink)' : 'var(--text-muted)',
                   fontFamily: 'var(--font-sans)',
                   fontWeight: 500,
                   cursor: 'pointer',
@@ -407,7 +407,7 @@ export default function OnboardingUsagePage() {
       </div>
 
       {error ? (
-        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: 0 }}>
           {error}
         </p>
       ) : null}

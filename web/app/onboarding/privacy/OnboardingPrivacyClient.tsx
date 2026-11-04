@@ -180,7 +180,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           <span
             className="editorial-caption-tight nums-tabular"
             style={{
-              color: analyticsOptIn ? 'var(--accent)' : 'var(--text-faint)',
+              color: analyticsOptIn ? 'var(--accent-ink)' : 'var(--text-faint)',
               marginTop: 4,
               minWidth: 22,
               textAlign: 'right',
@@ -196,7 +196,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           role="alert"
           style={{
             fontSize: 13,
-            color: 'var(--warn-earth)',
+            color: 'var(--warn-earth-ink)',
             margin: 0,
           }}
         >
@@ -245,7 +245,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
               fontSize: 12,
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: acknowledged ? 'var(--text-faint)' : 'var(--accent)',
+              color: acknowledged ? 'var(--text-faint)' : 'var(--accent-ink)',
               textDecoration: acknowledged ? 'none' : 'underline',
               textUnderlineOffset: 4,
               padding: 0,
@@ -258,7 +258,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           </button>
           <span
             className="editorial-caption-tight nums-tabular"
-            style={{ color: canContinue ? 'var(--accent)' : 'var(--text-faint)' }}
+            style={{ color: canContinue ? 'var(--accent-ink)' : 'var(--text-faint)' }}
           >
             {ackCount} / {totalRows} acknowledged
           </span>

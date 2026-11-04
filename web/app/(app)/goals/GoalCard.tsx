@@ -8,14 +8,13 @@ import type { GoalState } from '@/domain/goalAdherence';
 import type { DismissKind } from '@/domain/goalMeta';
 import type { Proposal } from '@/domain/goalProposals';
 import { formatMoney } from '@/lib/format';
-import { formatIndianDate } from '@/lib/date';
-import { localeForCountry } from '@/lib/regions';
+import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isDiscreetMode } from '@/lib/discreet';
 import { Button } from '@web/components/ui/Button';
 import { ProgressRing } from '@web/components/ui/ProgressRing';
 import { MetricRow } from '@web/components/visual';
 import { GoalStateCaption } from './GoalStateCaption';
-import { stateColor, type ProposalCopy } from '@web/lib/goals/goalCardModel';
+import { stateColor, stateTextColor, type ProposalCopy } from '@web/lib/goals/goalCardModel';
 import { doneLabel, proposalRowLabel } from './goalsView';
 
 export interface GoalCardProps {
@@ -64,6 +63,7 @@ export function GoalCard({
   // Teal only when on track or met; terracotta for any concern. Never alarm-red.
   // Same token for the figure and the gauge so they read as one mark.
   const toneColor = stateColor(state);
+  const toneTextColor = stateTextColor(state);
   const isDone = goal.status === 'completed' || goal.status === 'abandoned';
   // A proposal is only ever next/reanchor on a card; "start" belongs to the create form.
   const dismissKind: DismissKind | null =
@@ -92,7 +92,7 @@ export function GoalCard({
             </div>
           ) : null}
           {!isDone ? (
-            <span className="editorial-numeral--micro nums-tabular" style={{ color: toneColor }}>
+            <span className="editorial-numeral--micro nums-tabular" style={{ color: toneTextColor }}>
               {pct}%
             </span>
           ) : null}
@@ -112,7 +112,7 @@ export function GoalCard({
       </div>
 
       {isDone ? (
-        <p className="text-small text-text-muted">{doneLabel(goal.status, goal.completedAt, formatIndianDate)}</p>
+        <p className="text-small text-text-muted">{doneLabel(goal.status, goal.completedAt, timezoneForCountry(profile.country))}</p>
       ) : (
         <p className="text-small text-text-muted">
           {explanation}

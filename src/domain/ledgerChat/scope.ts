@@ -7,7 +7,7 @@ export const IN_SCOPE: readonly string[] = [
   'Your entries from the last 90 days: time, sticks, brand alias or name, variant, price paid, purchase mode, mood before and after, trigger, craving, situation and notes. In discreet mode, brands are aliased and notes and variants are left out.',
   'Daily totals for up to a year (never before you joined), and the comparisons, trends, peaks and savings worked out from them.',
   'Your goals: the active ones with their live state and suggestions, and the history of paused, completed and abandoned goals (type, target, dates and outcome).',
-  'Prices you recorded on entries in the last 90 days: brand alias or name, unit price, pack size and date.',
+  'Prices you recorded on entries in the last 90 days: brand alias or name, variant (not in discreet mode), unit price, pack size and date.',
   'Which entries you edited, and on what date. The values before an edit are not kept, so they cannot be read.',
   'A short context line: today’s date, time zone, currency, locale, your daily baseline, and whether discreet mode is on.',
 ];

@@ -57,7 +57,7 @@ import { Button } from '@web/components/ui/Button';
 import { getSupabase } from '@web/lib/supabase/client';
 import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { useGoalReconcile } from '@web/lib/goals/useGoalReconcile';
-import { goalCardModel, stateColor } from '@web/lib/goals/goalCardModel';
+import { goalCardModel, stateColor, stateTextColor } from '@web/lib/goals/goalCardModel';
 import { firstSuggestionSentence, shouldShowFirstSuggestion } from '@web/lib/goals/firstSuggestion';
 import { dismissFirstSuggestion, isFirstSuggestionDismissed } from '@web/lib/goals/firstSuggestionStore';
 import {
@@ -271,6 +271,7 @@ export function DashboardClient({
     [activeGoal, logs, today, profile],
   );
   const goalToneColor = goalCard ? stateColor(goalCard.state) : 'var(--text-muted)';
+  const goalToneTextColor = goalCard ? stateTextColor(goalCard.state) : 'var(--text-muted)';
   // Every figure in the line is a count of days; hidden Home totals show no line at all.
   const goalLine =
     goalCard && !hidden
@@ -419,7 +420,7 @@ export function DashboardClient({
   const deck = headlineDeck({ sticks, windowDays, deltaPct: period.stickDeltaPct, streak, hidden });
   const tTone = trendTone(period.stickDeltaPct);
   const trendColour =
-    tTone === 'up' ? 'var(--warn-earth)' : tTone === 'down' ? 'var(--accent)' : 'var(--text-muted)';
+    tTone === 'up' ? 'var(--warn-earth-ink)' : tTone === 'down' ? 'var(--accent-ink)' : 'var(--text-muted)';
   const periodCap = WINDOWS.find((w) => w.days === windowDays)?.label ?? 'Day';
 
   const idx = (n: number) => ({ ['--ed-index' as string]: n } as React.CSSProperties);
@@ -509,7 +510,7 @@ export function DashboardClient({
             ) : null}
             {quickLogError ? (
               <div role="alert" className="flex items-center justify-between gap-md mt-md p-md bg-bg border border-[var(--warn-earth)] rounded-md">
-                <p className="text-small flex-1" style={{ color: 'var(--warn-earth)' }}>
+                <p className="text-small flex-1" style={{ color: 'var(--warn-earth-ink)' }}>
                   {quickLogError}
                 </p>
                 {lastLogParams && (
@@ -655,7 +656,7 @@ export function DashboardClient({
               <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
                 {goalHeading}
                 <span className="text-text-faint"> · </span>
-                <span className="editorial-numeral--micro" style={{ color: goalToneColor }}>
+                <span className="editorial-numeral--micro" style={{ color: goalToneTextColor }}>
                   {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
                 </span>
               </p>

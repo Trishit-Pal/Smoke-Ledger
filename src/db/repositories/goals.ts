@@ -159,6 +159,65 @@ export async function setGoalStatus(id: string, status: Goal['status']): Promise
   if (error) throw mapDbError(error);
 }
 
+/**
+ * Reconcile's completion: flips an ACTIVE goal to completed and reports whether a row
+ * changed. 0 rows means another device set it aside or deleted it, so nothing happened
+ * and no "Quit day." moment is owed. (A user's own status change uses `setGoalStatus`,
+ * which must stay unconditional.)
+ */
+export async function completeGoalIfActive(id: string): Promise<boolean> {
+  parseOrThrow(IdSchema, id, 'goal_id');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from('goals')
+    .update({ status: 'completed' })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .eq('status', 'active')
+    .select('id');
+  if (error) throw mapDbError(error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Reconcile's "met" mark: sets `metOn` on the CURRENT row's meta (never a stale snapshot
+ * copy, which would resurrect steps and dismissals written since). Returns false when the
+ * goal is gone, no longer active, or its cap moved since the plan was made.
+ *
+ * Not racy for the accept case: the UPDATE is conditional on `target_value`, and accepting a
+ * proposal changes target_value and meta in one statement, so either accept lands first (0
+ * rows here, replanned next time) or it lands after and rebuilds its meta without `metOn`.
+ * ponytail: the meta itself is read-then-write, so a write that changes only meta (a dismissal)
+ * inside the read-to-write gap is lost; a jsonb `||` merge in an RPC closes it if that ever matters.
+ */
+export async function markGoalMet(id: string, metOn: string, expectedTarget: number): Promise<boolean> {
+  parseOrThrow(IdSchema, id, 'goal_id');
+  const supabase = getSupabase();
+  const userId = await requireUserId();
+  const { data: row, error: readError } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (readError) throw mapDbError(readError);
+  if (!row) return false;
+  const current = rowToGoal(row as Row);
+  if (current.targetValue !== expectedTarget) return false;
+  const { data, error } = await supabase
+    .from('goals')
+    .update({ meta_json: { ...(current.meta ?? {}), metOn } })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .eq('status', 'active')
+    .eq('target_value', expectedTarget)
+    .select('id');
+  if (error) throw mapDbError(error);
+  return (data?.length ?? 0) > 0;
+}
+
 export async function deleteGoal(id: string): Promise<void> {
   parseOrThrow(IdSchema, id, 'goal_id');
   const supabase = getSupabase();

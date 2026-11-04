@@ -12,7 +12,7 @@
  * the one tap saves it and sends the pending question.
  *
  * The panel reads its own state (opt-in, masking, currency, starters) from
- * GET /api/ledger-chat on first open, so the dock needs no page data. An
+ * GET /api/ledger-chat on every open, so the dock needs no page data. An
  * initial question from the dock is sent once per open when the reader has
  * opted in, and waits behind the consent notice when they have not.
  */
@@ -32,7 +32,7 @@ import {
   type ChatStateResponse,
   type Row,
 } from '@/domain/ledgerChat/types';
-import { maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { maskCount, maskInr, maskNumbers, spokenMask } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { track } from '@/services/analytics';
@@ -42,11 +42,12 @@ import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { getSupabase } from '@web/lib/supabase/client';
 import { Button } from '@web/components/ui/Button';
 import { InlineRule, MetricRow, SectionLabel } from '@web/components/visual';
-import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
+import { LEDGER_CHAT_NOTICE, LEDGER_CHAT_NOTICE_VERSION, chatOptInValue } from '@web/components/chat/notice';
 import {
   clearTranscript,
   loadTranscript,
   saveTranscript,
+  transcriptClearCount,
   type TranscriptTurn,
 } from '@web/components/chat/transcriptStore';
 
@@ -55,9 +56,14 @@ export interface AskLedgerPanelProps {
   onOpenChange: (open: boolean) => void;
   /** A question typed into the dock: pre-filled, and sent once per open when opted in. */
   initialQuestion?: string;
+  /** Where focus goes on close. The dock owns the controls that opened the panel; Radix has no Trigger to return to. */
+  returnFocus?: () => void;
 }
 
 type Status = 'idle' | 'loading' | 'consent' | 'outdated' | 'rate_limited' | 'disabled' | 'error';
+
+/** Statuses a fresh clean GET proves out of date. Never 'loading': that is an answer in flight. */
+const STALE_ON_CLEAN_GET: ReadonlySet<Status> = new Set(['disabled', 'outdated', 'error']);
 
 interface Pending {
   question: string;
@@ -126,8 +132,12 @@ function rowDisplay(row: Row, masked: boolean, money: (n: number) => string): st
   return String(row.value);
 }
 
-export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedgerPanelProps) {
+export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocus }: AskLedgerPanelProps) {
   const inputId = React.useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  // The newest answer that arrived while the panel was open: the one the live region announces.
+  const [announcedId, setAnnouncedId] = React.useState<string | null>(null);
   const [userId, setUserId] = React.useState<string | null>(null);
   const [turns, setTurnsState] = React.useState<TranscriptTurn[]>([]);
   // send() awaits the network; it must append to the turns as they are when the
@@ -143,12 +153,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(() => new Set());
 
   const [state, setState] = React.useState<ChatStateResponse | null>(null);
-  // Set once the session and (on first open) the GET state have both landed for this open.
+  // Set once the session and the GET state have both landed for this open.
   const [ready, setReady] = React.useState(false);
-  const fetchedRef = React.useRef(false);
-  // The in-flight GET, shared by a StrictMode re-run so the state cap is spent once.
+  // This open's GET, shared by a StrictMode re-run so the state cap is spent once per open.
+  // Cleared on close, never in the effect cleanup, or the re-run would fetch twice.
   const stateLoadRef = React.useRef<Promise<LoadedState> | null>(null);
   const consumedRef = React.useRef(false);
+  // Bumped on every close, so a consent-then-send that was started in an earlier open stops there.
+  const openEpochRef = React.useRef(0);
 
   // Until the state is read, figures stay masked: the safe default.
   const hidden = state ? state.hideTotals : true;
@@ -159,30 +171,71 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     [state?.currency, state?.locale],
   );
   const busy = status === 'loading';
+  const announced = turns.find((t) => t.id === announcedId);
+  // Same rule as the prose on screen, so discreet mode never reads a figure aloud.
+  const announcedMasked = announced ? hidden && !revealed.has(`${announced.id}:answer`) : true;
+
+  // Radix would focus the first tabbable, the confirm-free Clear button once there are turns,
+  // and a stray Enter would wipe the conversation. The question box is the right start.
+  // A disabled box (an answer still in flight) falls back to the dialog itself.
+  const onOpenFocus = (e: Event) => {
+    e.preventDefault();
+    const input = inputRef.current;
+    (input && !input.disabled ? input : contentRef.current)?.focus({ preventScroll: true });
+  };
+  const onCloseFocus = (e: Event) => {
+    e.preventDefault();
+    returnFocus?.();
+  };
+
+  // The box and starters are disabled while an answer is in flight, which drops focus to the dialog.
+  // When it ends, put focus back in the box, unless the reader has moved to another control.
+  // Not on touch: it would raise the keyboard over each new answer in the short sheet.
+  const wasBusyRef = React.useRef(false);
+  React.useEffect(() => {
+    if (wasBusyRef.current && !busy && open && !window.matchMedia('(pointer: coarse)').matches) {
+      const active = document.activeElement;
+      const lost =
+        !active || active === document.body || active === contentRef.current || active === inputRef.current || active.closest('[data-starters]');
+      if (lost) inputRef.current?.focus({ preventScroll: true });
+    }
+    wasBusyRef.current = busy;
+  }, [busy, open]);
 
   // The transcript key needs the user id: getSession() reads the local session,
-  // no network round-trip. The panel state is read from GET once per mount.
+  // no network round-trip. The panel state is read from GET on every open: the dock
+  // outlives Settings changes (Hide totals, discreet, country), so a kept copy goes stale.
   React.useEffect(() => {
     if (!open) {
       setReady(false);
       consumedRef.current = false;
+      stateLoadRef.current = null;
+      openEpochRef.current += 1;
+      // Unknown state masks every figure, and a figure the reader revealed stays revealed only for that open.
+      setState(null);
+      setRevealed(new Set());
+      setAnnouncedId(null);
       return;
     }
     let cancelled = false;
-    let stateLoad: Promise<LoadedState | null> = Promise.resolve(null);
-    if (!fetchedRef.current) {
-      stateLoadRef.current ??= loadChatState();
-      stateLoad = stateLoadRef.current;
-    }
-    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoad]).then(([id, loaded]) => {
+    stateLoadRef.current ??= loadChatState();
+    void Promise.all([sessionUserId(() => getSupabase().auth.getSession()), stateLoadRef.current]).then(([id, loaded]) => {
       if (cancelled) return;
       setUserId(id);
       setTurns(id ? loadTranscript(id) : []);
-      if (loaded) {
-        fetchedRef.current = true;
-        setState(loaded.state);
-        if (loaded.blocked) setStatus(loaded.blocked);
-      }
+      setState(loaded.state);
+      // A refusal or error from an earlier open is stale once this GET is clean (the reader may have
+      // just reviewed the agreements); loading and rate_limited are left alone here. A consent card
+      // from an earlier open is moot once the server says consented (opted in elsewhere, e.g.
+      // Settings). That is decided here, on the GET alone: the optimistic consented flag set by
+      // onTurnOnAndAsk must never drop the card when the POST then answers consent_required.
+      // The stale pending question stays hidden (it only shows while status is not idle) and the next send replaces it.
+      setStatus((prev) => {
+        if (loaded.blocked) return loaded.blocked;
+        if (!loaded.state) return prev;
+        if (STALE_ON_CLEAN_GET.has(prev) || (prev === 'consent' && loaded.state.consented)) return 'idle';
+        return prev;
+      });
       setReady(true);
     });
     return () => {
@@ -196,6 +249,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       if (!q) return;
       setPending({ question: q, starter });
       setStatus('loading');
+      const clearsAtStart = transcriptClearCount();
       try {
         const res = await fetch('/api/ledger-chat', {
           method: 'POST',
@@ -204,6 +258,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
         });
         if (res.ok) {
           const body = (await res.json()) as ChatResponse;
+          // Cleared while the answer was in flight (Clear, sign-out, discreet on, chat turned off):
+          // the policy says those empty the device, so the late answer is dropped, never saved.
+          if (transcriptClearCount() !== clearsAtStart) {
+            setTurns([]);
+            setPending(null);
+            setStatus('idle');
+            return;
+          }
           const current = turnsRef.current;
           const turn: TranscriptTurn = {
             id: `${Date.now().toString(36)}-${current.length}`,
@@ -214,6 +276,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
           };
           const next = [...current, turn];
           setTurns(userId ? saveTranscript(userId, next) : next);
+          setAnnouncedId(turn.id);
           setPending(null);
           setDraft('');
           setStatus('idle');
@@ -251,9 +314,12 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
 
   const onTurnOnAndAsk = async () => {
     if (!pending) return;
+    const openLoad = stateLoadRef.current;
+    const openEpoch = openEpochRef.current;
     setStatus('loading');
     try {
-      await setSetting('consent.ledgerChatOptIn', true);
+      // The notice version, not `true`: the consent covers only the words shown here.
+      await setSetting('consent.ledgerChatOptIn', chatOptInValue(true));
     } catch {
       setStatus('error');
       setPending(null);
@@ -263,16 +329,26 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
       await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
         enabled: true,
         privacyVersion: LEGAL_VERSIONS.privacy,
+        noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
       });
     } catch {
       // Consent is already saved. The audit row is best-effort here: the edge
       // allowlist may lag a deploy, and that must never block the answer.
     }
+    // Closed during the consent writes: the consent is saved, but the panel is gone, so no question
+    // is sent and no answer is saved; status and pending are reset. The reader asks again on the next open.
+    // ponytail: resets status even if the panel was reopened meanwhile; that open re-derives it from its own GET.
+    if (openEpochRef.current !== openEpoch) {
+      setStatus('idle');
+      setPending(null);
+      return;
+    }
     setState((prev) => (prev ? { ...prev, consented: true } : prev));
     await send(pending.question, pending.starter);
     // Opted in now: read the state again so the starters appear without a reload.
     const loaded = await loadChatState();
-    if (loaded.state) setState(loaded.state);
+    // Closed (ref cleared) or reopened (a newer GET) in the meantime: that open's state wins.
+    if (loaded.state && stateLoadRef.current === openLoad) setState(loaded.state);
   };
 
   const onNotNow = () => {
@@ -298,7 +374,12 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50" />
-        <Dialog.Content className="ask-sheet fixed inset-x-0 bottom-0 z-[60] flex max-h-[88dvh] flex-col rounded-t-lg border-t border-border bg-card shadow-xl md:inset-y-0 md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[min(100vw,28rem)] md:rounded-none md:border-l md:border-t-0">
+        <Dialog.Content
+          ref={contentRef}
+          onOpenAutoFocus={onOpenFocus}
+          onCloseAutoFocus={onCloseFocus}
+          className="ask-sheet fixed inset-x-0 bottom-0 z-[60] flex max-h-[88dvh] flex-col rounded-t-lg border-t border-border bg-card shadow-xl md:inset-y-0 md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[min(100vw,28rem)] md:rounded-none md:border-l md:border-t-0"
+        >
           <header className="flex shrink-0 items-start justify-between gap-md px-lg pt-lg">
             <div className="flex min-w-0 flex-col gap-xs">
               <Dialog.Title asChild>
@@ -333,7 +414,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
             {!ready && !state ? (
               <p className="rule-hair-strong mt-lg pt-md text-caption italic text-text-faint">{COPY.loading}</p>
             ) : starters.length > 0 ? (
-              <section className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
+              <section data-starters className="rule-hair-strong mt-lg flex flex-col gap-xs pt-md">
                 <SectionLabel spacing="none">To begin</SectionLabel>
                 <ul className="flex flex-col">
                   {starters.map((text) => (
@@ -409,6 +490,10 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
             })}
 
             <div aria-live="polite" className="flex flex-col gap-sm">
+              {/* The transcript above is outside this region, so the newest answer is mirrored here as hidden text.
+                  ponytail: a screen reader's browse mode can read it twice (here and in the transcript); aria-hide the
+                  transcript's newest article if that proves noisy. */}
+              {announced ? <p className="sr-only">{spokenMask(announced.answer, announcedMasked)}</p> : null}
               {pending && status !== 'idle' ? (
                 <p className="editorial-pullquote mt-md text-[clamp(1rem,2vw,1.125rem)] text-text">{pending.question}</p>
               ) : null}
@@ -471,6 +556,7 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion }: AskLedge
                 Ask your ledger
               </label>
               <input
+                ref={inputRef}
                 id={inputId}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

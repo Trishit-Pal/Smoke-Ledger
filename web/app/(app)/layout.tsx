@@ -18,7 +18,7 @@ import { RealtimeRefresher } from '@web/components/realtime/RealtimeRefresher';
 // (dimmed, no bloom) so task-focused pages stay legible.
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
 // Ask the ledger on every reading page (hidden on Log). The layout passes the
-// server flag only; the dock reads its own state on first open. Where the dock
+// server flag only; the dock reads its own state on every open. Where the dock
 // shows, --ask-dock-clear (globals.css) pads main and lifts page-level fixed
 // controls (History's New log, its toast) clear of it; 0 when off and on Log.
 import { AskLedgerDock } from '@web/components/chat/AskLedgerDock';

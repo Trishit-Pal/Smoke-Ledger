@@ -44,7 +44,9 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['--on-accent', '--accent-ink'],
   ['--on-accent', '--warn-earth-ink'],
   ['--warn-earth-ink', '--bg'],
+  ['--warn-earth-ink', '--card'],
   ['--warn-earth-ink', '--warn-earth-soft'],
+  ['--ink-surface-accent', '--ink-surface'],
 ];
 
 describe.each(Object.entries(themes))('%s theme token contrast', (_name, tokens) => {

@@ -61,6 +61,15 @@ export const STORES: readonly LifecycleStore[] = [
     clearOn: ['signOut', ...ERASE_FAMILY],
   },
   { id: 'mobile.lockKeys', platform: 'mobile', kind: 'secure-store', personal: true, clearOn: ERASE_FAMILY },
+  // The re-auth detour record for delete (10 min, one-shot). Cleared on sign-out so one reader's
+  // leftover cannot be honoured for the next.
+  {
+    id: 'mobile.deleteIntent',
+    platform: 'mobile',
+    kind: 'secure-store',
+    personal: true,
+    clearOn: ['signOut', ...ERASE_FAMILY],
+  },
   { id: 'mobile.notifications', platform: 'mobile', kind: 'os', personal: true, clearOn: ERASE_FAMILY },
   { id: 'mobile.exportFile', platform: 'mobile', kind: 'file', personal: true, clearOn: ERASE_FAMILY },
   // Kept: device preferences, nothing personal.

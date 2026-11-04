@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/immutability -- Reanimated SharedValue is a mutable box; writing `.value` in press handlers is its documented API */
 import React, { memo, useEffect } from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
-import { Tabs, Redirect, usePathname } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -16,8 +16,6 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { useLayout } from '@/hooks/useLayout';
 import { useAuth } from '@/store/auth';
 import { useSession } from '@/store/session';
-import { isOnboarded } from '@/lib/compliance';
-import { consentGateRedirect, resumeOnboardingRoute } from '@/lib/onboardingSteps';
 import { tabBarHeight } from '@/lib/askPill';
 import { AskPill } from '@/components/ask/AskPill';
 
@@ -192,11 +190,8 @@ const TabItem = memo(function TabItem({ glyph, label, a11yLabel, active, reduce,
 });
 
 export default function TabsLayout() {
-  const session = useAuth((s) => s.session);
   const initialized = useAuth((s) => s.initialized);
-  const profile = useSession((s) => s.profile);
   const booted = useSession((s) => s.booted);
-  const pathname = usePathname();
   const theme = useTheme();
 
   if (!initialized || !booted) {
@@ -207,13 +202,8 @@ export default function TabsLayout() {
     );
   }
 
-  if (!session) return <Redirect href="/login" />;
-  // Mid-wizard sign-in resumes at the saved step (privacy until consented).
-  if (!isOnboarded(profile)) return <Redirect href={resumeOnboardingRoute(profile)} />;
-  // Re-consent gate. Settings stays reachable (export / withdraw live there) so
-  // "Not now" cannot loop; /consent itself is outside the tabs.
-  const consentRedirect = consentGateRedirect(pathname, profile, true);
-  if (consentRedirect) return <Redirect href={consentRedirect} />;
+  // Session, onboarding and re-consent are the root layout's route guard
+  // (src/lib/routeGuard.ts); this only waits for the data the tabs read.
 
   return (
     <View style={{ flex: 1 }}>

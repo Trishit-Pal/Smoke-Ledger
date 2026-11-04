@@ -38,14 +38,15 @@ describe('ledger-chat route guards', () => {
     expect(post).toContain("fail('consent_required', 403)");
   });
 
-  test('the profile gate checks consents, onboarding, then current legal versions', () => {
+  test('the profile gate checks onboarding, then missing or outdated consents (the shared predicate)', () => {
     const gate = route.slice(route.indexOf('async function gatedProfile('));
     const load = gate.indexOf('loadProfile(');
-    const consents = gate.indexOf('hasRequiredConsents(');
-    const outdated = gate.indexOf('consentsOutdated(');
+    const onboarded = gate.indexOf('isOnboarded(');
+    const refresh = gate.indexOf('needsConsentRefresh(');
     expect(load).toBeGreaterThan(-1);
-    expect(consents).toBeGreaterThan(load);
-    expect(outdated).toBeGreaterThan(consents);
+    expect(onboarded).toBeGreaterThan(load);
+    expect(refresh).toBeGreaterThan(onboarded);
+    expect(gate).toContain("fail('forbidden', 403)");
     expect(gate).toContain("fail('consent_outdated', 403)");
   });
 

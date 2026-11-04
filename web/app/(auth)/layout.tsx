@@ -2,11 +2,19 @@ import * as React from 'react';
 import Link from 'next/link';
 import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell';
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
+import { WordmarkHomeLink } from '@web/components/auth/WordmarkHomeLink';
 import { LEGAL_LINKS } from '@web/lib/legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <EditorialPageShell maxWidth={520} backdrop={<SceneBackdrop intensity="full" />}>
+    // The wordmark is the way home here; the fixed-corner "Go to Homepage" link
+    // stays only on the legal and support pages.
+    <EditorialPageShell
+      maxWidth={520}
+      backdrop={<SceneBackdrop intensity="full" />}
+      showGoHome={false}
+    >
+      <WordmarkHomeLink />
       {children}
       <footer
         style={{

@@ -208,19 +208,38 @@ export async function markConsentOutdated(userId: string): Promise<void> {
   if (error) throw new Error(`seed: markConsentOutdated failed: ${error.message}`);
 }
 
+/**
+ * Drop an onboarded user's age and data-processing stamps, the way a legacy row
+ * from before those columns existed looks: still onboarded, missing a consent.
+ */
+export async function clearConsentStamps(userId: string): Promise<void> {
+  const a = getAdmin();
+  if (!a) throw new Error('seed: admin not configured');
+  const { error } = await a
+    .from('user_profiles')
+    .update({ age_confirmed_at: null, data_processing_consent_at: null })
+    .eq('id', userId);
+  if (error) throw new Error(`seed: clearConsentStamps failed: ${error.message}`);
+}
+
+interface ConsentState {
+  terms_version: string | null;
+  health_data_consent_at: string | null;
+  age_confirmed_at: string | null;
+  data_processing_consent_at: string | null;
+}
+
 /** The consent columns the re-consent screen writes, read back with the service role. */
-export async function readConsentState(
-  userId: string,
-): Promise<{ terms_version: string | null; health_data_consent_at: string | null }> {
+export async function readConsentState(userId: string): Promise<ConsentState> {
   const a = getAdmin();
   if (!a) throw new Error('seed: admin not configured');
   const { data, error } = await a
     .from('user_profiles')
-    .select('terms_version,health_data_consent_at')
+    .select('terms_version,health_data_consent_at,age_confirmed_at,data_processing_consent_at')
     .eq('id', userId)
     .single();
   if (error) throw new Error(`seed: readConsentState failed: ${error.message}`);
-  return data as { terms_version: string | null; health_data_consent_at: string | null };
+  return data as ConsentState;
 }
 
 /** The saved onboarding step pointer (what the middleware gates on). */

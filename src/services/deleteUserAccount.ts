@@ -11,6 +11,12 @@ interface DeleteOptions {
    * "Please sign in again to confirm account deletion" UI.
    */
   onReauthRequired?: () => void;
+  /**
+   * The deletion ends a consent withdrawal. The server writes the `consent_revoked`
+   * row itself, only once the deletion succeeded (a failed delete leaves none): after the
+   * account is gone no client can authenticate an audit write. Omitted (web) sends no body.
+   */
+  withdraw?: boolean;
 }
 
 export async function deleteUserAccount(options: DeleteOptions = {}): Promise<void> {
@@ -33,6 +39,7 @@ export async function deleteUserAccount(options: DeleteOptions = {}): Promise<vo
 
   const { data, error } = await supabase.functions.invoke('delete-account', {
     headers: { Authorization: `Bearer ${accessToken}` },
+    ...(options.withdraw === undefined ? {} : { body: { withdraw: options.withdraw } }),
   });
 
   if (error) {

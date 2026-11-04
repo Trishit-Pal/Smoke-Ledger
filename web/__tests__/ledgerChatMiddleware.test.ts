@@ -18,7 +18,14 @@ describe('middleware carve-out for /api/ledger-chat', () => {
   });
 
   test('carves out only the chat route, not all API paths', () => {
-    expect(middleware).not.toMatch(/startsWith\('\/api\/?'\)/);
-    expect(middleware).not.toMatch(/startsWith\('\/api'\)/);
+    // Before the session lookup, only the chat route skips the gates. (After it,
+    // API paths are exempt from the onboarding redirects, never from sign-in.)
+    const beforeAuth = middleware.slice(
+      middleware.indexOf('export async function middleware('),
+      middleware.indexOf('supabase.auth.getUser()'),
+    );
+    expect(beforeAuth.length).toBeGreaterThan(0);
+    expect(beforeAuth).not.toMatch(/startsWith\('\/api\/?'\)/);
+    expect(beforeAuth).not.toMatch(/isApiRoute\(/);
   });
 });

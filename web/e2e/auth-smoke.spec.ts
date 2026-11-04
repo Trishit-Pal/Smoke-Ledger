@@ -97,6 +97,21 @@ test('go to homepage link navigates from public pages', async ({ page }) => {
   await expect(page).toHaveURL('/');
 });
 
+test('auth pages carry a wordmark home link; sign-up shows the setup steps', async ({ page }) => {
+  for (const route of ['/login', '/signup']) {
+    await page.goto(route);
+    await expect(page.getByRole('link', { name: 'Smoke Ledger home' })).toHaveAttribute('href', '/');
+    await expect(page.getByRole('link', { name: 'Go to Smoke Ledger homepage' })).toHaveCount(0);
+  }
+
+  const steps = page.getByRole('list', { name: 'Setup steps' }).getByRole('listitem');
+  await expect(steps).toHaveText(['Account', 'Privacy', 'Baseline', 'Goal', 'Brands', 'Done']);
+  await expect(steps.first()).toHaveAttribute('aria-current', 'step');
+
+  await page.goto('/login');
+  await expect(page.getByRole('list', { name: 'Setup steps' })).toHaveCount(0);
+});
+
 test('go to homepage link is hidden on landing page', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Go to Smoke Ledger homepage' })).toHaveCount(0);

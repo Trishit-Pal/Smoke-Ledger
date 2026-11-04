@@ -29,7 +29,8 @@ import { createBrand, upsertVariant, setVariantPriceOverride } from '@/db/reposi
 import { eraseAllUserData } from '@/services/cloudErase';
 import { deleteUserAccount } from '@/services/deleteUserAccount';
 import { exportAccountData } from '@/services/exportAccountData';
-import { recordConsentWithdrawal, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import { recordWithdrawalAfter, saveAnalyticsOptIn } from '@/services/consentWithdrawal';
+import { beginDeleteDetour, takeDeleteResume } from '@/lib/deleteIntent';
 import {
   WITHDRAW_DELETE_LABEL,
   WITHDRAW_ERASE_LABEL,
@@ -823,7 +824,8 @@ export default function Settings() {
   // the user back here at DELETE_RESUME_PATH). A fresh sign-in alone must never
   // delete an account, and cancelling must say that nothing was deleted —
   // otherwise "it made me sign in again" reads as "it's done".
-  // `withdraw` marks the deletion as the end of a consent withdrawal (emits consent_revoked).
+  // `withdraw` marks the deletion as the end of a consent withdrawal: it is sent to the
+  // delete-account function, which writes consent_revoked after its re-auth gate.
   const deleteAccount = (variant: 'first' | 'resume' = 'first', withdraw = false) => {
     Alert.alert(
       variant === 'resume'
@@ -848,16 +850,27 @@ export default function Settings() {
             setError(null);
             let isReauthRedirect = false;
             try {
-              if (withdraw) await recordConsentWithdrawal('delete');
               await deleteUserAccount({
+                // The server writes consent_revoked itself, past its re-auth gate: after the
+                // delete no session is left to authenticate a client-side audit write.
+                withdraw,
                 // After the detour a further reauth_required is shown as an
                 // error, never another redirect: no silent login ↔ Settings loop.
                 onReauthRequired:
                   variant === 'resume'
                     ? undefined
                     : () => {
+                        // Mark the detour (and the withdraw intent) before leaving: the
+                        // resume honours ?action=delete only against this record.
+                        // ponytail: SecureStore unavailable => no detour => delete is blocked
+                        // here (fail closed). Delete is the erasure path, so a device with a
+                        // broken keystore cannot finish it; upgrade: carry the proof in the
+                        // login route param (or email the reader a link) if that bites.
                         isReauthRedirect = true;
-                        router.replace('/login?reason=reauth');
+                        void beginDeleteDetour(withdraw).then((started) => {
+                          if (started) router.replace('/login?reason=reauth');
+                          else setError('Could not start the sign-in step. Your account has not been deleted.');
+                        });
                       },
               });
               // Best-effort local cleanup; never block the redirect on it.
@@ -886,14 +899,19 @@ export default function Settings() {
 
   // Re-auth resume: the login screen returns here with ?action=delete after
   // the fresh sign-in the server demanded. Clear the param so a later visit
-  // does not re-open the prompt, then re-confirm.
+  // does not re-open the prompt, then re-confirm. The param alone is not proof:
+  // any link can carry it, so it is honoured only against the record this device
+  // wrote before the detour (consumed here either way), which also restores `withdraw`.
   const { action } = useLocalSearchParams<{ action?: string }>();
   const resumeHandled = useRef(false);
   useEffect(() => {
     if (resumeHandled.current || action !== 'delete') return;
     resumeHandled.current = true;
     router.setParams({ action: '' });
-    deleteAccount('resume');
+    void takeDeleteResume().then((intent) => {
+      if (intent) deleteAccount('resume', intent.withdraw);
+      else setError('Your account has not been deleted.');
+    });
     // deleteAccount is a stable closure over state setters; run once per resume.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action]);
@@ -912,8 +930,7 @@ export default function Settings() {
             setBusy('erase-all');
             setError(null);
             try {
-              if (withdraw) await recordConsentWithdrawal('erase');
-              await eraseAllUserData();
+              await recordWithdrawalAfter(withdraw, 'erase', eraseAllUserData);
               // Notifications, export file, lock state and first-suggestion stamp (registry's erase row).
               await clearNativeDevice('erase');
               await boot();

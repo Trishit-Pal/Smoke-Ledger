@@ -3,7 +3,7 @@
 
 import { LEDGER_CHAT_NOTICE } from '@/domain/ledgerChat/notice';
 import type { ChatStateResponse, Row } from '@/domain/ledgerChat/types';
-import { maskCount, maskInr, maskNumbers } from '@/lib/discreet';
+import { maskCount, maskInr, maskNumbers, spokenMask } from '@/lib/discreet';
 import { formatMoney } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/regions';
 import type { ChatFailure } from '@/services/ledgerChat';
@@ -37,6 +37,32 @@ export function takeWaitingQuestion(draft: string, alreadyTaken: boolean): strin
   return alreadyTaken || !q ? null : q;
 }
 
+/**
+ * The "already sent" guard after an ask comes back. A consent_required refusal
+ * means the waiting question never went out, so it must be sendable again after
+ * the next opt-in; the guard only exists to stop a double tap.
+ */
+export function waitingTakenAfter(taken: boolean, failure: ChatFailure | null): boolean {
+  return failure === 'consent_required' ? false : taken;
+}
+
+/**
+ * Where Close / "Not now" go. After a cold start from smokeledger://ask the
+ * modal is the only screen, so router.back() would do nothing.
+ */
+export function leaveTarget(canGoBack: boolean): 'back' | '/(tabs)' {
+  return canGoBack ? 'back' : '/(tabs)';
+}
+
+/**
+ * What a screen reader speaks for a new answer: the same masking the screen
+ * draws for an unrevealed answer, so discreet mode holds for speech too.
+ */
+export function answerAnnouncement(answer: string, hidden: boolean): string {
+  const paragraphs = answer.split(/\n+/).filter((p) => p.trim().length > 0);
+  return spokenMask(paragraphs.join(' '), hidden);
+}
+
 /** Same helpers Home uses, so the mask glyph and rules stay in one place. */
 export function rowDisplay(
   row: Row,
@@ -54,6 +80,7 @@ export function rowDisplay(
 }
 
 /** What the phone says where the web says "in this browser": nothing is kept on the device. */
+// Part of the consent notice: bump LEDGER_CHAT_NOTICE_VERSION with any change here.
 export const MOBILE_DEVICE_NOTE =
   'We store no questions or replies on our servers, and the app keeps none on this device. The conversation lives only on this screen, and leaving it clears it. You can turn this off in Settings at any time.';
 

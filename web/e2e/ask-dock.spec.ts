@@ -53,8 +53,207 @@ test.describe('ask dock', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(QUESTION).first()).toBeVisible();
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByText('Written by AI')).toBeVisible();
+  });
+
+  test('reopening re-reads the state: a figure shown on the first open is masked once Hide totals is on', async ({ page, onboarded }) => {
+    // Settings only router.refresh()es, so the mounted panel must not keep its first reading.
+    // The mock stands in for the reader flipping Hide totals between the two opens.
+    const answer = { ...ANSWER, rows: [{ id: 'compare.current.sticks', label: 'This week', value: 8, unit: 'sticks' }] };
+    let gets = 0;
+    await page.route(CHAT_ROUTE, (route: Route) => {
+      if (route.request().method() !== 'GET') return route.fulfill(json(200, answer));
+      gets += 1;
+      return route.fulfill(
+        json(200, { consented: true, discreet: false, hideTotals: gets > 1, currency: 'INR', locale: 'en-IN', starters: [] }),
+      );
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByLabel('This week 8', { exact: true })).toBeVisible();
+    expect(gets).toBe(1);
+
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await dockBox(page).press('Enter');
+    await expect(dialog.getByLabel('This week hidden, tap to reveal')).toBeVisible();
+    await expect(dialog.getByLabel('This week 8', { exact: true })).toHaveCount(0);
+    await expect.poll(() => gets).toBe(2);
+  });
+
+  test('reopening after the agreements were reviewed clears the outdated notice and sends the question', async ({ page, onboarded }) => {
+    // The dock stays mounted while the reader visits /consent, so a block from one open must not outlive it.
+    let gets = 0;
+    await page.route(CHAT_ROUTE, (route: Route) => {
+      if (route.request().method() !== 'GET') return route.fulfill(json(200, ANSWER));
+      gets += 1;
+      return route.fulfill(
+        gets === 1
+          ? json(403, { error: 'consent_outdated' })
+          : json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }),
+      );
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.getByText('Your agreements changed. Review them to keep asking.')).toHaveCount(0);
+    expect(gets).toBe(2);
+  });
+
+  test('reopening after a failed answer clears the error notice once the state reads clean', async ({ page, onboarded }) => {
+    let failPost = true;
+    await page.route(CHAT_ROUTE, (route: Route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill(json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }));
+      }
+      return route.fulfill(failPost ? json(500, { error: 'upstream_failed' }) : json(200, ANSWER));
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    const errorNotice = dialog.getByText("The ledger couldn't be read just now.", { exact: false });
+    await expect(errorNotice).toBeVisible();
+
+    failPost = false;
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await dockBox(page).press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(errorNotice).toHaveCount(0);
+  });
+
+  test('an answer that lands after Clear conversation is dropped, never saved back', async ({ page, onboarded }) => {
+    // The dock outlives navigation, so the answer can land while the reader is on Settings clearing the device.
+    let releaseAnswer: () => void = () => {};
+    const answerHeld = new Promise<void>((resolve) => {
+      releaseAnswer = resolve;
+    });
+    let answerSent = false;
+    await page.route(CHAT_ROUTE, async (route: Route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill(json(200, { consented: true, discreet: false, hideTotals: false, currency: 'INR', locale: 'en-IN', starters: [] }));
+      }
+      await answerHeld;
+      answerSent = true;
+      return route.fulfill(json(200, ANSWER));
+    });
+    await login(page, onboarded);
+
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByRole('status')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+
+    await page.getByRole('link', { name: 'Settings' }).first().click();
+    await expect(page).toHaveURL(/\/settings/);
+    await page.getByText('Clear conversation', { exact: true }).click();
+
+    releaseAnswer();
+    await expect.poll(() => answerSent).toBe(true);
+    // Let the panel handle the response before looking at the device.
+    await page.waitForTimeout(500);
+    const saved = await page.evaluate(() =>
+      Object.keys(window.localStorage)
+        .filter((k) => k.startsWith('ledger-chat:v1:'))
+        .map((k) => window.localStorage.getItem(k)),
+    );
+    expect(saved.filter((v) => v && v !== '[]')).toEqual([]);
+
+    await dockBox(page).press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(ANSWER.answer)).toHaveCount(0);
+  });
+
+  test('keyboard: open focuses the question box, never Clear; Escape returns focus to the dock', async ({ page, onboarded }) => {
+    // A stored earlier turn is what puts the confirm-free Clear conversation button first in the tab order.
+    await mockChat(page, true);
+    await login(page, onboarded);
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(dockBox(page)).toBeFocused();
+
+    await dockBox(page).press('Enter');
+    await expect(dialog.getByRole('button', { name: 'Clear conversation' })).toBeVisible();
+    await expect(dialog.getByLabel('Ask your ledger')).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Clear conversation' })).not.toBeFocused();
+
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(dockBox(page)).toBeFocused();
+  });
+
+  test('keyboard: the phone pill gets focus back after the panel closes', async ({ page, onboarded }) => {
+    await mockChat(page, true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, onboarded);
+    const pill = page.getByRole('button', { name: 'Ask', exact: true });
+    await pill.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.getByLabel('Ask your ledger')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(pill).toBeFocused();
+  });
+
+  test('the answer is announced by the live region, with figures masked while totals are hidden', async ({ page, onboarded }) => {
+    const answer = { ...ANSWER, answer: 'You logged 8 sticks, 2 fewer than last week.' };
+    await page.route(CHAT_ROUTE, (route: Route) =>
+      route.fulfill(
+        route.request().method() === 'GET'
+          ? json(200, { consented: true, discreet: false, hideTotals: true, currency: 'INR', locale: 'en-IN', starters: [] })
+          : json(200, answer),
+      ),
+    );
+    await login(page, onboarded);
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    const live = dialog.locator('[aria-live="polite"]');
+    await expect(live).toContainText('You logged');
+    // Read aloud as it is printed: no digit survives while totals are hidden.
+    await expect(live).not.toContainText(/\d/);
+  });
+
+  test('keyboard: the box takes focus back once an answer has landed', async ({ page, onboarded }) => {
+    await mockChat(page, true);
+    await login(page, onboarded);
+    await dockBox(page).fill(QUESTION);
+    await dockBox(page).press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.getByLabel('Ask your ledger')).toBeFocused();
+  });
+
+  test('keyboard: Minimise moves focus to Show, and Show back to the box', async ({ page, onboarded }) => {
+    await login(page, onboarded);
+    await page.getByRole('button', { name: 'Minimise Ask the ledger' }).first().focus();
+    await page.keyboard.press('Enter');
+    const show = page.getByRole('button', { name: 'Show Ask the ledger' });
+    await expect(show).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await expect(dockBox(page)).toBeFocused();
   });
 
   test('never covers History’s New log button, on a phone or a desktop', async ({ page, onboarded }) => {

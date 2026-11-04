@@ -172,8 +172,8 @@ export default function OnboardingBrandsPage() {
             maxWidth: 520,
           }}
         >
-          Two or three is enough — you can always add more from Settings. Don&rsquo;t see yours?
-          Add a custom one later.
+          Two or three is enough. Favorites are picked only here, and you can still log any
+          brand in the catalog. Don&rsquo;t see yours? Add it in Settings after setup.
         </p>
       </header>
 
@@ -195,7 +195,7 @@ export default function OnboardingBrandsPage() {
                   borderRadius: 999,
                   border: selected ? '1px solid var(--accent)' : '1px solid var(--rule)',
                   background: selected ? 'var(--accent-soft)' : 'var(--bg-elevated)',
-                  color: selected ? 'var(--accent)' : 'var(--text-muted)',
+                  color: selected ? 'var(--accent-ink)' : 'var(--text-muted)',
                   fontFamily: 'var(--font-sans)',
                   fontWeight: 500,
                   cursor: 'pointer',
@@ -268,7 +268,7 @@ export default function OnboardingBrandsPage() {
                 <span
                   className="editorial-caption-tight nums-tabular"
                   style={{
-                    color: selected ? 'var(--accent)' : 'var(--text-faint)',
+                    color: selected ? 'var(--accent-ink)' : 'var(--text-faint)',
                     paddingLeft: 8,
                   }}
                 >
@@ -381,7 +381,7 @@ export default function OnboardingBrandsPage() {
       ) : null}
 
       {error ? (
-        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth)', margin: 0 }}>
+        <p role="alert" style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: 0 }}>
           {error}
         </p>
       ) : null}

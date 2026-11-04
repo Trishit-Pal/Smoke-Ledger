@@ -140,7 +140,7 @@ export default function GoalNewScreen() {
   async function handleSubmit() {
     setError(null);
     if (isEdit && existingGoal) {
-      const result = buildGoalPatch(form, logs, today, existingGoal);
+      const result = buildGoalPatch(form, logs, today, existingGoal, localeForCountry(profile?.country));
       if (!result.ok) { setError(result.error); return; }
       setBusy(true);
       try {
@@ -159,7 +159,7 @@ export default function GoalNewScreen() {
         );
         return;
       }
-      const result = buildGoalPayload(form, logs, today);
+      const result = buildGoalPayload(form, logs, today, localeForCountry(profile?.country));
       if (!result.ok) { setError(result.error); return; }
       setBusy(true);
       try {

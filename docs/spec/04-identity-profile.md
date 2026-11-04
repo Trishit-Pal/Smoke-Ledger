@@ -16,7 +16,7 @@ sources:
   - web/middleware.ts
   - web/app/onboarding/**
   - app/onboarding/**
-last_verified_commit: 8398559
+last_verified_commit: 62902bc
 status: current
 ---
 
@@ -39,6 +39,8 @@ Once inside, the Settings screen shows a **Profile** section with five rows:
 - **Place** — editable in-place, no rate-limit.
 
 The three read-only rows look visually identical to the editable ones — same hairline-rule table, same label-left / value-right layout — except there is no "Edit" link next to them. The UI does not explain why they cannot be changed; it simply doesn't offer the option.
+
+Beside the profile, Settings › Privacy holds the choice to use Ask the ledger. The opt-in stores the notice version (not `true`), so a changed notice asks again. When the feature is on for the build, web and mobile each show the switch with the same notice (`LedgerChatSetting` on mobile); on mobile the switch shows only the saved state (turning it on opens the notice and saves nothing until "Turn on"; turning it off with nothing saved just closes the notice, writing no setting or audit row); turning it on writes `consent.ledgerChatOptIn` and a `ledger_chat_consent_toggled` audit row, and turning it off drops any open conversation. The chat never reads the identity rows above: they are outside the allowlist that builds its context (see Security and Privacy).
 
 ## How it works
 
@@ -195,7 +197,7 @@ Signing out mid-wizard and signing back in, on either platform, lands on the ste
 The step writes live in one shared module, `src/services/onboarding.ts`, used by the web pages (`web/app/onboarding/*`) and the Expo screens (`app/onboarding/*`), so re-entry behaves identically on both:
 
 - `submitConsentStep({ alreadyConsented, analyticsOptIn, healthDataConsent })` refuses to continue unless `healthDataConsent` is true, then records the consents (health-data consent included, stamped as `health_data_consent_at`) and the legal versions, with `onboarding_step = 'usage'` in the same UPDATE. When `alreadyConsented` is true — computed by `consentsCurrent(profile)` on the web server (`web/app/onboarding/privacy/page.tsx`) or from `useSession` on mobile, so the client never receives the whole profile — only the step and the `consent.*` settings are written and no audit row is added. On a fresh consent the `consent_accepted` audit is recorded **before** the profile write: a duplicate row on retry is acceptable, a consent with no audit row is not. It never writes `marketing_consent_at`; the analytics opt-in is not marketing consent (the mobile screen used to conflate the two).
-- `acceptChangedTerms({ needsHealthConsent, healthDataConsent })` is the re-consent write for an already onboarded reader: one `consent_accepted` audit, then the current versions, never lower than the stored ones (`newerVersion`, so an older web tab or store build cannot downgrade them), (and the health-data consent when it was missing, refused without it) and the `consent.*` settings. It is a different function from `submitConsentStep` on purpose: it carries no `onboardingStep`, so asking again can never move the wizard, and it leaves the analytics preference untouched. Who is sent there, and why it cannot loop, is in Security and Privacy.
+- `acceptChangedTerms` is the re-consent write for an already onboarded reader: one `consent_accepted` audit, then the current versions, never lower than the stored ones (`newerVersion`, so an older web tab or store build cannot downgrade them), the health-data consent when it was missing, and the age confirmation and data-processing consent when those stamps are missing (decided from the stored profile as well as the screen's flags, so a stale screen cannot skip one; each is refused unless ticked), and the `consent.*` settings. It is a different function from `submitConsentStep` on purpose: it carries no `onboardingStep`, so asking again can never move the wizard, and it leaves the analytics preference untouched. Who is sent there, and why it cannot loop, is in Security and Privacy.
 - `loadUsageStep()` returns the profile plus the saved baseline (`onboarding.typicalDaily` setting, falling back to `baseline_per_day`, window, purchase preference) or `draft: null` if the step was never saved. `submitUsageStep` validates with `OnboardingUsageSchema` (`src/lib/validation.ts`) and writes baseline + `onboarding_step = 'goal'` in one UPDATE.
 - `loadGoalStep()` finds the newest active goal of the three offered types and seeds the draft from it via `goalToFormState`. `submitGoalStep(form, existing)` updates the target when the type is unchanged, otherwise creates the new goal; either way it then abandons every other active goal of the offered types (create-first, so a failed create leaves the live goal untouched, and a retry after any half-failure heals to one active goal; the clients re-read the saved goal on failure), so there is never more than one active onboarding goal (the one-active-per-type rule in `createGoal` used to throw `conflict` here). `skipGoalStep` only advances the step and throws on failure instead of navigating anyway.
 

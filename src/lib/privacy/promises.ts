@@ -28,7 +28,7 @@ export const DATA_PROMISES: readonly DataPromise[] = [
   { key: 'ownRowsOnly', text: 'Only your account can read your ledger. The database checks every request against who is signed in.' },
   { key: 'analyticsOptIn', text: 'Usage analytics stay off until you turn them on. Turning them off deletes the events already recorded.' },
   { key: 'chatOptIn', text: 'Nothing is sent to the AI service unless you have turned Ask the ledger on.' },
-  { key: 'chatNotStored', text: 'We keep no chat questions or replies on our servers. The conversation stays in your browser.' },
+  { key: 'chatNotStored', text: 'We keep no chat questions or replies on our servers. The conversation stays on your device: in your browser on the web, in the app’s memory on mobile.' },
   {
     key: 'eraseEverywhere',
     text: 'Erase removes your ledger, and your name, date of birth and gender, from every place we keep them, including the sign-in record.',

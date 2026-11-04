@@ -155,18 +155,39 @@ export function resumeOnboardingRoute(profile: ResumeProfile | null | undefined)
 /**
  * Someone who consented before, but not to what is current: a stored version is
  * older than LEGAL_VERSIONS (see `versionAtLeast`), or the explicit health-data consent was never given
- * (every user from before it existed has it NULL). Never true for someone who has
- * not consented at all - onboarding asks them. Reads only consent columns, never
- * `onboarding_step`, so asking again cannot move the wizard.
+ * (every user from before it existed has it NULL). Never true for someone missing a
+ * required consent: `needsConsentRefresh` covers those once they are onboarded.
+ * Reads only consent columns, never `onboarding_step`, so asking again cannot move
+ * the wizard.
  */
 export function consentsOutdated(profile: ConsentProfile | null | undefined): boolean {
-  if (!hasRequiredConsents(profile)) return false;
+  return hasRequiredConsents(profile) && termsChanged(profile);
+}
+
+/**
+ * The documents changed since this reader accepted them: a stored version is
+ * missing or older than LEGAL_VERSIONS, or the health-data consent was never
+ * given. False when only the age or data-processing stamp is missing, so /consent
+ * can say so instead of "We have updated our terms."
+ */
+export function termsChanged(profile: ConsentProfile | null | undefined): boolean {
   return !(
     versionAtLeast(profile?.termsVersion, LEGAL_VERSIONS.terms) &&
     versionAtLeast(profile?.privacyVersion, LEGAL_VERSIONS.privacy) &&
     versionAtLeast(profile?.healthDisclaimerVersion, LEGAL_VERSIONS.medicalDisclaimer) &&
     profile?.healthDataConsentAt
   );
+}
+
+/**
+ * An onboarded reader who must answer /consent: a required consent is missing (a
+ * legacy row from before the column existed) or what they accepted is no longer
+ * current. Never true before onboarding — the wizard asks those readers. The one
+ * check behind every re-consent gate, so an existing reader is never sent into the
+ * wizard (which would bounce them straight back: a redirect loop).
+ */
+export function needsConsentRefresh(profile: ConsentProfile | null | undefined, onboarded: boolean): boolean {
+  return onboarded && (!hasRequiredConsents(profile) || consentsOutdated(profile));
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -206,8 +227,8 @@ const CONSENT_EXEMPT_PATHS = [
 /**
  * Where an onboarded user must go for the re-consent gate, or null. Shared by the
  * web middleware, post-auth routing and the Expo layout so they cannot disagree.
- * Outdated -> /consent (which is exempt, so it never loops); current on /consent
- * -> `home`. A user still onboarding is left to the onboarding gates.
+ * Missing or outdated -> /consent (which is exempt, so it never loops); current on
+ * /consent -> `home`. A user still onboarding is left to the onboarding gates.
  */
 export function consentGateRedirect(
   pathname: string,
@@ -217,7 +238,7 @@ export function consentGateRedirect(
 ): string | null {
   if (!onboarded) return null;
   const onConsent = pathname === CONSENT_ROUTE || pathname.startsWith(`${CONSENT_ROUTE}/`);
-  if (!consentsOutdated(profile)) return onConsent ? home : null;
+  if (!needsConsentRefresh(profile, onboarded)) return onConsent ? home : null;
   const exempt = CONSENT_EXEMPT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return exempt ? null : CONSENT_ROUTE;
 }

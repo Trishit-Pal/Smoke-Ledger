@@ -91,8 +91,8 @@ export interface AuditEventPropsMap {
   reminder_enabled: { kind: string };
   reminder_disabled: { kind: string };
   // Consent to send ledger figures to the AI processor (Ask the ledger), with
-  // the privacy-policy version the notice was based on.
-  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string };
+  // the privacy-policy version and the notice version (LEDGER_CHAT_NOTICE_VERSION) it rested on.
+  ledger_chat_consent_toggled: { enabled: boolean; privacyVersion?: string; noticeVersion?: string };
 }
 
 function isPrimitive(value: unknown): value is string | number | boolean | null {
@@ -171,7 +171,10 @@ export async function recordAuditEvent<K extends AuditEventType>(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventType, eventCategory, props: safeProps }),
     });
-    if (isAuditSuccessStatus(res.status)) return;
+    // A followed redirect or an HTML page is never the audit route answering: its
+    // 200 must not pass for a recorded audit (the row would be silently lost).
+    const isHtml = res.headers.get('content-type')?.includes('text/html') ?? false;
+    if (!res.redirected && !isHtml && isAuditSuccessStatus(res.status)) return;
     if (res.status === 429) {
       throw new AppError('rate_limited', 'audit_rate_limited');
     }

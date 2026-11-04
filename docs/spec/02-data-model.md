@@ -9,7 +9,7 @@ sources:
   - src/db/repositories/goals.ts
   - src/db/repositories/facts.ts
   - src/db/repositories/summary.ts
-last_verified_commit: 8398559
+last_verified_commit: 3d534c0
 status: current
 ---
 
@@ -58,7 +58,7 @@ One row per authenticated user, created automatically by the `on_auth_user_creat
 | `health_disclaimer_version` | text | NULL | — | — |
 | `data_processing_consent_at` | timestamptz | NULL | — | — |
 | `health_data_consent_at` | timestamptz | NULL | — | When the reader ticked the separate, explicit health-data consent (GDPR Art 9(2)(a), DPDP s6; `20261104130000_health_consent.sql`). Deliberately no backfill: every account from before it existed has NULL, because stamping a consent nobody gave would be false. NULL on an onboarded account is what sends the reader to the re-consent screen. Cleared by `erase_account_data()`; exported with the rest of the profile row |
-| `marketing_consent_at` | timestamptz | NULL | — | CHECK `IS NULL` (`user_profiles_marketing_consent_unused`). Unused: no marketing opt-in exists. Old mobile builds stamped it from the analytics checkbox; `20261102120000_clear_marketing_consent.sql` cleared those with one `marketing_consent_cleared` audit row each. See `docs/architecture/marketing-consent.md`. |
+| `marketing_consent_at` | timestamptz | NULL | — | Always NULL: the BEFORE INSERT OR UPDATE trigger `trg_user_profiles_marketing_consent_null` forces it (`20261105110000_marketing_consent_null_trigger.sql`). Unused: no marketing opt-in exists. Old mobile builds stamped it from the analytics checkbox; `20261102120000_clear_marketing_consent.sql` cleared those with one `marketing_consent_cleared` audit row each and added a CHECK, which `20261105110000` replaced with the trigger (the CHECK made an older build's consent write fail with 23514). See `docs/architecture/marketing-consent.md`. |
 | `deleted_at` | timestamptz | NULL | — | Not set by `erase_account_data()` any more (`20261104100000_erase_auth_metadata.sql`); erase keeps the account live and re-onboards through `onboarded_at = NULL`. Erase now clears stamps left by older erases (`20261104140000_erase_profile_leftovers.sql`). Nothing reads it |
 | `full_name` | text | NULL | — | CHECK: NULL or 1–80 chars |
 | `date_of_birth` | date | NULL | — | CHECK: NULL or > 1900-01-01 (upper/18+ bound is in the trigger, not here) |
@@ -172,7 +172,7 @@ User-defined targets evaluated against the logs.
 | `id` | text | NOT NULL | — | PK |
 | `user_id` | uuid | NOT NULL | — | FK → `auth.users.id` ON DELETE CASCADE |
 | `type` | text | NOT NULL | — | CHECK `goals_type_check`: `daily_cap`, `spend_cap_daily`, `no_smoke_window`, `reduction_target`, `weekly_target`, `quit_date`, `taper` (`taper` added by `20261103000000_adaptive_goals.sql`) |
-| `target_value` | float8 | NOT NULL | — | CHECK: > 0 and ≤ 1000 |
+| `target_value` | float8 | NOT NULL | — | CHECK `goals_target_value_check`: > 0 and ≤ 100000 for `spend_cap_daily`, ≤ 1000 for every other type (`20261105100000_goal_target_by_unit.sql`; was a flat 1000). `scripts/sql/smoke.sql` fails CI if the constraint stops bounding spend caps at 100000 |
 | `current_baseline` | float8 | NULL | — | Locked baseline at goal creation (used by `reduction_target`) |
 | `start_date` | text | NOT NULL | — | `YYYY-MM-DD` |
 | `end_date` | text | NULL | — | `YYYY-MM-DD`; null means open-ended |
@@ -418,6 +418,10 @@ Calls `public.enforce_profile_identity_rules()`. This trigger has three jobs:
 Calls `public.keep_onboarding_step_monotonic()` (`supabase/migrations/20261101120000_onboarding_step_monotonic.sql`). `onboarding_step` means "the next onboarding page to show", and every step writes the following step as it saves. Going Back and pressing Continue again used to rewrite an earlier value, after which the middleware bounced the user away from pages they had already finished. The trigger ranks both values with `public.onboarding_step_rank(text)` (privacy 0 · usage/setup/baseline 1 · goal 2 · brands 3 · done 4) and silently keeps the higher one. A NULL on either side passes through, so `erase_account_data()` can still reset the step and a fresh row can take its first value. An unknown value ranks NULL, so the comparison is NULL, nothing is swapped, and the CHECK constraint rejects it as before. Both functions are `SECURITY INVOKER` with `search_path = ''`; the rank helper is granted to `authenticated` and `service_role` because the trigger runs as the writing role. Widen the rank function together with the CHECK and with `ONBOARDING_STEP_INDEX` in `src/lib/onboardingSteps.ts`.
 
 
+**`trg_user_profiles_marketing_consent_null`** (BEFORE INSERT OR UPDATE on `public.user_profiles`)
+
+Calls `public.null_marketing_consent_at()` (`supabase/migrations/20261105110000_marketing_consent_null_trigger.sql`), which sets `NEW.marketing_consent_at := NULL` and returns the row. It keeps the column empty for every role, since the `user_profiles` UPDATE policy is row-wide, without rejecting the write: a mobile build installed before the earlier fix still sends the column in the same update that stamps the consent versions, and a CHECK turned that into a 23514 that blocked consent. `export_account_data()` only reads the column and `erase_account_data()` writes NULL, so neither depended on the CHECK, which this migration drops (`user_profiles_marketing_consent_unused`, `DROP ... IF EXISTS`). The function is `SECURITY INVOKER`, pins `search_path = ''` and has all privileges revoked from `PUBLIC`, `anon` and `authenticated`. `scripts/sql/smoke.sql` fails CI if the trigger is missing or the CHECK is back, and now also checks `trg_user_profiles_onboarding_step_monotonic` and `goals_stamp_completed_at`; `src/tests/onboarding-step-rank-parity.test.ts` checks that `onboarding_step_rank` agrees with `ONBOARDING_STEP_INDEX`. Drop the trigger and function in the migration that ships a real marketing opt-in.
+
 **`goals_stamp_completed_at`** (BEFORE UPDATE OF `status` on `public.goals`)
 
 Calls `public.goals_stamp_completed_at()` (`supabase/migrations/20261103000000_adaptive_goals.sql`). When `status` moves into `completed` or `abandoned` from a state that was not already one of those, it sets `completed_at = now()`; when `status` is `active` or `paused` it clears `completed_at` to NULL. Completed to abandoned (or back) keeps the first stamp. Because the clock is the database's, a client that reconciles a goal late stamps the time of the write, not the quit date. The function is `SECURITY INVOKER` with `search_path = public`, and all privileges are revoked from `PUBLIC`, `anon` and `authenticated`; it is trigger-only and nobody calls it directly. Goals finished before this migration keep `completed_at` NULL: the ledger does not invent dates.
@@ -558,6 +562,8 @@ These rules must never break:
 ## Open gaps
 
 - **The V3 migrations are not applied anywhere yet.** `20261104100000` to `20261104140000` are proven by source-level tests (`src/tests/erase-auth-metadata.test.ts`, `retention-purge.test.ts`, `export-complete-migration.test.ts`, `health-consent-migration.test.ts`, `erase-profile-leftovers-migration.test.ts`) and `smoke.sql` checks the purge job in CI, but the owner applies them to the live project after review. If pg_cron is absent the purge never runs; `npm run verify:backend` prints the manual `cron.job` check.
+- **`20261105110000_marketing_consent_null_trigger.sql` is not confirmed live.** Until the owner applies it, the live CHECK from `20261102120000` still stands and an older mobile build that ticks analytics fails its consent write with 23514. It is proven by `src/tests/marketing-consent-null-trigger-migration.test.ts` and the `smoke.sql` check in CI, and is idempotent.
+- **`20261105100000_goal_target_by_unit.sql` is not applied yet either.** Until the owner applies it, the live `goals_target_value_check` still caps every type at 1000, so a weekly or monthly spend cap above 1000 is accepted by the app and refused on save. It is proven by `src/tests/goal-target-by-unit-migration.test.ts` and the `smoke.sql` check in CI, and is idempotent (drop, then add).
 - **`smoke_seed` tables have RLS disabled**. The Supabase advisor flags `smoke_seed.brand_catalog`, `smoke_seed.smoking_facts`, and `smoke_seed.health_milestones` as critical. In practice, these tables have `REVOKE ALL … FROM PUBLIC` and are not directly reachable by PostgREST, but the belt-and-suspenders posture would be to add `ENABLE ROW LEVEL SECURITY` with no policies (which makes them default-deny) or to move them fully outside PostgREST's reach.
 - **`price_entries` has no FK on `brand_id` or `variant_id`**. The columns are nullable and have no referential integrity. This was presumably intentional (brand can be deleted without orphaning price history), but it means there is no cheap way to join price entries back to a live brand record. An index on `user_id` was added in `20260602000000` but nothing enforces consistency.
 - **`goals.completed_at` is NULL for goals finished before `20261103000000_adaptive_goals.sql`**, and for any goal that is active or paused. Readers must treat NULL as "date unknown" (the Done list prints the bare word), not as "never finished". No automated test exercises the trigger itself; `src/tests/session-goals.test.ts` covers the store's local mirror of the stamp.

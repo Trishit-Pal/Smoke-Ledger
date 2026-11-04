@@ -50,7 +50,7 @@ export function EditorialModeSwitch<T extends string>({
                 fontSize: 11,
                 textTransform: 'uppercase',
                 letterSpacing: '0.18em',
-                color: selected ? 'var(--accent)' : 'var(--text-muted)',
+                color: selected ? 'var(--accent-ink)' : 'var(--text-muted)',
                 cursor: 'pointer',
                 borderBottom: selected
                   ? '1px solid var(--accent)'

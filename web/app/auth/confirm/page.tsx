@@ -6,6 +6,7 @@ import { EditorialPageShell } from '@web/components/editorial/EditorialPageShell
 import { EditorialMasthead } from '@web/components/editorial/EditorialMasthead';
 import { EditorialClosingSignet } from '@web/components/editorial/EditorialClosingSignet';
 import { SceneBackdrop } from '@web/components/marketing/SceneBackdrop';
+import { WordmarkHomeLink } from '@web/components/auth/WordmarkHomeLink';
 import { sanitizeCallbackNextPath } from '@web/lib/auth/callbackNextPath';
 import { PRIMARY_CTA_STYLE } from '@web/lib/auth/inputStyle';
 import { createClient, isSupabaseServerConfigured } from '@web/lib/supabase/server';
@@ -46,7 +47,12 @@ export default async function ConfirmEmailLinkPage({
   const signedInAs = maskAccount(user);
 
   return (
-    <EditorialPageShell maxWidth={520} backdrop={<SceneBackdrop intensity="full" />}>
+    <EditorialPageShell
+      maxWidth={520}
+      backdrop={<SceneBackdrop intensity="full" />}
+      showGoHome={false}
+    >
+      <WordmarkHomeLink />
       <EditorialMasthead
         caption="Account · Sign-in link"
         title={
@@ -58,7 +64,7 @@ export default async function ConfirmEmailLinkPage({
       />
 
       {signedInAs ? (
-        <p role="status" className="mt-md" style={{ fontSize: 13, color: 'var(--warn-earth)' }}>
+        <p role="status" className="mt-md" style={{ fontSize: 13, color: 'var(--warn-earth-ink)' }}>
           You&apos;re signed in as {signedInAs}. If this link is for a different account, continuing switches to it.
         </p>
       ) : null}

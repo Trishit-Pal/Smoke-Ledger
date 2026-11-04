@@ -2,11 +2,16 @@
 
 import { getSupabase } from '@/lib/supabase';
 import { logClientError } from '@/lib/logger';
+import { invalidateAnalyticsConsentCache } from '@/services/analytics';
 
 export async function eraseAllUserData(): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.rpc('erase_account_data');
   if (error) throw new Error(error.message);
+
+  // The erase deleted settings_kv (incl. the analytics opt-in); drop the cached
+  // consent so track() stops writing usage_events for this user immediately.
+  invalidateAnalyticsConsentCache();
 
   // Erase removed name / DOB / gender from the sign-in record; refresh so the
   // JWT stops carrying the old user_metadata. The erase itself already

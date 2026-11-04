@@ -1,14 +1,18 @@
 import { LEDGER_CHAT_NOTICE } from '@/domain/ledgerChat/notice';
+import { maskNumbers } from '@/lib/discreet';
 import type { Row } from '@/domain/ledgerChat/types';
 import {
+  answerAnnouncement,
   FAILURE_COPY,
   isHidden,
   isRowMaskable,
+  leaveTarget,
   mobileNoticeParagraphs,
   proseMasked,
   rowDisplay,
   rowMasked,
   takeWaitingQuestion,
+  waitingTakenAfter,
 } from '@/lib/askView';
 
 jest.mock('@/lib/supabase', () => ({ getSupabase: jest.fn() }));
@@ -74,6 +78,42 @@ describe('takeWaitingQuestion', () => {
   });
   it('returns null for an empty draft', () => {
     expect(takeWaitingQuestion('   ', false)).toBeNull();
+  });
+});
+
+describe('waitingTakenAfter', () => {
+  it('re-arms the waiting question when the ask is refused for consent', () => {
+    expect(waitingTakenAfter(true, 'consent_required')).toBe(false);
+  });
+  it('keeps the question taken for every other outcome', () => {
+    expect(waitingTakenAfter(true, 'network')).toBe(true);
+    expect(waitingTakenAfter(true, null)).toBe(true);
+    expect(waitingTakenAfter(false, 'rate_limited')).toBe(false);
+  });
+});
+
+describe('leaveTarget', () => {
+  it('goes back when there is somewhere to go back to', () => {
+    expect(leaveTarget(true)).toBe('back');
+  });
+  it('falls back to the tabs after a cold start from a deep link', () => {
+    expect(leaveTarget(false)).toBe('/(tabs)');
+  });
+});
+
+describe('answerAnnouncement', () => {
+  it('speaks the answer as written when totals are shown', () => {
+    expect(answerAnnouncement('You logged 4 today.', false)).toBe('You logged 4 today.');
+  });
+  it('speaks "hidden" for each figure, not the bullet glyph, when totals are hidden', () => {
+    const spoken = answerAnnouncement('You logged 4 sticks, costing 1,200.', true);
+    expect(spoken).toBe('You logged hidden sticks, costing hidden.');
+    expect(spoken).not.toMatch(/[0-9•]/);
+    // The drawn text keeps the glyph.
+    expect(maskNumbers('You logged 4 sticks', true)).toBe('You logged ••• sticks');
+  });
+  it('joins paragraphs into one sentence run', () => {
+    expect(answerAnnouncement('A quiet week.\n\nNothing to add.', false)).toBe('A quiet week. Nothing to add.');
   });
 });
 

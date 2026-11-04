@@ -31,8 +31,9 @@ export const PRIMARY_CTA_STYLE: React.CSSProperties = {
   padding: '0 24px',
   border: 'none',
   borderRadius: 10,
-  background: 'var(--accent)',
-  color: '#ffffff',
+  // A fill that carries text: the ink pair (AA in both themes), not --accent + white (~3.1:1).
+  background: 'var(--accent-ink)',
+  color: 'var(--on-accent)',
   fontFamily: 'var(--font-sans)',
   fontWeight: 600,
   fontSize: 14,

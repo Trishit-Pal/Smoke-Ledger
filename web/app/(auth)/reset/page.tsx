@@ -160,7 +160,7 @@ export default function ResetPage() {
         {submitError ? (
           <p
             role="alert"
-            style={{ fontSize: 13, color: 'var(--warn-earth)', margin: '12px 0 0 0' }}
+            style={{ fontSize: 13, color: 'var(--warn-earth-ink)', margin: '12px 0 0 0' }}
           >
             {submitError}
           </p>

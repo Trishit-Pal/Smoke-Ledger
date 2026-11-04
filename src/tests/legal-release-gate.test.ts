@@ -5,7 +5,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { LEGAL_VERSIONS } from '@/lib/legal';
+import { CHAT_UNDISCLOSED_PRIVACY, isChatPolicyLive, LEGAL_VERSIONS } from '@/lib/legal';
 import { EU_REPRESENTATIVE, euRepresentativeIsNamed } from '@/lib/legalEntity';
 
 const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '../..', rel), 'utf8');
@@ -29,6 +29,14 @@ describe('legal release gate', () => {
     for (const field of [EU_REPRESENTATIVE.name, EU_REPRESENTATIVE.address, EU_REPRESENTATIVE.email]) {
       expect(field.trim()).not.toBe('');
     }
+  });
+
+  it('the chat gate stays shut at exactly the privacy version readers accepted', () => {
+    // A literal, not PUBLISHED.privacy: PUBLISHED moves when the bump ships, the gate date must not.
+    expect(CHAT_UNDISCLOSED_PRIVACY).toBe('2026-11-02');
+    expect(CHAT_UNDISCLOSED_PRIVACY <= PUBLISHED.privacy).toBe(true);
+    expect(isChatPolicyLive(PUBLISHED.privacy)).toBe(false);
+    expect(isChatPolicyLive('2026-11-03')).toBe(true);
   });
 
   it('never moves a version backwards from what readers accepted', () => {

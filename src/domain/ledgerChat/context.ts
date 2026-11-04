@@ -7,6 +7,7 @@
 import type { CigaretteLog, Goal, UserProfile } from '@/types';
 import type { DailySummaryRow } from '@/domain/periodSummary';
 import { brandAlias } from '@/lib/discreet';
+import { NOTE_MAX_CHARS, TEXT_FIELD_MAX_CHARS } from './types';
 import { localeForCountry, timezoneForCountry, type CurrencyCode } from '@/lib/regions';
 
 export interface ToolContext {
@@ -37,6 +38,32 @@ export interface BuildToolContextInput {
   summarySinceYmd: string;
 }
 
+/** Control characters become spaces, then trim and cap: stored text is unconstrained (no DB length CHECK). */
+export function cleanText(text: string, max: number = TEXT_FIELD_MAX_CHARS): string {
+  return text.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+}
+
+/**
+ * New log objects whose free-text fields are bounded, so one huge or hostile
+ * value cannot bloat every model call or smuggle instruction text. Done here,
+ * once, so every tool (and the guard's name list) sees the same bounded text.
+ * Empty-after-cleaning becomes null, which is what the tools already treat as absent.
+ */
+function boundLogText(logs: readonly CigaretteLog[]): CigaretteLog[] {
+  const bound = (s: string | null, max?: number): string | null => (s ? cleanText(s, max) || null : null);
+  return logs.map((l) => ({
+    ...l,
+    brandNameSnap: bound(l.brandNameSnap),
+    variantSnap: bound(l.variantSnap),
+    // Tags are typed unions in the app but the DB does not enforce them.
+    triggerTag: bound(l.triggerTag) as CigaretteLog['triggerTag'],
+    moodBefore: bound(l.moodBefore) as CigaretteLog['moodBefore'],
+    moodAfter: bound(l.moodAfter) as CigaretteLog['moodAfter'],
+    contextTag: bound(l.contextTag) as CigaretteLog['contextTag'],
+    notes: bound(l.notes, NOTE_MAX_CHARS),
+  }));
+}
+
 /** New log objects with brands aliased by first-seen order and free text removed. */
 export function aliasLogsForDiscreet(logs: readonly CigaretteLog[]): CigaretteLog[] {
   const aliases = new Map<string, string>();
@@ -64,6 +91,7 @@ function pickProfile(source: UserProfile): ContextProfile {
 export function buildToolContext(input: BuildToolContextInput): ToolContext {
   const profile = pickProfile(input.profile);
   const discreet = profile.discreetMode;
+  const logs = boundLogText(input.logs);
   return {
     today: input.today,
     timezone: timezoneForCountry(profile.country),
@@ -72,7 +100,7 @@ export function buildToolContext(input: BuildToolContextInput): ToolContext {
     baselinePerDay: profile.baselinePerDay,
     summarySinceYmd: input.summarySinceYmd,
     discreet,
-    logs: discreet ? aliasLogsForDiscreet(input.logs) : input.logs,
+    logs: discreet ? aliasLogsForDiscreet(logs) : logs,
     rows: input.rows,
     goals: input.goals,
     goalHistory: input.goalHistory ?? [],

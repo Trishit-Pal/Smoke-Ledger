@@ -31,8 +31,10 @@ export default function OnboardingLayout() {
 
     // The /done screen is the last onboarding step and is shown AFTER markOnboarded
     // sets onboardedAt. Allow it to render; the done screen itself navigates to tabs.
-    if (profile.onboardedAt && pathname !== '/onboarding/done') {
-      router.replace('/(tabs)');
+    // An onboarded reader is never sent to a wizard step from here, missing consents
+    // or not: the root guard owns re-consent (/consent).
+    if (profile.onboardedAt) {
+      if (pathname !== '/onboarding/done') router.replace('/(tabs)');
       return;
     }
 

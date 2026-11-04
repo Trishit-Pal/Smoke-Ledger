@@ -11,6 +11,8 @@ export const CHAT_HISTORY_TEXT_MAX = 600;
 export const RECENT_MAX_DAYS = 30;
 export const RECENT_MAX_ROWS = 200;
 export const NOTE_MAX_CHARS = 120;
+/** Every other free-text field a tool sends (brand, variant, trigger, mood, context). */
+export const TEXT_FIELD_MAX_CHARS = 60;
 
 export const chatHistoryTurnSchema = z
   .object({

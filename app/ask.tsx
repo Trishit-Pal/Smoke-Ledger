@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
@@ -10,8 +10,17 @@ import { AskTurn, type AskTurnData } from '@/components/ask/AskTurn';
 import { ConsentNotice } from '@/components/ask/ConsentNotice';
 import { spacing, fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { CHAT_QUESTION_MAX, type ChatStateResponse } from '@/domain/ledgerChat/types';
-import { ASK_COPY, FAILURE_COPY, isHidden, takeWaitingQuestion } from '@/lib/askView';
+import {
+  answerAnnouncement,
+  ASK_COPY,
+  FAILURE_COPY,
+  isHidden,
+  leaveTarget,
+  takeWaitingQuestion,
+  waitingTakenAfter,
+} from '@/lib/askView';
 import { isLedgerChatEnabled } from '@/lib/askPill';
 import { track } from '@/services/analytics';
 import { AnalyticsEvents } from '@/constants/events';
@@ -37,7 +46,14 @@ const BLOCKING: ReadonlySet<ChatFailure> = new Set(['disabled', 'signed_out', 'c
 export default function AskScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const reduceMotion = useReduceMotion();
   const mounted = useRef(true);
+  const scrollRef = useRef<ScrollView>(null);
+  const wantsEnd = useRef(false);
+  const sheetRef = useRef<View>(null);
+  // KeyboardAvoidingView measures against its parent, not the screen; the page
+  // sheet's own top offset is the gap, so it is measured rather than guessed.
+  const [sheetTop, setSheetTop] = useState(0);
 
   const [state, setState] = useState<ChatStateResponse | null>(null);
   // Flag off: nothing is requested and the screen says it is resting.
@@ -51,6 +67,8 @@ export default function AskScreen() {
   const [turningOn, setTurningOn] = useState(false);
   // The question typed before opting in is sent once, right after the opt-in is saved.
   const waitingTaken = useRef(false);
+  // send() is memoised once; it reads the latest masking from here.
+  const hiddenRef = useRef(true);
 
   useEffect(() => {
     mounted.current = true;
@@ -88,6 +106,7 @@ export default function AskScreen() {
     if (!mounted.current) return;
     setPending(null);
     if (!result.ok) {
+      waitingTaken.current = waitingTakenAfter(waitingTaken.current, result.reason);
       setFailure(result.reason);
       if (result.reason === 'consent_required') setState((prev) => (prev ? { ...prev, consented: false } : prev));
       return;
@@ -99,6 +118,8 @@ export default function AskScreen() {
     turnsRef.current = next;
     setTurns(next);
     setDraft('');
+    // iOS has no live regions: speak the answer, masked exactly as it is drawn.
+    void AccessibilityInfo.announceForAccessibility(answerAnnouncement(result.data.answer, hiddenRef.current));
     void track(AnalyticsEvents.LEDGER_CHAT_ASKED, { starter, tools: result.data.toolsUsed.length });
   }, []);
 
@@ -133,11 +154,28 @@ export default function AskScreen() {
   const needsConsent = state !== null && !state.consented && !blocked;
   const canAsk = state?.consented === true && !blocked;
   const hidden = isHidden(state);
+  useEffect(() => {
+    hiddenRef.current = hidden;
+  }, [hidden]);
+  // New content (an answer, or the pending question) brings the end into view.
+  useEffect(() => {
+    wantsEnd.current = true;
+  }, [turns.length, pending]);
+  const leave = () => {
+    if (leaveTarget(router.canGoBack()) === 'back') router.back();
+    else router.replace('/(tabs)');
+  };
   const starters = state?.starters ?? [];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top', 'left', 'right', 'bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <SafeAreaView
+      ref={sheetRef}
+      onLayout={() => sheetRef.current?.measureInWindow((_x, y) => setSheetTop(y))}
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      edges={['top', 'left', 'right', 'bottom']}
+    >
+      {/* 'height' on Android: edge-to-edge no longer resizes the window (as log/new and goals/new). */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={sheetTop}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.sm }}>
           <View style={{ flex: 1, gap: spacing.xs }}>
             <Text variant="h1" accessibilityRole="header">
@@ -148,7 +186,7 @@ export default function AskScreen() {
             </Text>
           </View>
           <Pressable
-            onPress={() => router.back()}
+            onPress={leave}
             accessibilityRole="button"
             accessibilityLabel="Close Ask the ledger"
             style={{ minHeight: MIN_TARGET, minWidth: MIN_TARGET, alignItems: 'center', justifyContent: 'center' }}
@@ -160,6 +198,12 @@ export default function AskScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
+          onContentSizeChange={() => {
+            if (!wantsEnd.current) return;
+            wantsEnd.current = false;
+            scrollRef.current?.scrollToEnd({ animated: !reduceMotion });
+          }}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}
           keyboardShouldPersistTaps="handled"
@@ -182,7 +226,7 @@ export default function AskScreen() {
               <ConsentNotice />
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md }}>
                 <Button title="Turn on and ask" onPress={() => void turnOnAndAsk()} loading={turningOn} />
-                <Button title="Not now" variant="ghost" onPress={() => router.back()} disabled={turningOn} />
+                <Button title="Not now" variant="ghost" onPress={leave} disabled={turningOn} />
               </View>
             </View>
           ) : null}

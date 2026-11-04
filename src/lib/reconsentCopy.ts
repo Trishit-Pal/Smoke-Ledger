@@ -9,6 +9,31 @@ export const RECONSENT_TITLE = 'We have updated our terms.';
 export const RECONSENT_LEDE =
   'Please read what changed and accept to carry on. Your ledger has not been touched.';
 
+export interface ReconsentHeading {
+  caption: string;
+  title: string;
+  lede: string;
+}
+
+const CHANGED_TERMS: ReconsentHeading = {
+  caption: RECONSENT_CAPTION,
+  title: RECONSENT_TITLE,
+  lede: RECONSENT_LEDE,
+};
+
+// For a reader whose documents are current but whose account has no record of the
+// age confirmation or the data-processing consent (a row from before those existed).
+const NO_RECORD: ReconsentHeading = {
+  caption: 'Notice · Missing confirmations',
+  title: 'Before you continue.',
+  lede: 'Your account is missing some confirmations we need on record. Please answer each one to carry on. Your ledger has not been touched.',
+};
+
+/** The heading for /consent: changed terms, or (when nothing changed) the missing confirmations. */
+export function reconsentHeading(termsChanged: boolean): ReconsentHeading {
+  return termsChanged ? CHANGED_TERMS : NO_RECORD;
+}
+
 export interface ReconsentChange {
   title: string;
   body: string;

@@ -4,7 +4,7 @@
       "id": "glossary",
       "file": "00-glossary.md",
       "sources": [],
-      "last_verified_commit": "b4d45ae",
+      "last_verified_commit": "467615f",
       "status": "current"
     },
     {
@@ -18,9 +18,10 @@
         "web/lib/server/**",
         "web/components/realtime/**",
         "app/_layout.tsx",
-        "metro.config.js"
+        "metro.config.js",
+        "src/lib/routeGuard.ts"
       ],
-      "last_verified_commit": "b4d45ae",
+      "last_verified_commit": "c0cc07b",
       "status": "current"
     },
     {
@@ -30,7 +31,7 @@
         "supabase/migrations/**",
         "src/types/index.ts"
       ],
-      "last_verified_commit": "8398559",
+      "last_verified_commit": "3d534c0",
       "status": "current"
     },
     {
@@ -49,7 +50,7 @@
         "src/lib/emailOtpType.ts",
         "src/lib/onboardingSteps.ts"
       ],
-      "last_verified_commit": "8398559",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -72,7 +73,7 @@
         "web/app/onboarding/**",
         "app/onboarding/**"
       ],
-      "last_verified_commit": "8398559",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -115,7 +116,7 @@
         "app/(tabs)/goals.tsx",
         "app/goals/**"
       ],
-      "last_verified_commit": "b4d45ae",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -137,7 +138,7 @@
         "web/components/character/MilestoneCelebration.tsx",
         "app/(auth)/login.tsx"
       ],
-      "last_verified_commit": "798a45b",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -165,9 +166,15 @@
         "src/services/cloudErase.ts",
         "app/consent.tsx",
         "web/app/consent/**",
-        "web/lib/privacy/**"
+        "web/lib/privacy/**",
+        "src/lib/deleteIntent.ts",
+        "src/lib/reauth.ts",
+        "src/lib/secureStore.ts",
+        "app/ask.tsx",
+        "src/lib/askView.ts",
+        "web/components/chat/**"
       ],
-      "last_verified_commit": "8398559",
+      "last_verified_commit": "62902bc",
       "status": "current"
     },
     {
@@ -184,7 +191,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "9d24456",
+      "last_verified_commit": "3d534c0",
       "status": "current"
     }
   ]

@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Exact CLI version for every npx supabase call: an unpinned npx resolves "latest" on each run,
+# so a new major (3.0.0 shipped 2026-11-02) would change CI with no commit. Bump deliberately.
+env:
+  SUPABASE_CLI_VERSION: '2.122.1'
+
 # Free-tier Actions minutes: a newer push to a PR supersedes its old run. Never
 # cancel on main: each main run's secret scan covers only its own push, so a
 # cancelled run would leave those commits unscanned.
@@ -98,6 +103,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -109,19 +116,19 @@ jobs:
         run: npm ci
 
       - name: Start Supabase local DB
-        run: npx supabase db start
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} db start
 
       - name: Apply migrations smoke
-        run: npx supabase db reset --no-seed
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} db reset --no-seed
 
       - name: Run SQL smoke assertions
         run: |
-          DB_URL=$(npx supabase status --output json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.DB_URL||j.db_url||'');})")
+          DB_URL=$(npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} status --output json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log(j.DB_URL||j.db_url||'');})")
           psql "$DB_URL" -f scripts/sql/smoke.sql
 
       - name: Stop Supabase local DB
         if: always()
-        run: npx supabase stop --no-backup
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} stop --no-backup
 
   rls-integration:
     runs-on: ubuntu-latest
@@ -134,6 +141,8 @@ jobs:
     # which are safe only because the stack lives and dies on this runner.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -145,12 +154,12 @@ jobs:
         run: npm ci
 
       - name: Start local Supabase (applies every migration on a fresh DB)
-        run: npx supabase start
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} start
 
       - name: Provision throwaway test users and export test env
         run: |
           set -euo pipefail
-          status=$(npx supabase status -o env)
+          status=$(npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} status -o env)
           url=$(printf '%s\n' "$status" | sed -n 's/^API_URL="\(.*\)"$/\1/p')
           anon=$(printf '%s\n' "$status" | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')
           [ -n "$url" ] && [ -n "$anon" ] || { echo "::error::could not read local API_URL/ANON_KEY"; exit 1; }
@@ -175,7 +184,7 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: npx supabase stop --no-backup
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} stop --no-backup
 
   responsive-e2e:
     # Every page × viewport × engine (Chromium/Edge, Firefox, WebKit phone,
@@ -194,6 +203,8 @@ jobs:
       LEDGER_CHAT_ENABLED: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -211,12 +222,12 @@ jobs:
         working-directory: web
 
       - name: Start local Supabase (applies every migration on a fresh DB)
-        run: npx supabase start
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} start
 
       - name: Export local stack env
         run: |
           set -euo pipefail
-          status=$(npx supabase status -o env)
+          status=$(npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} status -o env)
           get() { printf '%s\n' "$status" | sed -n "s/^$1=\"\(.*\)\"$/\1/p"; }
           url=$(get API_URL); anon=$(get ANON_KEY); service=$(get SERVICE_ROLE_KEY)
           [ -n "$url" ] && [ -n "$anon" ] && [ -n "$service" ] || { echo "::error::could not read local stack env"; exit 1; }
@@ -253,7 +264,7 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: npx supabase stop --no-backup
+        run: npx --yes supabase@${{ env.SUPABASE_CLI_VERSION }} stop --no-backup
 
   secrets:
     runs-on: ubuntu-latest

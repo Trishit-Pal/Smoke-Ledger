@@ -1,6 +1,15 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { IN_SCOPE, IN_SCOPE_SUMMARY, OUT_OF_SCOPE } from '@/domain/ledgerChat/scope';
-import { LEDGER_CHAT_NOTICE, LEDGER_CHAT_NOTICE_TEXT } from '@/domain/ledgerChat/notice';
+import {
+  LEDGER_CHAT_NOTICE,
+  LEDGER_CHAT_NOTICE_TEXT,
+  LEDGER_CHAT_NOTICE_VERSION,
+  LEDGER_CHAT_SETTINGS_SUBLABEL,
+  chatOptInValue,
+  isCurrentChatOptIn,
+} from '@/domain/ledgerChat/notice';
+import { mobileNoticeParagraphs } from '@/lib/askView';
 import * as webNotice from '@web/components/chat/notice';
 import { SYSTEM_PROMPT } from '@web/lib/server/ledgerChat/prompt';
 
@@ -63,7 +72,7 @@ describe('ledger chat scope', () => {
   test('the sent-data sentence names the goal history, price history and edit dates the tools send', () => {
     for (const phrase of [
       'your goal history (type, target, dates and outcome)',
-      'the prices you recorded on entries, last 90 days (brand, unit price, pack size and date)',
+      'the prices you recorded on entries, last 90 days (brand, variant, unit price, pack size and date)',
       'the dates you edited entries',
     ]) {
       expect(LEDGER_CHAT_NOTICE.sent).toContain(phrase);
@@ -73,6 +82,40 @@ describe('ledger chat scope', () => {
   test('the web notice module re-exports the shared one', () => {
     expect(webNotice.LEDGER_CHAT_NOTICE).toBe(LEDGER_CHAT_NOTICE);
     expect(webNotice.LEDGER_CHAT_NOTICE_TEXT).toBe(LEDGER_CHAT_NOTICE_TEXT);
+    expect(webNotice.LEDGER_CHAT_NOTICE_VERSION).toBe(LEDGER_CHAT_NOTICE_VERSION);
+    expect(webNotice.isCurrentChatOptIn).toBe(isCurrentChatOptIn);
+    expect(webNotice.chatOptInValue).toBe(chatOptInValue);
     expect(typeof webNotice.LEDGER_CHAT_SETTINGS_SUBLABEL).toBe('string');
+  });
+});
+
+// The opt-in stores the notice version it was given to (ADR ledger-chat-consent-adr.md), so a
+// changed notice must come with a new version, or old opt-ins would silently cover new words.
+describe('chat opt-in is versioned to the notice', () => {
+  test('notice text is pinned to its version', () => {
+    // Append-only: a new notice adds a new version key; never edit an old hash.
+    const NOTICE_HASHES: Record<string, string> = {
+      '2026-11-03': '3681aa9d86874a5acfe9574a43909b6c0706b3a061a03baf0a1486931771e183',
+    };
+    // Everything a reader sees before opting in: the web notice, the mobile notice, the Settings line.
+    const shown = [LEDGER_CHAT_NOTICE_TEXT, ...mobileNoticeParagraphs(), LEDGER_CHAT_SETTINGS_SUBLABEL].join('\n');
+    const sha256 = createHash('sha256').update(shown).digest('hex');
+    expect(sha256, 'notice text changed: bump LEDGER_CHAT_NOTICE_VERSION and update this hash').toBe(
+      NOTICE_HASHES[LEDGER_CHAT_NOTICE_VERSION],
+    );
+  });
+
+  test('only the current version counts as consent; a pre-versioning true, an older version or off do not', () => {
+    expect(isCurrentChatOptIn(LEDGER_CHAT_NOTICE_VERSION)).toBe(true);
+    for (const stale of [true, false, null, undefined, '2026-11-02', '', 'true', 1]) {
+      expect(isCurrentChatOptIn(stale)).toBe(false);
+    }
+  });
+
+  test('writers store the version on opt-in and false on opt-out', () => {
+    expect(chatOptInValue(true)).toBe(LEDGER_CHAT_NOTICE_VERSION);
+    expect(chatOptInValue(false)).toBe(false);
+    expect(isCurrentChatOptIn(chatOptInValue(true))).toBe(true);
+    expect(isCurrentChatOptIn(chatOptInValue(false))).toBe(false);
   });
 });

@@ -34,7 +34,8 @@ interface ConsentItem {
   required: boolean;
 }
 
-const CONSENT_ROWS: ConsentItem[] = [
+// Also read by the /consent screen (app/consent.tsx), so the wording cannot drift.
+export const CONSENT_ROWS: ConsentItem[] = [
   {
     id: 'age',
     label: 'I confirm I am 18 or older.',
@@ -318,6 +319,7 @@ export function ConsentRow({ index, label, sub, required, value, onChange, showB
 
         {/* Switch */}
         <Switch
+          accessibilityLabel={label}
           value={value}
           onValueChange={onChange}
           trackColor={{ false: theme.border, true: theme.accent }}

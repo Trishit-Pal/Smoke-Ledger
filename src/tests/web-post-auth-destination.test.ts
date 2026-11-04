@@ -82,6 +82,48 @@ describe('postAuthDestination re-consent', () => {
   });
 });
 
+// Every stamp the gates read, snake_case as the callback selects them.
+const STAMPS = [
+  'age_confirmed_at',
+  'terms_version',
+  'privacy_version',
+  'health_disclaimer_version',
+  'data_processing_consent_at',
+  'health_data_consent_at',
+] as const;
+
+describe('postAuthDestination decision table: an existing reader never lands in the wizard', () => {
+  const NEXTS = [null, '/log', '/onboarding', '/onboarding/privacy', '/onboarding/goal'];
+  const EXEMPT_NEXTS = ['/settings?resume=delete', '/privacy', '/reset-password'];
+
+  it.each(STAMPS)('onboarded, missing %s: /consent ahead of any next, never an onboarding step', (key) => {
+    const profile = { ...ONBOARDED, [key]: null };
+    for (const type of [null, 'magiclink', 'signup'] as const) {
+      for (const next of NEXTS) {
+        expect([type, next, postAuthDestination(profile, type, next)]).toEqual([type, next, '/consent']);
+      }
+      // An exempt next (delete-resume, legal pages, recovery) is honoured, as for outdated consents.
+      for (const next of EXEMPT_NEXTS) expect(postAuthDestination(profile, type, next)).toBe(next);
+    }
+  });
+
+  it('onboarded and current: an onboarding next falls back to the dashboard', () => {
+    for (const next of ['/onboarding', '/onboarding/privacy', '/onboarding/goal']) {
+      expect(postAuthDestination(ONBOARDED, 'magiclink', next)).toBe('/dashboard');
+    }
+    expect(postAuthDestination(ONBOARDED, null, '/settings?resume=delete')).toBe('/settings?resume=delete');
+  });
+
+  it.each(STAMPS.filter((k) => k !== 'health_data_consent_at'))(
+    'not onboarded, missing %s: the privacy step (with the signup welcome) as before',
+    (key) => {
+      const profile = { ...CONSENTED, onboarding_step: 'goal', [key]: null };
+      expect(postAuthDestination(profile, null, '/log')).toBe('/onboarding/privacy');
+      expect(postAuthDestination(profile, 'signup', null)).toBe('/onboarding/privacy?welcome=1');
+    },
+  );
+});
+
 describe('nextPathForLink (token_hash links only)', () => {
   it('defaults a recovery link to /reset-password', () => {
     expect(nextPathForLink('recovery', null)).toBe('/reset-password');

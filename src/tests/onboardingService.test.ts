@@ -102,6 +102,9 @@ describe('consentsCurrent', () => {
 });
 
 describe('acceptChangedTerms (the /consent screen)', () => {
+  // A stored profile that already holds the age and data-processing stamps.
+  beforeEach(() => mocked(profileRepo.getProfile).mockResolvedValue(consentedProfile));
+
   it('stamps the current versions and the health consent, audits once, and never touches the step', async () => {
     await acceptChangedTerms({ needsHealthConsent: true, healthDataConsent: true });
 
@@ -140,6 +143,75 @@ describe('acceptChangedTerms (the /consent screen)', () => {
       acceptChangedTerms({ needsHealthConsent: true, healthDataConsent: false }),
     ).rejects.toThrow(/health-data consent/);
     expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
+  });
+});
+
+describe('acceptChangedTerms stamps a missing age or data-processing consent, and only that', () => {
+  const base = { needsHealthConsent: false, healthDataConsent: false };
+  beforeEach(() => mocked(profileRepo.getProfile).mockResolvedValue(consentedProfile));
+
+  it.each([
+    ['age', { needsAgeConfirm: true, ageConfirmed: true }, ['ageConfirmedAt']],
+    ['data processing', { needsDataProcessing: true, dataProcessingConsent: true }, ['dataProcessingConsentAt']],
+    [
+      'both',
+      { needsAgeConfirm: true, ageConfirmed: true, needsDataProcessing: true, dataProcessingConsent: true },
+      ['ageConfirmedAt', 'dataProcessingConsentAt'],
+    ],
+  ])('missing %s: stamps it alongside the versions', async (_n, input, stamped) => {
+    await acceptChangedTerms({ ...base, ...input });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(Object.keys(patch).sort()).toEqual(
+      ['termsVersion', 'privacyVersion', 'healthDisclaimerVersion', ...stamped].sort(),
+    );
+    for (const key of stamped) expect(patch[key as keyof typeof patch]).toEqual(expect.any(String));
+    expect('onboardingStep' in patch).toBe(false);
+  });
+
+  it('never restamps age or data processing when they were not missing, even if ticked', async () => {
+    await acceptChangedTerms({ ...base, ageConfirmed: true, dataProcessingConsent: true });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect('ageConfirmedAt' in patch).toBe(false);
+    expect('dataProcessingConsentAt' in patch).toBe(false);
+  });
+
+  it.each([
+    ['age confirmation', { needsAgeConfirm: true, ageConfirmed: false }, /age confirmation/],
+    ['data-processing consent', { needsDataProcessing: true, dataProcessingConsent: false }, /data-processing consent/],
+  ])('refuses a missing %s that was not ticked, writing and auditing nothing', async (_n, input, message) => {
+    await expect(acceptChangedTerms({ ...base, ...input })).rejects.toMatchObject({
+      code: 'validation_error',
+      message: expect.stringMatching(message),
+    });
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
+    expect(settingsRepo.setSetting).not.toHaveBeenCalled();
+  });
+
+  // A stale screen (rendered before the stamp went missing, or an old build that
+  // never asks) cannot skip a required stamp: the stored profile decides too.
+  it.each([
+    ['ageConfirmedAt', { ageConfirmed: true }, /age confirmation/],
+    ['dataProcessingConsentAt', { dataProcessingConsent: true }, /data-processing consent/],
+  ])('stored profile missing %s: refused unless ticked, stamped when ticked', async (key, ticked, message) => {
+    mocked(profileRepo.getProfile).mockResolvedValue({ ...consentedProfile, [key]: null });
+
+    await expect(acceptChangedTerms(base)).rejects.toMatchObject({
+      code: 'validation_error',
+      message: expect.stringMatching(message),
+    });
+    expect(recordAuditEvent).not.toHaveBeenCalled();
+    expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
+
+    await acceptChangedTerms({ ...base, ...ticked });
+    const patch = mocked(profileRepo.saveComplianceConsents).mock.calls[0][0];
+    expect(patch[key as keyof typeof patch]).toEqual(expect.any(String));
+  });
+
+  it('a profile that cannot be read counts as missing both (fails closed)', async () => {
+    mocked(profileRepo.getProfile).mockResolvedValue(undefined as unknown as UserProfile);
+    await expect(acceptChangedTerms(base)).rejects.toMatchObject({ code: 'validation_error' });
     expect(profileRepo.saveComplianceConsents).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import type { Route } from '@playwright/test';
 import { test, expect, login } from './_helpers/fixtures';
 import { canSeed, getAdmin, seedLogs, istYmdDaysAgo } from './_helpers/seed';
+import { LEDGER_CHAT_NOTICE_VERSION } from '../../src/domain/ledgerChat/notice';
 
 // Ask the ledger, end to end on the real UI with the model route mocked:
 // the route is a network boundary, so page.route stands in for Anthropic and
@@ -59,11 +60,11 @@ test.describe('ask the ledger', () => {
     expect(posts).toBe(0);
     await dialog.getByRole('button', { name: 'Turn on and ask' }).click();
 
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
     await expect(dialog.getByRole('definition').filter({ hasText: /^8$/ })).toBeVisible();
     await expect(dialog.getByText('₹160')).toBeVisible();
 
-    // Consent persisted as the settings key the route checks.
+    // Consent persisted as the settings key the route checks, holding the notice version.
     const admin = getAdmin();
     const { data } = await admin!
       .from('settings_kv')
@@ -71,7 +72,7 @@ test.describe('ask the ledger', () => {
       .eq('user_id', onboarded.id)
       .eq('key', 'consent.ledgerChatOptIn')
       .maybeSingle();
-    expect(data?.value_json).toBe(true);
+    expect(data?.value_json).toBe(LEDGER_CHAT_NOTICE_VERSION);
 
     await dialog.getByLabel('Ask your ledger').fill('And the month before?');
     await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
@@ -83,7 +84,10 @@ test.describe('ask the ledger', () => {
     await admin!.from('user_profiles').update({ discreet_mode: true }).eq('id', onboarded.id);
     await admin!
       .from('settings_kv')
-      .upsert({ user_id: onboarded.id, key: 'consent.ledgerChatOptIn', value_json: true }, { onConflict: 'user_id,key' });
+      .upsert(
+        { user_id: onboarded.id, key: 'consent.ledgerChatOptIn', value_json: LEDGER_CHAT_NOTICE_VERSION },
+        { onConflict: 'user_id,key' },
+      );
     await seedLogs(onboarded.id, [{ localDate: istYmdDaysAgo(0), quantity: 2, totalPriceInr: 40, unitPriceInr: 20 }]);
     await page.route(CHAT_ROUTE, (route: Route) =>
       route.fulfill(
@@ -96,7 +100,7 @@ test.describe('ask the ledger', () => {
     await page.getByRole('button', { name: 'Ask', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Ask the ledger' });
     await dialog.getByRole('button', { name: STARTER }).click();
-    await expect(dialog.getByText(ANSWER.answer)).toBeVisible();
+    await expect(dialog.locator('article').getByText(ANSWER.answer)).toBeVisible();
 
     // Money and stick rows are masked at the render site; the percent row is not.
     await expect(dialog.getByLabel('Spend, this week hidden, tap to reveal')).toBeVisible();

@@ -161,6 +161,64 @@ describe('runLedgerChatTurn', () => {
     expect(flagged.answer).toBe(FALLBACK_ANSWER);
   });
 
+  test('two calls to one tool each keep their rows under unique, deterministic ids', async () => {
+    const two = message(
+      [
+        { type: 'tool_use', id: 'tu-1', name: 'totals_in_window', input: { startYmd: '2026-06-14', endYmd: '2026-06-14' }, caller: { type: 'direct' } },
+        { type: 'tool_use', id: 'tu-2', name: 'totals_in_window', input: { startYmd: '2026-06-20', endYmd: '2026-06-21' }, caller: { type: 'direct' } },
+        { type: 'tool_use', id: 'tu-3', name: 'totals_in_window', input: { startYmd: '2026-06-14', endYmd: '2026-06-14' }, caller: { type: 'direct' } },
+      ] as unknown as Anthropic.ContentBlock[],
+      'tool_use',
+    );
+    const { client } = fakeClient([two, message([text('The second window was busier.')], 'end_turn')]);
+
+    const result = await run(client);
+
+    const ids = result.rows.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The first call keeps the bare ids; the second adds its own rows; the exact repeat adds none.
+    expect(result.rows.filter((r) => r.id.startsWith('totals.sticks')).map((r) => r.value)).toEqual([7, 8]);
+    expect(ids).toContain('totals.sticks');
+    expect(ids).toContain('totals.sticks#2');
+    expect(result.rows).toHaveLength(6);
+  });
+
+  test('two windows with equal values keep both rows, told apart by their window labels', async () => {
+    const two = message(
+      [
+        { type: 'tool_use', id: 'tu-1', name: 'totals_in_window', input: { startYmd: '2026-06-14', endYmd: '2026-06-14' }, caller: { type: 'direct' } },
+        { type: 'tool_use', id: 'tu-2', name: 'totals_in_window', input: { startYmd: '2026-06-20', endYmd: '2026-06-20' }, caller: { type: 'direct' } },
+      ] as unknown as Anthropic.ContentBlock[],
+      'tool_use',
+    );
+    const { client } = fakeClient([two, message([text('One day each.')], 'end_turn')]);
+
+    const result = await run(client);
+
+    const days = result.rows.filter((r) => r.id.startsWith('totals.days'));
+    expect(days.map((r) => r.value)).toEqual([1, 1]);
+    expect(days[0].label).toContain('2026-06-14');
+    expect(days[1].label).toContain('2026-06-20');
+    expect(new Set(result.rows.map((r) => r.label)).size).toBe(result.rows.length);
+  });
+
+  test('a 100 KB brand name reaches the model capped and without control characters', async () => {
+    const hugeLog: CigaretteLog = {
+      id: 'big', tsUtc: '2026-06-21T03:30:00.000Z', localDate: TODAY, localHour: 9, brandId: 'b',
+      brandNameSnap: `Evil\n${'x'.repeat(100_000)}`, variantSnap: null, quantity: 1, purchaseMode: 'single', packSize: null,
+      totalPriceInr: 20, unitPriceInr: 20, priceSource: 'exact', triggerTag: null, moodBefore: null, moodAfter: null,
+      craving: null, contextTag: null, notes: null, createdAt: '', updatedAt: '',
+    };
+    const bigCtx = buildToolContext({ profile, logs: [hugeLog], rows, goals: [], today: TODAY, summarySinceYmd: '2025-06-22' });
+    const { client, calls } = fakeClient([message([toolUse('recent_entries', { days: 7 })], 'tool_use'), message([text('Noted.')], 'end_turn')]);
+
+    await runLedgerChatTurn({ anthropic: client, model: 'fake', ctx: bigCtx, history: [], question: 'q' });
+
+    const result = (calls[1].messages[2].content as Anthropic.ToolResultBlockParam[])[0].content as string;
+    expect(result.length).toBeLessThan(2_000);
+    expect(JSON.parse(result).entries[0].brand).not.toMatch(/[\u0000-\u001f]/);
+  });
+
   test('discreet mode reaches the guard: a spelled-out duration triggers the retry', async () => {
     const discreetCtx = buildToolContext({
       profile: { ...profile, discreetMode: true }, logs, rows, goals: [], today: TODAY, summarySinceYmd: '2025-06-22',

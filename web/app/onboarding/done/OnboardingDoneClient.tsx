@@ -399,7 +399,7 @@ function SummaryRow({ label, value, sub, accent }: SummaryRowProps) {
     >
       <span className="editorial-caption-tight">{label}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 17, color: accent ? 'var(--accent)' : 'var(--text)' }}>
+        <span style={{ fontSize: 17, color: accent ? 'var(--accent-ink)' : 'var(--text)' }}>
           {value}
         </span>
         {sub ? (

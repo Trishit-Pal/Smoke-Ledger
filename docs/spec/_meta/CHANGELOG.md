@@ -4,6 +4,54 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — 62902bc
+- goals-insights: goal percentages and state captions use the AA ink tones (`stateTextColor`); rings keep the stroke tones.
+- security-privacy: the chat's 403 `forbidden` is for readers not yet onboarded; onboarded readers who need a refresh get `consent_outdated`.
+- auth: a new reader who has not consented can open `/privacy`, `/terms` and `/support` (the Privacy step links to them).
+- identity-profile, celebrations: re-verified against the same commit (middleware and dashboard edits only).
+
+## 2026-11-04 — c4fcc45
+- auth: sign-up is the first setup step (progress line, "Create account", "Use an email link instead"); sign-in carries no setup signals; wordmark home link on auth pages; onboarded readers are never routed into the wizard after sign-in.
+- identity-profile: `acceptChangedTerms` also stamps a missing age confirmation and data-processing consent, decided from the stored profile too.
+- celebrations: sign-up hides the greeting figure in favour of the setup progress line.
+- security-privacy: `needsConsentRefresh` sends onboarded readers with a missing stamp to `/consent` (no more wizard loop); `/api/*` skips the onboarding redirects; the chat answers `consent_outdated` for them; the no-record `/consent` heading.
+
+## 2026-11-03 — e974a1e
+- security-privacy: Phase B final-review fixes. `delete-account` writes `consent_revoked` only after `deleteUser` succeeds (`user_id` null, props `{ hashed_user_id, reason: 'delete' }`), superseding the earlier "past the re-auth gate, before the erase" wording; spoken masks say "hidden" (`spokenMask`) on both the web live region and the mobile announcement; the discreet guard also counts "twice", "a couple of", "a dozen".
+- goals-insights: the mobile store reloads the goals once when a reconcile transition was skipped.
+- architecture: the route guard's cover is modal to VoiceOver and the content wrapper hides from TalkBack while it shows.
+- identity-profile: verified only; the diff touched a stale `--warn-earth` comment in `SettingsClient.tsx`.
+- Also updated outside the spec: `docs/legal/owner-actions.md` (step 3 note on when the withdrawal row is written).
+
+## 2026-11-03 — 3d534c0
+- security-privacy: Phase B review fixes recorded. Chat guard: digits in any script fold to ASCII, decimals must match a tool figure (rounding pass removed), a day of the month passes before an English month name, hour fields and `notes` verify no figure, "zero" and one/two/do before a unit count only in discreet mode, and discreet replies are English (prompt). Tools: free text is cleaned and capped once (`cleanText`, `TEXT_FIELD_MAX_CHARS` 60, notes 120), repeated tool rows get `#2`/`#3` ids. Web panel: focus on open/close and after an answer, the live region mirrors the newest answer masked, a late answer is dropped after any `clearTranscript` (clear counter), a consent card survives a server `consent_required`. Mobile Ask: keyboard offset, scroll to end, masked announcement, exit fallback, switch shows saved state. Delete re-auth: the mobile resume needs a per-user SecureStore record with a 10-minute expiry (lifecycle row `mobile.deleteIntent`); the `delete-account` function writes `consent_revoked` when the client sends `{ withdraw }`, mobile erase records the withdrawal only after success. Marketing consent: the old statement that a CHECK keeps `marketing_consent_at` NULL is superseded, see the data-model line below. New open gaps (migration unconfirmed live, web withdrawal still client-side and before the action, English-only date and word coverage), new tests listed.
+- data-model: `marketing_consent_at` is now held NULL by the trigger `trg_user_profiles_marketing_consent_null` (`20261105110000`), which dropped the CHECK (23514 for older mobile builds); the trigger is documented beside the other profile triggers and the smoke checks listed; new open gap for the unapplied migration. This supersedes the CHECK described in the 2026-11-02 entry for e1a652d (history kept as written).
+- architecture: the one mobile route guard (`src/lib/routeGuard.ts`, run from `app/_layout.tsx`; tabs layout no longer redirects); the store's goal writer is the conditional pair.
+- auth: the mobile auth layout note points at the root route guard and says why auth routes stay open to signed-in readers.
+- goals-insights: reconcile writes only active goals (`completeGoalIfActive`, `markGoalMet` with a target condition and merge onto current meta), a `skipped` list beside `applied` and `failed`, the Done date is read in the reader's zone, the max-target message groups digits by locale, `--warn-earth-ink` for web concern text; open gap for the meta read-then-write.
+- identity-profile: mobile Settings switch for Ask the ledger shows saved state only.
+- infra-ops: CI pins the Supabase CLI (`SUPABASE_CLI_VERSION` 2.122.1), checkouts do not persist credentials, smoke.sql also asserts the monotonic, completed-at and marketing triggers.
+- celebrations: verified only; the diff touched warning colours (`--warn-earth-ink`) on Home and login, no celebration behaviour.
+- Also updated outside the spec: `docs/architecture/marketing-consent.md` (amendment: CHECK replaced by a trigger; the 23514 warning is resolved).
+- Not recorded in the spec: `--warn-earth-ink` is not described in DESIGN.md's token list (no section owns it beyond the goals note).
+
+## 2026-11-03 — 467615f
+- goals-insights: goal targets are bounded per unit (`maxTargetFor`: sticks 1 000, spend caps 100 000), through the schema, the create form's message and the database; a start or re-anchor proposal above the limit is dropped, not clamped.
+- data-model: `goals_target_value_check` is per unit (`20261105100000_goal_target_by_unit.sql`, with a `smoke.sql` check); a new open gap says the migration is unapplied and, until it is, weekly or monthly spend caps over 1 000 are refused on save.
+- security-privacy: the chat's kill switch is now a code-enforced release gate (`isChatPolicyLive`: Production and mobile release builds stay off until `LEGAL_VERSIONS.privacy` passes 2026-11-02; mobile dev builds exempt). The opt-in stores the notice version (`LEDGER_CHAT_NOTICE_VERSION`) instead of `true`, with a notice hash tripwire and `noticeVersion` on the audit event; web Settings hides the switch while the flag is off; the panel re-reads its state on every open. Records the earlier consent-gate edit to this section that had no entry (the versioned opt-in text, made in 5ace0ac). ADR: `docs/architecture/ledger-chat-consent-adr.md`. Tests and the open gap updated.
+- architecture: the dock reads its state on every open, and Settings receives the server chat flag.
+- identity-profile: the Settings › Privacy opt-in stores the notice version and web shows it only while the flag is on.
+- glossary: Ledger Chat consent wording; new Notice version entry.
+- Not recorded in the spec: mobile `textFaint` now meets WCAG AA (DESIGN.md already carries the values); no spec section owns `src/constants/theme.ts`.
+
+## 2026-11-03 — 27c86cb
+- security-privacy: Ask the ledger rewritten for web and mobile. New gates and shapes: `consent_outdated` (403) in the profile gate; `GET /api/ledger-chat` (own `ledger_chat_state` bucket, no model, returns only `{ consented, discreet, hideTotals, currency, locale, starters }`). `scope.ts` is the one list of what the chat may read and never reads, rendered into the prompt and the notice; the tool context is built from an allowlist (identity-leak test). Twelve tools (goal history, price history from entries, entry edit dates added). Number words count as figures and are blocked outright in discreet mode. Where it appears: the web dock (five pages, not Log, minimise as the device preference `sl_chat_dock_minimised`) and the mobile pill and `/ask` screen; mobile keeps the conversation in memory only. New invariants 19 and a longer 9 and 11, the CI specs, and an honest open gap: built but off, owner steps in owner-actions section 8.
+- architecture: the `(app)` layout mounts the dock with the server flag only; mobile registers the `/ask` modal.
+- identity-profile: Settings › Privacy holds the mobile opt-in switch for Ask the ledger; identity rows are outside the chat allowlist.
+- infra-ops: the `responsive-e2e` job runs with `LEDGER_CHAT_ENABLED` and a functional step for the chat, dock, consent and goals specs; the mobile build flag and the blank `EXPO_PUBLIC_WEB_BASE_URL` in `eas.json`.
+- celebrations: verified only; the Dashboard no longer carries its own Ask link (the layout dock replaced it). No celebration behaviour changed.
+- glossary: Ledger Chat updated; Chat scope and Ask dock and Ask pill added.
+
 ## 2026-11-03 — 8398559
 - data-model: erase also clears `mobile_changed_at` and old `deleted_at` stamps (`20261104140000_erase_profile_leftovers.sql`); country and currency kept as regional settings; the unapplied-migrations gap now runs to 140000.
 - auth: post-auth routing honours an exempt next (the `/settings` delete-resume) when consents are outdated; "outdated" means older, not different.

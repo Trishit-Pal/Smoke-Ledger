@@ -122,6 +122,111 @@ describe('Hinglish hundreds, thousands and money (fix round 1, I1)', () => {
   );
 });
 
+describe('Unicode digits, zero, and the review strings (review fixes, Task 7)', () => {
+  const discreet = { discreet: true };
+
+  // The five strings the review ran through the discreet guard, all unflagged before:
+  // - "Kal bees cigarettes, pachaas rupaye": Hindi number words outside the Hinglish list
+  //   ("bees" is also English). Prevented by the prompt: discreet replies are English.
+  // - "आपने पाँच सिगरेट पी, ५०० रुपये": the guard flags the Devanagari digits; the word "पाँच" is
+  //   prevented by the prompt.
+  // - "Vous avez fumé quinze cigarettes": French. Prevented by the prompt.
+  // - "Two packs, zero today": the guard flags both words.
+  // - Mixed digits, "Aaj १५ sticks, kal 8.": the guard flags the made-up १५ (15), not the 8 in the data.
+  it.each([
+    ['आपने पाँच सिगरेट पी, ५०० रुपये', ['500']],
+    ['Two packs, zero today', ['Two', 'zero']],
+    ['Aaj १५ sticks, kal 8.', ['15']],
+  ])('flags what the guard can see in discreet mode: %s', (text, expected) => {
+    expect(findUnverifiedFigures(text, allowed, discreet)).toEqual(expected);
+  });
+
+  it('reads a figure in any script by its value, so a verified one passes', () => {
+    expect(findUnverifiedNumbers('Is hafte ८ sticks, ₹१,2०० kharch.', allowed)).toEqual([]);
+    expect(findUnverifiedNumbers('Fullwidth ８ and Arabic-Indic ٨ too.', allowed)).toEqual([]);
+  });
+
+  it('a number word right after non-ASCII digits is left to the digit check', () => {
+    expect(findUnverifiedNumberWords('Down २१ percent.', { discreet: false })).toEqual([]);
+  });
+
+  it('zero is a figure only in discreet mode', () => {
+    expect(findUnverifiedNumberWords('Zero entries today.', { discreet: false })).toEqual([]);
+    expect(findUnverifiedNumberWords('Zero entries today.', discreet)).toEqual(['Zero']);
+  });
+
+  it('in discreet mode "twice", "a couple of" and "a dozen" are figures; plain mode leaves them', () => {
+    expect(findUnverifiedNumberWords('You smoked twice.', discreet)).toEqual(['twice']);
+    expect(findUnverifiedNumberWords('A couple of packs.', discreet)).toEqual(['A couple of']);
+    expect(findUnverifiedNumberWords('About a dozen sticks.', discreet)).toEqual(['a dozen']);
+    for (const text of ['You smoked twice.', 'A couple of packs.', 'About a dozen sticks.']) {
+      expect(findUnverifiedNumberWords(text, { discreet: false })).toEqual([]);
+    }
+  });
+
+  it('in discreet mode one and two count before a unit, like "do"', () => {
+    expect(findUnverifiedNumberWords('One stick, then two cigarettes.', discreet)).toEqual(['One', 'two']);
+    expect(findUnverifiedNumberWords('One of the evenings, two quiet days.', discreet)).toEqual([]);
+  });
+});
+
+describe('dates and hours verify no figures (review fixes, Task 7)', () => {
+  const entries: ToolOutcome = {
+    ok: true,
+    data: {
+      startYmd: '2026-06-08',
+      entries: [{ date: '2026-06-14', hour: 21, quantity: 2 }],
+      edits: [{ entryDate: '2026-06-12', entryHour: 9, editedOn: '2026-06-16' }],
+      goals: [{ startDate: '2025-12-01' }],
+    },
+    rows: [{ id: 'r', label: 'Sticks, 2026-06-08 to 2026-06-14', value: 2, unit: 'sticks' }],
+  };
+  const allowedHere = allowedNumbers([entries], { year: '2026', extraText: ['- Today: 2026-06-23 (Asia/Kolkata)'] });
+
+  it.each(['14', '6', '8', '12', '16', '23', '21', '9'])('a made-up %s sticks is flagged, though it is a date part or an hour', (n) => {
+    expect(findUnverifiedNumbers(`${n} sticks on Tuesday.`, allowedHere)).toEqual([n]);
+  });
+
+  it('a numeric field still verifies its figure', () => {
+    expect(findUnverifiedNumbers('2 sticks on Tuesday.', allowedHere)).toEqual([]);
+  });
+
+  it('a date keeps its year, and a day before a month reads as a date', () => {
+    expect(findUnverifiedNumbers('You set it in December 2025.', allowedHere)).toEqual([]);
+    expect(findUnverifiedNumbers('You edited the 12 June entry on 16th June, and 14th of June.', allowedHere)).toEqual([]);
+  });
+
+  it('hours read as times by their context', () => {
+    expect(findUnverifiedNumbers('Mostly around 9 pm, or 21:00.', allowedHere)).toEqual([]);
+  });
+
+  it('a figure under a key that is not an hour is still harvested (peakHours[].sticks)', () => {
+    const peaks = allowedNumbers([{ ok: true, data: { peakHours: [{ hour: 21, sticks: 17 }] }, rows: [] }], { year: '2026' });
+    expect(findUnverifiedNumbers('17 sticks at the peak.', peaks)).toEqual([]);
+  });
+
+  it("the reader's own notes verify no figures", () => {
+    const noted = allowedNumbers(
+      [{ ok: true, data: { entries: [{ quantity: 1, notes: 'had 10 with Raj, 3 coffees' }] }, rows: [] }],
+      { year: '2026' },
+    );
+    expect(findUnverifiedNumbers('3 sticks today.', noted)).toEqual(['3']);
+    expect(findUnverifiedNumbers('10 sticks today.', noted)).toEqual(['10']);
+  });
+});
+
+describe('decimals pass only as roundings of the data (review fixes, Task 7)', () => {
+  const allowedHere = allowedNumbers([{ ok: true, data: { unitPrice: 18 }, rows: [] }], { year: '2026' });
+
+  it('₹18.40 is not verified by an 18 in the data', () => {
+    expect(findUnverifiedNumbers('Each one cost ₹18.40.', allowedHere)).toEqual(['18.40']);
+  });
+
+  it('the value itself and its fixed-point forms pass', () => {
+    expect(findUnverifiedNumbers('₹18 a stick, or ₹18.00.', allowedHere)).toEqual([]);
+  });
+});
+
 describe('brand names are not figures (fix round 1, I2)', () => {
   const brandOutcome: ToolOutcome = {
     ok: true,

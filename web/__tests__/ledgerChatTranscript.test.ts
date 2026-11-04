@@ -4,6 +4,7 @@ import {
   clearTranscript,
   loadTranscript,
   saveTranscript,
+  transcriptClearCount,
   type TranscriptTurn,
 } from '@web/components/chat/transcriptStore';
 
@@ -50,6 +51,20 @@ describe('transcriptStore', () => {
     expect(loadTranscript('u1', store)).toEqual([]);
     expect(loadTranscript('u2', store)).toEqual([]);
     expect(store.getItem('theme')).toBe('dark');
+  });
+
+  test('every clear moves the clear count, so a late answer can tell it was cleared', () => {
+    const store = fakeStorage();
+    const before = transcriptClearCount();
+    saveTranscript('u1', [turn(1)], store);
+    expect(transcriptClearCount()).toBe(before);
+    clearTranscript('u1', store);
+    expect(transcriptClearCount()).toBe(before + 1);
+    clearTranscript(undefined, store);
+    expect(transcriptClearCount()).toBe(before + 2);
+    // Nothing to clear (no storage) is still a clear request: the count moves.
+    clearTranscript(undefined, null);
+    expect(transcriptClearCount()).toBe(before + 3);
   });
 
   test('ignores a corrupt entry instead of throwing', () => {

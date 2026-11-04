@@ -123,6 +123,13 @@ function deltaColor(tone: 'up' | 'down' | 'flat'): string {
   return 'var(--text-muted)';
 }
 
+// Text-only variant: the shared deltaColor also feeds chart strokes, which keep the decorative token.
+function deltaTextColor(tone: 'up' | 'down' | 'flat'): string {
+  if (tone === 'up') return 'var(--warn-earth-ink)';
+  if (tone === 'down') return 'var(--accent-ink)';
+  return deltaColor(tone);
+}
+
 /** Editorial label for the masthead — pairs the static word "Trends" with the
  *  selected period. Reads as a section title in the publication. */
 function windowLabel(days: WindowDays): string {
@@ -275,7 +282,6 @@ export function TrendsClient({ profile, logs, dailySummary, goals }: TrendsClien
   const stickTone = deltaTone(summary.stickDeltaPct);
   const spendTone = deltaTone(summary.spendDeltaPct);
   const stickToneColor = deltaColor(stickTone);
-  const spendToneColor = deltaColor(spendTone);
 
   const hasData = logs.length > 0;
   const periodLabel = windowLabel(windowDays);
@@ -358,7 +364,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals }: TrendsClien
                   </div>
                   <span
                     className="text-small nums-tabular mt-xs"
-                    style={{ color: stickToneColor }}
+                    style={{ color: deltaTextColor(stickTone) }}
                     aria-label={`Sticks change: ${formatDelta(summary.stickDeltaPct)} vs previous period`}
                   >
                     {formatDelta(summary.stickDeltaPct)}
@@ -379,7 +385,7 @@ export function TrendsClient({ profile, logs, dailySummary, goals }: TrendsClien
                   </div>
                   <span
                     className="text-small nums-tabular mt-xs"
-                    style={{ color: spendToneColor }}
+                    style={{ color: deltaTextColor(spendTone) }}
                     aria-label={`Spend change: ${formatDelta(summary.spendDeltaPct)} vs previous period`}
                   >
                     {formatDelta(summary.spendDeltaPct)}

@@ -2,6 +2,7 @@ import { getSupabase } from '@/lib/supabase';
 import { getSetting, setSetting } from '@/db/repositories/settings';
 import { recordAuditEvent } from '@/services/audit';
 import { CHAT_HISTORY_MAX_TURNS, CHAT_HISTORY_TEXT_MAX } from '@/domain/ledgerChat/types';
+import { LEDGER_CHAT_NOTICE_VERSION } from '@/domain/ledgerChat/notice';
 import {
   askLedger,
   getChatState,
@@ -172,27 +173,34 @@ describe('historyFor', () => {
 });
 
 describe('ledger chat opt-in', () => {
-  it('reads the settings_kv key; only true is on', async () => {
-    (getSetting as jest.Mock).mockResolvedValueOnce(true);
+  it('reads the settings_kv key; only the current notice version is on', async () => {
+    (getSetting as jest.Mock).mockResolvedValueOnce(LEDGER_CHAT_NOTICE_VERSION);
     expect(await readLedgerChatOptIn()).toBe(true);
     expect(getSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn');
-    (getSetting as jest.Mock).mockResolvedValueOnce(null);
-    expect(await readLedgerChatOptIn()).toBe(false);
+    // A pre-versioning true, an older notice's version, off and unset all read as off.
+    for (const stale of [true, '2026-11-02', false, null]) {
+      (getSetting as jest.Mock).mockResolvedValueOnce(stale);
+      expect(await readLedgerChatOptIn()).toBe(false);
+    }
   });
 
-  it.each([true, false])('writes the key and the audit row when set to %s', async (enabled) => {
+  it.each([
+    [true, LEDGER_CHAT_NOTICE_VERSION],
+    [false, false],
+  ])('set to %s: stores %s and writes the audit row with both versions', async (enabled, stored) => {
     await setLedgerChatOptIn(enabled);
-    expect(setSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn', enabled);
+    expect(setSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn', stored);
     expect(recordAuditEvent).toHaveBeenCalledWith('ledger_chat_consent_toggled', 'privacy', {
       enabled,
       privacyVersion: expect.any(String),
+      noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
     });
   });
 
   it('saves the opt-in even when the audit row fails', async () => {
     (recordAuditEvent as jest.Mock).mockRejectedValueOnce(new Error('edge allowlist lag'));
     await expect(setLedgerChatOptIn(true)).resolves.toBeUndefined();
-    expect(setSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn', true);
+    expect(setSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn', LEDGER_CHAT_NOTICE_VERSION);
   });
 
   it('does not swallow a failed settings write, and writes no audit row for it', async () => {

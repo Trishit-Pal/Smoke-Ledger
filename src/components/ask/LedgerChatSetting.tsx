@@ -76,9 +76,16 @@ export function LedgerChatSetting() {
     }
   };
 
+  // The switch shows saved state only. Turning on opens the notice and saves nothing
+  // until "Turn on"; an off event without a saved opt-in just closes the notice, so no
+  // setting or audit row is written for a consent that was never on.
   const onToggle = (value: boolean) => {
-    if (value) setConfirming(true);
-    else void save(false);
+    if (value) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
+    if (on) void save(false);
   };
 
   return (
@@ -91,11 +98,11 @@ export function LedgerChatSetting() {
           </Text>
         </View>
         <Switch
-          value={on || confirming}
+          value={on}
           onValueChange={onToggle}
           disabled={busy || !known}
           trackColor={{ false: theme.rule, true: theme.accent }}
-          thumbColor={on || confirming ? theme.bg : theme.textFaint}
+          thumbColor={on ? theme.bg : theme.textFaint}
           ios_backgroundColor={theme.rule}
           accessibilityLabel={LABEL}
           accessibilityRole="switch"

@@ -22,6 +22,21 @@ export async function recordConsentWithdrawal(outcome: 'erase' | 'delete'): Prom
 }
 
 /**
+ * Run the erase/delete, and only if it succeeds record the withdrawal it ends.
+ * A failed or redirected action (re-auth detour, cancel, network) rejects here
+ * and writes nothing, so the audit trail never claims a withdrawal that did not
+ * happen. `withdraw` false (an ordinary erase/delete) records nothing.
+ */
+export async function recordWithdrawalAfter(
+  withdraw: boolean,
+  outcome: 'erase' | 'delete',
+  action: () => Promise<void>,
+): Promise<void> {
+  await action();
+  if (withdraw) await recordConsentWithdrawal(outcome);
+}
+
+/**
  * Store the analytics preference. Turning it off first deletes the reader's past
  * usage events, so a failed delete leaves the preference on and the toggle can
  * simply be retried.

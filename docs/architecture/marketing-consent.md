@@ -1,6 +1,6 @@
 # ADR-0001: Retire the misrecorded marketing-consent stamps
 
-**Status:** Accepted
+**Status:** Accepted; the lock was amended 2026-11-03 (CHECK replaced by a trigger, see Amendment)
 **Date:** 2026-11-02
 **Deciders:** Product owner (Trishit); DPDP and RLS reviewers on the migration
 
@@ -17,7 +17,7 @@ The `user_profiles` UPDATE policy is row-wide (`id = auth.uid()`), so any signed
 Migration `20261102120000_clear_marketing_consent.sql`:
 
 1. In one statement, set every non-null `marketing_consent_at` to NULL and insert one `marketing_consent_cleared` compliance audit row per affected user (props: `{ reason: 'analytics_opt_in_misrecorded' }`, no timestamp or other PII). The event type is server-only and is absent from every client audit registry.
-2. Add `CHECK (marketing_consent_at IS NULL)` so no role can set it again.
+2. Add `CHECK (marketing_consent_at IS NULL)` so no role can set it again. **Superseded:** `20261105110000_marketing_consent_null_trigger.sql` drops this CHECK and keeps the column empty with a trigger instead (see Amendment).
 
 App code loses the write path: `ComplianceConsentPatch` no longer has `marketingConsentAt`. The read mapping stays so types and exports match the column.
 
@@ -31,7 +31,7 @@ App code loses the write path: `ComplianceConsentPatch` no longer has `marketing
 | Reversibility | Drop one constraint |
 | Data honesty | Exports stop showing a consent nobody gave |
 
-**Pros:** smallest change that makes the record true and keeps it true for every client, including stale builds and direct API calls. **Cons:** a pre-branch mobile build would fail its consent step for analytics opt-ins once the CHECK lands (see Consequences).
+**Pros:** smallest change that makes the record true and keeps it true for every client, including stale builds and direct API calls. **Cons:** a pre-branch mobile build would fail its consent step for analytics opt-ins once the CHECK lands (see Consequences). This turned out to be a real problem, not a theoretical one: see Amendment.
 
 ### B. Build a real opt-in toggle
 | Dimension | Assessment |
@@ -51,7 +51,7 @@ App code loses the write path: `ComplianceConsentPatch` no longer has `marketing
 **Cons:** churns compliance-critical functions (`export_account_data`, `erase_account_data`) for no user-visible gain over A.
 
 ### Alternatives for the lock
-A trigger or column-level grant could also block writes. A CHECK binds every role (including `service_role`), needs no function grants, and is one line to reverse.
+A trigger or column-level grant could also block writes. A CHECK binds every role (including `service_role`), needs no function grants, and is one line to reverse. The Amendment below went the other way, for the reason in its first paragraph.
 
 ## Trade-off analysis
 
@@ -60,12 +60,19 @@ A wins because it corrects the data and prevents recurrence with the least movin
 ## Consequences
 
 - **Easier:** exports and audits are truthful; no client path, old or new, can record marketing consent.
-- **Harder:** shipping a real marketing opt-in now requires dropping the constraint in the same migration that adds the feature and its own audit event.
-- **Revisit:** before applying to a shared project, confirm no pre-branch mobile build is still in use, or ship the app update first. A build that predates this branch sends `marketing_consent_at = now()` when analytics is ticked and will get a Postgres 23514 on the privacy step.
+- **Harder:** shipping a real marketing opt-in now requires dropping the trigger and its function (originally the constraint) in the same migration that adds the feature and its own audit event.
+- **Resolved:** the old concern, that a build predating this branch sends `marketing_consent_at = now()` when analytics is ticked and so got a Postgres 23514 on the privacy step, no longer applies once `20261105110000` is applied (see Amendment).
 
 ## Action items
 
 1. [x] Migration with per-user audit and CHECK; source-guard tests in `src/tests/security-migrations.test.ts`.
 2. [x] Remove the write path from `src/db/repositories/profile.ts`; type-level test in `src/tests/onboardingService.test.ts`.
 3. [ ] Count affected rows on each project before applying (`select count(*) from user_profiles where marketing_consent_at is not null`), then verify the audit count matches afterwards.
-4. [ ] Confirm the live mobile build includes this branch before applying to production.
+4. [x] Confirm the live mobile build includes this branch before applying to production. Dropped as a precondition: the Amendment makes the migration safe for old builds.
+5. [ ] Apply `20261105110000_marketing_consent_null_trigger.sql` to the live project (it also drops the CHECK). Until then the live CHECK still rejects an older build's consent write.
+
+## Amendment (2026-11-03): a trigger, not a CHECK
+
+The CHECK in step 2 made a consent write from a mobile build installed before this fix fail with Postgres 23514: that build sends `marketingConsentAt: analyticsOptIn ? now : null` in the same profile update that stamps the consent versions, so a reader who ticked analytics could not get past consent, and there are no over-the-air mobile updates to fix it. The 23514 warning in the original Consequences was therefore a blocker, not a footnote.
+
+`20261105110000_marketing_consent_null_trigger.sql` drops `user_profiles_marketing_consent_unused` and adds the BEFORE INSERT OR UPDATE trigger `trg_user_profiles_marketing_consent_null` (`public.null_marketing_consent_at()`, `SECURITY INVOKER`, `search_path = ''`, revoked from everyone), which sets the column to NULL on every write. The old build's write now succeeds and the column still ends up empty for every role, which is the property the CHECK was there for. Neither `export_account_data()` (reads the column) nor `erase_account_data()` (writes NULL) relied on the CHECK, and the cleared-stamps audit rows from step 1 are untouched. The trigger is idempotent (`DROP ... IF EXISTS`, `CREATE OR REPLACE`); `scripts/sql/smoke.sql` fails CI if the trigger is missing or the CHECK returns; `src/tests/marketing-consent-null-trigger-migration.test.ts` guards the migration source. A real opt-in later drops the trigger and function in its own migration.

@@ -2,13 +2,34 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { TiltCard } from '@web/components/onboarding/TiltCard';
+import { SETUP_STEPS, type SetupStepKey } from '@web/components/onboarding/steps';
 
-const PILLARS: { num: string; title: string; copy: string }[] = [
-  { num: 'I.', title: 'Free', copy: 'No ads, no upsell, no subscription tier.' },
-  { num: 'II.', title: 'Private', copy: 'Encrypted at rest. Yours to export or delete.' },
-  { num: 'III.', title: 'Honest', copy: 'No streaks. No badges. No shame patterns.' },
-];
+/**
+ * What each step asks and why. Keep every line true of the step as built:
+ * the usual-day number (Settings) and the goal (Goals) are the answers a reader
+ * can change after setup, so the lead names only those.
+ */
+const STEP_DETAILS: Record<SetupStepKey, { asks: string; why: string }> = {
+  privacy: {
+    asks: 'Confirm you’re 18 or older, accept the terms, and consent to us keeping a record of your smoking. Analytics is optional.',
+    why: 'What you log is health information, so the ledger needs your consent first.',
+  },
+  usage: {
+    asks: 'How many you smoke on a usual day, how you usually buy, and how many days to compare over.',
+    why: 'Your savings and trends are measured against it.',
+  },
+  goal: {
+    asks: 'One small limit if you want one: sticks a day, spend a day, or hours without smoking.',
+    why: 'Your dashboard shows how each day compares with it.',
+  },
+  brands: {
+    asks: 'The few brands you smoke most.',
+    why: 'They come first in the dashboard’s quick log, so logging one takes a tap.',
+  },
+};
+
+/** Stagger index for the editorial-stage entrance (instant under reduced motion). */
+const idx = (n: number) => ({ ['--ed-index' as string]: n }) as React.CSSProperties;
 
 export default function OnboardingWelcomePage() {
   const router = useRouter();
@@ -20,9 +41,8 @@ export default function OnboardingWelcomePage() {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      // Only when nothing holds focus: a focused link, toggle or the button keeps its own Enter.
+      if (e.target !== document.body) return;
       if (e.key === 'Enter' || e.key === 'ArrowRight') {
         e.preventDefault();
         advance();
@@ -33,102 +53,62 @@ export default function OnboardingWelcomePage() {
   }, [advance]);
 
   return (
-    <div
-      className="editorial-stage"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 32,
-        maxWidth: 640,
-        position: 'relative',
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: -40,
-          right: -80,
-          fontFamily: 'var(--font-display)',
-          fontStyle: 'italic',
-          fontWeight: 300,
-          fontSize: 360,
-          color: 'var(--rule)',
-          opacity: 0.5,
-          lineHeight: 0.85,
-          pointerEvents: 'none',
-          letterSpacing: '-0.06em',
-          userSelect: 'none',
-          transform: 'translateZ(0)',
-          animation: 'driftSlow 18s ease-in-out infinite',
-          zIndex: 0,
-        }}
+    <div className="editorial-stage flex max-w-[640px] flex-col gap-xl">
+      <header className="flex flex-col gap-md" style={idx(0)}>
+        <h1
+          className="editorial-headline m-0"
+          style={{ fontSize: 'clamp(32px, 4vw, 44px)', color: 'var(--text)' }}
+        >
+          Set up your ledger.
+        </h1>
+        <p className="m-0 max-w-[34rem]" style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--text-muted)' }}>
+          Four short steps, a few minutes. Your usual-day number and your goal can be changed later,
+          in Settings and Goals.
+        </p>
+      </header>
+
+      <ol
+        role="list"
+        aria-label="Setup steps"
+        className="m-0 list-none p-0"
+        style={{ ...idx(1), borderTop: '1px solid var(--rule-strong)' }}
       >
-        №.01
-      </div>
+        {SETUP_STEPS.map((step) => (
+          <li
+            key={step.key}
+            className="grid items-baseline gap-x-lg py-lg"
+            style={{ gridTemplateColumns: 'auto 1fr', borderBottom: '1px solid var(--rule)' }}
+          >
+            {/* Same folio as the rail; the <ol> already numbers the steps for screen readers. */}
+            <span aria-hidden className="editorial-caption-tight nums-tabular" style={{ color: 'var(--text-faint)' }}>
+              {step.index}
+            </span>
+            <div className="flex max-w-[34rem] flex-col gap-xs">
+              <h2
+                className="m-0"
+                style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: 20, lineHeight: 1.25 }}
+              >
+                {step.label}
+              </h2>
+              <p className="m-0 text-body" style={{ lineHeight: 1.55, color: 'var(--text)' }}>
+                {STEP_DETAILS[step.key].asks}
+              </p>
+              <p className="m-0 text-small" style={{ lineHeight: 1.55, color: 'var(--text-muted)' }}>
+                {STEP_DETAILS[step.key].why}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <span className="editorial-caption">An honest tracker · Established 2026</span>
-      </div>
-
-      <h1
-        className="editorial-headline"
-        style={{
-          fontSize: 'clamp(40px, 5.5vw, 64px)',
-          margin: 0,
-          color: 'var(--text)',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        Know every stick.
-        <br />
-        Spend less.
-        <br />
-        <span style={{ color: 'var(--accent-ink)', fontStyle: 'italic' }}>Quit on your terms.</span>
-      </h1>
-
-      <div
-        className="rule-draw"
-        style={{
-          borderTop: '1px solid var(--rule-strong)',
-          width: 80,
-          position: 'relative',
-          zIndex: 1,
-        }}
-      />
-
-      <p
-        style={{
-          fontSize: 16,
-          lineHeight: 1.6,
-          color: 'var(--text-muted)',
-          margin: 0,
-          maxWidth: 520,
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        Smoke Ledger is a private, observational record of your smoking — not a streak game, not a
-        guilt machine. We&rsquo;ll set this up in four small steps. About ninety seconds.
-      </p>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: 16,
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
+      <div className="flex flex-wrap items-center gap-lg" style={idx(2)}>
         <button
           type="button"
           onClick={advance}
           onMouseDown={() => setPressed(true)}
           onMouseUp={() => setPressed(false)}
           onMouseLeave={() => setPressed(false)}
-          className="focus-ring"
+          className="focus-ring text-body"
           style={{
             height: 56,
             padding: '0 28px',
@@ -139,7 +119,6 @@ export default function OnboardingWelcomePage() {
             borderRadius: 10,
             fontFamily: 'var(--font-sans)',
             fontWeight: 600,
-            fontSize: 15,
             letterSpacing: '0.01em',
             display: 'inline-flex',
             alignItems: 'center',
@@ -151,77 +130,15 @@ export default function OnboardingWelcomePage() {
             transition: 'transform 120ms ease-out, box-shadow 240ms ease',
           }}
         >
-          Begin the ledger
+          Start setup
           <span aria-hidden style={{ fontSize: 18 }}>
             →
           </span>
         </button>
-        <span
-          style={{
-            fontSize: 11,
-            color: 'var(--text-faint)',
-            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-            letterSpacing: '0.12em',
-          }}
-        >
-          ↵ ENTER
+        {/* Keyboard hint only where a keyboard is likely. */}
+        <span className="hidden text-small md:inline" style={{ color: 'var(--text-faint)' }}>
+          or press Enter
         </span>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 18,
-          marginTop: 16,
-          paddingTop: 24,
-          borderTop: '1px solid var(--rule)',
-          position: 'relative',
-          transformStyle: 'preserve-3d',
-          perspective: 1000,
-          zIndex: 1,
-        }}
-      >
-        {PILLARS.map(({ num, title, copy }, i) => (
-          <TiltCard
-            key={num}
-            max={8}
-            lift={10}
-            glare
-            style={{
-              padding: '18px 16px',
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--rule)',
-              borderRadius: 10,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-              opacity: 0,
-              animationDelay: `${i * 80 + 600}ms`,
-              animationName: 'pillarRise',
-              animationDuration: '700ms',
-              animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-              animationFillMode: 'both',
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 32,
-                color: 'var(--accent-ink)',
-                lineHeight: 1,
-                fontStyle: 'italic',
-                fontWeight: 500,
-              }}
-            >
-              {num}
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {copy}
-            </span>
-          </TiltCard>
-        ))}
       </div>
     </div>
   );

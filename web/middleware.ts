@@ -6,9 +6,9 @@ import {
   canAccessOnboardingStep,
   CONSENT_ROUTE,
   consentGateRedirect,
-  consentsOutdated,
   effectiveOnboardingStep,
   hasRequiredConsents,
+  needsConsentRefresh,
   resumeOnboardingRoute,
   resumeProfileFromRow,
 } from '@/lib/onboardingSteps';
@@ -48,6 +48,15 @@ function isCallbackRoute(pathname: string): boolean {
 
 function isRecoveryRoute(pathname: string): boolean {
   return pathname === '/reset-password';
+}
+
+// API routes answer for themselves: /api/audit checks same-origin and the session
+// (it must work before consent: it records it); /api/ledger-chat its caller and
+// its own consent and onboarding gate. Exempt from the onboarding redirects only,
+// never from sign-in: a redirect turns the wizard's audit POST into an HTML 200
+// that the caller would take for a recorded audit.
+function isApiRoute(pathname: string): boolean {
+  return pathname.startsWith('/api/');
 }
 
 type CookieOptions = {
@@ -199,18 +208,26 @@ export async function middleware(request: NextRequest) {
     return finalize(
       NextResponse.redirect(
         new URL(
-          onboarded && consented ? (consentsOutdated(steps) ? CONSENT_ROUTE : '/dashboard') : resume,
+          onboarded ? (needsConsentRefresh(steps, true) ? CONSENT_ROUTE : '/dashboard') : resume,
           request.url,
         ),
       ),
     );
   }
 
+  // The wizard's consent step is for readers who are not onboarded yet. An
+  // onboarded reader missing a consent falls through to the re-consent gate:
+  // sending them here would be bounced back by the onboarded redirect, a loop.
+  // The public pages stay open so the Terms and Privacy Policy the step links to
+  // can be read before agreeing to them.
   if (
+    !onboarded &&
     !consented &&
     pathname !== '/onboarding' &&
     pathname !== '/onboarding/privacy' &&
-    !isRecoveryRoute(pathname)
+    !isPublicRoute(pathname) &&
+    !isRecoveryRoute(pathname) &&
+    !isApiRoute(pathname)
   ) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
@@ -219,14 +236,16 @@ export async function middleware(request: NextRequest) {
     !onboarded &&
     !isOnboardingRoute(pathname) &&
     !isPublicRoute(pathname) &&
-    !isRecoveryRoute(pathname)
+    !isRecoveryRoute(pathname) &&
+    !isApiRoute(pathname)
   ) {
     return finalize(NextResponse.redirect(new URL(resume, request.url)));
   }
 
-  // Re-consent gate: an onboarded user whose consents are older than the current
-  // legal versions (or who never gave the health-data consent) is sent to /consent
-  // before anything else, and a current user on /consent goes home. Sits before
+  // Re-consent gate: an onboarded user missing a consent, or whose consents are
+  // older than the current legal versions (or who never gave the health-data
+  // consent), is sent to /consent before anything else, and a current user on
+  // /consent goes home. Sits before
   // the onboarded bounce so /onboarding/* also lands on /consent, not /dashboard.
   // /consent and the legal, settings, auth and API paths are exempt, so no loop.
   const consentRedirect = consentGateRedirect(pathname, steps, onboarded);

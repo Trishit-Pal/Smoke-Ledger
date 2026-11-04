@@ -120,14 +120,17 @@ const everyDay = (n: number, quantity: number): CigaretteLog[] =>
 const ctx = { currency: 'INR' as const, formatMoney: (n: number) => `Rs${n}`, formatDate: (d: string) => d, hideMoney: false };
 
 describe('doneLabel', () => {
-  const fmt = (d: string) => `<${d}>`;
-  it('dates a completed or set-aside goal', () => {
-    expect(doneLabel('completed', '2026-10-30T08:00:00.000Z', fmt)).toBe('Completed <2026-10-30T08:00:00.000Z>');
-    expect(doneLabel('abandoned', '2026-10-30T08:00:00.000Z', fmt)).toBe('Set aside <2026-10-30T08:00:00.000Z>');
+  // 18:30Z on 2 Nov is already 3 Nov in Kolkata (+05:30) but still 2 Nov in UTC / Paris.
+  const lateEvening = '2026-11-02T18:30:00.000Z';
+  it('dates a completed or set-aside goal in the reader zone, not the runtime zone', () => {
+    expect(doneLabel('completed', lateEvening, 'Asia/Kolkata')).toBe('Completed 03/11/2026');
+    expect(doneLabel('abandoned', lateEvening, 'Asia/Kolkata')).toBe('Set aside 03/11/2026');
+    expect(doneLabel('completed', lateEvening, 'Europe/Paris')).toBe('Completed 02/11/2026');
+    expect(doneLabel('completed', lateEvening, 'UTC')).toBe('Completed 02/11/2026');
   });
   it('falls back to the bare word without a date', () => {
-    expect(doneLabel('completed', null, fmt)).toBe('Completed');
-    expect(doneLabel('abandoned', null, fmt)).toBe('Set aside');
+    expect(doneLabel('completed', null, 'Asia/Kolkata')).toBe('Completed');
+    expect(doneLabel('abandoned', null, 'Asia/Kolkata')).toBe('Set aside');
   });
 });
 

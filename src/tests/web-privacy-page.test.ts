@@ -67,6 +67,22 @@ describe('privacy policy', () => {
     expect(page).toContain('LEGAL_ENTITY.anthropicRetention');
   });
 
+  it('names everything the notice says is sent: goal history, price history, edit dates (web and mobile)', () => {
+    const notice = read('src/domain/ledgerChat/notice.ts');
+    for (const category of ['goal history', 'prices you recorded on entries', 'dates you edited entries']) {
+      expect(notice).toContain(category);
+      expect(page).toContain(category);
+    }
+    expect(page).toMatch(/web app and the mobile app/);
+    expect(page).toMatch(/on mobile it is kept only in the app’s memory/i);
+    expect(page).not.toMatch(/web app only/);
+  });
+
+  it('lists the dock-minimised preference among browser storage', () => {
+    expect(page).toMatch(/whether you folded the Ask box away/);
+    expect(read('src/lib/privacy/lifecycle.ts')).toContain("id: 'web.chatDockMinimised'");
+  });
+
   it('gives the legal basis for health data and the transfer safeguard', () => {
     expect(page).toContain('Article 9(2)(a)');
     expect(page).toContain('Standard Contractual Clauses');

@@ -36,6 +36,8 @@ export function WeekStrip({ data, inverted = false, hidden = false }: WeekStripP
   const restColour = inverted ? 'rgba(230, 234, 239, 0.45)' : 'rgba(11, 15, 20, 0.30)';
   const todayColour = 'var(--accent)';
   const labelColour = inverted ? 'var(--ink-surface-muted)' : 'var(--text-muted)';
+  // Teal text: the inverted panel flips with the theme, so it needs the opposite theme's ink.
+  const todayTextColour = inverted ? 'var(--ink-surface-accent)' : 'var(--accent-ink)';
 
   return (
     <div
@@ -97,7 +99,7 @@ export function WeekStrip({ data, inverted = false, hidden = false }: WeekStripP
             </div>
             <div
               className="text-small font-medium nums-tabular"
-              style={{ color: i === last ? 'var(--accent)' : labelColour }}
+              style={{ color: i === last ? todayTextColour : labelColour }}
             >
               {hidden ? '••' : d.value}
             </div>
