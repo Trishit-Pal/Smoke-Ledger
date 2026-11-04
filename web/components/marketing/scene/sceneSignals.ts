@@ -34,3 +34,30 @@ export function subscribeHomeSignals(fn: Listener): () => void {
 export function getHomeSignals(): HomeSignals | null {
   return current;
 }
+
+/**
+ * One-shot "light the airways" request. The overlay asks, the scene answers.
+ * three.js loads after first paint, so a request made before the scene has
+ * subscribed is held and replayed once to the first subscriber.
+ */
+const airwayListeners = new Set<() => void>();
+let airwayPending = false;
+
+export function requestAirwayLight(): void {
+  if (airwayListeners.size === 0) {
+    airwayPending = true;
+    return;
+  }
+  airwayListeners.forEach((fn) => fn());
+}
+
+export function subscribeAirwayLight(fn: () => void): () => void {
+  airwayListeners.add(fn);
+  if (airwayPending) {
+    airwayPending = false;
+    fn();
+  }
+  return () => {
+    airwayListeners.delete(fn);
+  };
+}

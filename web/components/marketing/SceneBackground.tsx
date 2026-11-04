@@ -33,16 +33,18 @@ import {
   hazeCountFor,
   pickSceneTier,
   SCENE_BUDGET,
-  type SceneEnv,
   type SceneIntensity,
 } from '@web/lib/sceneTier';
 
 import { BLOOM_BREATH_LIFT, BLOOM_STRENGTH, buildBloom, type BloomPassLike, type Composer } from './scene/bloom';
-import { breathPhase, breathScale, hazeDensity, sceneClearStart } from './scene/breath';
+import { createAirwayLight } from './scene/airwayLight';
+import { breathPhase, breathScale, hazeDensity } from './scene/breath';
 import { DisposeBin } from './scene/disposables';
+import { readSceneEnv, sessionClearStart } from './scene/env';
 import { buildHaze } from './scene/haze';
 import { LAYOUT, NARROW_ASPECT } from './scene/layout';
 import { buildLungs } from './scene/lungMeshes';
+import { subscribeAirwayLight } from './scene/sceneSignals';
 import { buildSign } from './scene/signMesh';
 import { readTokens } from './scene/tokens';
 
@@ -70,28 +72,6 @@ function hasWebGL(): boolean {
     return !!(window.WebGLRenderingContext && gl);
   } catch {
     return false;
-  }
-}
-
-function readSceneEnv(): SceneEnv {
-  const nav = navigator as Navigator & {
-    deviceMemory?: number;
-    connection?: { saveData?: boolean };
-  };
-  return {
-    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
-    hardwareConcurrency: nav.hardwareConcurrency,
-    deviceMemory: nav.deviceMemory,
-    saveData: nav.connection?.saveData,
-  };
-}
-
-/** Epoch-ms the haze started clearing for this session (a reload never restarts it). */
-function sessionClearStart(): number {
-  try {
-    return sceneClearStart(window.sessionStorage, Date.now());
-  } catch {
-    return Date.now(); // storage blocked: the haze simply restarts each visit
   }
 }
 
@@ -262,6 +242,11 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
       // scene is a fixed backdrop that must keep living through the whole scroll.)
       const clearStartMs = sessionClearStart();
+      // A newly reached milestone lights the airways once (never under reduced motion).
+      const light = createAirwayLight((level) => lungs?.setAirwayGlow(level));
+      const offLight = lungs
+        ? subscribeAirwayLight(() => reduce.matches || light.start(performance.now()))
+        : () => {};
       let raf = 0;
       let running = true;
       let clockStart = performance.now();
@@ -287,6 +272,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
 
         // Slow breath (no spring), haze thinning with session time, a gentle sway.
         lungs?.setBreath(breathScale(t));
+        light.tick(now);
         haze.update(dt, t, hazeDensity((Date.now() - clearStartMs) / 1000));
         world.rotation.y = Math.sin(t * 0.07) * 0.3;
         if (sign) sign.group.rotation.y = t * 0.15;
@@ -371,6 +357,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         reduce.removeEventListener('change', onReduceChange);
         canvas.removeEventListener('webglcontextlost', onContextLost);
         themeObserver.disconnect();
+        offLight();
         composer?.dispose();
         bloomPass?.dispose?.();
         bin.disposeAll(); // every geometry, material, texture, env map and PMREM the scene built

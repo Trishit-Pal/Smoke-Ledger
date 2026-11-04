@@ -22,6 +22,8 @@ export interface Lungs {
   setBreath(scale: number): void;
   /** Re-resolve every colour and opacity from the tokens; `dim` scales opacity. */
   retheme(tokens: SceneTokens, dim: number): void;
+  /** Lift the airways' accent glow by `level` in [0, 1] over their themed resting glow. */
+  setAirwayGlow(level: number): void;
 }
 
 export const LOBE_OPACITY = { dark: 0.5, light: 0.3 } as const;
@@ -29,6 +31,7 @@ export const AIRWAY_OPACITY = { dark: 0.8, light: 0.4 } as const;
 const TUBE_SEGMENTS = 10;
 const TUBE_RADIAL_SEGMENTS = 6;
 const AIRWAY_BEND = 0.035; // sideways bow of each airway, so the tree is not ruler-straight
+const AIRWAY_LIGHT_LIFT = 0.9; // emissive added at the peak of the airway light
 const EDGE_DARKEN = 0.2; // light theme: extra pull towards black for the glass rim
 
 /**
@@ -118,6 +121,7 @@ export function buildLungs(
   });
 
   const edge = new THREE.Color();
+  let restingGlow = 0;
   const retheme = (t: SceneTokens, dim: number) => {
     lobeMat.color.copy(t.ink);
     edge.copy(t.ink);
@@ -131,12 +135,17 @@ export function buildLungs(
     lobeMat.opacity = (t.isLight ? LOBE_OPACITY.light : LOBE_OPACITY.dark) * dim;
     airwayMat.color.copy(edge);
     airwayMat.emissive.copy(t.accent); // faint accent rim on the airways
-    airwayMat.emissiveIntensity = t.isLight ? 0.05 : 0.18;
+    restingGlow = t.isLight ? 0.05 : 0.18;
+    airwayMat.emissiveIntensity = restingGlow;
     // Light theme: draw the airways over the (near-opaque) lobes so they stay readable.
     for (const a of airways) a.renderOrder = t.isLight ? 2 : 0;
     airwayMat.opacity = (t.isLight ? AIRWAY_OPACITY.light : AIRWAY_OPACITY.dark) * dim;
   };
   retheme(tokens, 1);
 
-  return { group, setBreath: (s) => body.scale.setScalar(s), retheme };
+  const setAirwayGlow = (level: number) => {
+    airwayMat.emissiveIntensity = restingGlow + AIRWAY_LIGHT_LIFT * level;
+  };
+
+  return { group, setBreath: (s) => body.scale.setScalar(s), retheme, setAirwayGlow };
 }

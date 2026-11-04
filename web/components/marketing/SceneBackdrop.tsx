@@ -10,6 +10,7 @@
 
 import dynamic from 'next/dynamic';
 import type { SceneIntensity } from './SceneBackground';
+import { MilestoneOverlay } from './scene/MilestoneOverlay';
 
 const Scene = dynamic(() => import('./SceneBackground'), { ssr: false });
 
@@ -22,7 +23,12 @@ export function SceneBackdrop({
   discreet?: boolean;
   lastSmokeIso?: string | null;
 }) {
-  return <Scene intensity={intensity} discreet={discreet} lastSmokeIso={lastSmokeIso} />;
+  return (
+    <>
+      <Scene intensity={intensity} discreet={discreet} lastSmokeIso={lastSmokeIso} />
+      <MilestoneOverlay lastSmokeIso={lastSmokeIso} discreet={discreet} intensity={intensity} />
+    </>
+  );
 }
 
 export default SceneBackdrop;
