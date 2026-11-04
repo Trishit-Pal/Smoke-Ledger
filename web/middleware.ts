@@ -218,11 +218,14 @@ export async function middleware(request: NextRequest) {
   // The wizard's consent step is for readers who are not onboarded yet. An
   // onboarded reader missing a consent falls through to the re-consent gate:
   // sending them here would be bounced back by the onboarded redirect, a loop.
+  // The public pages stay open so the Terms and Privacy Policy the step links to
+  // can be read before agreeing to them.
   if (
     !onboarded &&
     !consented &&
     pathname !== '/onboarding' &&
     pathname !== '/onboarding/privacy' &&
+    !isPublicRoute(pathname) &&
     !isRecoveryRoute(pathname) &&
     !isApiRoute(pathname)
   ) {

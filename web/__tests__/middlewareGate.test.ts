@@ -160,6 +160,13 @@ describe('middleware: readers still onboarding (unchanged)', () => {
     }
   });
 
+  test('the Terms and Privacy Policy stay readable before consenting (the Privacy step links to them)', async () => {
+    for (const row of [null, { onboarding_step: 'privacy' }]) {
+      state.row = row;
+      for (const path of ['/privacy', '/terms', '/support']) expect(await walk(path)).toEqual([path]);
+    }
+  });
+
   test('consented mid-wizard: resumes at the saved step, never /consent', async () => {
     state.row = { ...CURRENT, onboarding_step: 'goal' };
     for (const path of ['/', '/dashboard', '/onboarding/done', '/consent', '/settings']) {

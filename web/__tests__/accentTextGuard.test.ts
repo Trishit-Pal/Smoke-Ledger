@@ -26,7 +26,7 @@ const PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 const ALLOWLIST: Readonly<Record<string, string>> = {
   'components/ui/ProgressRing.tsx:31': 'ring stroke default, not text',
   'components/dashboard/WeekStrip.tsx:37': 'bar fill (background), not text',
-  'app/(app)/dashboard/DashboardClient.tsx:553': 'progressColor is the ring stroke, not text',
+  'app/(app)/dashboard/DashboardClient.tsx:554': 'progressColor is the ring stroke, not text',
 };
 
 function sourceFiles(): string[] {

@@ -57,7 +57,7 @@ import { Button } from '@web/components/ui/Button';
 import { getSupabase } from '@web/lib/supabase/client';
 import { sessionUserId } from '@web/lib/goals/sessionUserId';
 import { useGoalReconcile } from '@web/lib/goals/useGoalReconcile';
-import { goalCardModel, stateColor } from '@web/lib/goals/goalCardModel';
+import { goalCardModel, stateColor, stateTextColor } from '@web/lib/goals/goalCardModel';
 import { firstSuggestionSentence, shouldShowFirstSuggestion } from '@web/lib/goals/firstSuggestion';
 import { dismissFirstSuggestion, isFirstSuggestionDismissed } from '@web/lib/goals/firstSuggestionStore';
 import {
@@ -271,6 +271,7 @@ export function DashboardClient({
     [activeGoal, logs, today, profile],
   );
   const goalToneColor = goalCard ? stateColor(goalCard.state) : 'var(--text-muted)';
+  const goalToneTextColor = goalCard ? stateTextColor(goalCard.state) : 'var(--text-muted)';
   // Every figure in the line is a count of days; hidden Home totals show no line at all.
   const goalLine =
     goalCard && !hidden
@@ -655,7 +656,7 @@ export function DashboardClient({
               <p className="editorial-headline text-[clamp(1.25rem,2.4vw,1.6rem)] text-text">
                 {goalHeading}
                 <span className="text-text-faint"> · </span>
-                <span className="editorial-numeral--micro" style={{ color: goalToneColor }}>
+                <span className="editorial-numeral--micro" style={{ color: goalToneTextColor }}>
                   {Math.round(Math.max(0, Math.min(100, goalProgress.percent)))}%
                 </span>
               </p>
