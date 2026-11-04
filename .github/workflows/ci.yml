@@ -32,7 +32,7 @@ jobs:
     steps:
       # Full history: spec:drift diffs against the commit each spec section was
       # stamped at, which a depth-1 checkout does not contain.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -102,7 +102,7 @@ jobs:
   db-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -140,7 +140,7 @@ jobs:
     # that check) and the local stack uses the CLI's public demo JWT keys,
     # which are safe only because the stack lives and dies on this runner.
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -202,7 +202,7 @@ jobs:
       # No Anthropic key: the specs mock /api/ledger-chat, so no model is called.
       LEDGER_CHAT_ENABLED: 'true'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -269,7 +269,7 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           # The scanner is a downloaded binary: keep the token out of .git/config.
@@ -307,7 +307,7 @@ jobs:
     # zod needs 3 -> 4 together with @hookform/resolvers 5 (the signup/reset forms).
     # Revisit when the Expo SDK or zod migrations land, then tighten to `high`.
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Root production dependencies (critical — blocking)
         run: npm audit --omit=dev --audit-level=critical
