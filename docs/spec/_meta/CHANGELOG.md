@@ -4,6 +4,16 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — 42f5db1
+- infra-ops: the functional e2e step also runs consent-chat.spec.ts.
+- security-privacy: the mobile chat-ask check times out after 4 s and does not ask.
+- identity-profile: re-verified after the consent rows' layout fix.
+
+## 2026-11-04 — 22df03f
+- security-privacy: consent screens ask two required ticks (one agreement line; the explicit health-data line on its own) and an optional Ask the ledger Yes / No only while the chat is on and unanswered; the "I don't consent" button is gone; the V3 migrations note now records their late application.
+- identity-profile: the sign-up consent step's single agreement tick and the chat answer written after `submitConsentStep`.
+- architecture: `settings_kv` read semantics — a stored `false` is an answer; mobile `getSetting` vs web `getServerSetting`.
+
 ## 2026-11-04 — 71634f2
 - security-privacy: the ambient backdrop is a discreet-mode render site (neutral haze in the Suspense fallback and on a failed read); "Turn on and ask" no longer awaits the consent audit (#110).
 - identity-profile: re-verified after the middleware Settings pass-through; no text change.

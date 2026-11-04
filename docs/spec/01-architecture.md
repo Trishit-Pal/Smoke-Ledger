@@ -7,7 +7,7 @@ sources:
   - app/_layout.tsx
   - metro.config.js
   - src/lib/routeGuard.ts
-last_verified_commit: c9a710f
+last_verified_commit: 22df03f
 status: current
 ---
 
@@ -110,7 +110,7 @@ The Supabase project `tvcwrsglceahkjnfuzkn` (region: us-east-2) holds these publ
 | `brand_variants` | Variants per brand with rolling price statistics (`price_sum_inr`, `price_count`). |
 | `cigarette_logs` | Every logged cigarette. Dual timestamp: `ts_utc` (absolute) + `local_date`/`local_hour` (derived in the ledger's zone, the profile country's, IST when there is none, for chart bucketing). `client_op_id` enables safe retries. |
 | `goals` | Daily/weekly caps, spend caps, tapers, windows and quit dates (seven types). `meta_json` holds type-specific configuration and the cap history; `completed_at` is stamped by a trigger. See Goals and the data model. |
-| `settings_kv` | Arbitrary per-user key/value store (e.g. `consent.analyticsOptIn`). |
+| `settings_kv` | Arbitrary per-user key/value store (e.g. `consent.analyticsOptIn`). A stored `false` or `0` is an answer, not an absence. The mobile `getSetting` returns `null` only for a missing row or JSON null. The web `getServerSetting` still returns `null` for any falsy value, because its callers expect that. So "has the reader answered?" checks read the row itself (`web/lib/server/ledgerChat/askChat.ts`). |
 | `reminders` | Push notification schedules (schema exists; no rows yet). |
 | `usage_events` | Analytics events written from the client (opt-in). Deleted when the opt-in is switched off, and after 12 months. |
 | `audit_events` | Server-side record of account-level actions (delete, export, etc.). Deleted after 12 months by a daily purge. |

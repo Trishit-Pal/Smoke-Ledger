@@ -8,15 +8,19 @@ export const HEALTH_CONSENT_LABEL =
 export const HEALTH_CONSENT_SUB =
   'You can withdraw this at any time in Settings. Withdrawing means your data is erased.';
 
-/** The decline path sits beside the consent row at the same size as the accept control. */
-export const HEALTH_DECLINE_LABEL = "I don't consent";
+/**
+ * Tick 1: one agreement line. Split so each platform can turn the two document
+ * names into links; joined, the parts are the verbatim label.
+ */
+export const AGREEMENT_LABEL_PARTS = {
+  before: 'I am 18 or older, I agree to the ',
+  terms: 'Terms of Service',
+  middle: ' and the ',
+  privacy: 'Privacy Policy',
+  after: ', and I understand this app does not provide medical advice.',
+} as const;
 
-export const HEALTH_DECLINE_NOTE =
-  "Nothing has been saved. Without this consent we can't keep a ledger, so we can't go further. Tick the box above whenever you change your mind.";
-
-/** Re-consent screens: the reader already has a ledger, so nothing is lost by declining. */
-export const HEALTH_DECLINE_NOTE_EXISTING =
-  "Your ledger stays exactly as it is. Without this consent we can't keep it going, so we can't go further. You can export or delete it from Settings, or tick the box above whenever you change your mind.";
+export const AGREEMENT_SUB = 'We process your data to run your account, sync it and keep it secure.';
 
 export const WITHDRAW_ROW_LABEL = 'Withdraw consent';
 export const WITHDRAW_ROW_SUBLABEL =

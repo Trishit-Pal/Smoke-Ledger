@@ -11,8 +11,8 @@ export async function getSetting<T>(key: string): Promise<T | null> {
     .eq('key', key)
     .maybeSingle();
   if (error) throw mapDbError(error);
-  if (!data?.value_json) return null;
-  return data.value_json as T;
+  // Only a missing row (or a JSON null) is null: a stored false or 0 is a real answer.
+  return (data?.value_json ?? null) as T | null;
 }
 
 export async function setSetting<T>(key: string, value: T): Promise<void> {

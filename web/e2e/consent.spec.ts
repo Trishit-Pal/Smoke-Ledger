@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect, login } from './_helpers/fixtures';
 import {
   canSeed,
@@ -11,6 +12,15 @@ import {
 // The re-consent gate: an onboarded user whose consents are older than the current
 // terms (or who never gave the health-data consent) is asked once, never loops, and
 // the answer never moves the onboarding step.
+
+// Ticks the agreement, then the health box and the chat "No, thanks" when they are shown.
+async function answerConsent(page: Page) {
+  await page.getByRole('checkbox', { name: /I am 18 or older/ }).check();
+  const health = page.getByRole('checkbox', { name: /explicitly consent/ });
+  if (await health.isVisible()) await health.check();
+  const noThanks = page.getByRole('button', { name: 'No, thanks' });
+  if (await noThanks.isVisible()) await noThanks.click();
+}
 
 test.describe('re-consent gate', () => {
   test.skip(!canSeed(), 'Set SUPABASE_SERVICE_ROLE_KEY + E2E_SUPABASE_URL/ANON_KEY to run.');
@@ -35,14 +45,10 @@ test.describe('re-consent gate', () => {
     await expect(page).toHaveURL(/\/privacy$/);
     await page.goto('/consent');
 
-    // Nothing is pre-ticked, and Accept stays off until every row is answered.
+    // Nothing is pre-ticked, and Accept stays off until every shown row is answered.
     const accept = page.getByRole('button', { name: /Accept and continue/ });
     await expect(accept).toBeDisabled();
-    await page.getByRole('checkbox', { name: /Terms of Service/ }).check();
-    await page.getByRole('checkbox', { name: /Privacy Policy/ }).check();
-    await page.getByRole('checkbox', { name: /does not provide medical advice/ }).check();
-    await expect(accept).toBeDisabled();
-    await page.getByRole('checkbox', { name: /explicitly consent/ }).check();
+    await answerConsent(page);
     await expect(accept).toBeEnabled();
     await accept.click();
 
@@ -93,13 +99,9 @@ test.describe('re-consent gate', () => {
     await expect(page).toHaveURL(/\/consent$/);
 
     const accept = page.getByRole('button', { name: /Accept and continue/ });
-    await page.getByRole('checkbox', { name: /Terms of Service/ }).check();
-    await page.getByRole('checkbox', { name: /Privacy Policy/ }).check();
-    await page.getByRole('checkbox', { name: /does not provide medical advice/ }).check();
-    // The missing rows are asked, and Accept waits for them.
+    // One agreement tick covers the missing age and data-processing stamps.
     await expect(accept).toBeDisabled();
-    await page.getByRole('checkbox', { name: /18 or older/ }).check();
-    await page.getByRole('checkbox', { name: /processing my data/ }).check();
+    await answerConsent(page);
     await expect(accept).toBeEnabled();
     await accept.click();
 

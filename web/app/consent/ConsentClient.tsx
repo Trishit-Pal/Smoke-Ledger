@@ -4,6 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { acceptChangedTerms } from '@/services/onboarding';
+import { setSetting } from '@/db/repositories/settings';
+import { recordAuditEvent } from '@/services/audit';
+import { LEGAL_VERSIONS } from '@/lib/legal';
+import { canContinueConsent, type ChatAnswer } from '@/lib/consentForm';
 import { toSafeErrorMessage } from '@/lib/errors';
 import {
   RECONSENT_ACCEPT_LABEL,
@@ -12,11 +16,11 @@ import {
   RECONSENT_NOT_NOW_NOTE,
   reconsentHeading,
 } from '@/lib/reconsentCopy';
+import { LEDGER_CHAT_NOTICE_VERSION, chatOptInValue } from '@web/components/chat/notice';
 import {
-  ConsentCheckRow,
+  AgreementRow,
+  ChatChoiceRow,
   HealthConsentRow,
-  REQUIRED_ROWS,
-  type RequiredKey,
 } from '@web/components/onboarding/ConsentRows';
 import { InlineRule, SectionLabel } from '@web/components/visual';
 
@@ -48,6 +52,8 @@ export interface ConsentClientProps {
   needsAgeConfirm: boolean;
   /** The profile has no data-processing consent on record: show its row. */
   needsDataProcessing: boolean;
+  /** Server-computed: the chat is enabled and this reader has never answered the Yes / No. */
+  chatAsk: boolean;
 }
 
 export function ConsentClient({
@@ -55,43 +61,56 @@ export function ConsentClient({
   needsHealthConsent,
   needsAgeConfirm,
   needsDataProcessing,
+  chatAsk,
 }: ConsentClientProps) {
   const router = useRouter();
-  const [ticked, setTicked] = React.useState<Partial<Record<RequiredKey, boolean>>>({});
+  const [agreed, setAgreed] = React.useState(false);
   const [health, setHealth] = React.useState(false);
-  const [healthDeclined, setHealthDeclined] = React.useState(false);
+  // No default: null until the reader picks Yes or No.
+  const [chatAnswer, setChatAnswer] = React.useState<ChatAnswer>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Set once the terms are accepted, so a retry after a failed chat write never
+  // records a second consent audit.
+  const savedRef = React.useRef(false);
 
-  // The rows tied to a legal version are always asked. Age and data-processing do
-  // not change with the documents, so they are asked only when there is no record.
-  const askedOnlyWhenMissing: Partial<Record<RequiredKey, boolean>> = {
-    age: needsAgeConfirm,
-    dataProcessing: needsDataProcessing,
-  };
-  const rows = REQUIRED_ROWS.filter((r) => askedOnlyWhenMissing[r.id] ?? true);
   const heading = reconsentHeading(termsChanged);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
-  const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
-
-  const setHealthConsent = (given: boolean) => {
-    setHealth(given);
-    setHealthDeclined(!given);
-  };
+  // Terms, Privacy and the medical notice are versioned, so tick 1 is always asked.
+  const canAccept = canContinueConsent({
+    agreed,
+    needsHealth: needsHealthConsent,
+    health,
+    chatShown: chatAsk,
+    chatAnswer,
+  });
 
   const onAccept = async () => {
     if (!canAccept) return;
     setSubmitting(true);
     setError(null);
     try {
-      await acceptChangedTerms({
-        needsHealthConsent,
-        healthDataConsent: health,
-        needsAgeConfirm,
-        ageConfirmed: ticked.age ?? false,
-        needsDataProcessing,
-        dataProcessingConsent: ticked.dataProcessing ?? false,
-      });
+      if (!savedRef.current) {
+        // Tick 1 covers age and data processing; the service stamps only what is missing.
+        await acceptChangedTerms({
+          needsHealthConsent,
+          healthDataConsent: health,
+          needsAgeConfirm,
+          ageConfirmed: true,
+          needsDataProcessing,
+          dataProcessingConsent: true,
+        });
+        savedRef.current = true;
+      }
+      if (chatAnswer !== null) {
+        await setSetting('consent.ledgerChatOptIn', chatOptInValue(chatAnswer));
+        // Best-effort and not awaited: a slow or failing audit edge never blocks the next step.
+        void recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+          enabled: chatAnswer,
+          privacyVersion: LEGAL_VERSIONS.privacy,
+          noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
+        }).catch(() => undefined);
+      }
       router.replace('/dashboard');
       router.refresh();
     } catch (e) {
@@ -161,22 +180,15 @@ export function ConsentClient({
         <SectionLabel id="consent-accept" rule="strong">
           Your answer
         </SectionLabel>
-        {rows.map((row, i) => (
-          <ConsentCheckRow
-            key={row.id}
-            row={row}
-            index={i}
-            checked={ticked[row.id] ?? false}
-            onChange={(v) => setTicked((prev) => ({ ...prev, [row.id]: v }))}
-          />
-        ))}
+        <AgreementRow checked={agreed} onChange={setAgreed} number="01" />
         {needsHealthConsent ? (
-          <HealthConsentRow
-            checked={health}
-            declined={healthDeclined}
-            onChange={setHealthConsent}
-            number={String(rows.length + 1).padStart(2, '0')}
-            existingLedger
+          <HealthConsentRow checked={health} onChange={setHealth} number="02" />
+        ) : null}
+        {chatAsk ? (
+          <ChatChoiceRow
+            answer={chatAnswer}
+            onAnswer={setChatAnswer}
+            number={needsHealthConsent ? '03' : '02'}
           />
         ) : null}
       </section>
