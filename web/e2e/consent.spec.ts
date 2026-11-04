@@ -1,5 +1,4 @@
-import type { Page } from '@playwright/test';
-import { test, expect } from './_helpers/fixtures';
+import { test, expect, login } from './_helpers/fixtures';
 import {
   canSeed,
   clearConsentStamps,
@@ -13,15 +12,6 @@ import {
 // terms (or who never gave the health-data consent) is asked once, never loops, and
 // the answer never moves the onboarding step.
 
-async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Email').fill(user.email);
-  await page.getByLabel('Password', { exact: true }).fill(user.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/(dashboard|consent|onboarding)/, { timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
-}
-
 test.describe('re-consent gate', () => {
   test.skip(!canSeed(), 'Set SUPABASE_SERVICE_ROLE_KEY + E2E_SUPABASE_URL/ANON_KEY to run.');
 
@@ -33,7 +23,7 @@ test.describe('re-consent gate', () => {
     const stepBefore = await readOnboardingStep(onboarded.id);
     const auditBefore = await countAuditEvents(onboarded.id, 'consent_accepted');
 
-    await signIn(page, onboarded);
+    await login(page, onboarded);
     await expect(page).toHaveURL(/\/consent$/);
 
     // A deep link into the app is bounced to the same screen, not to a loop.
@@ -74,7 +64,7 @@ test.describe('re-consent gate', () => {
     onboarded,
   }) => {
     await markConsentOutdated(onboarded.id);
-    await signIn(page, onboarded);
+    await login(page, onboarded);
     await expect(page).toHaveURL(/\/consent$/);
 
     await page.getByRole('link', { name: /Not now/ }).click();
@@ -94,7 +84,7 @@ test.describe('re-consent gate', () => {
     const stepBefore = await readOnboardingStep(onboarded.id);
     const auditBefore = await countAuditEvents(onboarded.id, 'consent_accepted');
 
-    await signIn(page, onboarded);
+    await login(page, onboarded);
     await expect(page).toHaveURL(/\/consent$/);
     // Their documents are current, so they are not told the terms changed.
     await expect(page.getByRole('heading', { name: 'Before you continue.' })).toBeVisible();
@@ -122,7 +112,7 @@ test.describe('re-consent gate', () => {
   });
 
   test('a current user never sees /consent', async ({ page, onboarded }) => {
-    await signIn(page, onboarded);
+    await login(page, onboarded);
     await expect(page).toHaveURL(/\/dashboard/);
     await page.goto('/consent');
     await expect(page).toHaveURL(/\/dashboard/);

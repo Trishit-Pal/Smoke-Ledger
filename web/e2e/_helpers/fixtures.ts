@@ -16,6 +16,7 @@ import {
   createConfirmedUser,
   deleteUser,
   markOnboarded,
+  resetLoginRateLimits,
   seedFavoriteBrand,
   istYmdDaysAgo,
   type SeededUser,
@@ -59,12 +60,14 @@ export { expect };
 
 /** Sign in through the real login form and wait for the post-login route. */
 export async function login(page: Page, user: { email: string; password: string }): Promise<void> {
+  await resetLoginRateLimits();
   await page.goto('/login');
   await page.getByLabel('Email').fill(user.email);
   // exact: the reveal button's "Show password (press and hold)" label also contains "password".
   await page.getByLabel('Password', { exact: true }).fill(user.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 30_000 });
+  // /consent: an onboarded reader with outdated or missing consents lands there.
+  await page.waitForURL(/\/(dashboard|onboarding|consent)/, { timeout: 30_000 });
   // The URL flips before the client router settles; a goto issued now races it
   // ("interrupted by another navigation" on WebKit). Wait for the landing to idle.
   await page.waitForLoadState('networkidle');

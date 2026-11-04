@@ -16,10 +16,10 @@ import {
   createConfirmedUser,
   deleteUser,
   getAdmin,
+  isLocalStack,
   istYmdDaysAgo,
   markOnboarded,
   seedLogs,
-  SUPABASE_URL,
   type SeededUser,
 } from './_helpers/seed';
 import { login } from './_helpers/fixtures';
@@ -48,14 +48,6 @@ function viewportsFor(page: Page, info: TestInfo) {
   const own = page.viewportSize();
   if (info.project.use.isMobile && own) return [own, { width: own.height, height: own.width }];
   return info.project.name.includes('firefox') ? FIREFOX_SWEEP : SWEEP;
-}
-
-function isLocalStack(): boolean {
-  try {
-    return ['127.0.0.1', 'localhost'].includes(new URL(SUPABASE_URL).hostname);
-  } catch {
-    return false;
-  }
 }
 
 interface Issue {
