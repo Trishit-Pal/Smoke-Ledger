@@ -42,6 +42,9 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
+  // Functional run only: compile the app's routes once up front. The responsive
+  // matrix warms per worker inside responsive.spec.ts.
+  globalSetup: process.env.E2E_RESPONSIVE ? undefined : './e2e/_helpers/global-setup.ts',
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-first-retry',
