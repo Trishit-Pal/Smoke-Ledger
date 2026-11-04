@@ -1,5 +1,6 @@
 import { getServerProfile } from '@web/lib/server/data';
 import { isNextRedirectError } from '@web/lib/auth/authCatch';
+import { shouldAskChat } from '@web/lib/server/ledgerChat/askChat';
 import { consentsCurrent } from '@/services/onboarding';
 import { OnboardingPrivacyClient } from './OnboardingPrivacyClient';
 
@@ -16,5 +17,8 @@ export default async function OnboardingPrivacyPage() {
     return null;
   });
 
-  return <OnboardingPrivacyClient alreadyConsented={consentsCurrent(profile)} />;
+  // The Ask the ledger Yes / No is shown only to a reader who has never answered.
+  const chatAsk = await shouldAskChat();
+
+  return <OnboardingPrivacyClient alreadyConsented={consentsCurrent(profile)} chatAsk={chatAsk} />;
 }

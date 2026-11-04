@@ -84,8 +84,10 @@ export async function completeOnboarding(page: Page, opts: { baseline?: string }
   await page.getByRole('button', { name: 'Stamp all consents' }).click();
   // The explicit health-data consent is its own decision: "Stamp all" never ticks it.
   await page.getByRole('checkbox', { name: /explicitly consent/ }).check();
-  // "Stamp all" sets the 5 acknowledgements on staggered timers (~520ms) and
-  // Continue is disabled until all land — wait for enabled before clicking.
+  // The Ask the ledger Yes / No shows only when the chat is enabled for the server; it has
+  // no default, so answer it. It is server-rendered, so it is present once the step is.
+  const noThanks = page.getByRole('button', { name: 'No, thanks' });
+  if (await noThanks.isVisible()) await noThanks.click();
   const privacyContinue = page.getByRole('button', { name: /Continue/ });
   await expect(privacyContinue).toBeEnabled();
   await privacyContinue.click();

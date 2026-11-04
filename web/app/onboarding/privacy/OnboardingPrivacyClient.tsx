@@ -5,26 +5,30 @@ import { useRouter } from 'next/navigation';
 import { Stamp } from '@web/components/onboarding/Stamp';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { submitConsentStep } from '@/services/onboarding';
+import { setSetting } from '@/db/repositories/settings';
+import { recordAuditEvent } from '@/services/audit';
+import { LEGAL_VERSIONS } from '@/lib/legal';
+import { canContinueConsent, type ChatAnswer } from '@/lib/consentForm';
 import { useOnboardingDraft } from '@/store/onboardingDraft';
 import { toSafeErrorMessage } from '@/lib/errors';
+import { LEDGER_CHAT_NOTICE_VERSION, chatOptInValue } from '@web/components/chat/notice';
 import {
-  ConsentCheckRow,
+  AgreementRow,
+  ChatChoiceRow,
   HealthConsentRow,
-  REQUIRED_ROWS,
-  type RequiredKey,
 } from '@web/components/onboarding/ConsentRows';
 
-// "Stamp all" covers only the five acknowledgements above. The health-data consent
-// (Art 9) and the optional analytics tick are separate decisions the reader makes.
-// Stagger between stamps when "stamp all" is pressed (a visual beat, not a save).
-const STAMP_STAGGER_MS = 130;
+// "Stamp all" ticks the agreement only. The health-data consent (Art 9), the optional
+// analytics tick and the Ask the ledger choice are separate decisions the reader makes.
 
 export interface OnboardingPrivacyClientProps {
   /** Server-computed: the saved consents are already at the current legal versions. */
   alreadyConsented: boolean;
+  /** Server-computed: the chat is enabled and this reader has never answered the Yes / No. */
+  chatAsk: boolean;
 }
 
-export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyClientProps) {
+export function OnboardingPrivacyClient({ alreadyConsented, chatAsk }: OnboardingPrivacyClientProps) {
   const router = useRouter();
   // Draft-backed so ticked consents survive back/forward navigation within the
   // session. Never hydrated from the server: consent is a fresh decision.
@@ -48,28 +52,24 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
     }
   }, [router]);
 
-  const values: Record<RequiredKey | 'health' | 'analytics', boolean> = {
-    age: consents.age ?? false,
-    terms: consents.terms ?? false,
-    privacy: consents.privacy ?? false,
-    medical: consents.medical ?? false,
-    dataProcessing: consents.dataProcessing ?? false,
-    health: consents.health ?? false,
-    analytics: consents.analytics ?? false,
-  };
-  const analyticsOptIn = values.analytics;
-  const healthDataConsent = values.health;
+  const agreed = consents.agreement ?? false;
+  const healthDataConsent = consents.health ?? false;
+  const analyticsOptIn = consents.analytics ?? false;
+  // No default: null until the reader picks Yes or No. Draft-backed like the ticks.
+  const chatAnswer: ChatAnswer = chatAsk ? (consents.chat ?? null) : null;
 
-  const acknowledged = REQUIRED_ROWS.every((row) => values[row.id]);
-  const canContinue = acknowledged && healthDataConsent;
-  const ackCount = Object.values(values).filter(Boolean).length;
-  const totalRows = REQUIRED_ROWS.length + 2;
+  const canContinue = canContinueConsent({
+    agreed,
+    needsHealth: true,
+    health: healthDataConsent,
+    chatShown: chatAsk,
+    chatAnswer,
+  });
+  // The counter covers the required rows that are shown; the analytics tick is optional.
+  const requiredCount = chatAsk ? 3 : 2;
+  const ackCount = [agreed, healthDataConsent, chatAsk && chatAnswer !== null].filter(Boolean).length;
 
-  const stampAll = () => {
-    REQUIRED_ROWS.forEach((row, i) => {
-      setTimeout(() => setConsent(row.id, true), i * STAMP_STAGGER_MS);
-    });
-  };
+  const stampAll = () => setConsent('agreement', true);
 
   const onContinue = async () => {
     if (!canContinue) return;
@@ -82,6 +82,16 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
         healthDataConsent,
       });
       savedRef.current = true;
+      if (chatAnswer !== null) {
+        // Consent is already saved above, so a failure here retries safely (alreadyConsented).
+        await setSetting('consent.ledgerChatOptIn', chatOptInValue(chatAnswer));
+        // Best-effort and not awaited: a slow or failing audit edge never blocks the next step.
+        void recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+          enabled: chatAnswer,
+          privacyVersion: LEGAL_VERSIONS.privacy,
+          noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
+        }).catch(() => undefined);
+      }
       router.push('/onboarding/usage');
     } catch (e) {
       setError(toSafeErrorMessage(e, 'dependency_failure'));
@@ -115,20 +125,12 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
       />
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {REQUIRED_ROWS.map((row, i) => (
-          <ConsentCheckRow
-            key={row.id}
-            row={row}
-            index={i}
-            checked={values[row.id]}
-            onChange={(v) => setConsent(row.id, v)}
-          />
-        ))}
+        <AgreementRow checked={agreed} onChange={(v) => setConsent('agreement', v)} number="01" />
 
         <HealthConsentRow
           checked={healthDataConsent}
           onChange={(given) => setConsent('health', given)}
-          number="06"
+          number="02"
         />
 
         <label
@@ -179,9 +181,17 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
               textAlign: 'right',
             }}
           >
-            07
+            03
           </span>
         </label>
+
+        {chatAsk ? (
+          <ChatChoiceRow
+            answer={chatAnswer}
+            onAnswer={(turnOn) => setConsent('chat', turnOn)}
+            number="04"
+          />
+        ) : null}
       </div>
 
       {error ? (
@@ -229,31 +239,31 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
           <button
             type="button"
             onClick={stampAll}
-            disabled={acknowledged}
+            disabled={agreed}
             className="focus-ring hit-target"
             style={{
               background: 'transparent',
               border: 'none',
-              cursor: acknowledged ? 'default' : 'pointer',
+              cursor: agreed ? 'default' : 'pointer',
               fontSize: 12,
               fontFamily: 'var(--font-display)',
               fontStyle: 'italic',
-              color: acknowledged ? 'var(--text-faint)' : 'var(--accent-ink)',
-              textDecoration: acknowledged ? 'none' : 'underline',
+              color: agreed ? 'var(--text-faint)' : 'var(--accent-ink)',
+              textDecoration: agreed ? 'none' : 'underline',
               textUnderlineOffset: 4,
               padding: 0,
-              opacity: acknowledged ? 0.5 : 1,
+              opacity: agreed ? 0.5 : 1,
               transition: 'all 200ms ease',
             }}
             aria-label="Stamp all consents"
           >
-            {acknowledged ? 'stamped' : 'stamp all'}
+            {agreed ? 'stamped' : 'stamp all'}
           </button>
           <span
             className="editorial-caption-tight nums-tabular"
             style={{ color: canContinue ? 'var(--accent-ink)' : 'var(--text-faint)' }}
           >
-            {ackCount} / {totalRows} acknowledged
+            {ackCount} / {requiredCount} acknowledged
           </span>
           <button
             type="button"

@@ -8,6 +8,8 @@ async function stampAndContinue(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/onboarding\/privacy/);
   await page.getByRole('button', { name: 'Stamp all consents' }).click();
   await page.getByRole('checkbox', { name: /explicitly consent/ }).check();
+  const noThanks = page.getByRole('button', { name: 'No, thanks' });
+  if (await noThanks.isVisible()) await noThanks.click();
   const cont = page.getByRole('button', { name: /Continue/ });
   await expect(cont).toBeEnabled();
   await cont.click();
