@@ -58,6 +58,7 @@ export interface SceneBackgroundProps {
   intensity?: SceneIntensity;
   /** Neutral haze only: no lungs, airways or sign. Default false. */
   discreet?: boolean;
+  lastSmokeIso?: string | null; // newest log (ISO); the overlay reads it, the scene ignores it
 }
 
 function hasWebGL(): boolean {

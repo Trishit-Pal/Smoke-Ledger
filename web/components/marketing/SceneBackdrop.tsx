@@ -16,11 +16,13 @@ const Scene = dynamic(() => import('./SceneBackground'), { ssr: false });
 export function SceneBackdrop({
   intensity = 'full',
   discreet = false,
+  lastSmokeIso = null,
 }: {
   intensity?: SceneIntensity;
   discreet?: boolean;
+  lastSmokeIso?: string | null;
 }) {
-  return <Scene intensity={intensity} discreet={discreet} />;
+  return <Scene intensity={intensity} discreet={discreet} lastSmokeIso={lastSmokeIso} />;
 }
 
 export default SceneBackdrop;
