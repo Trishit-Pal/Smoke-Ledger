@@ -2,57 +2,96 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { LEDGER_CHAT_NOTICE_VERSION } from '@web/components/chat/notice';
+
 const isLedgerChatEnabled = vi.fn<() => boolean>();
-const getServerSetting = vi.fn<(key: string) => Promise<unknown>>();
+const createClient = vi.fn();
 
 vi.mock('@web/lib/server/ledgerChat/enabled', () => ({ isLedgerChatEnabled: () => isLedgerChatEnabled() }));
-vi.mock('@web/lib/server/data', () => ({ getServerSetting: (key: string) => getServerSetting(key) }));
+vi.mock('@web/lib/supabase/server', () => ({ createClient: () => createClient() }));
 
 const { shouldAskChat } = await import('@web/lib/server/ledgerChat/askChat');
 
+interface RowResult {
+  data: { value_json: unknown } | null;
+  error: { message: string } | null;
+}
+
+/** A Supabase client stub at the query level; `queries` records every table read. */
+function stubClient(result: RowResult, user: { id: string } | null = { id: 'u1' }) {
+  const eqs: Array<[string, unknown]> = [];
+  const queries: string[] = [];
+  const builder = {
+    select: vi.fn(() => builder),
+    eq: vi.fn((col: string, val: unknown) => {
+      eqs.push([col, val]);
+      return builder;
+    }),
+    maybeSingle: vi.fn(async () => result),
+  };
+  createClient.mockResolvedValue({
+    auth: { getUser: async () => ({ data: { user }, error: null }) },
+    from: (table: string) => {
+      queries.push(table);
+      return builder;
+    },
+  });
+  return { eqs, queries, builder };
+}
+
 describe('shouldAskChat', () => {
   beforeEach(() => {
-    isLedgerChatEnabled.mockReset();
-    getServerSetting.mockReset();
+    isLedgerChatEnabled.mockReset().mockReturnValue(true);
+    createClient.mockReset();
   });
 
-  test('asks when the chat is enabled and the setting was never written', async () => {
-    isLedgerChatEnabled.mockReturnValue(true);
-    getServerSetting.mockResolvedValue(null);
+  test('asks when the chat is enabled and no row was ever written', async () => {
+    const { eqs, queries, builder } = stubClient({ data: null, error: null });
     expect(await shouldAskChat()).toBe(true);
-    expect(getServerSetting).toHaveBeenCalledWith('consent.ledgerChatOptIn');
+    expect(queries).toEqual(['settings_kv']);
+    expect(builder.select).toHaveBeenCalledWith('value_json');
+    expect(eqs).toEqual([
+      ['user_id', 'u1'],
+      ['key', 'consent.ledgerChatOptIn'],
+    ]);
   });
 
-  test('does not ask a reader who declined', async () => {
-    isLedgerChatEnabled.mockReturnValue(true);
-    getServerSetting.mockResolvedValue(false);
+  test('does not ask a reader who declined (a stored false is an answer)', async () => {
+    stubClient({ data: { value_json: false }, error: null });
     expect(await shouldAskChat()).toBe(false);
   });
 
   test('does not ask a reader holding a stale-version string', async () => {
-    isLedgerChatEnabled.mockReturnValue(true);
-    getServerSetting.mockResolvedValue('2025-01-01');
+    stubClient({ data: { value_json: '2020-01-01' }, error: null });
     expect(await shouldAskChat()).toBe(false);
   });
 
-  test('does not ask when the chat is disabled for the build', async () => {
+  test('does not ask a reader on the current notice version', async () => {
+    stubClient({ data: { value_json: LEDGER_CHAT_NOTICE_VERSION }, error: null });
+    expect(await shouldAskChat()).toBe(false);
+  });
+
+  test('a query error means no ask', async () => {
+    stubClient({ data: null, error: { message: 'boom' } });
+    expect(await shouldAskChat()).toBe(false);
+  });
+
+  test('no signed-in user means no ask', async () => {
+    stubClient({ data: null, error: null }, null);
+    expect(await shouldAskChat()).toBe(false);
+  });
+
+  test('a client that throws means no ask, and never throws', async () => {
+    createClient.mockRejectedValue(new Error('boom'));
+    expect(await shouldAskChat()).toBe(false);
+  });
+
+  test('chat disabled for the build means no ask, without querying', async () => {
     isLedgerChatEnabled.mockReturnValue(false);
-    getServerSetting.mockResolvedValue(null);
+    const { queries } = stubClient({ data: null, error: null });
     expect(await shouldAskChat()).toBe(false);
-  });
-
-  test('a failed read means no ask, and never throws', async () => {
-    isLedgerChatEnabled.mockReturnValue(true);
-    getServerSetting.mockRejectedValue(new Error('boom'));
-    expect(await shouldAskChat()).toBe(false);
-  });
-
-  test('a read that throws synchronously also means no ask', async () => {
-    isLedgerChatEnabled.mockReturnValue(true);
-    getServerSetting.mockImplementation(() => {
-      throw new Error('sync boom');
-    });
-    expect(await shouldAskChat()).toBe(false);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(queries).toEqual([]);
   });
 });
 
