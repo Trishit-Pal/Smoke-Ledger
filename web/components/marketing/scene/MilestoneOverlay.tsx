@@ -2,7 +2,7 @@
 
 /*
  * MilestoneOverlay — the next recovery milestone, set as a margin note in the
- * right gutter beside the lungs (app pages only). A Fraunces italic label over
+ * right gutter above the lungs (app pages only). A Fraunces italic label over
  * a small-caps DM Sans caption, in tokens only. It is DOM, not WebGL, so it
  * stays crisp; it sits above the page veil (z-index 2 > the veil's 1) but is
  * aria-hidden and pointer-events:none: atmosphere, never a control.
@@ -18,7 +18,7 @@ import type { SceneIntensity } from '@web/lib/sceneTier';
 
 import { OVERLAY_ANCHOR } from './layout';
 import { milestoneLine, sweepDue } from './pull';
-import { getHomeSignals, requestAirwayLight, subscribeHomeSignals, type HomeSignals } from './sceneSignals';
+import { cancelAirwayLight, getHomeSignals, requestAirwayLight, subscribeHomeSignals, type HomeSignals } from './sceneSignals';
 
 const TICK_MS = 60_000;
 
@@ -29,7 +29,7 @@ export interface MilestoneOverlayProps {
   intensity?: SceneIntensity;
 }
 
-function overlayEnabled(discreet: boolean, intensity: SceneIntensity): boolean {
+export function overlayEnabled(discreet: boolean, intensity: SceneIntensity): boolean {
   if (discreet || intensity === 'full') return false;
   return true;
 }
@@ -38,14 +38,15 @@ export function MilestoneNote({ text, caption }: { text: string; caption: string
   return (
     <div
       aria-hidden="true"
-      className="hidden min-[1440px]:block text-right"
+      className="hidden min-[1536px]:block text-right"
       style={{
         position: 'fixed',
-        top: OVERLAY_ANCHOR.top,
+        bottom: OVERLAY_ANCHOR.bottom,
         right: OVERLAY_ANCHOR.right,
         width: OVERLAY_ANCHOR.width,
         zIndex: 2,
         pointerEvents: 'none',
+        textWrap: 'balance',
       }}
     >
       <p
@@ -128,6 +129,7 @@ export function MilestoneOverlay({ lastSmokeIso, discreet = false, intensity = '
     } catch {
       // storage blocked: no sweep, the note still shows
     }
+    return cancelAirwayLight; // a request nobody picked up must not outlive the overlay
   }, [hasLine, reached]);
 
   if (!line) return null;

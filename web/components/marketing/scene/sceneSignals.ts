@@ -38,25 +38,33 @@ export function getHomeSignals(): HomeSignals | null {
 /**
  * One-shot "light the airways" request. The overlay asks, the scene answers.
  * three.js loads after first paint, so a request made before the scene has
- * subscribed is held and replayed once to the first subscriber.
+ * subscribed is held and replayed once to the first subscriber, but only while
+ * it is still fresh: a scene that mounts much later (discreet turned off, a
+ * remount) must not play a glow for a milestone that was reached long ago.
  */
+export const AIRWAY_REQUEST_TTL_MS = 10_000;
+
 const airwayListeners = new Set<() => void>();
-let airwayPending = false;
+let airwayPendingAt: number | null = null;
 
 export function requestAirwayLight(): void {
   if (airwayListeners.size === 0) {
-    airwayPending = true;
+    airwayPendingAt = Date.now();
     return;
   }
   airwayListeners.forEach((fn) => fn());
 }
 
+/** Drop a held request nobody picked up (the overlay calls this as it goes away). */
+export function cancelAirwayLight(): void {
+  airwayPendingAt = null;
+}
+
 export function subscribeAirwayLight(fn: () => void): () => void {
   airwayListeners.add(fn);
-  if (airwayPending) {
-    airwayPending = false;
-    fn();
-  }
+  const heldAt = airwayPendingAt;
+  airwayPendingAt = null;
+  if (heldAt !== null && Date.now() - heldAt < AIRWAY_REQUEST_TTL_MS) fn();
   return () => {
     airwayListeners.delete(fn);
   };

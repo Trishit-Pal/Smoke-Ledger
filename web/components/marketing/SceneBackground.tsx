@@ -42,7 +42,7 @@ import { breathPhase, breathScale, hazeDensity } from './scene/breath';
 import { DisposeBin } from './scene/disposables';
 import { readSceneEnv, sessionClearStart } from './scene/env';
 import { buildHaze } from './scene/haze';
-import { LAYOUT, NARROW_ASPECT } from './scene/layout';
+import { CAMERA, LAYOUT, NARROW_ASPECT } from './scene/layout';
 import { buildLungs } from './scene/lungMeshes';
 import { subscribeAirwayLight } from './scene/sceneSignals';
 import { buildSign } from './scene/signMesh';
@@ -129,8 +129,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       renderer.toneMappingExposure = 1.0;
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
-      camera.position.set(0, 0, 22);
+      const camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(0, 0, CAMERA.z);
 
       // Real environment map → the glass actually reflects/refracts. Computed
       // once (PMREM), cheap thereafter. The RoomEnvironment scene itself is
@@ -242,11 +242,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
       // scene is a fixed backdrop that must keep living through the whole scroll.)
       const clearStartMs = sessionClearStart();
-      // A newly reached milestone lights the airways once (never under reduced motion).
       const light = createAirwayLight((level) => lungs?.setAirwayGlow(level));
-      const offLight = lungs
-        ? subscribeAirwayLight(() => reduce.matches || light.start(performance.now()))
-        : () => {};
       let raf = 0;
       let running = true;
       let clockStart = performance.now();
@@ -326,6 +322,12 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       for (const ev of WAKE_EVENTS) window.addEventListener(ev, wake, { passive: true });
       const onVisibility = () => sync();
       document.addEventListener('visibilitychange', onVisibility);
+
+      // A newly reached milestone lights the airways once (never under reduced motion). It
+      // arms the light and wakes the loop, so an idle reader still sees it from its first frame.
+      const offLight = lungs
+        ? subscribeAirwayLight(() => reduce.matches || (light.start(), wake()))
+        : () => {};
 
       // Blank the canvas for good (reduced-motion turned on, or the GPU context was lost).
       // ponytail: stays off until the next mount/navigation; add re-init if users toggle often.

@@ -8,9 +8,14 @@ import {
   airwayLightLevel,
   createAirwayLight,
 } from '@web/components/marketing/scene/airwayLight';
-import { MilestoneNote, MilestoneOverlay } from '@web/components/marketing/scene/MilestoneOverlay';
-import { OVERLAY_ANCHOR } from '@web/components/marketing/scene/layout';
-import { requestAirwayLight, subscribeAirwayLight } from '@web/components/marketing/scene/sceneSignals';
+import { MilestoneNote, MilestoneOverlay, overlayEnabled } from '@web/components/marketing/scene/MilestoneOverlay';
+import { CAMERA, LAYOUT, OVERLAY_ANCHOR, lungTopPercent } from '@web/components/marketing/scene/layout';
+import {
+  AIRWAY_REQUEST_TTL_MS,
+  cancelAirwayLight,
+  requestAirwayLight,
+  subscribeAirwayLight,
+} from '@web/components/marketing/scene/sceneSignals';
 
 const MARKETING = join(__dirname, '..', 'components', 'marketing');
 const read = (...p: string[]) => readFileSync(join(MARKETING, ...p), 'utf8');
@@ -37,8 +42,9 @@ describe('createAirwayLight', () => {
   it('animates once, ends at 0, and ignores start while running', () => {
     const apply = vi.fn();
     const light = createAirwayLight(apply);
-    light.start(1000);
-    light.start(1500); // no-op: already running, must not restart the clock
+    light.start();
+    light.tick(1000); // first drawn frame starts the clock
+    light.start(); // no-op: already running, must not restart the clock
     light.tick(1000 + AIRWAY_LIGHT_MS / 2);
     expect(apply).toHaveBeenLastCalledWith(expect.closeTo(1, 6));
     light.tick(1000 + AIRWAY_LIGHT_MS + 1);
@@ -46,12 +52,23 @@ describe('createAirwayLight', () => {
     const calls = apply.mock.calls.length;
     light.tick(1000 + AIRWAY_LIGHT_MS + 50); // finished: nothing more to do
     expect(apply.mock.calls.length).toBe(calls);
-    light.start(9000); // may run again once finished
+    light.start(); // may run again once finished
+    light.tick(9000);
     light.tick(9000 + AIRWAY_LIGHT_MS / 2);
     expect(apply).toHaveBeenLastCalledWith(expect.closeTo(1, 6));
   });
 
-  it('does nothing before it is started', () => {
+  it('plays in full from the first drawn frame even if the loop was stopped long after arming', () => {
+    const apply = vi.fn();
+    const light = createAirwayLight(apply);
+    light.start(); // armed while the loop is idle-stopped or the tab is hidden
+    light.tick(500_000); // the reader returns: first drawn frame, much later
+    expect(apply).toHaveBeenLastCalledWith(0); // elapsed 0: begins at the bottom of the ease
+    light.tick(500_000 + AIRWAY_LIGHT_MS / 2);
+    expect(apply).toHaveBeenLastCalledWith(expect.closeTo(1, 6)); // not skipped
+  });
+
+  it('does nothing before it is armed', () => {
     const apply = vi.fn();
     createAirwayLight(apply).tick(100);
     expect(apply).not.toHaveBeenCalled();
@@ -69,9 +86,8 @@ describe('airway light request channel', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('replays one request made before the scene (three.js loads late) subscribed', () => {
-    const early = vi.fn();
-    subscribeAirwayLight(early)(); // drain anything left pending by an earlier case
+  it('replays one fresh request made before the scene (three.js loads late) subscribed', () => {
+    subscribeAirwayLight(vi.fn())(); // drain anything left pending by an earlier case
     requestAirwayLight();
     const fn = vi.fn();
     const off = subscribeAirwayLight(fn);
@@ -81,6 +97,42 @@ describe('airway light request channel', () => {
     subscribeAirwayLight(again)();
     expect(again).not.toHaveBeenCalled(); // consumed, not replayed twice
   });
+
+  it('drops a held request older than the TTL', () => {
+    vi.useFakeTimers();
+    try {
+      subscribeAirwayLight(vi.fn())();
+      requestAirwayLight();
+      vi.advanceTimersByTime(AIRWAY_REQUEST_TTL_MS + 1);
+      const late = vi.fn();
+      subscribeAirwayLight(late)();
+      expect(late).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replays a request still inside the TTL', () => {
+    vi.useFakeTimers();
+    try {
+      subscribeAirwayLight(vi.fn())();
+      requestAirwayLight();
+      vi.advanceTimersByTime(AIRWAY_REQUEST_TTL_MS - 1000);
+      const fn = vi.fn();
+      subscribeAirwayLight(fn)();
+      expect(fn).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancelAirwayLight discards a held request', () => {
+    requestAirwayLight();
+    cancelAirwayLight();
+    const fn = vi.fn();
+    subscribeAirwayLight(fn)();
+    expect(fn).not.toHaveBeenCalled();
+  });
 });
 
 describe('MilestoneNote markup', () => {
@@ -88,10 +140,10 @@ describe('MilestoneNote markup', () => {
     React.createElement(MilestoneNote, { text: 'Lung capacity begins to improve — in 3 h', caption: 'Next, from your last entry' }),
   );
 
-  it('is aria-hidden, pointer-events none, hidden below the wide breakpoint', () => {
+  it('is aria-hidden, pointer-events none, hidden below 1536px', () => {
     expect(html).toMatch(/aria-hidden="true"/);
     expect(html).toMatch(/pointer-events:none/);
-    expect(html).toMatch(/class="[^"]*hidden[^"]*min-\[1440px\]:block/);
+    expect(html).toMatch(/class="[^"]*hidden[^"]*min-\[1536px\]:block/);
   });
 
   it('carries the label and caption in their tokens', () => {
@@ -102,9 +154,10 @@ describe('MilestoneNote markup', () => {
     expect(html).not.toMatch(COLOUR_LITERAL);
   });
 
-  it('sits above the 91% veil (z-index 1), at the layout anchor', () => {
+  it('sits above the 91% veil (z-index 1), at the layout anchor, balanced', () => {
     expect(html).toMatch(/z-index:2/);
-    expect(html).toContain(`top:${OVERLAY_ANCHOR.top}`);
+    expect(html).toContain(`bottom:${OVERLAY_ANCHOR.bottom}`);
+    expect(html).toMatch(/text-wrap:balance/);
   });
 });
 
@@ -113,8 +166,13 @@ describe('MilestoneOverlay', () => {
     expect(renderToStaticMarkup(React.createElement(MilestoneOverlay, { lastSmokeIso: '2026-11-04T00:00:00Z', intensity: 'quiet' }))).toBe('');
   });
 
-  it('declines when discreet, under full intensity, or with no entries', () => {
-    expect(overlaySrc).toMatch(/if \(discreet \|\| intensity === 'full'\) return false/);
+  it('declines when discreet or under full intensity', () => {
+    expect(overlayEnabled(true, 'quiet')).toBe(false);
+    expect(overlayEnabled(false, 'full')).toBe(false);
+    expect(overlayEnabled(false, 'quiet')).toBe(true);
+  });
+
+  it('declines with no entries', () => {
     expect(overlaySrc).toMatch(/milestoneLine\(/);
     expect(overlaySrc).toMatch(/if \(!line\) return null/);
   });
@@ -177,6 +235,22 @@ describe('wiring', () => {
 
   it('puts the overlay under the desktop lungs, in the right gutter', () => {
     expect(OVERLAY_ANCHOR.right).toBeTruthy();
-    expect(OVERLAY_ANCHOR.top).toMatch(/%$/);
+    expect(OVERLAY_ANCHOR.bottom).toMatch(/%$/);
+  });
+
+  it('pins the note wholly above the lungs, with room for orbit and breath', () => {
+    // Re-derive the lung top from the scene constants, independently of layout.ts.
+    const [, y, z] = LAYOUT.wide.lungs;
+    const half = (CAMERA.z - z) * Math.tan(((CAMERA.fov / 2) * Math.PI) / 180);
+    const lungTop = 50 - ((y + LAYOUT.wide.lungScale * (0.9 - 0.12)) / half) * 50;
+    expect(lungTopPercent()).toBeCloseTo(lungTop, 6);
+    const noteBottomEdge = 100 - parseFloat(OVERLAY_ANCHOR.bottom); // % from viewport top
+    expect(noteBottomEdge).toBeLessThan(lungTop - 4);
+    // The Ask dock sits bottom-right; the note must live in the top half.
+    expect(noteBottomEdge).toBeLessThan(50);
+  });
+
+  it('only exposes the note from 1536px, where the gutter is wide enough to read', () => {
+    expect(OVERLAY_ANCHOR.width).toContain('14rem');
   });
 });
