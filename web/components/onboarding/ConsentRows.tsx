@@ -306,9 +306,10 @@ export function ChatChoiceRow({ answer, onAnswer, number }: ChatChoiceRowProps) 
       <details>
         <summary
           className="focus-ring editorial-caption"
-          style={{ cursor: 'pointer', color: 'var(--text-muted)', minHeight: 44, display: 'flex', alignItems: 'center' }}
+          // list-item keeps the native disclosure marker; the 44px target lives on the inner span.
+          style={{ cursor: 'pointer', color: 'var(--text-muted)', display: 'list-item' }}
         >
-          Read the details
+          <span style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Read the details</span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
           <p style={noticeText}>{scope}</p>

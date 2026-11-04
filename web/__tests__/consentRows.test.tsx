@@ -75,6 +75,13 @@ describe('ChatChoiceRow', () => {
     expect(no).toMatch(/aria-pressed="true"[^>]*>No, thanks/);
   });
 
+  test('keeps the native disclosure marker on the summary', () => {
+    const out = html(<ChatChoiceRow answer={null} onAnswer={noop} number="03" />);
+    const summary = out.match(/<summary[^>]*>/)?.[0] ?? '';
+    expect(summary).toContain('display:list-item');
+    expect(summary).not.toContain('display:flex');
+  });
+
   test('wraps everything after the lead in a details element', () => {
     const out = html(<ChatChoiceRow answer={null} onAnswer={noop} number="03" />);
     const lead = out.indexOf(esc(LEDGER_CHAT_NOTICE.lead));
