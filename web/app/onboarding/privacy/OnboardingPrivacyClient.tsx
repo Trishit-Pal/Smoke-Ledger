@@ -59,7 +59,6 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
   };
   const analyticsOptIn = values.analytics;
   const healthDataConsent = values.health;
-  const healthDeclined = consents.healthDeclined ?? false;
 
   const acknowledged = REQUIRED_ROWS.every((row) => values[row.id]);
   const canContinue = acknowledged && healthDataConsent;
@@ -70,11 +69,6 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
     REQUIRED_ROWS.forEach((row, i) => {
       setTimeout(() => setConsent(row.id, true), i * STAMP_STAGGER_MS);
     });
-  };
-
-  const setHealthConsent = (given: boolean) => {
-    setConsent('health', given);
-    setConsent('healthDeclined', !given);
   };
 
   const onContinue = async () => {
@@ -133,8 +127,7 @@ export function OnboardingPrivacyClient({ alreadyConsented }: OnboardingPrivacyC
 
         <HealthConsentRow
           checked={healthDataConsent}
-          declined={healthDeclined}
-          onChange={setHealthConsent}
+          onChange={(given) => setConsent('health', given)}
           number="06"
         />
 

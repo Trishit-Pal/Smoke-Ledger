@@ -4,16 +4,16 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Stamp } from '@web/components/onboarding/Stamp';
 import { LEGAL_LINKS } from '@web/lib/legal';
+import { LEDGER_CHAT_NOTICE } from '@web/components/chat/notice';
 import {
+  AGREEMENT_LABEL_PARTS,
+  AGREEMENT_SUB,
   HEALTH_CONSENT_LABEL,
   HEALTH_CONSENT_SUB,
-  HEALTH_DECLINE_LABEL,
-  HEALTH_DECLINE_NOTE,
-  HEALTH_DECLINE_NOTE_EXISTING,
 } from '@/lib/healthConsent';
 
 // The consent rows, shared by the onboarding privacy step and the /consent
-// re-consent screen so the wording, links and decline path cannot drift.
+// re-consent screen so the wording and links cannot drift.
 
 export type RequiredKey = 'age' | 'terms' | 'privacy' | 'medical' | 'dataProcessing';
 
@@ -133,92 +133,203 @@ export function ConsentCheckRow({ row, index, checked, onChange }: ConsentCheckR
   );
 }
 
-export interface HealthConsentRowProps {
+interface TickRowProps {
   checked: boolean;
-  declined: boolean;
-  /** Ticking gives consent; the decline button passes false. */
-  onChange: (given: boolean) => void;
-  /** The printed row number, e.g. "06". */
+  onChange: (checked: boolean) => void;
   number: string;
-  /** True on the re-consent screen, where the reader already has a ledger. */
-  existingLedger?: boolean;
+  rotate: number;
+  label: React.ReactNode;
+  sub: string;
 }
 
-/** The unticked Art 9 row, with a decline control the same size as the accept one. */
-export function HealthConsentRow({ checked, declined, onChange, number, existingLedger = false }: HealthConsentRowProps) {
+/** One unticked line: checkbox, its words, the stamp and the printed number. */
+function TickRow({ checked, onChange, number, rotate, label, sub }: TickRowProps) {
   return (
-    <div style={{ borderBottom: '1px solid var(--rule)' }}>
-      <label
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 14,
+        padding: '14px 0',
+        borderBottom: '1px solid var(--rule)',
+        cursor: 'pointer',
+      }}
+    >
+      <input
+        type="checkbox"
+        className="ed-checkbox focus-ring"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ marginTop: 2 }}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.5 }}>{sub}</span>
+      </div>
+      <div style={{ minWidth: 96, display: 'flex', justifyContent: 'flex-end' }}>
+        <Stamp show={checked} rotate={rotate}>
+          Acknowledged
+        </Stamp>
+      </div>
+      <span
+        className="editorial-caption-tight nums-tabular"
         style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 14,
-          padding: '14px 0 8px',
-          cursor: 'pointer',
+          color: checked ? 'var(--accent-ink)' : 'var(--text-faint)',
+          marginTop: 4,
+          minWidth: 22,
+          textAlign: 'right',
         }}
       >
-        <input
-          type="checkbox"
-          className="ed-checkbox focus-ring"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          style={{ marginTop: 2 }}
-        />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-          <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
-            {HEALTH_CONSENT_LABEL}
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.5 }}>
-            {HEALTH_CONSENT_SUB}
-          </span>
-        </div>
+        {number}
+      </span>
+    </label>
+  );
+}
+
+export interface TickRowOwnProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  /** The printed row number, e.g. "01". */
+  number: string;
+}
+
+/** Tick 1: age, Terms, Privacy Policy and the medical-advice note, in one line. */
+export function AgreementRow({ checked, onChange, number }: TickRowOwnProps) {
+  const { before, terms, middle, privacy, after } = AGREEMENT_LABEL_PARTS;
+  return (
+    <TickRow
+      checked={checked}
+      onChange={onChange}
+      number={number}
+      rotate={-7}
+      sub={AGREEMENT_SUB}
+      label={
+        <>
+          {before}
+          <Link href={LEGAL_LINKS.terms} style={linkStyle}>
+            {terms}
+          </Link>
+          {middle}
+          <Link href={LEGAL_LINKS.privacy} style={linkStyle}>
+            {privacy}
+          </Link>
+          {after}
+        </>
+      }
+    />
+  );
+}
+
+/** Tick 2: the unticked Art 9 consent, on its own line. */
+export function HealthConsentRow({ checked, onChange, number }: TickRowOwnProps) {
+  return (
+    <TickRow
+      checked={checked}
+      onChange={onChange}
+      number={number}
+      rotate={-5}
+      label={HEALTH_CONSENT_LABEL}
+      sub={HEALTH_CONSENT_SUB}
+    />
+  );
+}
+
+export interface ChatChoiceRowProps {
+  /** null until the reader chooses; there is no default. */
+  answer: boolean | null;
+  onAnswer: (turnOn: boolean) => void;
+  number: string;
+}
+
+const noticeText: React.CSSProperties = {
+  fontSize: 13,
+  color: 'var(--text-muted)',
+  lineHeight: 1.55,
+  maxWidth: '52ch',
+  margin: 0,
+};
+
+function ChoiceButton({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className="focus-ring hit-target min-h-11"
+      style={{
+        flex: 1,
+        padding: '0 16px',
+        background: 'transparent',
+        cursor: 'pointer',
+        fontSize: 14,
+        color: 'var(--text)',
+        fontWeight: pressed ? 600 : 400,
+        border: `1px solid ${pressed ? 'var(--accent-ink)' : 'var(--rule-strong)'}`,
+        boxShadow: pressed ? 'inset 0 0 0 1px var(--accent-ink)' : 'none',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Ask the ledger: the full notice (lead up front, the rest folded) and an equal Yes / No pair. */
+export function ChatChoiceRow({ answer, onAnswer, number }: ChatChoiceRowProps) {
+  const headingId = React.useId();
+  const { lead, scope, sent, discreet, retention, device } = LEDGER_CHAT_NOTICE;
+  return (
+    <div
+      role="group"
+      aria-labelledby={headingId}
+      style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 0', borderBottom: '1px solid var(--rule)' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+        <p id={headingId} style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5, margin: 0, flex: 1 }}>
+          Turn on Ask the ledger? <span style={{ color: 'var(--text-muted)' }}>{lead}</span>
+        </p>
         <div style={{ minWidth: 96, display: 'flex', justifyContent: 'flex-end' }}>
-          <Stamp show={checked} rotate={-5}>
-            Acknowledged
+          <Stamp show={answer !== null} rotate={-4}>
+            Answered
           </Stamp>
         </div>
         <span
           className="editorial-caption-tight nums-tabular"
           style={{
-            color: checked ? 'var(--accent-ink)' : 'var(--text-faint)',
-            marginTop: 4,
+            color: answer === null ? 'var(--text-faint)' : 'var(--accent-ink)',
             minWidth: 22,
             textAlign: 'right',
           }}
         >
           {number}
         </span>
-      </label>
-      <div style={{ paddingBottom: 12, paddingLeft: 32 }}>
-        <button
-          type="button"
-          aria-pressed={declined}
-          onClick={() => onChange(false)}
-          className="focus-ring hit-target"
-          style={{
-            minHeight: 44,
-            padding: '0 4px',
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            color: 'var(--text-muted)',
-            textDecoration: declined ? 'underline' : 'none',
-            textUnderlineOffset: 4,
-          }}
+      </div>
+      <details>
+        <summary
+          className="focus-ring editorial-caption"
+          style={{ cursor: 'pointer', color: 'var(--text-muted)', minHeight: 44, display: 'flex', alignItems: 'center' }}
         >
-          {HEALTH_DECLINE_LABEL}
-        </button>
-        {declined ? (
-          <p
-            role="status"
-            style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.55 }}
-          >
-            {existingLedger ? HEALTH_DECLINE_NOTE_EXISTING : HEALTH_DECLINE_NOTE}
+          Read the details
+        </summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+          <p style={noticeText}>{scope}</p>
+          <p style={noticeText}>{sent}</p>
+          <p style={noticeText}>{discreet}</p>
+          <p style={noticeText}>{retention}</p>
+          <p style={noticeText}>
+            {device}{' '}
+            <Link href={LEGAL_LINKS.privacy} style={linkStyle}>
+              Privacy policy
+            </Link>
           </p>
-        ) : null}
+        </div>
+      </details>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <ChoiceButton pressed={answer === true} onClick={() => onAnswer(true)}>
+          Yes, turn it on
+        </ChoiceButton>
+        <ChoiceButton pressed={answer === false} onClick={() => onAnswer(false)}>
+          No, thanks
+        </ChoiceButton>
       </div>
     </div>
   );

@@ -59,7 +59,6 @@ export function ConsentClient({
   const router = useRouter();
   const [ticked, setTicked] = React.useState<Partial<Record<RequiredKey, boolean>>>({});
   const [health, setHealth] = React.useState(false);
-  const [healthDeclined, setHealthDeclined] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -73,11 +72,6 @@ export function ConsentClient({
   const heading = reconsentHeading(termsChanged);
   const changes = RECONSENT_CHANGES.filter((c) => needsHealthConsent || !c.onlyWithoutHealthConsent);
   const canAccept = rows.every((r) => ticked[r.id]) && (!needsHealthConsent || health);
-
-  const setHealthConsent = (given: boolean) => {
-    setHealth(given);
-    setHealthDeclined(!given);
-  };
 
   const onAccept = async () => {
     if (!canAccept) return;
@@ -173,10 +167,8 @@ export function ConsentClient({
         {needsHealthConsent ? (
           <HealthConsentRow
             checked={health}
-            declined={healthDeclined}
-            onChange={setHealthConsent}
+            onChange={setHealth}
             number={String(rows.length + 1).padStart(2, '0')}
-            existingLedger
           />
         ) : null}
       </section>
