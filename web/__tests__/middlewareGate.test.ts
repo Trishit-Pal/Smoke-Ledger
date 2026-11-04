@@ -160,6 +160,7 @@ describe('middleware: a failed profile read never sends a signed-in reader to on
       expect([path, res.headers.get('location'), res.status]).toEqual([path, null, 503]);
       expect(new URL(res.headers.get('x-middleware-rewrite') ?? '', 'http://localhost').pathname).toBe('/unavailable');
       expect(res.headers.get('content-security-policy')).toContain("'nonce-");
+      expect(res.headers.get('cache-control')).toBe('no-store');
     }
     log.mockRestore();
   });
@@ -179,6 +180,8 @@ describe('middleware: a failed profile read never sends a signed-in reader to on
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const res = await middleware(new NextRequest(new URL('/api/audit', 'http://localhost'), { method: 'POST' }));
     expect([res.headers.get('location'), res.headers.get('x-middleware-rewrite'), res.status]).toEqual([null, null, 200]);
+    // The error branch ran (a healthy null row would pass /api too, without logging).
+    expect(log).toHaveBeenCalledTimes(1);
     log.mockRestore();
   });
 

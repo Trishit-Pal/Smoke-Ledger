@@ -216,6 +216,8 @@ export async function middleware(request: NextRequest) {
       status: 503,
       request: { headers: requestHeaders },
     });
+    // Never cached: the page must go away as soon as the read works again.
+    unavailable.headers.set('Cache-Control', 'no-store');
     // Keep any session cookies getUser() just refreshed.
     for (const cookie of response.cookies.getAll()) unavailable.cookies.set(cookie);
     return finalize(unavailable);
