@@ -27,7 +27,7 @@ export interface Lungs {
 export const LOBE_OPACITY = { dark: 0.5, light: 0.3 } as const;
 // Light theme: soft and translucent, so the lungs read as a silhouette (not soot) and keep text contrast.
 const TRANSMISSION = { dark: 0.9, light: 0 } as const;
-export const AIRWAY_OPACITY = { dark: 0.8, light: 0.5 } as const;
+export const AIRWAY_OPACITY = { dark: 0.8, light: 0.4 } as const;
 const TUBE_SEGMENTS = 10;
 const TUBE_RADIAL_SEGMENTS = 6;
 const AIRWAY_BEND = 0.035; // sideways bow of each airway, so the tree is not ruler-straight

@@ -11,7 +11,7 @@ export interface SignMesh {
 }
 
 const SIGN_OPACITY = 0.5;
-const SIGN_OPACITY_LIGHT = 1; // terracotta needs more body to read on pale grey
+export const SIGN_OPACITY_LIGHT = 0.5; // same as dark: any more drops muted text over the ring below AA (0.8 measured 4.48:1)
 /** Keep the satin colour under the bloom threshold so the sign never glows. */
 const BLOOM_HEADROOM = 0.8;
 

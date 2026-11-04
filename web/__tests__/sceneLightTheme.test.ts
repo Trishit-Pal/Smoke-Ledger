@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { buildHaze } from '@web/components/marketing/scene/haze';
 import { DisposeBin } from '@web/components/marketing/scene/disposables';
 import { AIRWAY_OPACITY, LOBE_OPACITY } from '@web/components/marketing/scene/lungMeshes';
+import { SIGN_OPACITY_LIGHT } from '@web/components/marketing/scene/signMesh';
 import { LIGHT_INK_DARKEN } from '@web/components/marketing/scene/tokens';
 import { exhaleWeight } from '@web/components/marketing/scene/breath';
 import type { SceneTokens } from '@web/components/marketing/scene/tokens';
@@ -22,7 +23,11 @@ describe('light theme stays a soft silhouette, not soot', () => {
   });
 
   it('keeps the light airways soft enough that muted text over them holds AA', () => {
-    expect(AIRWAY_OPACITY.light).toBeLessThanOrEqual(0.5);
+    expect(AIRWAY_OPACITY.light).toBeLessThanOrEqual(0.4);
+  });
+
+  it('keeps the light sign soft enough that muted text over it holds AA', () => {
+    expect(SIGN_OPACITY_LIGHT).toBeLessThanOrEqual(0.5);
   });
 
   it('pulls the light ink only part-way towards black', () => {
