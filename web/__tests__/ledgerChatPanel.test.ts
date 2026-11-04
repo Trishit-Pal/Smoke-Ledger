@@ -71,8 +71,11 @@ describe('AskLedgerPanel', () => {
     expect(consent).toBeGreaterThan(-1);
     expect(audit).toBeGreaterThan(consent);
     expect(panel).toContain('Turn on and ask');
-    // The audit call sits inside a try block.
-    expect(panel.slice(audit - 200, audit)).toMatch(/try\s*\{/);
+    // Not awaited: a slow or hung audit edge call (cold start, outage) must not hold
+    // back the answer; its failure is caught. A try block alone still waited on it.
+    expect(panel.slice(audit - 10, audit)).toMatch(/void\s*$/);
+    expect(panel).not.toMatch(/await\s+recordAuditEvent\('ledger_chat_consent_toggled'/);
+    expect(panel.slice(audit, audit + 400)).toContain('.catch(');
   });
 
   test('renders the answer as plain text, never as HTML', () => {

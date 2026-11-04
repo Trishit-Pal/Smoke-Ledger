@@ -325,16 +325,14 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
       setPending(null);
       return;
     }
-    try {
-      await recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
-        enabled: true,
-        privacyVersion: LEGAL_VERSIONS.privacy,
-        noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
-      });
-    } catch {
-      // Consent is already saved. The audit row is best-effort here: the edge
-      // allowlist may lag a deploy, and that must never block the answer.
-    }
+    // Consent is already saved. The audit row is best-effort here and not awaited: the
+    // edge allowlist may lag a deploy, and a slow or hung edge call (a cold start) must
+    // never hold back the answer. The request still goes out; a failure is dropped.
+    void recordAuditEvent('ledger_chat_consent_toggled', 'privacy', {
+      enabled: true,
+      privacyVersion: LEGAL_VERSIONS.privacy,
+      noticeVersion: LEDGER_CHAT_NOTICE_VERSION,
+    }).catch(() => undefined);
     // Closed during the consent writes: the consent is saved, but the panel is gone, so no question
     // is sent and no answer is saved; status and pending are reset. The reader asks again on the next open.
     // ponytail: resets status even if the panel was reopened meanwhile; that open re-derives it from its own GET.
