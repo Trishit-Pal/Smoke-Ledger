@@ -4,20 +4,31 @@ import { join } from 'node:path';
 
 const WEB = join(__dirname, '..');
 const layout = readFileSync(join(WEB, 'app', '(app)', 'layout.tsx'), 'utf8');
+const reader = readFileSync(join(WEB, 'components', 'marketing', 'SceneForReader.tsx'), 'utf8');
 const backdrop = readFileSync(join(WEB, 'components', 'marketing', 'SceneBackdrop.tsx'), 'utf8');
 
 describe('scene discreet wiring', () => {
-  it('derives discreet in the app layout from the cached profile via isDiscreetMode', () => {
-    expect(layout).toMatch(/import \{ isDiscreetMode \} from '@\/lib\/discreet'/);
-    expect(layout).toMatch(/getServerProfile\(\)\s*\.then\(isDiscreetMode\)/);
+  it('keeps the app layout synchronous so the shell streams', () => {
+    expect(layout).toMatch(/export default function AppLayout\(/);
+    expect(layout).not.toMatch(/async function AppLayout/);
+    expect(layout).not.toMatch(/getServerProfile/);
   });
 
-  it('falls back to false when the profile read fails, so the layout never throws', () => {
-    expect(layout).toMatch(/\.catch\(\(\) => false\)/);
+  it('renders SceneForReader in Suspense with a haze-only (discreet) fallback', () => {
+    expect(layout).toMatch(
+      /<React\.Suspense fallback=\{<SceneBackdrop intensity="quiet" discreet \/>\}>\s*<SceneForReader \/>\s*<\/React\.Suspense>/,
+    );
   });
 
-  it('passes discreet to SceneBackdrop', () => {
-    expect(layout).toMatch(/<SceneBackdrop intensity="quiet" discreet=\{discreet\} \/>/);
+  it('resolves discreet from the cached profile via isDiscreetMode', () => {
+    expect(reader).toMatch(/import \{ isDiscreetMode \} from '@\/lib\/discreet'/);
+    expect(reader).toMatch(/await getServerProfile\(\)\s*\.then\(isDiscreetMode\)/);
+    expect(reader).toMatch(/<SceneBackdrop intensity="quiet" discreet=\{discreet\} \/>/);
+  });
+
+  it('fails closed to discreet when the profile read rejects', () => {
+    expect(reader).toMatch(/\.catch\(\(\) => true\)/);
+    expect(reader).not.toMatch(/\.catch\(\(\) => false\)/);
   });
 
   it('forwards discreet from SceneBackdrop to the scene', () => {
