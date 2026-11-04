@@ -10,7 +10,7 @@ import {
   type AuthCookieOptions,
 } from '@web/lib/supabase/cookieOptions';
 import { sanitizeCallbackNextPath } from '@web/lib/auth/callbackNextPath';
-import { POST_AUTH_PROFILE_COLUMNS, postAuthDestination } from '@web/lib/auth/postAuthDestination';
+import { resolvePostSignInPath } from '@web/lib/auth/signInDestination';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 
 type CookieOptions = AuthCookieOptions;
@@ -98,17 +98,11 @@ export async function GET(request: NextRequest) {
     return redirectWithCookies(response, new URL('/login?error=session_missing', requestUrl.origin));
   }
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select(POST_AUTH_PROFILE_COLUMNS)
-    .eq('id', user.id)
-    .maybeSingle();
-
-  return redirectWithCookies(
-    response,
-    new URL(
-      postAuthDestination(profile, link.kind === 'exchange' ? link.type : null, nextPath),
-      requestUrl.origin,
-    ),
+  const destination = await resolvePostSignInPath(
+    supabase,
+    user.id,
+    nextPath,
+    link.kind === 'exchange' ? link.type : null,
   );
+  return redirectWithCookies(response, new URL(destination, requestUrl.origin));
 }

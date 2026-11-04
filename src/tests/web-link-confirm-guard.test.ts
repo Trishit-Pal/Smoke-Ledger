@@ -19,9 +19,9 @@ describe('web: opening a link never signs a browser in', () => {
     expect(route).toContain('confirmLinkPath(');
   });
 
-  it('the callback classifies links with readAuthLink and routes with postAuthDestination', () => {
+  it('the callback classifies links with readAuthLink and routes with resolvePostSignInPath', () => {
     expect(route).toContain('readAuthLink(');
-    expect(route).toContain('postAuthDestination(');
+    expect(route).toContain('resolvePostSignInPath(');
   });
 
   it('the callback takes the link type from readAuthLink only (one source of truth)', () => {
@@ -32,7 +32,7 @@ describe('web: opening a link never signs a browser in', () => {
     const action = read('web', 'app', 'auth', 'confirm', 'actions.ts');
     expect(action.startsWith("'use server';")).toBe(true);
     expect(action).toContain('verifyOtp(');
-    expect(action).toContain('postAuthDestination(');
+    expect(action).toContain('resolvePostSignInPath(');
     expect(action).toContain('nextPathForLink(');
     const page = read('web', 'app', 'auth', 'confirm', 'page.tsx');
     expect(page).toMatch(/<form action=\{confirmEmailLinkAction\}/);

@@ -4,11 +4,8 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { readAuthLink } from '@/lib/authLink';
 import { sanitizeCallbackNextPath } from '@web/lib/auth/callbackNextPath';
-import {
-  POST_AUTH_PROFILE_COLUMNS,
-  nextPathForLink,
-  postAuthDestination,
-} from '@web/lib/auth/postAuthDestination';
+import { nextPathForLink } from '@web/lib/auth/postAuthDestination';
+import { resolvePostSignInPath } from '@web/lib/auth/signInDestination';
 import { isSameOriginRequest } from '@web/lib/security/sameOrigin';
 import { createClient } from '@web/lib/supabase/server';
 
@@ -51,11 +48,5 @@ export async function confirmEmailLinkAction(formData: FormData): Promise<void> 
   } = await supabase.auth.getUser();
   if (!user) redirect('/login?error=session_missing');
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select(POST_AUTH_PROFILE_COLUMNS)
-    .eq('id', user.id)
-    .maybeSingle();
-
-  redirect(postAuthDestination(profile, link.type, nextPath));
+  redirect(await resolvePostSignInPath(supabase, user.id, nextPath, link.type));
 }
