@@ -146,6 +146,31 @@ describe('shouldAskChat', () => {
     (getSetting as jest.Mock).mockRejectedValueOnce(new Error('offline'));
     await expect(shouldAskChat()).resolves.toBe(false);
   });
+
+  describe('a stalled read', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('resolves false after 4 s instead of holding the screen', async () => {
+      (getSetting as jest.Mock).mockReturnValueOnce(new Promise(() => {}));
+      const result = shouldAskChat();
+      await jest.advanceTimersByTimeAsync(3999);
+      let settled = false;
+      void result.then(() => {
+        settled = true;
+      });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toBe(false);
+    });
+
+    it('clears its timer once the read wins', async () => {
+      (getSetting as jest.Mock).mockResolvedValueOnce(null);
+      await expect(shouldAskChat()).resolves.toBe(true);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+  });
 });
 
 describe('getSetting tells a stored false from no row', () => {

@@ -104,6 +104,7 @@ describe('onboarding privacy page', () => {
     expect(page).toContain("from '@web/lib/server/ledgerChat/askChat'");
     expect(page).toMatch(/chatAsk=\{/);
     expect(page).toContain('shouldAskChat()');
+    expect(page).toContain('await Promise.all([');
   });
 });
 

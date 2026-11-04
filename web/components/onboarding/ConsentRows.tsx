@@ -21,17 +21,24 @@ const linkStyle: React.CSSProperties = {
   textUnderlineOffset: 3,
 };
 
-interface TickRowProps {
+// The stamp column reserves the full width of "ACKNOWLEDGED" even while the stamp is invisible,
+// which would leave ~110 px for the words on a 360 px phone. Below sm only the tick and the
+// printed number show state, so no inline `display` here (it would beat `hidden`).
+const STAMP_COLUMN = 'hidden sm:flex justify-end';
+
+export interface TickRowProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   number: string;
   rotate: number;
   label: React.ReactNode;
   sub: string;
+  /** The last line of a list carries no closing hairline. */
+  last?: boolean;
 }
 
 /** One unticked line: checkbox, its words, the stamp and the printed number. */
-function TickRow({ checked, onChange, number, rotate, label, sub }: TickRowProps) {
+export function TickRow({ checked, onChange, number, rotate, label, sub, last = false }: TickRowProps) {
   return (
     <label
       style={{
@@ -39,7 +46,7 @@ function TickRow({ checked, onChange, number, rotate, label, sub }: TickRowProps
         alignItems: 'flex-start',
         gap: 14,
         padding: '14px 0',
-        borderBottom: '1px solid var(--rule)',
+        borderBottom: last ? 'none' : '1px solid var(--rule)',
         cursor: 'pointer',
       }}
     >
@@ -54,7 +61,7 @@ function TickRow({ checked, onChange, number, rotate, label, sub }: TickRowProps
         <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>{label}</span>
         <span style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.5 }}>{sub}</span>
       </div>
-      <div style={{ minWidth: 96, display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={STAMP_COLUMN} style={{ minWidth: 96 }}>
         <Stamp show={checked} rotate={rotate}>
           Acknowledged
         </Stamp>
@@ -143,7 +150,7 @@ function ChoiceButton({ pressed, onClick, children }: { pressed: boolean; onClic
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className="focus-ring hit-target min-h-11"
+      className="focus-ring hit-target min-h-11 rounded-md"
       style={{
         flex: 1,
         padding: '0 16px',
@@ -175,7 +182,7 @@ export function ChatChoiceRow({ answer, onAnswer, number }: ChatChoiceRowProps) 
         <p id={headingId} style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5, margin: 0, flex: 1 }}>
           Turn on Ask the ledger? <span style={{ color: 'var(--text-muted)' }}>{lead}</span>
         </p>
-        <div style={{ minWidth: 96, display: 'flex', justifyContent: 'flex-end' }}>
+        <div className={STAMP_COLUMN} style={{ minWidth: 96 }}>
           <Stamp show={answer !== null} rotate={-4}>
             Answered
           </Stamp>

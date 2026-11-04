@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Stamp } from '@web/components/onboarding/Stamp';
 import { ConfettiBurst } from '@web/components/character/ConfettiBurst';
 import { submitConsentStep } from '@/services/onboarding';
 import { setSetting } from '@/db/repositories/settings';
@@ -16,6 +15,7 @@ import {
   AgreementRow,
   ChatChoiceRow,
   HealthConsentRow,
+  TickRow,
 } from '@web/components/onboarding/ConsentRows';
 
 // "Stamp all" ticks the agreement only. The health-data consent (Art 9), the optional
@@ -133,25 +133,14 @@ export function OnboardingPrivacyClient({ alreadyConsented, chatAsk }: Onboardin
           number="02"
         />
 
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 14,
-            padding: '14px 0',
-            cursor: 'pointer',
-            opacity: 0.95,
-          }}
-        >
-          <input
-            type="checkbox"
-            className="ed-checkbox focus-ring"
-            checked={analyticsOptIn}
-            onChange={(e) => setConsent('analytics', e.target.checked)}
-            style={{ marginTop: 2 }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-            <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5 }}>
+        <TickRow
+          checked={analyticsOptIn}
+          onChange={(v) => setConsent('analytics', v)}
+          number="03"
+          rotate={-4}
+          last={!chatAsk}
+          label={
+            <>
               <em
                 style={{
                   color: 'var(--text-muted)',
@@ -162,28 +151,10 @@ export function OnboardingPrivacyClient({ alreadyConsented, chatAsk }: Onboardin
                 Optional
               </em>{' '}
               — allow first-party product analytics to help improve reliability.
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.5 }}>
-              No third-party trackers, ever.
-            </span>
-          </div>
-          <div style={{ minWidth: 96, display: 'flex', justifyContent: 'flex-end' }}>
-            <Stamp show={analyticsOptIn} rotate={-4}>
-              Acknowledged
-            </Stamp>
-          </div>
-          <span
-            className="editorial-caption-tight nums-tabular"
-            style={{
-              color: analyticsOptIn ? 'var(--accent-ink)' : 'var(--text-faint)',
-              marginTop: 4,
-              minWidth: 22,
-              textAlign: 'right',
-            }}
-          >
-            03
-          </span>
-        </label>
+            </>
+          }
+          sub="No third-party trackers, ever."
+        />
 
         {chatAsk ? (
           <ChatChoiceRow

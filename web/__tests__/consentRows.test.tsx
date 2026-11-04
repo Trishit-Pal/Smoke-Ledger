@@ -11,7 +11,7 @@ vi.mock('next/link', () => ({
 
 (globalThis as { React?: typeof React }).React = React;
 
-const { AgreementRow, HealthConsentRow, ChatChoiceRow } = await import('@web/components/onboarding/ConsentRows');
+const { AgreementRow, HealthConsentRow, ChatChoiceRow, TickRow } = await import('@web/components/onboarding/ConsentRows');
 const { AGREEMENT_LABEL_PARTS } = await import('@/lib/healthConsent');
 const { LEDGER_CHAT_NOTICE } = await import('@web/components/chat/notice');
 
@@ -95,6 +95,36 @@ describe('ChatChoiceRow', () => {
       expect(at).toBeGreaterThan(open);
       expect(at).toBeLessThan(close);
     }
+  });
+});
+
+describe('narrow screens (360 px)', () => {
+  // The stamp column reserves ~125 px even while invisible, so below sm it must not render a box.
+
+  test('the tick row hides its stamp wrapper below sm, with no inline display to override it', () => {
+    const out = html(<TickRow checked={false} onChange={noop} number="03" rotate={-4} label="x" sub="y" />);
+    const wrapper = out.match(/<div[^>]*class="hidden sm:flex[^"]*"[^>]*>/)?.[0];
+    expect(wrapper).toBeDefined();
+    expect(wrapper).not.toContain('display:');
+  });
+
+  test('the chat row header hides its stamp wrapper below sm too', () => {
+    const out = html(<ChatChoiceRow answer={null} onAnswer={noop} number="04" />);
+    const wrapper = out.match(/<div[^>]*class="hidden sm:flex[^"]*"[^>]*>/)?.[0];
+    expect(wrapper).toBeDefined();
+    expect(wrapper).not.toContain('display:');
+  });
+
+  test('every consent row keeps its printed number visible', () => {
+    const out = html(<HealthConsentRow checked={false} onChange={noop} number="02" />);
+    expect(out).toContain('>02<');
+  });
+
+  test('the Yes / No buttons are rounded like the sibling buttons', () => {
+    const out = html(<ChatChoiceRow answer={null} onAnswer={noop} number="04" />);
+    const buttons = out.match(/<button[^>]*>/g) ?? [];
+    expect(buttons).toHaveLength(2);
+    for (const b of buttons) expect(b).toContain('rounded-md');
   });
 });
 

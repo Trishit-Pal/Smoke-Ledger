@@ -9,7 +9,8 @@ describe('consent page', () => {
 
   test('computes chatAsk with the shared helper and passes it down', () => {
     expect(page).toContain("from '@web/lib/server/ledgerChat/askChat'");
-    expect(page).toContain('await shouldAskChat()');
+    // Read together with the profile, not after it.
+    expect(page).toMatch(/await Promise\.all\(\[\s*getServerProfile\(\),\s*shouldAskChat\(\)\s*\]\)/);
     expect(page).toMatch(/chatAsk=\{chatAsk\}/);
   });
 });

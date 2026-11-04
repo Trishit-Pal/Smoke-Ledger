@@ -255,7 +255,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          npx playwright test e2e/ledger-chat.spec.ts e2e/ask-dock.spec.ts e2e/consent.spec.ts e2e/goals.spec.ts \
+          npx playwright test e2e/ledger-chat.spec.ts e2e/ask-dock.spec.ts e2e/consent.spec.ts e2e/consent-chat.spec.ts e2e/goals.spec.ts \
             --reporter=list,json 2>&1 | tee functional.log
           node -e "const r=require('./functional-report.json');const s=r.stats||{};if((s.skipped||0)>0||(s.expected||0)===0){console.error('::error::functional specs skipped or none ran',JSON.stringify(s));process.exit(1)}"
         working-directory: web
