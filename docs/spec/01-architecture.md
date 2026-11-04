@@ -7,7 +7,7 @@ sources:
   - app/_layout.tsx
   - metro.config.js
   - src/lib/routeGuard.ts
-last_verified_commit: 3d534c0
+last_verified_commit: c9a710f
 status: current
 ---
 
@@ -48,7 +48,7 @@ The repository root is the Expo/React Native project. The `web/` subdirectory is
       server/
         data.ts     ← server-side data fetching (React cache + Next.js unstable_cache)
       supabase/     ← server/admin Supabase clients for Next.js
-    middleware.ts   ← auth guard + CSP nonce + onboarding-step enforcement + re-consent gate
+    middleware.ts   ← auth guard + CSP nonce + onboarding-step enforcement + re-consent gate (503 /unavailable if the profile read fails)
     lib/privacy/    ← web half of the lifecycle clearers (clearDevice.ts)
   supabase/
     migrations/     ← versioned SQL migrations
