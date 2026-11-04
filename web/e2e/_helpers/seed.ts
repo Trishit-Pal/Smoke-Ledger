@@ -43,6 +43,28 @@ export function getAdmin(): SupabaseClient | null {
   return admin;
 }
 
+/** True when the Supabase URL is a local stack (never a hosted project). */
+export function isLocalStack(url: string = SUPABASE_URL): boolean {
+  try {
+    return ['127.0.0.1', 'localhost'].includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every password sign-in shares the app's login rate limit (10/10min per IP, and
+ * per-email windows), and e2e signs in from one IP, so a long run trips it. Clear the
+ * counters before a sign-in. Local stack + service role only; a no-op everywhere else,
+ * so it can never write to a hosted project. The app's limit itself is unchanged.
+ */
+export async function resetLoginRateLimits(): Promise<void> {
+  const a = getAdmin();
+  if (!a || !isLocalStack()) return;
+  const { error } = await a.from('rate_limit_counters').delete().like('kind', 'pw_login%');
+  if (error) throw new Error(`seed: resetLoginRateLimits failed: ${error.message}`);
+}
+
 /** True when seeded/authenticated specs can run (service role + url + anon present). */
 export function canSeed(): boolean {
   return !!getAdmin() && !!ANON_KEY;

@@ -4,6 +4,12 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — c9a710f
+- auth: every sign-in (password, phone OTP, callback, confirm) lands via `resolvePostSignInPath`; a failed profile read falls back to `next`/`/dashboard`; the e2e login-counter reset and route warm-up are recorded as a gotcha.
+- security-privacy: a failed middleware profile read answers a no-store 503 `/unavailable` page, never the wizard or `/consent`; chat tool results are escaped and `recent_entries` fenced; `totals_in_window` reports ranges outside the ledger.
+- identity-profile: the onboarding helpers only see a profile that was actually read.
+- architecture: the middleware line notes the 503 on a failed profile read.
+
 ## 2026-11-04 — 62902bc
 - goals-insights: goal percentages and state captions use the AA ink tones (`stateTextColor`); rings keep the stroke tones.
 - security-privacy: the chat's 403 `forbidden` is for readers not yet onboarded; onboarded readers who need a refresh get `consent_outdated`.

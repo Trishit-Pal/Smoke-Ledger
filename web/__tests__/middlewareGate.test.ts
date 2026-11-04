@@ -9,6 +9,8 @@ const SIGNED_IN = { id: 'u1', email: 'r@example.com', email_confirmed_at: 't' };
 const state = vi.hoisted(() => ({
   row: null as Record<string, unknown> | null,
   user: null as Record<string, unknown> | null,
+  // A failed profile read (missing column, outage): maybeSingle gives { data: null, error }.
+  error: null as { code: string; message: string } | null,
 }));
 
 vi.mock('@supabase/ssr', () => ({
@@ -16,7 +18,8 @@ vi.mock('@supabase/ssr', () => ({
     const chain = {
       select: () => chain,
       eq: () => chain,
-      maybeSingle: async () => ({ data: state.row, error: null }),
+      maybeSingle: async () =>
+        state.error ? { data: null, error: state.error } : { data: state.row, error: null },
     };
     return {
       auth: {
@@ -36,6 +39,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   state.user = SIGNED_IN;
+  state.error = null;
 });
 afterAll(() => vi.unstubAllEnvs());
 
@@ -135,6 +139,74 @@ describe('middleware: API paths are never sent to an onboarding or consent page'
   test('the exemption is not a sign-in bypass: signed out, /api/audit still goes to /login', async () => {
     state.user = null;
     const res = await middleware(new NextRequest(new URL('/api/audit', 'http://localhost'), { method: 'POST' }));
+    expect(new URL(res.headers.get('location') ?? '', 'http://localhost').pathname).toBe('/login');
+  });
+});
+
+// A failed read is not "no row": it must never look like a new reader. Whatever the
+// stored row would have said, the reader gets a calm 503 page, not the wizard or /consent.
+describe('middleware: a failed profile read never sends a signed-in reader to onboarding or /consent', () => {
+  const DB_ERROR = { code: '42703', message: 'column user_profiles.health_data_consent_at does not exist' };
+
+  test.each([
+    ['an onboarded reader', ONBOARDED],
+    ['a new reader', null],
+  ])('%s: pages answer 503 on the unavailable page, no redirect', async (_n, row) => {
+    state.row = row;
+    state.error = DB_ERROR;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const path of ['/', '/dashboard', '/onboarding/privacy', '/consent']) {
+      const res = await middleware(new NextRequest(new URL(path, 'http://localhost')));
+      expect([path, res.headers.get('location'), res.status]).toEqual([path, null, 503]);
+      expect(new URL(res.headers.get('x-middleware-rewrite') ?? '', 'http://localhost').pathname).toBe('/unavailable');
+      expect(res.headers.get('content-security-policy')).toContain("'nonce-");
+      expect(res.headers.get('cache-control')).toBe('no-store');
+    }
+    log.mockRestore();
+  });
+
+  test('logs the code once per request and nothing identifying', async () => {
+    state.error = DB_ERROR;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await middleware(new NextRequest(new URL('/dashboard', 'http://localhost')));
+    expect(log).toHaveBeenCalledTimes(1);
+    const [entry] = log.mock.calls[0] as [string];
+    expect(JSON.parse(entry)).toEqual({ level: 'error', event: 'middleware.profile_read_failed', code: '42703' });
+    log.mockRestore();
+  });
+
+  test('API paths go through to their own handlers: no redirect, no HTML 503', async () => {
+    state.error = DB_ERROR;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await middleware(new NextRequest(new URL('/api/audit', 'http://localhost'), { method: 'POST' }));
+    expect([res.headers.get('location'), res.headers.get('x-middleware-rewrite'), res.status]).toEqual([null, null, 200]);
+    // The error branch ran (a healthy null row would pass /api too, without logging).
+    expect(log).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  // Settings is where a reader exports, withdraws, deletes and signs out: it must stay
+  // reachable during an outage (it reads its own row), never locked behind the 503.
+  test('Settings, the legal pages and password recovery stay reachable', async () => {
+    state.error = DB_ERROR;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const path of ['/settings', '/privacy', '/terms', '/reset-password']) {
+      const res = await middleware(new NextRequest(new URL(path, 'http://localhost')));
+      expect([path, res.headers.get('location'), res.headers.get('x-middleware-rewrite'), res.status]).toEqual([path, null, null, 200]);
+    }
+    expect((await middleware(new NextRequest(new URL('/settingsx', 'http://localhost')))).status).toBe(503);
+    log.mockRestore();
+  });
+
+  test('the unavailable page itself is reachable (no redirect loop)', async () => {
+    state.row = null;
+    expect(await walk('/unavailable')).toEqual(['/unavailable']);
+  });
+
+  test('signed out, a failed read is irrelevant: /dashboard still goes to /login', async () => {
+    state.user = null;
+    state.error = DB_ERROR;
+    const res = await middleware(new NextRequest(new URL('/dashboard', 'http://localhost')));
     expect(new URL(res.headers.get('location') ?? '', 'http://localhost').pathname).toBe('/login');
   });
 });

@@ -11,6 +11,7 @@ import {
   toE164,
 } from '@web/lib/auth/phone';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
+import { resolvePostSignInPath } from '@web/lib/auth/signInDestination';
 import { readSupabaseAnonKey, readSupabaseUrl } from '@web/lib/supabase/env';
 import {
   applyAuthCookiePolicy,
@@ -125,7 +126,7 @@ export async function verifyPhoneOtpAction(
     return { code: 'disabled', message: 'Phone sign-in is temporarily unavailable.' };
   }
 
-  let nextPath: string | null = null;
+  let destination: string | null = null;
 
   try {
     const parsed = verifySchema.safeParse({
@@ -165,7 +166,8 @@ export async function verifyPhoneOtpAction(
       return { code: 'unavailable', message: 'Sign-in is temporarily unavailable.' };
     }
 
-    nextPath = sanitizeNextPath(parsed.data.next ?? null);
+    // '' fallback: "no usable next" stays distinct from the /dashboard default.
+    const requestedNext = sanitizeNextPath(parsed.data.next ?? null, '') || null;
 
     const cookieStore = await cookies();
     const supabase = createServerClient(supabaseUrl, anonKey, {
@@ -188,18 +190,22 @@ export async function verifyPhoneOtpAction(
       },
     });
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       phone: e164,
       token: parsed.data.code,
       type: 'sms',
     });
 
-    if (error) {
+    if (error || !data.user) {
       return {
         code: 'invalid',
         message: 'The code is invalid or has expired. Try sending a fresh OTP.',
       };
     }
+
+    // Land where the consent/onboarding gate says, not on a page the middleware
+    // would bounce (see resolvePostSignInPath).
+    destination = await resolvePostSignInPath(supabase, data.user.id, requestedNext);
   } catch (err) {
     if (isNextRedirectError(err)) throw err;
     return {
@@ -208,7 +214,8 @@ export async function verifyPhoneOtpAction(
     };
   }
 
-  if (nextPath) redirect(nextPath);
+  // Outside the try/catch so the NEXT_REDIRECT signal is not swallowed.
+  if (destination) redirect(destination);
   return {
     code: 'error',
     message: 'Verification completed but no redirect target.',

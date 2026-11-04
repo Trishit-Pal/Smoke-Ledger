@@ -42,6 +42,14 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
+  // Functional run only: compile the app's routes once up front. The responsive
+  // matrix warms per worker inside responsive.spec.ts.
+  globalSetup: process.env.E2E_RESPONSIVE ? undefined : './e2e/_helpers/global-setup.ts',
+  // Functional run only: under `next dev` a client navigation or a server action plus
+  // router.refresh() loads its route chunks on demand, measured at 6-10 s from click to
+  // commit (2026-11-04 trace: /consent -> /settings). The 5 s default fails a slow
+  // but correct page; a real hang still fails, just later.
+  ...(process.env.E2E_RESPONSIVE ? {} : { expect: { timeout: 15_000 } }),
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-first-retry',
@@ -58,6 +66,8 @@ export default defineConfig({
       ...process.env,
       NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseAnonKey,
+      // Keep compiled pages in memory for the whole run (see next.config.mjs).
+      NEXT_DEV_KEEP_PAGES: '1',
     },
   },
   // Default: one desktop Chromium project runs the functional specs. E2E_RESPONSIVE=1

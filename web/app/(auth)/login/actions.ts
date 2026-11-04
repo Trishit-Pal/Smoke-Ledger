@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { getAuthErrorCode, toAuthErrorMessage } from '@/lib/auth-errors';
 import { sanitizeNextPath } from '@web/lib/auth/redirect';
+import { resolvePostSignInPath } from '@web/lib/auth/signInDestination';
 import { emailZodStrict } from '@web/lib/auth/email';
 import { checkRateLimits, getClientIp } from '@web/lib/auth/rateLimit';
 import { loginRateLimitKeys } from '@web/lib/auth/authRateLimitKeys';
@@ -36,7 +37,7 @@ export async function signInWithPasswordAction(
   _prev: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
-  let nextPathToRedirect: string | null = null;
+  let destination: string | null = null;
 
   try {
     const supabaseUrl = readSupabaseUrl();
@@ -61,7 +62,8 @@ export async function signInWithPasswordAction(
     }
 
     const { email, password, rememberMe = false, captchaToken } = parsed.data;
-    nextPathToRedirect = sanitizeNextPath(parsed.data.next ?? null);
+    // '' fallback: "no usable next" stays distinct from the /dashboard default.
+    const requestedNext = sanitizeNextPath(parsed.data.next ?? null, '') || null;
 
     // DB-backed token bucket (same `consume_rate_limit` RPC as OTP). Fail-open
     // so a missing service-role key can't lock everyone out of sign-in —
@@ -111,7 +113,7 @@ export async function signInWithPasswordAction(
       },
     });
 
-    const { error } = await withTimeout(
+    const { data, error } = await withTimeout(
       supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -126,6 +128,10 @@ export async function signInWithPasswordAction(
       const code = getAuthErrorCode(error) || 'authentication_error';
       return { code, message: toAuthErrorMessage(error) };
     }
+
+    // Land where the consent/onboarding gate says, not on a page the middleware
+    // would bounce (see resolvePostSignInPath).
+    destination = await resolvePostSignInPath(supabase, data.user.id, requestedNext);
   } catch (err) {
     if (isNextRedirectError(err)) throw err;
     // Log the real error server-side (Vercel logs); return a GENERIC message so
@@ -138,6 +144,6 @@ export async function signInWithPasswordAction(
   // redirect() throws NEXT_REDIRECT so the client receives a 303 with the
   // session cookies attached on the same response. Calling it OUTSIDE the
   // try/catch above guarantees the redirect signal is not swallowed.
-  if (nextPathToRedirect) redirect(nextPathToRedirect);
+  if (destination) redirect(destination);
   return { code: 'internal_error', message: 'Sign-in completed but no redirect target.' };
 }

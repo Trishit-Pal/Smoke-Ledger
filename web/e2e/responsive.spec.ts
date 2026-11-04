@@ -16,13 +16,14 @@ import {
   createConfirmedUser,
   deleteUser,
   getAdmin,
+  isLocalStack,
   istYmdDaysAgo,
   markOnboarded,
   seedLogs,
-  SUPABASE_URL,
   type SeededUser,
 } from './_helpers/seed';
 import { login } from './_helpers/fixtures';
+import { warmSignedOut } from './_helpers/warmup';
 
 const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/support', '/login', '/signup', '/reset'];
 const APP_ROUTES = ['/dashboard', '/history', '/trends', '/goals', '/settings', '/log/new'];
@@ -48,14 +49,6 @@ function viewportsFor(page: Page, info: TestInfo) {
   const own = page.viewportSize();
   if (info.project.use.isMobile && own) return [own, { width: own.height, height: own.width }];
   return info.project.name.includes('firefox') ? FIREFOX_SWEEP : SWEEP;
-}
-
-function isLocalStack(): boolean {
-  try {
-    return ['127.0.0.1', 'localhost'].includes(new URL(SUPABASE_URL).hostname);
-  } catch {
-    return false;
-  }
 }
 
 interface Issue {
@@ -237,13 +230,9 @@ async function expectNoLedgerMoney(page: Page) {
   return { tableCount };
 }
 
-test.beforeAll(async ({ playwright }, info) => {
+test.beforeAll(async ({}, info) => {
   test.setTimeout(300_000);
-  const ctx = await playwright.request.newContext({ baseURL: info.project.use.baseURL });
-  for (const route of [...PUBLIC_ROUTES, ...APP_ROUTES, ...ONBOARDING_ROUTES]) {
-    await ctx.get(route, { timeout: 120_000, maxRedirects: 0 }).catch(() => undefined);
-  }
-  await ctx.dispose();
+  await warmSignedOut(info.project.use.baseURL!, [...PUBLIC_ROUTES, ...APP_ROUTES, ...ONBOARDING_ROUTES]);
 });
 
 test.beforeEach(async ({ page }) => {

@@ -16,7 +16,7 @@ sources:
   - web/middleware.ts
   - web/app/onboarding/**
   - app/onboarding/**
-last_verified_commit: 62902bc
+last_verified_commit: c9a710f
 status: current
 ---
 
@@ -206,7 +206,7 @@ The goal step offers a fourth card, **Suggest one later** ("After a week of logg
 
 The in-memory draft (`src/store/onboardingDraft.ts`) is still never persisted. Each step seeds it from the loader only when it is empty, so un-saved edits survive Back/forward within a session and are lost on refresh by design, while saved values always come back from the server.
 
-Step order has one source: `src/lib/onboardingSteps.ts`. `canAccessOnboardingStep` allows pages at or before the saved step (`<=`, not the old `<= current + 1`, which let a deep link skip the unsaved step). `effectiveOnboardingStep` derives the step to gate on — privacy until consented, then the saved step, defaulting to usage for consented rows with no step — and `resumeOnboardingRoute` turns it into a route. The web middleware, `postAuthDestination`, the Expo layout and the Expo index/tabs redirects all go through these two, so "may I see this page" and "where do I resume" can never disagree (a resume target the gate then rejects would be a redirect loop). Because the Expo layout gates on the in-memory profile, each mobile screen calls `refreshProfile()` before navigating.
+Step order has one source: `src/lib/onboardingSteps.ts`. `canAccessOnboardingStep` allows pages at or before the saved step (`<=`, not the old `<= current + 1`, which let a deep link skip the unsaved step). `effectiveOnboardingStep` derives the step to gate on — privacy until consented, then the saved step, defaulting to usage for consented rows with no step — and `resumeOnboardingRoute` turns it into a route. The web middleware, `postAuthDestination`, the Expo layout and the Expo index/tabs redirects all go through these two, so "may I see this page" and "where do I resume" can never disagree (a resume target the gate then rejects would be a redirect loop). These helpers only ever see a profile that was actually read: when the middleware's profile read fails, it serves the 503 `/unavailable` page instead of treating the missing row as a new reader (see Security and Privacy), and the sign-in actions fall back to `next` or `/dashboard`, never to onboarding. Because the Expo layout gates on the in-memory profile, each mobile screen calls `refreshProfile()` before navigating.
 
 The DB keeps `onboarding_step` from moving backwards (`trg_user_profiles_onboarding_step_monotonic`, see the data model), so re-submitting an earlier step is harmless from any client.
 
