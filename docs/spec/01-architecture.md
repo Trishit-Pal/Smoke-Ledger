@@ -7,7 +7,7 @@ sources:
   - app/_layout.tsx
   - metro.config.js
   - src/lib/routeGuard.ts
-last_verified_commit: c9a710f
+last_verified_commit: 22df03f
 status: current
 ---
 
