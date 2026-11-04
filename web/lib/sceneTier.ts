@@ -17,12 +17,6 @@ export interface SceneBudget {
   bronchiDepth: number;
   /** Radial/vertical segments of each lobe mesh. */
   lobeSegments: number;
-  /**
-   * TEMPORARY: the legacy SceneBackground still reads these two until Task 2
-   * rebuilds it; remove both then.
-   */
-  particles: number;
-  shards: number;
   /** Bloom still also requires the 'full' intensity (brand surfaces). */
   bloom: boolean;
   parallax: boolean;
@@ -33,12 +27,10 @@ export interface SceneBudget {
 export const SCENE_BUDGET: Record<Exclude<SceneTier, 'off'>, SceneBudget> = {
   standard: {
     dprCap: 2, hazeParticles: 420, bronchiDepth: 4, lobeSegments: 64,
-    particles: 500, shards: 7,
     bloom: true, parallax: true, frameIntervalMs: 0,
   },
   lite: {
     dprCap: 1, hazeParticles: 140, bronchiDepth: 3, lobeSegments: 40,
-    particles: 150, shards: 3,
     bloom: false, parallax: false, frameIntervalMs: 33,
   },
 };

@@ -27,6 +27,24 @@ describe('pickSceneTier', () => {
 });
 
 describe('SCENE_BUDGET', () => {
+  it('pins the exact budget of each tier', () => {
+    expect(SCENE_BUDGET.standard).toMatchObject({
+      dprCap: 2, hazeParticles: 420, bronchiDepth: 4, lobeSegments: 64,
+      bloom: true, parallax: true, frameIntervalMs: 0,
+    });
+    expect(SCENE_BUDGET.lite).toMatchObject({
+      dprCap: 1, hazeParticles: 140, bronchiDepth: 3, lobeSegments: 40,
+      bloom: false, parallax: false, frameIntervalMs: 33,
+    });
+  });
+
+  it('no longer carries the legacy shard and particle counts', () => {
+    for (const budget of Object.values(SCENE_BUDGET)) {
+      expect(budget).not.toHaveProperty('shards');
+      expect(budget).not.toHaveProperty('particles');
+    }
+  });
+
   it('lite is strictly cheaper than standard on every axis', () => {
     const { standard, lite } = SCENE_BUDGET;
     expect(lite.dprCap).toBeLessThan(standard.dprCap);

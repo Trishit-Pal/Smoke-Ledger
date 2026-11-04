@@ -26,6 +26,14 @@ export function breathScale(tSeconds: number): number {
 }
 
 /**
+ * How strongly the lungs are breathing OUT at time t, in 0..1: the falling half
+ * of the breath (the slope of breathPhase, sign-flipped and clamped).
+ */
+export function exhaleWeight(tSeconds: number): number {
+  return Math.max(0, -Math.cos((2 * Math.PI * tSeconds) / BREATH_PERIOD_S));
+}
+
+/**
  * Haze opacity multiplier in [HAZE_FLOOR, 1]: 1 at elapsed 0, decaying
  * exponentially towards HAZE_FLOOR. Negative elapsed is treated as 0.
  */

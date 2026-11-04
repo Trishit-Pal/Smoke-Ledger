@@ -21,7 +21,7 @@ export type Vec3 = [number, number, number];
 export const LOBE_HALF_AXES = { x: 0.5, y: 0.9, z: 0.4 } as const;
 
 /** Cardiac notch on the left lobe: centre in (u, v), radial depth and angular width (rad). */
-export const CARDIAC_NOTCH = { u: 0, v: 0.62, depth: 0.55, sigma: 0.5 } as const;
+export const CARDIAC_NOTCH = { u: 0, v: 0.74, depth: 0.55, sigma: 0.5 } as const;
 
 /** Unit direction for surface parameters (u, v); see the file header. */
 export function lobeDirection(u: number, v: number): Vec3 {
@@ -36,16 +36,40 @@ function dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-/** Radial multiplier of the unit ellipsoid along direction `dir` (unit). */
-function radiusAlong(side: LobeSide, dir: Vec3): number {
-  if (side === 'right') return 1;
+const smoothstep = (a: number, b: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Anatomy shared by both lobes: a narrower apex, a flattened medial face, a
+ * dished (concave) base and a faint oblique fissure groove on the lateral side.
+ */
+function lobeShape(dir: Vec3): number {
+  const [x, y] = dir;
+  const apex = 1 - 0.16 * smoothstep(0.55, 1, y);
+  const medialFlat = 1 - 0.16 * Math.max(0, x) ** 3;
+  const baseDish = 1 - 0.22 * Math.max(0, -y) ** 8;
+  const fissureOffset = 0.9 * y + 0.35 * x - 0.1;
+  const fissure = x < 0 ? 1 - 0.05 * Math.exp(-((fissureOffset / 0.07) ** 2)) : 1;
+  return apex * medialFlat * baseDish * fissure;
+}
+
+/**
+ * Radial multiplier of the unit ellipsoid along the UNIT direction `dir`
+ * (the normalised position, NOT the uv: three's SphereGeometry puts its uv
+ * origin on the -x face, so callers must displace by direction).
+ */
+export function lobeRadiusAlong(side: LobeSide, dir: Vec3): number {
+  const shape = lobeShape(dir);
+  if (side === 'right') return shape;
   const angle = Math.acos(Math.min(1, Math.max(-1, dot(dir, NOTCH_DIR))));
-  return 1 - CARDIAC_NOTCH.depth * Math.exp(-(angle * angle) / (2 * CARDIAC_NOTCH.sigma ** 2));
+  return shape * (1 - CARDIAC_NOTCH.depth * Math.exp(-(angle * angle) / (2 * CARDIAC_NOTCH.sigma ** 2)));
 }
 
 /** Displaced surface radius (multiplier of the unit ellipsoid) at surface parameters (u, v). */
 export function lobeRadiusAt(side: LobeSide, u: number, v: number): number {
-  return radiusAlong(side, lobeDirection(u, v));
+  return lobeRadiusAlong(side, lobeDirection(u, v));
 }
 
 /** True when the local-space point lies inside the lobe's displaced volume. */
@@ -55,7 +79,24 @@ export function insideLobe(side: LobeSide, x: number, y: number, z: number): boo
   const pz = z / LOBE_HALF_AXES.z;
   const r = Math.hypot(px, py, pz);
   if (r === 0) return true;
-  return r <= radiusAlong(side, [px / r, py / r, pz / r]);
+  return r <= lobeRadiusAlong(side, [px / r, py / r, pz / r]);
+}
+
+/**
+ * Lung-pair space (where bronchialTree lives) to lobe-local space. The left
+ * lobe sits at +offsetX and is mirrored so its local +x (medial) faces the
+ * midline; the right lobe sits at -offsetX unmirrored.
+ */
+export const LUNG_PLACEMENT = { offsetX: 0.56, centreY: -0.12 } as const;
+
+export function pairToLobe(side: LobeSide, p: Vec3): Vec3 {
+  const x = side === 'left' ? LUNG_PLACEMENT.offsetX - p[0] : p[0] + LUNG_PLACEMENT.offsetX;
+  return [x, p[1] - LUNG_PLACEMENT.centreY, p[2]];
+}
+
+export function lobeToPair(side: LobeSide, p: Vec3): Vec3 {
+  const x = side === 'left' ? LUNG_PLACEMENT.offsetX - p[0] : p[0] - LUNG_PLACEMENT.offsetX;
+  return [x, p[1] + LUNG_PLACEMENT.centreY, p[2]];
 }
 
 export interface Branch {
@@ -126,4 +167,30 @@ export function bronchialTree(depth: number): Branch[] {
     tips = next;
   }
   return branches;
+}
+
+/** How far inside the glass an airway must end (1 = exactly on the surface). */
+const AIRWAY_FIT_MARGIN = 0.92;
+
+/**
+ * Keep only the airways that stay inside the glass: the trachea always, then
+ * any branch whose end sits inside its lobe (shrunk by AIRWAY_FIT_MARGIN) and
+ * whose parent was kept. Branches are skipped rather than bent so the shape
+ * stays deterministic. Returns a new array; the input is never mutated.
+ */
+export function fitAirways(tree: Branch[]): Branch[] {
+  const droppedStarts = new Set<Vec3>();
+  return tree.filter((b, i) => {
+    if (i === 0) return true;
+    const start = b.points[0];
+    const end = b.points[b.points.length - 1];
+    const side: LobeSide = end[0] >= 0 ? 'left' : 'right';
+    const [x, y, z] = pairToLobe(side, end);
+    const fits = insideLobe(side, x / AIRWAY_FIT_MARGIN, y / AIRWAY_FIT_MARGIN, z / AIRWAY_FIT_MARGIN);
+    if (!fits || droppedStarts.has(start)) {
+      droppedStarts.add(end);
+      return false;
+    }
+    return true;
+  });
 }

@@ -6,6 +6,7 @@ import {
   SCENE_CLEAR_KEY,
   breathPhase,
   breathScale,
+  exhaleWeight,
   hazeDensity,
   sceneClearStart,
 } from '@web/components/marketing/scene/breath';
@@ -96,4 +97,16 @@ describe('sceneClearStart', () => {
       expect(s.data.get(SCENE_CLEAR_KEY)).toBe(String(NOW));
     },
   );
+});
+
+describe('exhaleWeight', () => {
+  it('is 0 while breathing in, peaks mid-exhale, and stays in 0..1', () => {
+    expect(exhaleWeight(BREATH_PERIOD_S * 0.1)).toBe(0); // rising half
+    expect(exhaleWeight(BREATH_PERIOD_S * 0.5)).toBeCloseTo(1, 9); // top of the exhale slope
+    for (let i = 0; i <= 200; i++) {
+      const w = exhaleWeight((i / 200) * BREATH_PERIOD_S * 3);
+      expect(w).toBeGreaterThanOrEqual(0);
+      expect(w).toBeLessThanOrEqual(1);
+    }
+  });
 });

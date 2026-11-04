@@ -3,9 +3,12 @@ import {
   CARDIAC_NOTCH,
   LOBE_HALF_AXES,
   bronchialTree,
+  fitAirways,
   insideLobe,
   lobeDirection,
   lobeRadiusAt,
+  lobeToPair,
+  pairToLobe,
 } from '@web/components/marketing/scene/lungs';
 
 /** A local-space point at `frac` of the displaced surface along (u, v). */
@@ -46,6 +49,47 @@ describe('insideLobe', () => {
     // u = 0.5 faces away from the notch (lateral).
     const [x, y, z] = surfacePoint('right', 0.5, 0.4, 0.95);
     expect(insideLobe('left', x, y, z)).toBe(true);
+  });
+});
+
+describe('fitAirways', () => {
+  const FIT_MARGIN = 0.92;
+
+  it.each([3, 4])('keeps only airways that end inside their lobe at depth %i', (depth) => {
+    const kept = fitAirways(bronchialTree(depth));
+    expect(kept[0].level).toBe(0);
+    for (const b of kept.slice(1)) {
+      const end = b.points[b.points.length - 1];
+      const side = end[0] >= 0 ? 'left' : 'right';
+      const [x, y, z] = pairToLobe(side, end);
+      expect(insideLobe(side, x / FIT_MARGIN, y / FIT_MARGIN, z / FIT_MARGIN)).toBe(true);
+    }
+  });
+
+  it('keeps the main bronchi and most of the tree', () => {
+    const tree = bronchialTree(4);
+    const kept = fitAirways(tree);
+    expect(kept.filter((b) => b.level === 1)).toHaveLength(2);
+    expect(kept.length).toBeGreaterThanOrEqual(tree.length * 0.6);
+  });
+
+  it('drops the children of a dropped branch and never mutates its input', () => {
+    const tree = bronchialTree(4);
+    const snapshot = JSON.stringify(tree);
+    const kept = fitAirways(tree);
+    expect(JSON.stringify(tree)).toBe(snapshot);
+    const ends = new Set(kept.map((b) => b.points[b.points.length - 1]));
+    for (const b of kept.slice(1)) {
+      if (b.level > 1) expect(ends.has(b.points[0])).toBe(true);
+    }
+  });
+
+  it('round-trips pair space and lobe space', () => {
+    for (const side of ['left', 'right'] as const) {
+      const p: [number, number, number] = [0.3, 0.2, -0.1];
+      const back = lobeToPair(side, pairToLobe(side, p));
+      back.forEach((c, i) => expect(c).toBeCloseTo(p[i], 9));
+    }
   });
 });
 
