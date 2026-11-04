@@ -24,14 +24,14 @@ export interface Lungs {
   retheme(tokens: SceneTokens, dim: number): void;
 }
 
-const LOBE_OPACITY = { dark: 0.5, light: 0.95 } as const;
-// Less see-through on the light theme, so the ink body shows against pale grey.
+export const LOBE_OPACITY = { dark: 0.5, light: 0.3 } as const;
+// Light theme: soft and translucent, so the lungs read as a silhouette (not soot) and keep text contrast.
 const TRANSMISSION = { dark: 0.9, light: 0 } as const;
-const AIRWAY_OPACITY = { dark: 0.8, light: 1 } as const;
+export const AIRWAY_OPACITY = { dark: 0.8, light: 0.5 } as const;
 const TUBE_SEGMENTS = 10;
 const TUBE_RADIAL_SEGMENTS = 6;
 const AIRWAY_BEND = 0.035; // sideways bow of each airway, so the tree is not ruler-straight
-const EDGE_DARKEN = 0.35; // light theme: extra pull towards black for the glass rim
+const EDGE_DARKEN = 0.2; // light theme: extra pull towards black for the glass rim
 
 /**
  * One lobe: a sphere pushed out along each vertex's own unit direction. The

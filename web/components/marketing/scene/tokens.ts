@@ -13,7 +13,7 @@ const FALLBACK = {
 /** Relative luminance above which the background counts as the light theme. */
 const LIGHT_BG_LUMINANCE = 0.3;
 /** How far the light theme pulls the ink towards black so edges read on pale grey. */
-const LIGHT_INK_DARKEN = 0.75;
+export const LIGHT_INK_DARKEN = 0.4;
 
 export function readVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;

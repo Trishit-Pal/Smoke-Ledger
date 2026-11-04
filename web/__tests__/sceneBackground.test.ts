@@ -84,6 +84,11 @@ describe('scene theme resync and quiet tier', () => {
     expect(component).toContain('scene.background = currentBg;');
   });
 
+  it('renders the light theme directly, so the bloom path never tone-maps the page colour', () => {
+    expect(component).toContain('if (composer && !isLight) composer.render();');
+    expect(component).toContain('else renderer.render(scene, camera);');
+  });
+
   it('thins the haze on the quiet tier', () => {
     expect(component).toMatch(/hazeCountFor\(budget, intensity === 'quiet'\)/);
   });
@@ -125,10 +130,19 @@ describe('scene disposal', () => {
     expect(seen).toBeGreaterThan(5);
   });
 
-  it('disposes the bin, renderer, env map, PMREM and composer on teardown', () => {
-    for (const call of ['bin.disposeAll()', 'renderer.dispose()', 'envRT.dispose()', 'pmrem.dispose()', 'composer?.dispose()']) {
+  it('disposes the bin, renderer and composer on teardown, with the env map and PMREM in the bin', () => {
+    for (const call of ['bin.disposeAll()', 'renderer.dispose()', 'composer?.dispose()']) {
       expect(component).toContain(call);
     }
+    expect(component).toMatch(/bin\.track\(new THREE\.PMREMGenerator\(/);
+    expect(component).toMatch(/bin\.track\(pmrem\.fromScene\(/);
+  });
+
+  it('frees the renderer and the bin when the build throws, without an unhandled rejection', () => {
+    expect(component).toMatch(/rendererToDispose = renderer;/);
+    expect(component).toMatch(
+      /\}\)\(\)\.catch\(\(\) => \{[\s\S]*?bin\.disposeAll\(\);[\s\S]*?rendererToDispose\?\.dispose\(\);[\s\S]*?visibility = 'hidden';[\s\S]*?\}\);/,
+    );
   });
 
   it('DisposeBin disposes everything it tracked, once, and returns the item', () => {

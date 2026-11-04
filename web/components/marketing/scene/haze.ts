@@ -19,6 +19,10 @@ const SPRITE_SIZE = 64;
 const POINT_SIZE = 0.75; // world units
 const BASE_ALPHA = 0.55;
 const PROGRESS_PER_EXHALE_SECOND = 0.16; // mean; each particle varies around it
+// Discreet has no breath, so no stop-start: a constant push at about half the exhale's mean weight.
+const DISCREET_PUSH = 0.5;
+// Light theme: how far the haze tint moves from the dark ink towards the page colour (mist, not soot).
+const LIGHT_MIST_MIX = 0.55;
 
 // Path out of the chest, in lung-pair space: seed -> carina -> trachea top -> out.
 const CARINA: Vec3 = [0, 0.35, 0];
@@ -157,7 +161,7 @@ export function buildHaze(
   };
 
   const update = (dt: number, t: number, density: number): void => {
-    const push = exhaleWeight(t) * dt;
+    const push = (discreet ? DISCREET_PUSH : exhaleWeight(t)) * dt;
     for (let i = 0; i < count; i++) {
       progress[i] += push * rate[i];
       if (progress[i] >= 1) respawn(i, 0);
@@ -176,6 +180,7 @@ export function buildHaze(
 
   const retheme = (t: SceneTokens, dim: number) => {
     tint.copy(t.ink);
+    if (t.isLight) tint.lerp(t.bg, LIGHT_MIST_MIX);
     opacity = dim;
   };
 

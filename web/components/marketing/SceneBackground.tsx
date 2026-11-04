@@ -106,6 +106,9 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
 
     let disposed = false;
     let cleanup = () => {};
+    // Hoisted so a build that throws part-way can still free what it made.
+    const bin = new DisposeBin();
+    let rendererToDispose: { dispose(): void } | null = null;
 
     // Resolve ALL dynamic imports up front, THEN build — so an unmount between
     // awaits can never leak a half-constructed renderer. three + its addons all
@@ -125,9 +128,9 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       if (disposed || !canvasRef.current) return;
 
       const tokens = readTokens(THREE);
-      const bin = new DisposeBin();
 
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      rendererToDispose = renderer;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, budget.dprCap));
       renderer.setSize(window.innerWidth, window.innerHeight, false); // false: CSS keeps 100%/100%
       // UnrealBloomPass requires tone mapping — without it, any pixel the
@@ -145,9 +148,9 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       // once (PMREM), cheap thereafter. The RoomEnvironment scene itself is
       // only a one-shot bake source — dispose it right after so its ~10 box
       // geometries/materials don't linger.
-      const pmrem = new THREE.PMREMGenerator(renderer);
+      const pmrem = bin.track(new THREE.PMREMGenerator(renderer));
       const roomEnv = new RoomEnvironment();
-      const envRT = pmrem.fromScene(roomEnv, 0.04);
+      const envRT = bin.track(pmrem.fromScene(roomEnv, 0.04));
       roomEnv.dispose();
       scene.environment = envRT.texture;
 
@@ -288,7 +291,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         camera.position.y += (-mouseY * 2 + orbitY - camera.position.y) * 0.03;
         camera.lookAt(layout.lookX, 0, -8);
 
-        if (composer) composer.render();
+        // The bloom blit tone-maps the page colour too; light has no bloom, so it renders direct.
+        if (composer && !isLight) composer.render();
         else renderer.render(scene, camera);
         raf = requestAnimationFrame(frame);
       };
@@ -360,12 +364,16 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         themeObserver.disconnect();
         composer?.dispose();
         bloomPass?.dispose?.();
-        envRT.dispose();
-        pmrem.dispose();
-        bin.disposeAll(); // every geometry, material and texture the scene built
+        bin.disposeAll(); // every geometry, material, texture, env map and PMREM the scene built
         renderer.dispose();
       };
-    })();
+    })().catch(() => {
+      // A throwing build must not leak the renderer or reject unhandled: free it, blank the canvas.
+      cleanup();
+      bin.disposeAll();
+      rendererToDispose?.dispose();
+      canvas.style.visibility = 'hidden';
+    });
 
     return () => {
       disposed = true;

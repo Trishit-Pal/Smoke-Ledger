@@ -12,7 +12,7 @@ export const BREATH_AMPLITUDE = 0.04;
 export const HAZE_FLOOR = 0.08;
 /** Time constant (seconds) of the exponential haze decay. */
 export const HAZE_TAU_S = 40;
-/** localStorage key holding the epoch-ms moment the haze started clearing. */
+/** sessionStorage key holding the epoch-ms moment the haze started clearing. */
 export const SCENE_CLEAR_KEY = 'scene-clear-start';
 
 /** Breath position in -1..1 (sine). 0 at t=0, rising; repeats every BREATH_PERIOD_S. */
