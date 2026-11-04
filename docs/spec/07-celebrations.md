@@ -14,7 +14,7 @@ sources:
   - web/components/marketing/AccountDeletedNotice.tsx
   - web/components/character/MilestoneCelebration.tsx
   - app/(auth)/login.tsx
-last_verified_commit: 3d534c0
+last_verified_commit: c4fcc45
 status: current
 ---
 
@@ -42,7 +42,7 @@ On the dashboard, two kinds of moments trigger a celebration.
 
 **Account deletion (negative).** After a successful deletion, the web landing page shows a dismissible notice with a `bye`-pose figure and "Your account and all its data have been deleted. You're welcome back anytime." On mobile, the `bye` farewell overlay (`dispatchFarewell`) plays for ~1.6s before returning to `/login?deleted=1`, where the sign-in screen shows the same sentence as a dismissible text notice (no figure). Both platforms read the flag through `ACCOUNT_DELETED_PARAM` (`src/lib/reauth.ts`). Warm wave-off, not guilt.
 
-**Re-login.** The login screen greets returning users with the `greet` figure and a "Welcome back." caption on arrival (success redirects via a server action, so the warm beat lives on arrival rather than after submit).
+**Re-login.** The login screen greets returning users with the `greet` figure and a "Welcome back." caption on arrival; sign-up hides the figure, because its setup progress line takes that place (success redirects via a server action, so the warm beat lives on arrival rather than after submit).
 
 For modal celebrations the overlay is semi-transparent and auto-dismisses after 5.2 seconds. On web the overlay itself scrolls (the card is centred with `margin: auto`), so on a short landscape phone the top of the card is never clipped, while confetti can still spill past the card edge. The user can dismiss earlier by tapping anywhere outside the card, tapping "Carry on", or — on web — pressing Escape. The figure shown in the modal is `applaud` for standard tiers and `victory` for grand tiers.
 

@@ -4,6 +4,12 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-04 — c4fcc45
+- auth: sign-up is the first setup step (progress line, "Create account", "Use an email link instead"); sign-in carries no setup signals; wordmark home link on auth pages; onboarded readers are never routed into the wizard after sign-in.
+- identity-profile: `acceptChangedTerms` also stamps a missing age confirmation and data-processing consent, decided from the stored profile too.
+- celebrations: sign-up hides the greeting figure in favour of the setup progress line.
+- security-privacy: `needsConsentRefresh` sends onboarded readers with a missing stamp to `/consent` (no more wizard loop); `/api/*` skips the onboarding redirects; the chat answers `consent_outdated` for them; the no-record `/consent` heading.
+
 ## 2026-11-03 — e974a1e
 - security-privacy: Phase B final-review fixes. `delete-account` writes `consent_revoked` only after `deleteUser` succeeds (`user_id` null, props `{ hashed_user_id, reason: 'delete' }`), superseding the earlier "past the re-auth gate, before the erase" wording; spoken masks say "hidden" (`spokenMask`) on both the web live region and the mobile announcement; the discreet guard also counts "twice", "a couple of", "a dozen".
 - goals-insights: the mobile store reloads the goals once when a reconcile transition was skipped.
