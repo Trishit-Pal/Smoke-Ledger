@@ -8,6 +8,20 @@ export const HEALTH_CONSENT_LABEL =
 export const HEALTH_CONSENT_SUB =
   'You can withdraw this at any time in Settings. Withdrawing means your data is erased.';
 
+/**
+ * Tick 1: one agreement line. Split so each platform can turn the two document
+ * names into links; joined, the parts are the verbatim label.
+ */
+export const AGREEMENT_LABEL_PARTS = {
+  before: 'I am 18 or older, I agree to the ',
+  terms: 'Terms of Service',
+  middle: ' and the ',
+  privacy: 'Privacy Policy',
+  after: ', and I understand this app does not provide medical advice.',
+} as const;
+
+export const AGREEMENT_SUB = 'We process your data to run your account, sync it and keep it secure.';
+
 /** The decline path sits beside the consent row at the same size as the accept control. */
 export const HEALTH_DECLINE_LABEL = "I don't consent";
 
