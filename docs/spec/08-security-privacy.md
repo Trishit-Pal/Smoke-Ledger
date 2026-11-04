@@ -29,7 +29,7 @@ sources:
   - app/ask.tsx
   - src/lib/askView.ts
   - web/components/chat/**
-last_verified_commit: c9a710f
+last_verified_commit: 71634f2
 status: current
 ---
 
