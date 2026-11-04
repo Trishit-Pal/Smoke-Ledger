@@ -697,10 +697,10 @@ function LoginPageInner() {
         }}
       >
         {/* A returning reader's link comes first; sign-up stays, quietly. */}
-        <Link href="/reset" style={QUIET_LINK_STYLE}>
+        <Link href="/reset" className="hit-target" style={QUIET_LINK_STYLE}>
           Forgot password?
         </Link>
-        <Link href="/signup" style={QUIET_LINK_STYLE}>
+        <Link href="/signup" className="hit-target" style={QUIET_LINK_STYLE}>
           Create an account
         </Link>
       </div>

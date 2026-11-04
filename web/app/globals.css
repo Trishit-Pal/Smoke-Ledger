@@ -257,6 +257,12 @@
   body:has([data-setup-progress]) .shell-companion {
     display: none;
   }
+  /* Six caption labels fit one line down to 360px with tighter tracking; narrower phones scroll. */
+  @media (max-width: 639px) {
+    [data-setup-progress] li {
+      letter-spacing: 0.06em;
+    }
+  }
 
   /* Page column — the one reading measure for every authenticated page, so the
      ultrawide cap lives in one place. Only width + horizontal padding: pages

@@ -76,3 +76,35 @@ describe('sign-in and sign-up are distinct entry pages', () => {
     expect(login).not.toContain('Account · Sign in');
   });
 });
+
+describe('entry pages: final-review polish', () => {
+  const signup = read('app', '(auth)', 'signup', 'page.tsx');
+  const login = read('app', '(auth)', 'login', 'page.tsx');
+  const welcome = read('app', 'onboarding', 'page.tsx');
+
+  test('the sign-up progress line stays on one line on a phone', () => {
+    // Six labels: no wrap (a lone "Done" read as broken); scrolls sideways if a narrow phone needs it.
+    expect(signup).toMatch(/data-setup-progress[\s\S]{0,200}flex-nowrap[\s\S]{0,80}scrollbar-hide/);
+    expect(signup).not.toContain('flex-wrap gap-x-md gap-y-md');
+  });
+
+  test('both step lists keep list semantics in Safari', () => {
+    // list-none drops the implied list role in WebKit; role="list" restores it.
+    expect(signup).toMatch(/data-setup-progress[\s\S]{0,40}role="list"/);
+    expect(welcome).toMatch(/<ol\s+role="list"/);
+  });
+
+  test('the Welcome advances on Enter only when nothing else holds focus', () => {
+    expect(welcome).toContain('if (e.target !== document.body) return;');
+  });
+
+  test('the Welcome uses the type scale, not px literals', () => {
+    expect(welcome).not.toMatch(/fontSize: 1[35],/);
+  });
+
+  test('small auth text links get a 44px tap area', () => {
+    expect(login).toMatch(/<Link href="\/reset" className="hit-target"/);
+    expect(login).toMatch(/<Link href="\/signup" className="hit-target"/);
+    expect(signup).toMatch(/className="hit-target"[\s\S]{0,400}Sign in →/);
+  });
+});

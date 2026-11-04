@@ -34,14 +34,15 @@ const SERVICE_UNAVAILABLE_MESSAGE =
 // Sign-up is the first step of setup: the account, then the onboarding rail's own steps.
 const SETUP_PROGRESS = ['Account', ...ONBOARDING_STEPS.filter((s) => s.key !== 'welcome').map((s) => s.label)];
 
-/** The journey at a glance; ink, not accent, because progress isn't a win (as on the rail). */
+/** The journey at a glance: the current step in text colour, the rest faint. No teal, since progress isn't a win. */
 function SetupProgress() {
-  // Each segment keeps its label's width, so on a phone the run simply wraps.
+  // ponytail: one line that scrolls sideways on the narrowest phones; a lone wrapped "Done" read as broken.
   return (
     <ol
       data-setup-progress
+      role="list"
       aria-label="Setup steps"
-      className="m-0 flex list-none flex-wrap gap-x-md gap-y-md p-0"
+      className="m-0 flex list-none flex-nowrap gap-x-xs overflow-x-auto scrollbar-hide p-0 sm:gap-x-md"
     >
       {SETUP_PROGRESS.map((label, i) => {
         const current = i === 0;
@@ -615,6 +616,7 @@ export default function SignupPage() {
         </span>
         <Link
           href="/login"
+          className="hit-target"
           style={{
             fontFamily: 'var(--font-display)',
             fontStyle: 'italic',

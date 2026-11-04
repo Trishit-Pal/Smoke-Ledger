@@ -41,9 +41,8 @@ export default function OnboardingWelcomePage() {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      // Only when nothing holds focus: a focused link, toggle or the button keeps its own Enter.
+      if (e.target !== document.body) return;
       if (e.key === 'Enter' || e.key === 'ArrowRight') {
         e.preventDefault();
         advance();
@@ -69,6 +68,7 @@ export default function OnboardingWelcomePage() {
       </header>
 
       <ol
+        role="list"
         aria-label="Setup steps"
         className="m-0 list-none p-0"
         style={{ ...idx(1), borderTop: '1px solid var(--rule-strong)' }}
@@ -90,10 +90,10 @@ export default function OnboardingWelcomePage() {
               >
                 {step.label}
               </h2>
-              <p className="m-0" style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text)' }}>
+              <p className="m-0 text-body" style={{ lineHeight: 1.55, color: 'var(--text)' }}>
                 {STEP_DETAILS[step.key].asks}
               </p>
-              <p className="m-0" style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-muted)' }}>
+              <p className="m-0 text-small" style={{ lineHeight: 1.55, color: 'var(--text-muted)' }}>
                 {STEP_DETAILS[step.key].why}
               </p>
             </div>
@@ -108,7 +108,7 @@ export default function OnboardingWelcomePage() {
           onMouseDown={() => setPressed(true)}
           onMouseUp={() => setPressed(false)}
           onMouseLeave={() => setPressed(false)}
-          className="focus-ring"
+          className="focus-ring text-body"
           style={{
             height: 56,
             padding: '0 28px',
@@ -119,7 +119,6 @@ export default function OnboardingWelcomePage() {
             borderRadius: 10,
             fontFamily: 'var(--font-sans)',
             fontWeight: 600,
-            fontSize: 15,
             letterSpacing: '0.01em',
             display: 'inline-flex',
             alignItems: 'center',
