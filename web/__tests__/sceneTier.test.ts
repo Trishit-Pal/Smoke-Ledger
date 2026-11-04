@@ -30,8 +30,9 @@ describe('SCENE_BUDGET', () => {
   it('lite is strictly cheaper than standard on every axis', () => {
     const { standard, lite } = SCENE_BUDGET;
     expect(lite.dprCap).toBeLessThan(standard.dprCap);
-    expect(lite.particles).toBeLessThan(standard.particles);
-    expect(lite.shards).toBeLessThan(standard.shards);
+    expect(lite.hazeParticles).toBeLessThan(standard.hazeParticles);
+    expect(lite.bronchiDepth).toBeLessThan(standard.bronchiDepth);
+    expect(lite.lobeSegments).toBeLessThan(standard.lobeSegments);
     expect(lite.bloom).toBe(false);
     expect(lite.parallax).toBe(false);
     expect(lite.frameIntervalMs).toBeGreaterThan(standard.frameIntervalMs);
