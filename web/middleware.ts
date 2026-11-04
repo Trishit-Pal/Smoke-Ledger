@@ -203,11 +203,14 @@ export async function middleware(request: NextRequest) {
   if (profileError) {
     serverLog('error', 'middleware.profile_read_failed', { code: profileError.code });
     // These answer for themselves (API handlers run their own checks) or must stay
-    // readable: the legal pages, password recovery, the unavailable page itself.
+    // reachable: the legal pages, password recovery, the unavailable page itself, and
+    // Settings (export, withdraw, delete and sign-out live there; it reads its own row).
     if (
       isApiRoute(pathname) ||
       (isPublicRoute(pathname) && pathname !== '/') ||
-      isRecoveryRoute(pathname)
+      isRecoveryRoute(pathname) ||
+      pathname === '/settings' ||
+      pathname.startsWith('/settings/')
     ) {
       return response;
     }

@@ -185,6 +185,19 @@ describe('middleware: a failed profile read never sends a signed-in reader to on
     log.mockRestore();
   });
 
+  // Settings is where a reader exports, withdraws, deletes and signs out: it must stay
+  // reachable during an outage (it reads its own row), never locked behind the 503.
+  test('Settings, the legal pages and password recovery stay reachable', async () => {
+    state.error = DB_ERROR;
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const path of ['/settings', '/privacy', '/terms', '/reset-password']) {
+      const res = await middleware(new NextRequest(new URL(path, 'http://localhost')));
+      expect([path, res.headers.get('location'), res.headers.get('x-middleware-rewrite'), res.status]).toEqual([path, null, null, 200]);
+    }
+    expect((await middleware(new NextRequest(new URL('/settingsx', 'http://localhost')))).status).toBe(503);
+    log.mockRestore();
+  });
+
   test('the unavailable page itself is reachable (no redirect loop)', async () => {
     state.row = null;
     expect(await walk('/unavailable')).toEqual(['/unavailable']);
