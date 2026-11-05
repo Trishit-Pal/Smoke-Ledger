@@ -7,7 +7,7 @@ sources:
   - app/_layout.tsx
   - metro.config.js
   - src/lib/routeGuard.ts
-last_verified_commit: be6d3e7
+last_verified_commit: 333a734
 status: current
 ---
 
@@ -81,7 +81,7 @@ Cross-device/cross-screen freshness is handled by `RealtimeRefresher` (`src/comp
 ### Data flow: viewing the dashboard (web)
 
 1. Next.js calls `getDashboardData()` in the page's Server Component (`web/lib/server/data.ts:377–386`).
-2. `getDashboardData` fetches the profile first (its `onboardedAt` floors the summary range), then four cached fetchers in parallel: `getServerLogsPage` (60-day window, one page of up to 2000 rows, the `GOAL_WINDOW_LOG_LIMIT` constant, which is exported so the Ask-the-ledger route reads the same ceiling over its own 90-day window — still powers quick-log inference, insights, and the week strip), `getServerGoals`, `getServerBrandsWithVariants`, and `getServerDailySummary` (up to 365 days — the single source of truth for the dashboard's timeframe totals). `toDailySummaryRow()` adapts the server rows to the domain engine's shape.
+2. `getDashboardData` fetches the profile first (its `onboardedAt` floors the summary range), then five cached fetchers in parallel: `getServerLatestLogIso` (the newest log overall, so milestones count from a long-time quitter's real last entry rather than the 60-day window; request-cached, so it shares the scene's read), `getServerLogsPage` (60-day window, one page of up to 2000 rows, the `GOAL_WINDOW_LOG_LIMIT` constant, which is exported so the Ask-the-ledger route reads the same ceiling over its own 90-day window — still powers quick-log inference, insights, and the week strip), `getServerGoals`, `getServerBrandsWithVariants`, and `getServerDailySummary` (up to 365 days — the single source of truth for the dashboard's timeframe totals). `toDailySummaryRow()` adapts the server rows to the domain engine's shape.
 3. Each fetcher calls `requireServerUserId()` which redirects to `/login` if the session is missing — no page-level auth guard needed.
 4. Domain functions in `src/domain/` process the returned arrays in the Server Component or a Client Component to produce the numbers the user sees. No business logic runs inside Next.js route handlers.
 5. The `(app)` layout (`web/app/(app)/layout.tsx`) mounts `AskLedgerDock` once for every signed-in page and passes it only the server flag `isLedgerChatEnabled()`, so the layout stays query-free. The dock hides itself on `/log`, and reads its own state from `GET /api/ledger-chat` on every open (the dock outlives Settings changes, so a kept copy would go stale). The Settings page also receives the flag, so web Settings shows the Ask the ledger switch only while the server flag is on. Dashboard and Trends no longer carry their own Ask link. On mobile the equivalent is `AskPill` in `app/(tabs)/_layout.tsx` plus the `/ask` modal registered in `app/_layout.tsx`. Both are described in Security and Privacy.

@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-05 — 333a734
+- architecture: `getDashboardData` also reads `getServerLatestLogIso`, so Home's milestones count from the newest log, not the 60-day window.
+- celebrations: a reader with no baseline gets no jar instead of "Kept: ₹0".
+
 ## 2026-11-05 — 00cc520
 - celebrations: the jar's grain waits for a yesterday inside the reader's ledger (`grainEligible`), so day one never gets one.
 
