@@ -23,7 +23,7 @@ import { cancelAirwayLight, getHomeSignals, requestAirwayLight, subscribeHomeSig
 const TICK_MS = 60_000;
 
 export interface MilestoneOverlayProps {
-  /** Newest log (ISO) from the server; a fresher one published by Home overrides it. */
+  /** Newest log (ISO) from the server; a non-null one published by Home overrides it. */
   lastSmokeIso: string | null;
   discreet?: boolean;
   intensity?: SceneIntensity;
