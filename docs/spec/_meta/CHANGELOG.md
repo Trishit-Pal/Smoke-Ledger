@@ -4,6 +4,11 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-05 — 12e2d88
+- security-privacy: the chat runs through an ordered provider list with fallback and refuses vendors the notice does not name; the launch bump opens the Production gate (decision O-MVP, EU readers included); launch caps 10 and 200.
+- infra-ops: the EAS preview and production profiles carry the chat build flag and blank placeholders.
+- architecture: the mobile 401 retry, the consent line, and the provider list behind the chat route.
+
 ## 2026-11-05 — 333a734
 - architecture: `getDashboardData` also reads `getServerLatestLogIso`, so Home's milestones count from the newest log, not the 60-day window.
 - celebrations: a reader with no baseline gets no jar instead of "Kept: ₹0".
