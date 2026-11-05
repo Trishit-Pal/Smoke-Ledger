@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { LEDGER_CHAT_NOTICE_TEXT } from '@/domain/ledgerChat/notice';
 
 // Source-scan pins for the panel, in the repo's style for
 // components (no jsdom here). Each pin is a rule the design or privacy
@@ -151,6 +152,16 @@ describe('state from GET and the initial question', () => {
     expect(panel).toMatch(/!ready && !state \? \(\s*<p[^>]*>\{COPY\.loading\}<\/p>/);
     expect(panel).toContain("invite: 'Ask about your week, your spend or your goals.'");
     expect(panel).toContain('{state?.consented ? COPY.empty : COPY.invite}');
+  });
+
+  test('before opt-in, one quiet line under the box says consent is needed, outside the pinned notice', () => {
+    // Shown once the state says "not consented"; the consent card, when open, already says it, so no repeat there.
+    expect(panel).toContain("needsConsent: 'Off until you consent to AI processing of your ledger data. Type a question to see what is sent.'");
+    expect(panel).toMatch(/state && !state\.consented && status !== 'consent' \? \(\s*<p[^>]*>\{COPY\.needsConsent\}<\/p>/);
+    // The line sits under the input (after the form field), never inside the consent card.
+    expect(panel.indexOf('{COPY.needsConsent}')).toBeGreaterThan(panel.indexOf('placeholder="Ask your ledger…"'));
+    // It is not part of what readers consent to: the hash-pinned notice text does not contain it.
+    expect(LEDGER_CHAT_NOTICE_TEXT).not.toContain('Off until you consent');
   });
 
   test('after Turn on and ask, the state is read again so starters appear without a reload', () => {
