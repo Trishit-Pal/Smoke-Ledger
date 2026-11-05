@@ -26,6 +26,15 @@ export const LEDGER_CHAT_NOTICE = {
 export const LEDGER_CHAT_NOTICE_TEXT = Object.values(LEDGER_CHAT_NOTICE).join(' ');
 
 /**
+ * The model vendors the notice above (and the privacy policy) name as receiving a reader's ledger
+ * figures. The server's provider list may only use a vendor listed here whose label the notice also
+ * contains (web/lib/server/ledgerChat/fallback.ts refuses the rest). Adding a vendor is a consent
+ * event: name it in LEDGER_CHAT_NOTICE and the privacy page, bump LEDGER_CHAT_NOTICE_VERSION, add the
+ * new hash in web/__tests__/ledgerChatScope.test.ts, and ship web and mobile together.
+ */
+export const LEDGER_CHAT_DISCLOSED_PROVIDERS = [{ id: 'anthropic', label: 'Anthropic' }] as const;
+
+/**
  * The opt-in (settings_kv `consent.ledgerChatOptIn`) stores the version of the notice it was
  * given to, so a reader is asked again whenever the notice changes. Bump this with any change
  * to what a reader sees before opting in (LEDGER_CHAT_NOTICE, LEDGER_CHAT_SETTINGS_SUBLABEL, and

@@ -55,9 +55,19 @@ describe('ledger-chat route guards', () => {
     expect(get).toContain('resolveChatCaller(');
     expect(get).toContain('gatedProfile(');
     expect(get).toContain("kind: 'ledger_chat_state'");
-    for (const banned of ['ledger_chat_user', 'ledger_chat_global', 'new Anthropic(', 'runLedgerChatTurn(', 'ANTHROPIC_API_KEY']) {
+    for (const banned of ['ledger_chat_user', 'ledger_chat_global', 'runWithFallback(', 'PROVIDERS', 'hasUsableProvider(', 'ANTHROPIC_API_KEY']) {
       expect(get).not.toContain(banned);
     }
+  });
+
+  test('POST runs the turn through the provider fallback, and the route holds no vendor SDK or key', () => {
+    const post = route.slice(route.indexOf('export async function POST('), route.indexOf('export async function GET('));
+    expect(post).toContain('runWithFallback(');
+    expect(post).toContain('hasUsableProvider(PROVIDERS)');
+    expect(post).toContain('ChatUpstreamError');
+    expect(route).not.toContain('@anthropic-ai/sdk');
+    expect(route).not.toContain('new Anthropic(');
+    expect(route).not.toContain('ANTHROPIC_API_KEY');
   });
 
   test('the confirmed-email rule is the shared one, not a copy', () => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { LEGAL_VERSIONS } from '@/lib/legal';
 import { LEDGER_CHAT_NOTICE_VERSION } from '@/domain/ledgerChat/notice';
 import type { UserProfile } from '@/types';
+import { anthropicProvider } from '@web/lib/server/ledgerChat/providers';
 
 // Handler-level checks for the chat route with every I/O boundary mocked:
 // the consent_outdated gate on POST, and the GET that serves panel state.
@@ -147,6 +148,35 @@ describe('POST /api/ledger-chat consent currency', () => {
 
     expect(res.status).toBe(200);
     expect(mocks.runLedgerChatTurn).toHaveBeenCalledTimes(1);
+  });
+
+  test('every model provider failing answers a calm 502, not a crash', async () => {
+    const spy = vi.spyOn(anthropicProvider, 'client').mockReturnValue({
+      messages: { create: async () => { throw new Error('upstream down'); } },
+    } as never);
+    mocks.runLedgerChatTurn.mockImplementationOnce(async (input: { anthropic: { messages: { create: (p: unknown) => Promise<unknown> } } }) => {
+      await input.anthropic.messages.create({});
+      throw new Error('unreachable');
+    });
+    try {
+      const res = await POST(post());
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({ error: 'dependency_failure' });
+      expect(spy).toHaveBeenCalled(); // the stub, not a real network call, produced the failure
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('no key for any vendor the notice names: server_misconfigured, before anything is read', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
+
+    const res = await POST(post());
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'server_misconfigured' });
+    expect(mocks.resolveChatCaller).not.toHaveBeenCalled();
+    expect(mocks.runLedgerChatTurn).not.toHaveBeenCalled();
   });
 
   test.each([true, '2026-11-02'])('an opt-in stored as %s (an older notice) is refused with consent_required', async (stale) => {
