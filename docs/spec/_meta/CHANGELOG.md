@@ -4,6 +4,9 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-05 — 00cc520
+- celebrations: the jar's grain waits for a yesterday inside the reader's ledger (`grainEligible`), so day one never gets one.
+
 ## 2026-11-05 — be6d3e7
 - architecture: `getServerLatestLogIso` feeds the scene; Home publishes `HomeSignals` to the scene store (no server read, null when discreet or unmounted).
 - celebrations: the backdrop's quiet pull — the next-milestone note with its one-shot airway light, and Home's money jar with its grain.

@@ -14,7 +14,7 @@ sources:
   - web/components/marketing/AccountDeletedNotice.tsx
   - web/components/character/MilestoneCelebration.tsx
   - app/(auth)/login.tsx
-last_verified_commit: be6d3e7
+last_verified_commit: 00cc520
 status: current
 ---
 
@@ -96,7 +96,7 @@ The streak effect stores the previous streak value in `prevStreakRef`. It calls 
 The web dashboard also publishes `HomeSignals` to the scene store (`web/components/marketing/scene/sceneSignals.ts`) in an effect:
 - the jar fill, from `jarFill` in `scene/pull.ts`;
 - the savings label, run through `maskInr` so hide-totals masks it;
-- `underBaselineYesterday`, only once the reader has at least one summary row;
+- `underBaselineYesterday`, via `grainEligible`: only when the reader has summary rows and yesterday falls on or after their ledger start (`summarySinceYmd`), so a reader who joined today never gets a grain;
 - the newest log time.
 
 It publishes `null` when discreet and on unmount. The scene side lives under `web/components/marketing/scene/`:
