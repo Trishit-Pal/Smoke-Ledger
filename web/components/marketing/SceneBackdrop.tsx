@@ -10,6 +10,7 @@
 
 import dynamic from 'next/dynamic';
 import type { SceneIntensity } from './SceneBackground';
+import { JarLabel } from './scene/JarLabel';
 import { MilestoneOverlay } from './scene/MilestoneOverlay';
 
 const Scene = dynamic(() => import('./SceneBackground'), { ssr: false });
@@ -27,6 +28,7 @@ export function SceneBackdrop({
     <>
       <Scene intensity={intensity} discreet={discreet} lastSmokeIso={lastSmokeIso} />
       <MilestoneOverlay lastSmokeIso={lastSmokeIso} discreet={discreet} intensity={intensity} />
+      <JarLabel discreet={discreet} intensity={intensity} />
     </>
   );
 }

@@ -101,7 +101,9 @@ describe('scene early returns', () => {
   });
 
   it('still renders nothing without WebGL or in the off tier', () => {
-    expect(component).toContain('function hasWebGL()');
+    // The probe lives in scene/env.ts (moved out to keep this file under its line cap).
+    expect(sceneFiles.find((f) => f.name === 'env.ts')!.src).toContain('export function hasWebGL()');
+    expect(component).toMatch(/import \{[^}]*\bhasWebGL\b[^}]*\} from '\.\/scene\/env'/);
     expect(component).toMatch(/tier === 'off'\) return;/);
   });
 

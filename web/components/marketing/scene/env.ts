@@ -14,6 +14,18 @@ export function readSceneEnv(): SceneEnv {
   };
 }
 
+export function hasWebGL(): boolean {
+  try {
+    const c = document.createElement('canvas');
+    const gl = (c.getContext('webgl') || c.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+    // Release the probe context right away — browsers cap live WebGL contexts.
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return !!(window.WebGLRenderingContext && gl);
+  } catch {
+    return false;
+  }
+}
+
 /** Epoch-ms the haze started clearing for this session (a reload never restarts it). */
 export function sessionClearStart(): number {
   try {
