@@ -55,8 +55,21 @@ function isDisclosed(p: ChatProvider): boolean {
   return LEDGER_CHAT_DISCLOSED_PROVIDERS.some((d) => d.id === p.id) && LEDGER_CHAT_NOTICE_TEXT.includes(p.label);
 }
 
+/** A client() that throws (a malformed key, a broken adapter) is a failed attempt, never a crash. */
+function clientOf(p: ChatProvider): { client: ChatModelClient | null } | { error: unknown } {
+  try {
+    return { client: p.client() };
+  } catch (error) {
+    return { error };
+  }
+}
+
 export function hasUsableProvider(providers: readonly ChatProvider[]): boolean {
-  return providers.some((p) => isDisclosed(p) && p.client() !== null);
+  return providers.some((p) => {
+    if (!isDisclosed(p)) return false;
+    const made = clientOf(p);
+    return 'client' in made && made.client !== null;
+  });
 }
 
 /** Marks an error as coming from the model call, so our own bugs are never mistaken for an upstream failure. */
@@ -66,8 +79,8 @@ class ProviderCallError extends Error {
   }
 }
 
-function failureOf(providerId: string, e: ProviderCallError): ProviderFailure {
-  const cause = e.cause as { name?: unknown; status?: unknown } | null;
+function failureOf(providerId: string, error: unknown): ProviderFailure {
+  const cause = error as { name?: unknown; status?: unknown } | null;
   const failure: ProviderFailure = { providerId, errorName: typeof cause?.name === 'string' ? cause.name : 'Error' };
   if (typeof cause?.status === 'number') failure.status = cause.status;
   return failure;
@@ -105,11 +118,15 @@ export async function runWithFallback(input: FallbackInput): Promise<FallbackRes
     const remaining = input.budgetMs - (Date.now() - started);
     if (remaining <= 0) break;
     const provider = queue[i];
-    const client = provider.client();
-    if (!client) continue;
+    const made = clientOf(provider);
+    if ('error' in made) {
+      failed.push(failureOf(provider.id, made.error));
+      continue;
+    }
+    if (!made.client) continue;
     try {
       const result = await runLedgerChatTurn({
-        anthropic: guarded(client),
+        anthropic: guarded(made.client),
         model: provider.model(),
         ctx: input.ctx,
         history: input.history,
@@ -119,7 +136,7 @@ export async function runWithFallback(input: FallbackInput): Promise<FallbackRes
       return { ...result, providerId: provider.id, failed };
     } catch (e) {
       if (!(e instanceof ProviderCallError)) throw e;
-      failed.push(failureOf(provider.id, e));
+      failed.push(failureOf(provider.id, e.cause));
     }
   }
   throw new ChatUpstreamError(failed);

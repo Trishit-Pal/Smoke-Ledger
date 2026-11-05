@@ -104,6 +104,23 @@ describe('runWithFallback', () => {
     expect(mocks.turn.mock.calls[0][0].model).toBe('m2');
   });
 
+  test('a provider whose client() throws (a bad key, a broken adapter) is recorded and skipped, never a crash', async () => {
+    const broken = provider('anthropic', {
+      model: () => 'm1',
+      client: () => {
+        throw new TypeError('SECRET key format is wrong');
+      },
+    });
+    const b = provider('anthropic', { model: () => 'm2' });
+    const out = await runWithFallback(input([broken, b]));
+    expect(out.providerId).toBe('anthropic');
+    expect(out.failed).toEqual([{ providerId: 'anthropic', errorName: 'TypeError' }]);
+    expect(JSON.stringify(out.failed)).not.toContain('SECRET');
+    expect(mocks.turn.mock.calls[0][0].model).toBe('m2');
+    expect(hasUsableProvider([broken])).toBe(false);
+    expect(hasUsableProvider([broken, b])).toBe(true);
+  });
+
   test('no usable provider is an upstream failure with nothing tried', async () => {
     const err = await runWithFallback(input([provider('anthropic', { client: () => null })])).catch((e) => e);
     expect(err).toBeInstanceOf(ChatUpstreamError);
