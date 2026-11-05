@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-05 — 55afdcd
+- security-privacy: the runner shares the time budget only among providers that can run and skips a client() that throws; one limit line true for both caps; the bump paragraph and the history note now match decision O-MVP.
+- architecture: re-verified after the final-review fixes (no change in wording).
+
 ## 2026-11-05 — 12e2d88
 - security-privacy: the chat runs through an ordered provider list with fallback and refuses vendors the notice does not name; the launch bump opens the Production gate (decision O-MVP, EU readers included); launch caps 10 and 200.
 - infra-ops: the EAS preview and production profiles carry the chat build flag and blank placeholders.
