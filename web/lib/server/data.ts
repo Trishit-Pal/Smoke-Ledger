@@ -162,6 +162,33 @@ export const getServerProfile = cache(async (): Promise<UserProfile> => {
   return profile;
 });
 
+/**
+ * The signed-in reader's newest log timestamp (ISO), or null when there is no
+ * user, no log, or any error. Unlike the neighbours it never redirects: the
+ * ambient scene calls it from a layout Suspense boundary and must not throw.
+ * One indexed `limit 1` read per full load.
+ */
+export const getServerLatestLogIso = cache(async (): Promise<string | null> => {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from('cigarette_logs')
+      .select('ts_utc')
+      .eq('user_id', user.id)
+      .order('ts_utc', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return (data as { ts_utc: string }).ts_utc ?? null;
+  } catch {
+    return null;
+  }
+});
+
 /** Maximum rows returned by `getServerLogs`. Callers that need more should use `getServerLogsPage`. */
 const SERVER_LOGS_PAGE_SIZE = 200;
 /** Row limit for goal-consuming loaders (adherence, holds, proposals); see getDashboardData. */
@@ -437,15 +464,19 @@ export async function getDashboardData() {
   const fromDate = daysAgoInZone(60, zone);
   // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
   // ceiling. If nextCursor is ever non-null, page until it is null.
-  const [{ logs }, goals, brands, summary] = await Promise.all([
+  // The newest log overall (request-cached, shared with the scene): a reader smoke-free for
+  // 60+ days has no log in the window, and milestones must still count from their real last one.
+  const [{ logs }, goals, brands, summary, latestLogIso] = await Promise.all([
     getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
     getServerGoals(),
     getServerBrandsWithVariants(),
     getServerDailySummary({ from: summarySinceYmd, to: today }),
+    getServerLatestLogIso(),
   ]);
   return {
     profile,
     logs,
+    latestLogIso,
     goals,
     brands,
     summary: summary.map(toDailySummaryRow),

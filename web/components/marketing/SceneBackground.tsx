@@ -33,16 +33,19 @@ import {
   hazeCountFor,
   pickSceneTier,
   SCENE_BUDGET,
-  type SceneEnv,
   type SceneIntensity,
 } from '@web/lib/sceneTier';
 
 import { BLOOM_BREATH_LIFT, BLOOM_STRENGTH, buildBloom, type BloomPassLike, type Composer } from './scene/bloom';
-import { breathPhase, breathScale, hazeDensity, sceneClearStart } from './scene/breath';
+import { createAirwayLight } from './scene/airwayLight';
+import { breathPhase, breathScale, hazeDensity } from './scene/breath';
 import { DisposeBin } from './scene/disposables';
+import { hasWebGL, readSceneEnv, sessionClearStart } from './scene/env';
 import { buildHaze } from './scene/haze';
-import { LAYOUT, NARROW_ASPECT } from './scene/layout';
+import { mountJar } from './scene/jarMesh';
+import { CAMERA, LAYOUT, NARROW_ASPECT } from './scene/layout';
 import { buildLungs } from './scene/lungMeshes';
+import { subscribeAirwayLight } from './scene/sceneSignals';
 import { buildSign } from './scene/signMesh';
 import { readTokens } from './scene/tokens';
 
@@ -58,40 +61,7 @@ export interface SceneBackgroundProps {
   intensity?: SceneIntensity;
   /** Neutral haze only: no lungs, airways or sign. Default false. */
   discreet?: boolean;
-}
-
-function hasWebGL(): boolean {
-  try {
-    const c = document.createElement('canvas');
-    const gl = (c.getContext('webgl') || c.getContext('experimental-webgl')) as WebGLRenderingContext | null;
-    // Release the probe context right away — browsers cap live WebGL contexts.
-    gl?.getExtension('WEBGL_lose_context')?.loseContext();
-    return !!(window.WebGLRenderingContext && gl);
-  } catch {
-    return false;
-  }
-}
-
-function readSceneEnv(): SceneEnv {
-  const nav = navigator as Navigator & {
-    deviceMemory?: number;
-    connection?: { saveData?: boolean };
-  };
-  return {
-    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
-    hardwareConcurrency: nav.hardwareConcurrency,
-    deviceMemory: nav.deviceMemory,
-    saveData: nav.connection?.saveData,
-  };
-}
-
-/** Epoch-ms the haze started clearing for this session (a reload never restarts it). */
-function sessionClearStart(): number {
-  try {
-    return sceneClearStart(window.sessionStorage, Date.now());
-  } catch {
-    return Date.now(); // storage blocked: the haze simply restarts each visit
-  }
+  lastSmokeIso?: string | null; // newest log (ISO); the overlay reads it, the scene ignores it
 }
 
 export function SceneBackground({ intensity = 'full', discreet = false }: SceneBackgroundProps) {
@@ -148,8 +118,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       renderer.toneMappingExposure = 1.0;
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
-      camera.position.set(0, 0, 22);
+      const camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(0, 0, CAMERA.z);
 
       // Real environment map → the glass actually reflects/refracts. Computed
       // once (PMREM), cheap thereafter. The RoomEnvironment scene itself is
@@ -188,6 +158,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       if (lungs) world.add(lungs.group);
       scene.add(world);
       if (sign) scene.add(sign.group);
+      // Home's jar of money kept: app pages only, never discreet, pinned to the camera.
+      const jar = intensity === 'quiet' && !discreet ? mountJar(THREE, bin, scene, camera, tokens, { reduce, wake: () => wake() }) : null;
 
       // Layout: right and back on desktop, centred and dimmer on narrow screens.
       let layout = LAYOUT.wide;
@@ -199,6 +171,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         world.scale.setScalar(layout.lungScale);
         sign?.group.position.set(...layout.sign);
         sign?.group.scale.setScalar(layout.signScale);
+        jar?.place(layout === LAYOUT.wide);
         return changed;
       };
       applyLayout();
@@ -222,6 +195,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         lungs?.retheme(t, dim);
         haze.retheme(t, dim);
         sign?.retheme(t, dim);
+        jar?.retheme(t);
       };
       applyTheme();
       // next-themes flips the <html> class in its own effect, after any child effect has
@@ -261,6 +235,7 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       // Run loop with a single pause gate: tab hidden. (No offscreen pause — the
       // scene is a fixed backdrop that must keep living through the whole scroll.)
       const clearStartMs = sessionClearStart();
+      const light = createAirwayLight((level) => lungs?.setAirwayGlow(level));
       let raf = 0;
       let running = true;
       let clockStart = performance.now();
@@ -286,6 +261,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
 
         // Slow breath (no spring), haze thinning with session time, a gentle sway.
         lungs?.setBreath(breathScale(t));
+        light.tick(now);
+        jar?.tick(now);
         haze.update(dt, t, hazeDensity((Date.now() - clearStartMs) / 1000));
         world.rotation.y = Math.sin(t * 0.07) * 0.3;
         if (sign) sign.group.rotation.y = t * 0.15;
@@ -340,6 +317,13 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
       const onVisibility = () => sync();
       document.addEventListener('visibilitychange', onVisibility);
 
+      // A newly reached milestone lights the airways once (never under reduced motion). It
+      // arms the light and wakes the loop, so an idle reader still sees it from its first frame.
+      const offLight = lungs
+        ? subscribeAirwayLight(() => reduce.matches || (light.start(), wake()))
+        : () => {};
+      const offJar = jar?.subscribe() ?? (() => {});
+
       // Blank the canvas for good (reduced-motion turned on, or the GPU context was lost).
       // ponytail: stays off until the next mount/navigation; add re-init if users toggle often.
       const shutDown = () => {
@@ -370,6 +354,8 @@ export function SceneBackground({ intensity = 'full', discreet = false }: SceneB
         reduce.removeEventListener('change', onReduceChange);
         canvas.removeEventListener('webglcontextlost', onContextLost);
         themeObserver.disconnect();
+        offLight();
+        offJar();
         composer?.dispose();
         bloomPass?.dispose?.();
         bin.disposeAll(); // every geometry, material, texture, env map and PMREM the scene built

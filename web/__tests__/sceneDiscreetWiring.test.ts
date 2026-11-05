@@ -22,8 +22,10 @@ describe('scene discreet wiring', () => {
 
   it('resolves discreet from the cached profile via isDiscreetMode', () => {
     expect(reader).toMatch(/import \{ isDiscreetMode \} from '@\/lib\/discreet'/);
-    expect(reader).toMatch(/await getServerProfile\(\)\s*\.then\(isDiscreetMode\)/);
-    expect(reader).toMatch(/<SceneBackdrop intensity="quiet" discreet=\{discreet\} \/>/);
+    expect(reader).toMatch(/getServerProfile\(\)\s*\.then\(isDiscreetMode\)/);
+    expect(reader).toMatch(
+      /<SceneBackdrop intensity="quiet" discreet=\{discreet\} lastSmokeIso=\{lastSmokeIso\} \/>/,
+    );
   });
 
   it('fails closed to discreet when the profile read rejects', () => {
@@ -33,6 +35,8 @@ describe('scene discreet wiring', () => {
 
   it('forwards discreet from SceneBackdrop to the scene', () => {
     expect(backdrop).toMatch(/discreet\?: boolean/);
-    expect(backdrop).toMatch(/<Scene intensity=\{intensity\} discreet=\{discreet\} \/>/);
+    expect(backdrop).toMatch(
+      /<Scene intensity=\{intensity\} discreet=\{discreet\} lastSmokeIso=\{lastSmokeIso\} \/>/,
+    );
   });
 });
