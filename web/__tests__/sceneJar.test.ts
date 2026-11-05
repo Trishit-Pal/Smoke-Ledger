@@ -228,6 +228,16 @@ describe('mountJar', () => {
     expect(jarGroup()).toBeUndefined();
   });
 
+  it('has no jar when Home publishes no label (a reader without a baseline)', () => {
+    setup();
+    publishHomeSignals(signals({ label: '', fill: 0 }));
+    expect(jarGroup()).toBeUndefined();
+    publishHomeSignals(signals());
+    expect(jarGroup()).toBeDefined();
+    publishHomeSignals(signals({ label: '' }));
+    expect(jarGroup()).toBeUndefined();
+  });
+
   it('survives cleanup-then-republish in one tick without removing the jar', () => {
     setup();
     publishHomeSignals(signals());

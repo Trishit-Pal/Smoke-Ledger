@@ -198,7 +198,7 @@ function localYmd(): string {
 }
 
 /**
- * The jar exists only while Home holds signals AND the viewport has room for it (wide layout,
+ * The jar exists only while Home holds signals with a label (no baseline publishes none) AND the viewport has room for it (wide layout,
  * >= 1536px, tall enough); otherwise nothing is built or drawn. Camera-pinned, so the camera is
  * added to the scene (a camera outside the scene does not draw its children).
  */
@@ -220,7 +220,7 @@ export function mountJar(
   let raf = 0;
 
   const refresh = () => {
-    if (!latest || !placement) {
+    if (!latest || !latest.label || !placement) {
       if (jar) camera.remove(jar.group);
       return;
     }

@@ -72,6 +72,8 @@ import type { Brand, BrandVariant, CigaretteLog, Goal, UserProfile } from '@/typ
 export interface DashboardClientProps {
   profile: UserProfile;
   logs: CigaretteLog[];
+  /** Newest log overall; `logs` only covers 60 days. */
+  latestLogIso: string | null;
   goals: Goal[];
   brands: (Brand & { variants: BrandVariant[] })[];
   summary: DailySummaryRow[];
@@ -147,6 +149,7 @@ function trendTone(deltaPct: number): 'up' | 'down' | 'flat' {
 export function DashboardClient({
   profile,
   logs,
+  latestLogIso,
   goals,
   brands,
   summary,
@@ -212,13 +215,17 @@ export function DashboardClient({
     }));
   }, [logs, today, zone]);
   const last = React.useMemo(() => lastLog(logs), [logs]);
+  // A long-time quitter has no log in the 60-day window: fall back to the newest log overall.
+  const lastSmokeIso = last?.tsUtc ?? latestLogIso;
 
   // Tell the background scene what Home shows. The label goes through the same
   // mask as the hero total, so hidden totals reach the scene as •••, never a figure;
   // discreet mode publishes nothing (neutral haze). Cleared when Home unmounts.
   const discreet = isDiscreetMode(profile);
-  const sceneLabel = maskInr(allTimeSaved.totalInr, hidden, (n) => money(n, { compact: true }));
-  const sceneFill = jarFill(allTimeSaved.totalInr, baseline, fallbackUnit);
+  // No baseline, nothing to measure "kept" against: no jar rather than a forever-empty "Kept: ₹0".
+  const hasJar = baseline > 0;
+  const sceneLabel = hasJar ? maskInr(allTimeSaved.totalInr, hidden, (n) => money(n, { compact: true })) : '';
+  const sceneFill = hasJar ? jarFill(allTimeSaved.totalInr, baseline, fallbackUnit) : 0;
   // No rows yet, or yesterday before onboarding = no grain on day one.
   const sceneUnder = grainEligible(summary, baseline, today, summarySinceYmd);
   React.useEffect(() => {
@@ -230,10 +237,10 @@ export function DashboardClient({
       fill: sceneFill,
       label: sceneLabel,
       underBaselineYesterday: sceneUnder,
-      lastSmokeIso: last?.tsUtc ?? null,
+      lastSmokeIso,
     });
     return () => publishHomeSignals(null);
-  }, [discreet, sceneFill, sceneLabel, sceneUnder, last]);
+  }, [discreet, sceneFill, sceneLabel, sceneUnder, lastSmokeIso]);
   const insights = React.useMemo(
     () =>
       generateInsights(logs, today, (amount) =>
@@ -772,7 +779,7 @@ export function DashboardClient({
         {/* ─────────────── Body recovery ─────────────── */}
         <section style={idx(8)} aria-labelledby="recovery-heading">
           <SectionLabel id="recovery-heading">Body recovery</SectionLabel>
-          <HealthMilestones lastSmokeIso={last?.tsUtc ?? null} />
+          <HealthMilestones lastSmokeIso={lastSmokeIso} />
         </section>
 
         {/* ─────────────── Did you know — sourced facts ─────────────── */}

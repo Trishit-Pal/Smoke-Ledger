@@ -464,15 +464,19 @@ export async function getDashboardData() {
   const fromDate = daysAgoInZone(60, zone);
   // ponytail: one page of up to 2000 rows; the 60-day window holds >= 33 entries a day under that
   // ceiling. If nextCursor is ever non-null, page until it is null.
-  const [{ logs }, goals, brands, summary] = await Promise.all([
+  // The newest log overall (request-cached, shared with the scene): a reader smoke-free for
+  // 60+ days has no log in the window, and milestones must still count from their real last one.
+  const [{ logs }, goals, brands, summary, latestLogIso] = await Promise.all([
     getServerLogsPage({ fromDate, limit: GOAL_WINDOW_LOG_LIMIT }),
     getServerGoals(),
     getServerBrandsWithVariants(),
     getServerDailySummary({ from: summarySinceYmd, to: today }),
+    getServerLatestLogIso(),
   ]);
   return {
     profile,
     logs,
+    latestLogIso,
     goals,
     brands,
     summary: summary.map(toDailySummaryRow),
