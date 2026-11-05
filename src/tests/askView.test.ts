@@ -1,8 +1,9 @@
-import { LEDGER_CHAT_NOTICE } from '@/domain/ledgerChat/notice';
+import { LEDGER_CHAT_NOTICE, LEDGER_CHAT_NOTICE_TEXT } from '@/domain/ledgerChat/notice';
 import { maskNumbers } from '@/lib/discreet';
 import type { Row } from '@/domain/ledgerChat/types';
 import {
   answerAnnouncement,
+  ASK_COPY,
   FAILURE_COPY,
   isHidden,
   isRowMaskable,
@@ -124,6 +125,18 @@ describe('mobileNoticeParagraphs', () => {
     for (const line of [lead, scope, sent, discreet, retention]) expect(paragraphs).toContain(line);
     expect(paragraphs).not.toContain(device);
     expect(paragraphs.join(' ').toLowerCase()).not.toContain('browser');
+  });
+});
+
+describe('ASK_COPY.waiting (the line under the box before consent)', () => {
+  it('says consent is needed, in the same words as the web panel, and stays calm', () => {
+    expect(ASK_COPY.waiting).toContain('Off until you consent to AI processing of your ledger data.');
+    expect(ASK_COPY.waiting).not.toMatch(/error|failed|warning|danger|!/i);
+  });
+
+  it('is outside the hash-pinned notice, so wording it never re-asks anyone', () => {
+    expect(mobileNoticeParagraphs().join(' ')).not.toContain('Off until you consent');
+    expect(LEDGER_CHAT_NOTICE_TEXT).not.toContain('Off until you consent');
   });
 });
 

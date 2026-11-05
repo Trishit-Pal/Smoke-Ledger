@@ -97,7 +97,8 @@ export const ASK_COPY = {
   loading: 'Reading the ledger…',
   footnote: 'Not medical advice. A daily limit applies.',
   consentTitle: 'Before the first answer',
-  waiting: 'Your question is sent once you turn this on.',
+  // Not part of the pinned consent notice: it only tells a reader why the chat is waiting.
+  waiting: 'Off until you consent to AI processing of your ledger data. Your question is sent once you turn this on.',
   readFailed: "Couldn't read this setting just now.",
 } as const;
 

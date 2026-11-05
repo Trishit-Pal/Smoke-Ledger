@@ -67,16 +67,39 @@ function failureFor(status: number, error: ChatErrorCode | undefined): ChatFailu
   return 'unavailable';
 }
 
-async function request<T>(
-  init: { method: 'GET' } | { method: 'POST'; body: unknown },
-  isValid: (body: unknown) => body is T,
-): Promise<ChatResult<T>> {
+type RequestInit = { method: 'GET' } | { method: 'POST'; body: unknown };
+
+async function request<T>(init: RequestInit, isValid: (body: unknown) => body is T): Promise<ChatResult<T>> {
   const base = resolveWebBaseUrl(process.env.EXPO_PUBLIC_WEB_BASE_URL);
   if (base === null) return { ok: false, reason: 'unavailable' };
   const { data } = await getSupabase().auth.getSession();
   const token = data.session?.access_token;
   if (!token) return { ok: false, reason: 'signed_out' };
 
+  const first = await send(base, token, init, isValid);
+  if (first.ok || first.reason !== 'signed_out') return first;
+  // A 401 can be a stale access token. Refresh once and retry once; with no session after the
+  // refresh (or a refresh that fails) the reader really is signed out. The route answers 401
+  // before it spends a daily token or reads any data, so repeating the request costs nothing.
+  const fresh = await refreshedToken();
+  return fresh ? send(base, fresh, init, isValid) : first;
+}
+
+async function refreshedToken(): Promise<string | null> {
+  try {
+    const { data } = await getSupabase().auth.refreshSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function send<T>(
+  base: string,
+  token: string,
+  init: RequestInit,
+  isValid: (body: unknown) => body is T,
+): Promise<ChatResult<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
