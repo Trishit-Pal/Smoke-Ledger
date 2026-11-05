@@ -1,6 +1,6 @@
 # Smoke Ledger Privacy Policy
 
-Effective date: 2026-11-02
+Effective date: 2026-11-05
 
 > Mirror of `web/app/privacy/page.tsx`. The page renders operator facts from `src/lib/legalEntity.ts`, retention periods from `src/lib/privacy/retention.ts` and the promises from `src/lib/privacy/promises.ts`; the values below are those constants today. `src/tests/web-privacy-page.test.ts` fails if a page heading is missing here.
 

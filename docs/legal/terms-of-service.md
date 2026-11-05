@@ -1,6 +1,6 @@
 # Smoke Ledger Terms of Service
 
-Effective date: 2026-05-19
+Effective date: 2026-11-05
 
 > Mirror of `web/app/terms/page.tsx`, which renders operator facts from `src/lib/legalEntity.ts`. `src/tests/web-privacy-page.test.ts` fails if a page heading is missing here.
 

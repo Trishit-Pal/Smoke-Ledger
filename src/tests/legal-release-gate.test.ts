@@ -22,13 +22,24 @@ describe('legal release gate', () => {
     expect(read(mdRel)).toContain(`Effective date: ${LEGAL_VERSIONS[doc]}`);
   });
 
-  it('a version later than the published one needs a named EU representative', () => {
+  // Owner decision (2026-11-05): ship the Ask the ledger MVP before an Art 27 representative is
+  // signed. The bump is allowed without one, but only while the policy says so in plain words,
+  // never by silently dropping the line. Once a representative is named this check steps aside.
+  it('a bump without a named EU representative keeps the "appointing" line in the policy', () => {
     const bumped = (['terms', 'privacy'] as const).some((doc) => LEGAL_VERSIONS[doc] > PUBLISHED[doc]);
-    if (!bumped) return;
-    expect(euRepresentativeIsNamed(EU_REPRESENTATIVE)).toBe(true);
-    for (const field of [EU_REPRESENTATIVE.name, EU_REPRESENTATIVE.address, EU_REPRESENTATIVE.email]) {
-      expect(field.trim()).not.toBe('');
-    }
+    if (!bumped || euRepresentativeIsNamed(EU_REPRESENTATIVE)) return;
+    expect(read('web/app/privacy/page.tsx')).toContain('We are appointing a representative in the EU');
+    expect(read('docs/legal/privacy-policy.md')).toContain('being appointed');
+  });
+
+  it('terms and privacy are bumped together, so one /consent screen covers both', () => {
+    expect(LEGAL_VERSIONS.terms > PUBLISHED.terms).toBe(true);
+    expect(LEGAL_VERSIONS.privacy > PUBLISHED.privacy).toBe(true);
+    expect(LEGAL_VERSIONS.terms).toBe(LEGAL_VERSIONS.privacy);
+  });
+
+  it('the live privacy version opens the chat gate', () => {
+    expect(isChatPolicyLive(LEGAL_VERSIONS.privacy)).toBe(true);
   });
 
   it('the chat gate stays shut at exactly the privacy version readers accepted', () => {
