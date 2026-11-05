@@ -143,7 +143,7 @@ describe('MilestoneNote markup', () => {
   it('is aria-hidden, pointer-events none, hidden below 1536px', () => {
     expect(html).toMatch(/aria-hidden="true"/);
     expect(html).toMatch(/pointer-events:none/);
-    expect(html).toMatch(/class="[^"]*hidden[^"]*min-\[1536px\]:block/);
+    expect(html).toMatch(/class="[^"]*hidden[^"]*2xl:block/); // not min-[..]: tailwind.config's raw screen disables min-* variants
   });
 
   it('carries the label and caption in their tokens', () => {
@@ -175,6 +175,10 @@ describe('MilestoneOverlay', () => {
   it('declines with no entries', () => {
     expect(overlaySrc).toMatch(/milestoneLine\(/);
     expect(overlaySrc).toMatch(/if \(!line\) return null/);
+  });
+
+  it('does not use min-[..] variants (the raw short-landscape screen disables them)', () => {
+    expect(overlaySrc).not.toMatch(/min-\[/);
   });
 
   it('has no colour literals and uses the token pair', () => {

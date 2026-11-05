@@ -38,7 +38,7 @@ export function MilestoneNote({ text, caption }: { text: string; caption: string
   return (
     <div
       aria-hidden="true"
-      className="hidden min-[1536px]:block text-right"
+      className="hidden 2xl:block text-right"
       style={{
         position: 'fixed',
         bottom: OVERLAY_ANCHOR.bottom,

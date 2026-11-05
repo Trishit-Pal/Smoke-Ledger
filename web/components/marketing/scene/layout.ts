@@ -50,6 +50,6 @@ export function lungTopPercent(): number {
  */
 export const OVERLAY_ANCHOR = {
   bottom: `${(100 - (lungTopPercent() - LUNG_TOP_MARGIN_PCT)).toFixed(1)}%`,
-  right: '0.75rem',
+  right: '1.5rem',
   width: 'min(14rem, calc((100vw - 75rem) / 2 - 2rem))',
 } as const;
