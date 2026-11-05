@@ -201,6 +201,12 @@ describe('MilestoneOverlay', () => {
     expect(overlaySrc).toMatch(/cancelAnimationFrame\(/);
   });
 
+  it('falls back to the server ISO when Home publishes none; a published ISO still wins', () => {
+    // Home's log window is ~60 days, so a long-time quitter publishes lastSmokeIso: null.
+    expect(overlaySrc).toMatch(/const iso = published\?\.iso \?\? lastSmokeIso;/);
+    expect(overlaySrc).not.toMatch(/published \? published\.iso : lastSmokeIso/);
+  });
+
   it('requests the airway light only when a sweep is due and motion is allowed', () => {
     expect(overlaySrc).toMatch(/prefers-reduced-motion: reduce/);
     expect(overlaySrc).toMatch(/sweepDue\(window\.sessionStorage, [^)]+\)/);

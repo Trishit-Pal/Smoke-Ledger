@@ -38,7 +38,7 @@ import { localeForCountry, timezoneForCountry } from '@/lib/regions';
 import { isBirthdayToday } from '@/domain/age';
 import { formatMoney, formatDelta, formatPerStick } from '@/lib/format';
 import { isHomeTotalsHidden, isDiscreetMode, maskInr } from '@/lib/discreet';
-import { jarFill, underBaselineYesterday } from '@web/components/marketing/scene/pull';
+import { grainEligible, jarFill } from '@web/components/marketing/scene/pull';
 import { publishHomeSignals } from '@web/components/marketing/scene/sceneSignals';
 import { createLog, inferUnitPriceForVariant } from '@/db/repositories/logs';
 import { AnalyticsEvents } from '@/constants/events';
@@ -219,8 +219,8 @@ export function DashboardClient({
   const discreet = isDiscreetMode(profile);
   const sceneLabel = maskInr(allTimeSaved.totalInr, hidden, (n) => money(n, { compact: true }));
   const sceneFill = jarFill(allTimeSaved.totalInr, baseline, fallbackUnit);
-  // No rows yet = brand-new reader: no grain on day one.
-  const sceneUnder = summary.length > 0 && underBaselineYesterday(summary, baseline, today);
+  // No rows yet, or yesterday before onboarding = no grain on day one.
+  const sceneUnder = grainEligible(summary, baseline, today, summarySinceYmd);
   React.useEffect(() => {
     if (discreet) {
       publishHomeSignals(null);

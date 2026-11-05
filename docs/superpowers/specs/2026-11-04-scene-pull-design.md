@@ -22,7 +22,7 @@ The owner wants the background to push harder toward quitting. PRODUCT.md forbid
   - **Line format.** It shows `next.label` plus `formatMinutesUntil(minutesToNext)`, with a quiet caption: "Next, from your last entry".
   - **The light passing through.** It plays when `current` changes while the page is open, or on the first load after a milestone was crossed since the last visit. Keep the last seen milestone id in `sessionStorage`. It plays once and never repeats in a loop.
 - **B.** Use `savedAllTime(rows, baselinePerDay, fallbackUnitPrice, sinceYmd, endYmd)` from `src/domain/periodSummary.ts`. It adds `max(0, baseline − sticks)` per day, so it never decreases as days pass. Its window start is `max(onboardedAt, 365 days ago)`, which is the same wiring the dashboard uses.
-  - **Fill level.** Since there is no target, the fill level is a soft log curve of the total, `fill = 1 − e^(−total / k)`, with `k` scaled to one week of the reader's baseline spend. That way the jar visibly moves early and keeps creeping later without ever reaching full.
+  - **Fill level.** Since there is no target, the fill level is a soft log curve of the total, `fill = 1 − e^(−total / k)`, with `k` scaled to one week of the reader's baseline spend. That way the jar visibly moves early and keeps creeping later without ever reaching full. Amended at final review: the exponential read as full after about three weeks; the hyperbola `fill = total / (total + k)` keeps the early motion and the long creep.
   - **Label.** "Kept: ₹2,340" in the reader's currency, using the existing money formatter, with locale from the country.
   - **The falling grain.** When the latest day's spend is under baseline, a grain drops in, once per load.
 

@@ -116,7 +116,8 @@ export function MilestoneOverlay({ lastSmokeIso, discreet = false, intensity = '
     };
   }, [enabled]);
 
-  const iso = published ? published.iso : lastSmokeIso;
+  // Home's log window is ~60 days: a quitter with an older last entry publishes null, so fall back.
+  const iso = published?.iso ?? lastSmokeIso;
   const line = React.useMemo(() => (enabled && now ? milestoneLine(iso, now) : null), [enabled, iso, now]);
   const hasLine = line !== null;
   const reached = line?.milestoneMinutes ?? null;

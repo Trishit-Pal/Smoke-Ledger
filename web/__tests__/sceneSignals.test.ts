@@ -56,7 +56,7 @@ describe('DashboardClient publishes to the scene', () => {
   it('derives fill, lastSmokeIso and the grain signal from the existing values', () => {
     expect(src).toMatch(/jarFill\(allTimeSaved\.totalInr, baseline, fallbackUnit\)/);
     expect(src).toMatch(/lastSmokeIso: last\?\.tsUtc \?\? null/);
-    // A reader with no history gets no grain on day one.
-    expect(src).toMatch(/summary\.length > 0 && underBaselineYesterday\(summary, baseline, today\)/);
+    // No grain on day one: the rule (rows exist, yesterday is on/after onboarding) lives in grainEligible.
+    expect(src).toMatch(/grainEligible\(summary, baseline, today, summarySinceYmd\)/);
   });
 });

@@ -15,7 +15,7 @@ export const MILESTONE_SEEN_KEY = 'scene-milestone-seen';
 export const GRAIN_DAY_KEY = 'scene-grain-day';
 
 const MILESTONE_CAPTION = 'Next, from your last entry';
-/** Jar time constant, in days of baseline spend: about a week kept fills ~63%. */
+/** Jar half-fill point, in days of baseline spend: a week kept fills half. */
 const JAR_DAYS = 7;
 
 export interface MilestoneLine {
@@ -25,22 +25,28 @@ export interface MilestoneLine {
   milestoneMinutes: number | null;
 }
 
-/** Milestone bodies are sentences ending in a period; drop one so the dash join reads cleanly. */
-const stripPeriod = (s: string): string => s.replace(/\.$/, '');
+/**
+ * Milestone bodies are sentences ending in a period, and one carries its own dash.
+ * Drop the period and turn inner dashes into "; " so the single " — " that joins the
+ * time reads cleanly.
+ */
+const cleanBody = (s: string): string => s.replace(/\.$/, '').replace(/ — /g, '; ');
 
 export function milestoneLine(lastSmokeIso: string | null, now: Date): MilestoneLine | null {
   if (!lastSmokeIso) return null;
   const p = milestoneProgress(lastSmokeIso, now);
   const milestoneMinutes = p.current?.minutes ?? null;
   if (p.next) {
+    // minutesToNext is always >= 1 here: minutesSince floors to whole minutes and the
+    // next milestone is, by definition, still ahead, so "in now" cannot occur.
     return {
-      text: `${stripPeriod(p.next.body)} — ${formatMinutesUntil(p.minutesToNext)}`,
+      text: `${cleanBody(p.next.body)} — in ${formatMinutesUntil(p.minutesToNext)}`,
       caption: MILESTONE_CAPTION,
       milestoneMinutes,
     };
   }
   if (!p.current) return null; // unreachable: no next means every milestone was reached
-  return { text: `${stripPeriod(p.current.body)} — reached`, caption: MILESTONE_CAPTION, milestoneMinutes };
+  return { text: `${cleanBody(p.current.body)} — reached`, caption: MILESTONE_CAPTION, milestoneMinutes };
 }
 
 /**
@@ -59,11 +65,16 @@ export function sweepDue(storage: MinimalStorage, milestoneMinutes: number | nul
   }
 }
 
-/** Jar fill in [0, 1): 1 - e^(-total / (7 days of baseline spend)); saturates, never overflows. */
+/**
+ * Jar fill in [0, 1): total / (total + a week of baseline spend). Half full after one
+ * week kept, 0.9 after nine, and a long tail that never reads full. A per-stick price
+ * under 1 (EUR) is used as it is; only a missing or non-positive one falls back to 1.
+ */
 export function jarFill(totalMoney: number, baselinePerDay: number, unitPrice: number): number {
   const total = Number.isFinite(totalMoney) ? Math.max(0, totalMoney) : 0;
-  const scale = JAR_DAYS * Math.max(baselinePerDay, 1) * Math.max(unitPrice, 1);
-  return 1 - Math.exp(-total / scale);
+  const scale = JAR_DAYS * Math.max(baselinePerDay, 1) * (unitPrice > 0 ? unitPrice : 1);
+  if (!Number.isFinite(scale)) return 0;
+  return Math.min(total / (total + scale), 1 - Number.EPSILON);
 }
 
 /** Yesterday (no row = smoke-free) was below a positive baseline. Today never counts. */
@@ -72,6 +83,14 @@ export function underBaselineYesterday(rows: DailySummaryRow[], baselinePerDay: 
   const yesterday = dayShift(todayYmd, -1);
   const sticks = rows.find((r) => r.date === yesterday)?.sticks ?? 0;
   return sticks < baselinePerDay;
+}
+
+/**
+ * A grain is earned only by a real yesterday: the reader has rows, and yesterday is on or
+ * after their onboarding day (earlier days predate the ledger and would count as smoke-free).
+ */
+export function grainEligible(rows: DailySummaryRow[], baselinePerDay: number, todayYmd: string, sinceYmd: string): boolean {
+  return rows.length > 0 && dayShift(todayYmd, -1) >= sinceYmd && underBaselineYesterday(rows, baselinePerDay, todayYmd);
 }
 
 /** True at most once per day per storage, and only when yesterday came in under baseline. */

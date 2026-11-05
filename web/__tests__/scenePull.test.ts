@@ -4,6 +4,7 @@ import { formatMinutesUntil } from '@/domain/health';
 import type { DailySummaryRow } from '@/domain/periodSummary';
 import {
   grainDue,
+  grainEligible,
   jarFill,
   milestoneLine,
   sweepDue,
@@ -43,10 +44,29 @@ describe('milestoneLine', () => {
   it('names the first milestone and the time left, without the body trailing period', () => {
     const line = milestoneLine(minutesAgo(10), NOW);
     expect(line).toEqual({
-      text: `${unperiod(HEALTH_MILESTONES[0].body)} — ${formatMinutesUntil(10)}`,
+      text: `${unperiod(HEALTH_MILESTONES[0].body)} — in ${formatMinutesUntil(10)}`,
       caption: 'Next, from your last entry',
       milestoneMinutes: null,
     });
+  });
+
+  it('says "in" before the time left, so "10m" cannot read as ten minutes ago', () => {
+    const line = milestoneLine(minutesAgo(HEALTH_MILESTONES[0].minutes - 10), NOW);
+    expect(line?.text).toMatch(/ — in 10m$/);
+  });
+
+  it('turns a dash inside a body into "; " so only one " — " joins the time', () => {
+    const m = HEALTH_MILESTONES.find((x) => x.minutes === 2880);
+    expect(m?.body).toContain(' — '); // the 48 h body carries its own dash
+    const line = milestoneLine(minutesAgo(2880 - 1054), NOW); // 17h 34m to go
+    expect(line?.text).toBe('Nerve endings start regrowing; taste and smell sharpen — in 17h 34m');
+    expect(line?.text.split(' — ')).toHaveLength(2);
+  });
+
+  it('applies the same body clean-up to the reached branch', () => {
+    const last = HEALTH_MILESTONES[HEALTH_MILESTONES.length - 1];
+    const line = milestoneLine(minutesAgo(last.minutes + 5), NOW);
+    expect(line?.text.split(' — ')).toHaveLength(2);
   });
 
   it('reports the last milestone as reached once all are passed', () => {
@@ -66,7 +86,7 @@ describe('milestoneLine', () => {
   it('treats a future last entry as just logged', () => {
     const future = new Date(NOW.getTime() + 3_600_000).toISOString();
     const line = milestoneLine(future, NOW);
-    expect(line?.text).toBe(`${unperiod(HEALTH_MILESTONES[0].body)} — ${formatMinutesUntil(HEALTH_MILESTONES[0].minutes)}`);
+    expect(line?.text).toBe(`${unperiod(HEALTH_MILESTONES[0].body)} — in ${formatMinutesUntil(HEALTH_MILESTONES[0].minutes)}`);
     expect(line?.milestoneMinutes).toBeNull();
   });
 });
@@ -111,14 +131,58 @@ describe('jarFill', () => {
     }
   });
 
-  it('follows 1 - e^(-total / (7 * baseline * price))', () => {
-    expect(jarFill(1000, 10, 15)).toBeCloseTo(1 - Math.exp(-1000 / (7 * 10 * 15)), 9);
-    expect(jarFill(300, 0.4, 0.2)).toBeCloseTo(1 - Math.exp(-300 / 7), 9);
+  it('follows total / (total + a week of baseline spend): one week kept reads half, nine weeks 0.9', () => {
+    expect(jarFill(7 * 10 * 15, 10, 15)).toBeCloseTo(0.5, 9);
+    expect(jarFill(9 * 7 * 10 * 15, 10, 15)).toBeCloseTo(0.9, 9);
+    expect(jarFill(1000, 10, 15)).toBeCloseTo(1000 / (1000 + 7 * 10 * 15), 9);
   });
 
-  it('is finite when baseline and price are 0', () => {
+  it('keeps creeping: three weeks of full savings is nowhere near full', () => {
+    expect(jarFill(21 * 10 * 15, 10, 15)).toBeCloseTo(0.75, 9);
+  });
+
+  it('uses a per-stick price under 1 as it is (EUR readers), not as 1', () => {
+    expect(jarFill(0.4 * 10 * 7, 10, 0.4)).toBeCloseTo(0.5, 9);
+  });
+
+  it('is finite when baseline and price are 0 (each floors to 1)', () => {
     expect(Number.isFinite(jarFill(500, 0, 0))).toBe(true);
-    expect(jarFill(500, 0, 0)).toBeCloseTo(1 - Math.exp(-500 / 7), 9);
+    expect(jarFill(500, 0, 0)).toBeCloseTo(500 / (500 + 7), 9);
+  });
+
+  it('is finite and in [0, 1) for NaN or infinite inputs', () => {
+    for (const f of [jarFill(500, Number.NaN, 15), jarFill(500, 10, Number.NaN), jarFill(500, Infinity, 15), jarFill(500, 10, Infinity), jarFill(Number.NaN, 10, 15), jarFill(Infinity, 10, 15)]) {
+      expect(Number.isFinite(f)).toBe(true);
+      expect(f).toBeGreaterThanOrEqual(0);
+      expect(f).toBeLessThan(1);
+    }
+  });
+
+  it('stays below 1 for very large totals', () => {
+    expect(jarFill(1e12, 10, 15)).toBeLessThan(1);
+    expect(jarFill(Number.MAX_VALUE, 10, 15)).toBeLessThan(1);
+  });
+});
+
+describe('grainEligible', () => {
+  const today = '2026-11-04';
+  const yesterday = '2026-11-03';
+
+  it('is false with no rows (brand-new reader)', () => {
+    expect(grainEligible([], 10, today, '2026-10-01')).toBe(false);
+  });
+
+  it('is false on the day of onboarding: yesterday predates the ledger', () => {
+    expect(grainEligible([row(today, 2)], 10, today, today)).toBe(false);
+  });
+
+  it('is true once yesterday is on or after the onboarding day and under baseline', () => {
+    expect(grainEligible([row(yesterday, 3)], 10, today, yesterday)).toBe(true);
+    expect(grainEligible([row(yesterday, 3)], 10, today, '2026-10-01')).toBe(true);
+  });
+
+  it('is false when yesterday was at or above baseline', () => {
+    expect(grainEligible([row(yesterday, 10)], 10, today, '2026-10-01')).toBe(false);
   });
 });
 
