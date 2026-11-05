@@ -14,7 +14,7 @@ sources:
   - web/components/marketing/AccountDeletedNotice.tsx
   - web/components/character/MilestoneCelebration.tsx
   - app/(auth)/login.tsx
-last_verified_commit: 62902bc
+last_verified_commit: be6d3e7
 status: current
 ---
 
@@ -43,6 +43,8 @@ On the dashboard, two kinds of moments trigger a celebration.
 **Account deletion (negative).** After a successful deletion, the web landing page shows a dismissible notice with a `bye`-pose figure and "Your account and all its data have been deleted. You're welcome back anytime." On mobile, the `bye` farewell overlay (`dispatchFarewell`) plays for ~1.6s before returning to `/login?deleted=1`, where the sign-in screen shows the same sentence as a dismissible text notice (no figure). Both platforms read the flag through `ACCOUNT_DELETED_PARAM` (`src/lib/reauth.ts`). Warm wave-off, not guilt.
 
 **Re-login.** The login screen greets returning users with the `greet` figure and a "Welcome back." caption on arrival; sign-up hides the figure, because its setup progress line takes that place (success redirects via a server action, so the warm beat lives on arrival rather than after submit).
+
+**The backdrop's quiet pull (web, 1536px and wider).** Two smaller acknowledgements live in the ambient lungs scene rather than in a modal. On every app page, a margin note above the lungs names the next health milestone counted from the last entry, for example "Heart rate and blood pressure drop toward normal — in 10m", with the caption "Next, from your last entry". When a new milestone is reached, one slow teal light passes once through the airways. On Home, a glass jar below the lungs fills with the money kept against the baseline, labelled "Kept: …". On the day after an under-baseline day, one grain of teal light drops into it. None of this ever scolds, a discreet reader sees none of it, and under reduced motion the two lines show still and nothing moves.
 
 For modal celebrations the overlay is semi-transparent and auto-dismisses after 5.2 seconds. On web the overlay itself scrolls (the card is centred with `margin: auto`), so on a short landscape phone the top of the card is never clipped, while confetti can still spill past the card edge. The user can dismiss earlier by tapping anywhere outside the card, tapping "Carry on", or — on web — pressing Escape. The figure shown in the modal is `applaud` for standard tiers and `victory` for grand tiers.
 
@@ -90,6 +92,17 @@ The birthday effect runs after the profile loads. A `birthdayFiredRef` ref preve
 The streak effect stores the previous streak value in `prevStreakRef`. It calls `milestoneForStreak` and dispatches a milestone when `streak > prev` — so the milestone never fires on first load. When the streak drops to `0` from a previous value of `3` or more, it instead dispatches a `concern` mood (the streak-break nudge) plus a `warn()` haptic on mobile; smaller drops and non-zero values are ignored. On first render, `prevStreakRef` is set to the current value and the effect returns early.
 
 **Web (`web/app/(app)/dashboard/DashboardClient.tsx`).** The same effects exist with identical logic and copy, including the streak-break branch (`concern` mood, no haptic on web). The web version uses `React.useRef` and `React.useEffect` rather than bare `useRef`/`useEffect`, and the birthday event shape is the same object (`type: 'birthday'`, `days: 0`, same title, same body).
+
+The web dashboard also publishes `HomeSignals` to the scene store (`web/components/marketing/scene/sceneSignals.ts`) in an effect:
+- the jar fill, from `jarFill` in `scene/pull.ts`;
+- the savings label, run through `maskInr` so hide-totals masks it;
+- `underBaselineYesterday`, only once the reader has at least one summary row;
+- the newest log time.
+
+It publishes `null` when discreet and on unmount. The scene side lives under `web/components/marketing/scene/`:
+- `MilestoneOverlay.tsx` (the note, plus `sweepDue` for the one-shot airway light);
+- `jarMesh.ts` (the jar geometry, `mountJar`, and the grain via `grainDue`);
+- `JarLabel.tsx`.
 
 On both platforms the streak that drives these effects now comes from `streakFromRows(summary, today)` — the canonical daily summary, up to 365 days — rather than the raw 90-day log window, so a long streak no longer truncates at the log-fetch horizon.
 
@@ -177,3 +190,7 @@ The `seed` prop acts purely as a memoisation key. Changing `seed` regenerates th
 **No cross-session birthday deduplication.** The `birthdayFiredRef` only persists for the lifetime of the React tree. A user who backgrounded and reforegrounded the app on their birthday would see the modal again. If this is undesirable, a dated flag in `SecureStore` (or Supabase) would be needed.
 
 **Birthday and simultaneous streak milestone.** If both events fire in the same render, the second `dispatchMilestone` overwrites the first's modal state. The earlier celebration is silently lost.
+
+**The jar's grain uses the browser's date.** `grainDue` keys "today" on the browser's local day, while the dashboard computes "yesterday" in the reader's ledger zone (IST, or the chosen EU country). For a reader whose browser sits in another zone, the grain can arrive a day early or be skipped around midnight. It is cosmetic, and publishing the dashboard's `today` in `HomeSignals` would close the gap.
+
+**The jar is faint by design.** It sits under the page veil like the lungs, so in light theme it reads only as a pale teal shape. Only its label carries contrast (AA in both themes).

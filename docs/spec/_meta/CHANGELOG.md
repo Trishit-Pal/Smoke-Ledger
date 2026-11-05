@@ -4,6 +4,10 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
+## 2026-11-05 — be6d3e7
+- architecture: `getServerLatestLogIso` feeds the scene; Home publishes `HomeSignals` to the scene store (no server read, null when discreet or unmounted).
+- celebrations: the backdrop's quiet pull — the next-milestone note with its one-shot airway light, and Home's money jar with its grain.
+
 ## 2026-11-04 — 42f5db1
 - infra-ops: the functional e2e step also runs consent-chat.spec.ts.
 - security-privacy: the mobile chat-ask check times out after 4 s and does not ask.

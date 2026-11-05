@@ -21,7 +21,7 @@
         "metro.config.js",
         "src/lib/routeGuard.ts"
       ],
-      "last_verified_commit": "22df03f",
+      "last_verified_commit": "be6d3e7",
       "status": "current"
     },
     {
@@ -138,7 +138,7 @@
         "web/components/character/MilestoneCelebration.tsx",
         "app/(auth)/login.tsx"
       ],
-      "last_verified_commit": "62902bc",
+      "last_verified_commit": "be6d3e7",
       "status": "current"
     },
     {
