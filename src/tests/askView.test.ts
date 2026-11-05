@@ -140,6 +140,12 @@ describe('ASK_COPY.waiting (the line under the box before consent)', () => {
   });
 });
 
+describe('FAILURE_COPY.rate_limited', () => {
+  it('is true for both the reader cap and the shared daily cap, matching the web panel', () => {
+    expect(FAILURE_COPY.rate_limited).toBe("Today's questions are used up. The ledger is still here tomorrow.");
+  });
+});
+
 describe('FAILURE_COPY', () => {
   it('has a calm line for every failure and never alarm wording', () => {
     for (const text of Object.values(FAILURE_COPY)) {

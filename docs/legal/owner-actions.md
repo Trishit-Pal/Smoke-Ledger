@@ -5,7 +5,7 @@ Written 3 November 2026.
 
 ## 1. Database and deploy order
 
-Order matters. Do these in sequence. **Do not deploy the web or mobile code until step 5.** Every live reader has no health-data consent yet (`health_data_consent_at` is NULL, deliberately not backfilled), so the re-consent screen fires the moment the new code is live, whatever `LEGAL_VERSIONS` says. Readers must only ever be asked to accept the final policy: the one that names the EU representative, under the bumped versions.
+Order matters. Do these in sequence. **Do not deploy the web or mobile code until step 5.** Every live reader has no health-data consent yet (`health_data_consent_at` is NULL, deliberately not backfilled), so the re-consent screen fires the moment the new code is live, whatever `LEGAL_VERSIONS` says. Readers must only ever be asked to accept the final policy under the bumped versions. **Decision O-MVP (section 2) changed what "final" means: the Ask the ledger launch bumps the versions while the policy still says the EU representative is being appointed.**
 
 - [ ] **1. Check the `auth.users` privilege.** Why: erase updates `auth.users`. If the privilege is missing, erase fails outright (the whole transaction rolls back), and delete-account fails too, because it runs erase first. Where: Supabase SQL editor.
   ```sql
@@ -28,7 +28,7 @@ Order matters. Do these in sequence. **Do not deploy the web or mobile code unti
   ```
   Expect `37 3 * * *`. If pg_cron is missing, enable it in Database, Extensions, and re-run the migration. Why: without it, nothing purges and the retention promise is false.
 - [ ] **3. Confirm `AUDIT_PEPPER` is set** for the edge functions (`supabase secrets list`), **then redeploy `audit-record` and `delete-account`**. Why: `delete-account` now hashes its rate-limit keys with the pepper and imports `_shared/redact.ts`; deployed without the secret, keys are hashed with an empty pepper. Where: `supabase functions deploy audit-record delete-account`. If phone sign-in is switched on, also deploy `send-sms-otp`. Redeploy `audit-record` whenever its allowlist gains an event. `delete-account` must be redeployed for the withdrawal proof row: it now reads an optional `{ withdraw: boolean }` body and writes `consent_revoked` itself, after the deletion succeeds (user_id null, hashed id and `reason: 'delete'` in props), because a client cannot write it once the account is gone. Until it is redeployed, a mobile Withdraw then Delete leaves no `consent_revoked` row (the function ignores the body).
-- [ ] **4. Release gate: sign the EU representative, fill `legalEntity`, bump `LEGAL_VERSIONS`.** See section 2. Nothing in step 5 happens before this.
+- [ ] **4. Release gate: bump `LEGAL_VERSIONS`.** Under decision O-MVP (section 2) the bump rides in the Ask the ledger launch PR and does not wait for the EU representative; signing one and filling `legalEntity` stays open. Nothing in step 5 happens before this.
 - [ ] **5. Only then deploy web and mobile together, both carrying the same `LEGAL_VERSIONS`.** Why: a mobile build is compiled with its own `LEGAL_VERSIONS` and there are no over-the-air updates. The app treats a stored version as current when it is the same or newer, so an older build no longer loops, but an older build will not ask its readers to accept the new version either; the web will. Ship the mobile build that carries the bump at the same time as the web, never ahead of it (a mobile build ahead of the bump would ask readers to accept the old policy). Expect every existing reader to see the re-consent screen once. That is intended and honest; do not backfill the health consent.
 
 ## 2. Release gate (the EU representative)
@@ -105,12 +105,13 @@ Ask the ledger is built on web and mobile and is **off everywhere** until you do
   5. A Hinglish question such as "pichhle hafte kitne piye, teen sau rupaye ka hisaab?". The reply must not state a number the rows do not show; if the model writes a number word (for example "teen"), the guard rewrites it once and then falls back to the fixed sentence.
 
   Then turn discreet mode on and repeat question 1: brand names must be aliases ("Brand A"), numbers masked, and no note or variant visible. Check the Vercel logs show only tool names and token counts, never the question or answer.
-- [ ] **5. Promote to Production**, then try the toggle in Settings › Privacy once on web. Confirm one `ledger_chat_consent_toggled` row reaches `audit_events` for the throwaway reader.
-- [ ] **6. Mobile build.** Both settings go in the EAS build profile (`eas.json`, `env` of `preview` and `production`), because Expo reads `EXPO_PUBLIC_*` at build time.
-  - `EXPO_PUBLIC_LEDGER_CHAT_ENABLED=true`.
-  - `EXPO_PUBLIC_WEB_BASE_URL` set to the production web origin. `eas.json` currently ships this as an empty string, and an empty value is treated as a misconfiguration (the Ask screen says it is unavailable) rather than falling back to the default. Fill it in or remove the key.
+- [ ] **5. Go live: set the Production variables (step 3), then merge the launch PR** (merging deploys Production; there is no separate promote step). Then try the toggle in Settings › Privacy once on web. Confirm one `ledger_chat_consent_toggled` row reaches `audit_events` for the throwaway reader.
+- [ ] **6. Mobile build.** Both settings go in the EAS build profile (`eas.json`, `env` of `preview` and `production`), committed, because Expo reads `EXPO_PUBLIC_*` at build time and all of these values are public. Fill them in `eas.json` itself rather than in EAS environment variables: a blank entry left in `eas.json` may win over an EAS variable of the same name.
+  - `EXPO_PUBLIC_LEDGER_CHAT_ENABLED=true`: already set in both profiles by the launch PR.
+  - `EXPO_PUBLIC_WEB_BASE_URL` set to the production web origin, a bare `https://` origin with no path (`src/tests/easChatFlag.test.ts` checks the shape). `eas.json` ships it as an empty string. The Ask screen treats an empty value as a misconfiguration and says it is unavailable; the legal links fall back to the default origin. Fill it in before the build.
+  - `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`: the public project URL and anon key, same rule.
   - Ship the mobile build only after the web steps above, together with the build that carries the `LEGAL_VERSIONS` bump.
-- [ ] **7. Check mobile by hand** (use an Expo dev build against the Preview deployment; an EAS preview or release build keeps the chat off until the `LEGAL_VERSIONS` bump):
+- [ ] **7. Check mobile by hand** (an EAS preview build from the launch branch shows the chat, because it carries the `LEGAL_VERSIONS` bump; or use an Expo dev build against the Preview deployment):
   - The "Ask" pill shows on Home, Trends, History, Goals and Settings, and **not** on Log.
   - First open shows the consent notice; the Settings › Privacy toggle does the same job. Turning it off clears the conversation.
   - A question returns an answer labelled "Written by AI" with rows; closing the screen and reopening it starts empty.

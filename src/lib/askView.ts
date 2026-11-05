@@ -108,7 +108,8 @@ export const FAILURE_COPY: Record<ChatFailure, string> = {
   signed_out: 'Please sign in again to ask the ledger.',
   consent_required: 'Turn on Ask the ledger to continue.',
   consent_outdated: 'Your agreements changed. Review them to keep asking.',
-  rate_limited: "You've reached today's limit. The ledger is still here tomorrow.",
+  // A 429 can be the reader's own cap or the shared daily cap; this is true for both.
+  rate_limited: "Today's questions are used up. The ledger is still here tomorrow.",
   unavailable: "The ledger couldn't be read just now. Your charts still can.",
   network: "Couldn't reach the ledger. Check your connection and try again.",
 };

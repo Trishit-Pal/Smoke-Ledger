@@ -111,27 +111,30 @@ export interface FallbackInput {
 
 export async function runWithFallback(input: FallbackInput): Promise<FallbackResult> {
   const started = Date.now();
-  const queue = input.providers.filter(isDisclosed);
   const failed: ProviderFailure[] = [];
 
-  for (let i = 0; i < queue.length; i++) {
+  // Build every disclosed provider's client first (cheap: no network), so the time budget is shared
+  // only among providers that can actually run; a vendor with no key never shrinks the others' slice.
+  // Undisclosed vendors are filtered out before any client of theirs is built.
+  const runnable: { provider: ChatProvider; client: ChatModelClient }[] = [];
+  for (const provider of input.providers.filter(isDisclosed)) {
+    const made = clientOf(provider);
+    if ('error' in made) failed.push(failureOf(provider.id, made.error));
+    else if (made.client) runnable.push({ provider, client: made.client });
+  }
+
+  for (let i = 0; i < runnable.length; i++) {
     const remaining = input.budgetMs - (Date.now() - started);
     if (remaining <= 0) break;
-    const provider = queue[i];
-    const made = clientOf(provider);
-    if ('error' in made) {
-      failed.push(failureOf(provider.id, made.error));
-      continue;
-    }
-    if (!made.client) continue;
+    const { provider, client } = runnable[i];
     try {
       const result = await runLedgerChatTurn({
-        anthropic: guarded(made.client),
+        anthropic: guarded(client),
         model: provider.model(),
         ctx: input.ctx,
         history: input.history,
         question: input.question,
-        signal: AbortSignal.timeout(attemptBudgetMs(remaining, queue.length - i)),
+        signal: AbortSignal.timeout(attemptBudgetMs(remaining, runnable.length - i)),
       });
       return { ...result, providerId: provider.id, failed };
     } catch (e) {

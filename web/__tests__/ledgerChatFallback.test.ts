@@ -59,13 +59,15 @@ beforeEach(() => {
 const input = (providers: readonly ChatProvider[], budgetMs = 25_000) => ({ providers, ctx, history: [], question: 'q', budgetMs });
 
 describe('runWithFallback', () => {
-  test('the first provider serves when it works, and no other client is built', async () => {
+  test('the first provider serves when it works, and the next one is never called', async () => {
     const a = provider('anthropic', { model: () => 'm1' });
-    const b = provider('anthropic', { model: () => 'm2' });
+    const bCreate = vi.fn(async () => ({}));
+    const b = provider('anthropic', { model: () => 'm2', create: bCreate });
     const out = await runWithFallback(input([a, b]));
     expect(out.providerId).toBe('anthropic');
     expect(out.failed).toEqual([]);
-    expect(b.made).toBe(0);
+    expect(bCreate).not.toHaveBeenCalled();
+    expect(mocks.turn).toHaveBeenCalledTimes(1);
   });
 
   test('a provider failure restarts the whole turn on the next one', async () => {
@@ -83,7 +85,7 @@ describe('runWithFallback', () => {
     const a = provider('anthropic', { model: () => 'm1' });
     const b = provider('anthropic', { model: () => 'm2' });
     await expect(runWithFallback(input([a, b]))).rejects.toThrow('our own bug');
-    expect(b.made).toBe(0);
+    expect(mocks.turn).toHaveBeenCalledTimes(1);
   });
 
   test('every provider failing gives one calm error that carries no content', async () => {
@@ -150,11 +152,12 @@ describe('runWithFallback', () => {
     const hangs = (_p: unknown, o?: { signal?: AbortSignal }) =>
       new Promise((_, reject) => o?.signal?.addEventListener('abort', () => reject(new Error('timed out'))));
     const slow = provider('anthropic', { model: () => 'm1', create: hangs as never });
-    const b = provider('anthropic', { model: () => 'm2' });
+    const bCreate = vi.fn(async () => ({}));
+    const b = provider('anthropic', { model: () => 'm2', create: bCreate });
     const err = await runWithFallback(input([slow, b], 40)).catch((e) => e);
     expect(err).toBeInstanceOf(ChatUpstreamError);
     expect(err.failed).toHaveLength(1);
-    expect(b.made).toBe(0);
+    expect(bCreate).not.toHaveBeenCalled();
   });
 
   test('each attempt gets its own abort signal, slice-limited', async () => {
@@ -169,6 +172,30 @@ describe('runWithFallback', () => {
     expect(seen).toHaveLength(2);
     expect(seen[0]).not.toBe(seen[1]);
     expect(seen.every((s) => s instanceof AbortSignal)).toBe(true);
+  });
+});
+
+describe('time slices count only providers that can actually run', () => {
+  test('a later provider with no key does not shrink the first one: it gets the whole budget', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      await runWithFallback(input([provider('anthropic', { model: () => 'm1' }), provider('anthropic', { client: () => null })]));
+      expect(timeout).toHaveBeenCalledTimes(1);
+      expect(timeout.mock.calls[0][0]).toBeGreaterThan(24_000);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  test('two runnable providers still share the budget', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const boom = async () => { throw new UpstreamBoom(503); };
+      await runWithFallback(input([provider('anthropic', { model: () => 'm1', create: boom }), provider('anthropic', { model: () => 'm2' })]));
+      expect(timeout.mock.calls[0][0]).toBeLessThanOrEqual(12_500);
+    } finally {
+      timeout.mockRestore();
+    }
   });
 });
 

@@ -156,12 +156,22 @@ describe('state from GET and the initial question', () => {
 
   test('before opt-in, one quiet line under the box says consent is needed, outside the pinned notice', () => {
     // Shown once the state says "not consented"; the consent card, when open, already says it, so no repeat there.
+    // Hidden while loading too: right after "Turn on and ask" the consent write is in flight and the state
+    // still says "not consented", so the line would flash "Off until you consent" at the reader who just did.
     expect(panel).toContain("needsConsent: 'Off until you consent to AI processing of your ledger data. Type a question to see what is sent.'");
-    expect(panel).toMatch(/state && !state\.consented && status !== 'consent' \? \(\s*<p[^>]*>\{COPY\.needsConsent\}<\/p>/);
+    expect(panel).toMatch(
+      /state && !state\.consented && status !== 'consent' && status !== 'loading' \? \(\s*<p[^>]*>\{COPY\.needsConsent\}<\/p>/,
+    );
     // The line sits under the input (after the form field), never inside the consent card.
     expect(panel.indexOf('{COPY.needsConsent}')).toBeGreaterThan(panel.indexOf('placeholder="Ask your ledger…"'));
     // It is not part of what readers consent to: the hash-pinned notice text does not contain it.
     expect(LEDGER_CHAT_NOTICE_TEXT).not.toContain('Off until you consent');
+  });
+
+  test('the limit message is true for both caps: it never tells a reader they used up a limit they did not', () => {
+    // 429 comes from the reader's own cap or the shared daily cap; the route cannot tell the panel which.
+    expect(panel).toContain("rateLimited: \"Today's questions are used up. The ledger is still here tomorrow.\"");
+    expect(panel).not.toContain("You've reached today's limit");
   });
 
   test('after Turn on and ask, the state is read again so starters appear without a reload', () => {

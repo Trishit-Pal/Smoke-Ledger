@@ -1,7 +1,8 @@
 /**
- * Release gate for the V3 privacy policy and terms (owner decision O1, Task 12).
- * Bumping LEGAL_VERSIONS asks every live reader to accept again, so it must not
- * happen while the policy still says the EU representative is "being appointed".
+ * Release gate for the privacy policy and terms. Bumping LEGAL_VERSIONS asks every live reader to
+ * accept again. Decision O-MVP (2026-11-05, docs/legal/owner-actions.md section 2): the Ask the
+ * ledger launch bumps before an EU representative is signed, so the policy must keep saying the
+ * representative is being appointed until one is named.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,7 +11,10 @@ import { EU_REPRESENTATIVE, euRepresentativeIsNamed } from '@/lib/legalEntity';
 
 const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '../..', rel), 'utf8');
 
-/** The versions live readers accepted before V3. Change only when a bump has shipped. */
+/**
+ * The versions live readers had accepted before the latest bump. Move them to LEGAL_VERSIONS once
+ * that bump has shipped (after the 2026-11-05 launch merges, both become '2026-11-05').
+ */
 const PUBLISHED = { terms: '2026-05-19', privacy: '2026-11-02' } as const;
 
 describe('legal release gate', () => {
@@ -32,21 +36,22 @@ describe('legal release gate', () => {
     expect(read('docs/legal/privacy-policy.md')).toContain('being appointed');
   });
 
-  it('terms and privacy are bumped together, so one /consent screen covers both', () => {
-    expect(LEGAL_VERSIONS.terms > PUBLISHED.terms).toBe(true);
-    expect(LEGAL_VERSIONS.privacy > PUBLISHED.privacy).toBe(true);
-    expect(LEGAL_VERSIONS.terms).toBe(LEGAL_VERSIONS.privacy);
+  it('the chat launch bumped terms and privacy together, and no later version goes below it', () => {
+    // One /consent screen covered both at launch. Later bumps may move either document on its own.
+    const LAUNCH = '2026-11-05';
+    expect(LEGAL_VERSIONS.terms >= LAUNCH).toBe(true);
+    expect(LEGAL_VERSIONS.privacy >= LAUNCH).toBe(true);
   });
 
   it('the live privacy version opens the chat gate', () => {
     expect(isChatPolicyLive(LEGAL_VERSIONS.privacy)).toBe(true);
   });
 
-  it('the chat gate stays shut at exactly the privacy version readers accepted', () => {
-    // A literal, not PUBLISHED.privacy: PUBLISHED moves when the bump ships, the gate date must not.
+  it('the chat gate stays shut at the last policy that did not describe the chat', () => {
+    // Literals, not PUBLISHED: PUBLISHED moves when a bump ships, the gate date must not.
     expect(CHAT_UNDISCLOSED_PRIVACY).toBe('2026-11-02');
     expect(CHAT_UNDISCLOSED_PRIVACY <= PUBLISHED.privacy).toBe(true);
-    expect(isChatPolicyLive(PUBLISHED.privacy)).toBe(false);
+    expect(isChatPolicyLive('2026-11-02')).toBe(false);
     expect(isChatPolicyLive('2026-11-03')).toBe(true);
   });
 

@@ -5,7 +5,8 @@
 //   - providers.ts puts Anthropic first, then everything in this array, in order.
 //   - A turn runs on the first provider; if its model call throws (rate limit, 5xx, timeout, bad
 //     key, network), the WHOLE turn restarts on the next provider. You do not write the retry loop.
-//   - A provider whose client() returns null (no key set) is skipped, so unset keys are harmless.
+//   - A provider whose client() returns null (no key set) is skipped, and does not shrink the time
+//     the others get, so unset keys are harmless. A client() that throws is logged and skipped.
 //
 // One entry per vendor (preferred), each with its own key:
 //   { id, label, model(), client() }  ->  see ChatProvider in ../fallback.ts

@@ -1,4 +1,6 @@
-const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? 'https://smokeledger.app';
+// A blank value (eas.json ships the key as a placeholder) counts as unset: a relative legal link
+// cannot be opened from the app, so it falls back to the default origin.
+const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim() || 'https://smokeledger.app';
 
 // 2026-11-05: the Ask the ledger launch. Terms and privacy move together, so one /consent screen
 // asks every live reader to accept the rewritten documents (and answer the chat Yes/No). Owner

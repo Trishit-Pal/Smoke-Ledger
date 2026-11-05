@@ -13,12 +13,12 @@ describe('eas.json build profiles', () => {
     expect(eas.build[profile].env?.EXPO_PUBLIC_LEDGER_CHAT_ENABLED).toBe('true');
   });
 
-  it('keeps the web origin and Supabase values as empty placeholders: the owner fills them, never the repo', () => {
-    for (const profile of ['preview', 'production']) {
-      const env = eas.build[profile].env ?? {};
-      for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_ANON_KEY', 'EXPO_PUBLIC_WEB_BASE_URL']) {
-        expect(env[key]).toBe('');
-      }
-    }
+  // The owner fills these public values in eas.json before a store build (owner-actions section 8
+  // step 6); a blank origin would make the Ask screen report "unavailable". Once set, it must be an
+  // https origin with no path, because the app appends /api/ledger-chat and /privacy to it.
+  it.each(['preview', 'production'])('%s: the web origin, when set, is a bare https origin', (profile) => {
+    const origin = eas.build[profile].env?.EXPO_PUBLIC_WEB_BASE_URL ?? '';
+    if (origin === '') return;
+    expect(origin).toMatch(/^https:\/\/[^/\s]+$/);
   });
 });

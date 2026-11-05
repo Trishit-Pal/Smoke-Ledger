@@ -76,7 +76,7 @@ test.describe('ask the ledger', () => {
 
     await dialog.getByLabel('Ask your ledger').fill('And the month before?');
     await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
-    await expect(dialog.getByText(/reached today/)).toBeVisible();
+    await expect(dialog.getByText(/questions are used up/)).toBeVisible();
   });
 
   test('masks figures for a discreet reader and fits a 320px viewport', async ({ page, onboarded }) => {

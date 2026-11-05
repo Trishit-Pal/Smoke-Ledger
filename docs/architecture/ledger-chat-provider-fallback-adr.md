@@ -24,7 +24,7 @@ The route runs each turn through `runWithFallback` (`web/lib/server/ledgerChat/f
 - **Disclosure check.** A provider runs only if its id is in `LEDGER_CHAT_DISCLOSED_PROVIDERS` **and** the notice text contains its label. This is checked before `client()` is called, so an undisclosed vendor's client is never even built.
 - **Whole-turn restart.** When the model call throws, the whole turn restarts on the next provider. The tools only read in-memory data, so a rerun is safe, and two vendors' tool formats are never mixed inside one turn.
 - **Only model-call failures fail over.** The runner wraps each client's `messages.create`; errors from anywhere else propagate unchanged, as before (a 500).
-- **Time slices.** Each attempt gets an equal share of what is left of the 25 s budget, never below 8 s and never more than is left. When nothing is left, it stops.
+- **Time slices.** The runner first builds every disclosed provider's client (cheap, no network). It then shares what is left of the 25 s budget evenly among the providers that can actually run, so a vendor with no key never shrinks the others. Each slice is never below 8 s and never more than is left; when nothing is left, it stops. A `client()` that throws (a malformed key, a broken adapter) is recorded as a failure and skipped.
 - **Logs** carry provider id, error class and status only, never a message. Every provider failing becomes one `ChatUpstreamError`, which the route maps to the existing 502 `dependency_failure`.
 - **Tripwire.** `web/__tests__/ledgerChatFallback.test.ts` fails if a registered provider is not named in the notice.
 
