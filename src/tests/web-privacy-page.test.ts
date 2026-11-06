@@ -54,7 +54,7 @@ describe('privacy policy', () => {
   });
 
   it('names every recipient that touches personal data', () => {
-    for (const recipient of ['Supabase', 'Vercel', 'Anthropic', 'MSG91', 'Cloudflare Turnstile', 'LEGAL_ENTITY.emailDeliveryProvider', 'Expo']) {
+    for (const recipient of ['Supabase', 'Vercel', 'Groq', 'Google LLC', 'OpenRouter', 'MSG91', 'Cloudflare Turnstile', 'LEGAL_ENTITY.emailDeliveryProvider', 'Expo']) {
       expect(page).toContain(recipient);
     }
   });
@@ -64,7 +64,7 @@ describe('privacy policy', () => {
     expect(page).toContain('CHAT_HISTORY_MAX_TURNS');
     expect(page).toContain('GOAL_WINDOW_LOG_LIMIT');
     expect(page).toContain('RECENT_MAX_ROWS');
-    expect(page).toContain('LEGAL_ENTITY.anthropicRetention');
+    expect(page).toContain('LEGAL_ENTITY.aiVendorRetention');
   });
 
   it('names everything the notice says is sent: goal history, price history, edit dates (web and mobile)', () => {

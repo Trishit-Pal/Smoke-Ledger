@@ -80,3 +80,19 @@ A and B differ in where translation happens. A translates once per vendor, in th
 2. [x] Route uses `runWithFallback`; tests for failover, time slices, the disclosure check, the calm 502 and a missing key.
 3. [ ] Owner: when adding a vendor, follow owner-actions §8 step 9, starting with the vendor's data and training terms.
 4. [ ] Revisit this ADR before adding streaming.
+
+## Amendment, 2026-11-06: six keys, free first, Anthropic removed
+
+**Decision (owner, 2026-11-06):** Anthropic is removed. `PROVIDERS` is now a fixed table of six slots, tried in order: `GROQ_API_KEY_1..3` (free), `GEMINI_API_KEY_1..2` (paid, billing-linked project), `OPENROUTER_API_KEY` (paid, `data_collection: 'deny'`). The goal is zero cost first, with paid keys only as a last resort. Every vendor runs through one adapter, `providers/aiSdk.ts`: the Vercel AI SDK (`generateText`, tools without `execute`) on the inside, the Anthropic message shape on the outside. So `turn.ts`, its guards and `fallback.ts` are unchanged, and `@anthropic-ai/sdk` is used for types only. `providers/langchain.ts` is gone; the AI SDK took its place (option C's dependency concern applied to LangChain, not to a thin SDK adapter).
+
+**Why this order and these terms** (checked 2026-11-06; re-check before each notice version):
+
+- Free Gemini uses prompts to improve Google products, human reviewers may read them, and it is not allowed in apps used in the EEA, Switzerland or the UK. Gemini is therefore used only from a billing-linked project. Gemini limits are per project, not per key.
+- Groq does not train on customer data and offers self-serve Zero Data Retention, even on the free tier, so it goes first. Its limits are per org.
+- OpenRouter goes last, with data collection denied (in practice, paid models).
+
+**Consequences:**
+
+- The notice names Groq, Google and OpenRouter. `LEDGER_CHAT_NOTICE_VERSION` moves to 2026-11-06 (opted-in readers are asked again), and `LEGAL_VERSIONS` moves to 2026-11-06 with the privacy and terms text.
+- Prompt caching and the effort setting no longer apply (the adapter drops `cache_control` and `output_config`).
+- With the 8 s slice floor, about three slow attempts fit in the 25 s budget. Fast failures (429, 401) let all six run. A turn whose free keys hang may time out before it reaches a paid key; this was accepted.

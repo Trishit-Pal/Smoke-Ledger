@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildToolContext, type ToolContext } from '@/domain/ledgerChat/context';
 import { isCurrentChatOptIn } from '@/domain/ledgerChat/notice';
+import { answerFor } from '@/domain/ledgerChat/safety';
 import { starterQuestions } from '@/domain/ledgerChat/starters';
 import {
   chatRequestSchema,
@@ -20,7 +21,9 @@ import { serverLog } from '@web/lib/log';
 import { resolveChatCaller } from '@web/lib/server/ledgerChat/auth';
 import { isLedgerChatEnabled } from '@web/lib/server/ledgerChat/enabled';
 import { ChatUpstreamError, hasUsableProvider, runWithFallback } from '@web/lib/server/ledgerChat/fallback';
-import { PROVIDERS } from '@web/lib/server/ledgerChat/providers';
+import { ClassifierUnavailable } from '@web/lib/server/ledgerChat/classifier';
+import { groqApiKeys, PROVIDERS } from '@web/lib/server/ledgerChat/providers';
+import { screenTurn } from '@web/lib/server/ledgerChat/screen';
 import {
   GOAL_WINDOW_LOG_LIMIT,
   loadDailySummary,
@@ -69,7 +72,8 @@ export async function POST(request: Request) {
   try {
     if (!isLedgerChatEnabled()) return fail('feature_disabled', 503);
     // No model key for any vendor the consent notice names: nothing to send to, so say so before reading anything.
-    if (!hasUsableProvider(PROVIDERS)) return fail('server_misconfigured', 500);
+    // The safety classifier runs on the Groq keys and fails closed, so no Groq key means no chat either.
+    if (!hasUsableProvider(PROVIDERS) || groqApiKeys().length === 0) return fail('server_misconfigured', 500);
 
     const resolved = await resolveChatCaller(request);
     if (!resolved.ok) return fail(resolved.error, resolved.status);
@@ -93,14 +97,30 @@ export async function POST(request: Request) {
     ]);
     if (!allowed) return fail('rate_limited', 429);
 
+    // Safety screening after the cap (a blocked question still spends it, so probing costs the
+    // prober) and before the ledger is read: a blocked turn loads nothing and sends nothing.
+    const screenStarted = Date.now();
+    const screened = await screenTurn({
+      history: parsed.data.history,
+      question: parsed.data.question,
+      signal: AbortSignal.timeout(TURN_BUDGET_MS),
+    });
+    if (!screened.ok) {
+      // Category and stage only: never the question.
+      serverLog('info', 'api.ledger_chat.blocked', { category: screened.category, stage: screened.stage });
+      const blocked: ChatResponse = { answer: answerFor(screened.category), rows: [], toolsUsed: [] };
+      return NextResponse.json(blocked);
+    }
+
     const ctx = await loadLedgerContext(db, userId, gate.profile);
 
     const result = await runWithFallback({
       providers: PROVIDERS,
       ctx,
-      history: parsed.data.history,
+      history: screened.history,
       question: parsed.data.question,
-      budgetMs: TURN_BUDGET_MS,
+      // The whole-turn budget, less what the safety screening used.
+      budgetMs: TURN_BUDGET_MS - (Date.now() - screenStarted),
     });
 
     // Counts and names only: never the question, the answer, or who asked.
@@ -109,12 +129,17 @@ export async function POST(request: Request) {
       ...result.usage,
       provider: result.providerId,
       failedProviders: result.failed.length,
+      droppedHistoryTurns: screened.droppedTurns,
       ms: Date.now() - startedAt,
     });
 
     const body: ChatResponse = { answer: result.answer, rows: result.rows, toolsUsed: result.toolsUsed };
     return NextResponse.json(body);
   } catch (error) {
+    if (error instanceof ClassifierUnavailable) {
+      serverLog('error', 'api.ledger_chat.classifier_unavailable', { ms: Date.now() - startedAt });
+      return fail('dependency_failure', 502);
+    }
     if (error instanceof ChatUpstreamError) {
       serverLog('error', 'api.ledger_chat.upstream', { failed: error.failed, ms: Date.now() - startedAt });
       return fail('dependency_failure', 502);

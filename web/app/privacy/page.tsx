@@ -65,7 +65,7 @@ const sections = [
     body: [
       'Supabase (United States, AWS us-east-2 in Ohio) hosts our database and sign-in. It holds everything listed above except the Ask the ledger conversation.',
       `Vercel (United States) runs the web app, so every web request passes through it, and it keeps request logs under its own retention. It also keeps your brand names in a short-lived cache for up to ${brandCacheMinutes} minutes so pages load faster; erasing your data or deleting your account clears that cache.`,
-      'Anthropic, PBC (United States) writes the answers in Ask the ledger, and only if you turn it on. Exactly what it receives is set out in the AI section below.',
+      'Groq, Inc., Google LLC and OpenRouter, Inc. (all United States) write the answers in Ask the ledger, and only if you turn it on. They are tried in that order, and only the one that answers receives your question and the figures. Groq also receives every question, with the earlier turns of the conversation, to check it for safety before any model answers. Exactly what it receives is set out in the AI section below.',
       'MSG91 (India) sends the one-time code by SMS if you sign in with your mobile number. It receives the number and the code.',
       'Cloudflare Turnstile, when switched on, checks the sign-in and sign-up forms for automated abuse. It sees your browser and IP address while it checks.',
       `${LEGAL_ENTITY.emailDeliveryProvider} delivers our sign-in, confirmation and password-reset emails. It receives your email address and the email we send.`,
@@ -76,7 +76,7 @@ const sections = [
   {
     title: 'Transfers outside India and the EU',
     body: [
-      'Our database is in the United States (Supabase, AWS us-east-2), and Vercel and Anthropic are in the United States too. Your data is therefore processed outside India and the European Economic Area.',
+      'Our database is in the United States (Supabase, AWS us-east-2), and Vercel, Groq, Google and OpenRouter are in the United States too. Your data is therefore processed outside India and the European Economic Area.',
       `For readers in the EU, these transfers rely on the European Commission’s Standard Contractual Clauses, which our providers’ data-processing terms use. We are putting those agreements and an assessment of the transfers in place. You can ask for a copy at ${contactEmail}.`,
       'Indian law currently restricts no country for these transfers.',
     ],
@@ -87,7 +87,7 @@ const sections = [
       'Your ledger, profile and settings: until you erase them or delete your account. We never delete an account for being inactive.',
       `Security records: ${RETENTION.auditEventsMonths} months, then deleted by a daily job. This includes the record that you erased your data or deleted your account. That record holds a one-way hashed identifier, the date and, while your account exists, a link to it, but not your name or your ledger, and it lets us show that your request was carried out.`,
       `Error reports: ${RETENTION.errorEventsDays} days. Usage events: ${RETENTION.usageEventsMonths} months, or until you turn analytics off, which deletes them. Rate-limit counters: about ${RETENTION.rateLimitCountersDays} days.`,
-      'The Ask the ledger conversation: on the web, in your browser until you clear it; on mobile, in the app’s memory until you close the Ask screen. Anthropic’s copy: as described in the AI section.',
+      'The Ask the ledger conversation: on the web, in your browser until you clear it; on mobile, in the app’s memory until you close the Ask screen. The AI vendor’s copy: as described in the AI section.',
       'Our database host may keep backup copies for a limited time under its own schedule, so erased data can remain in a backup until it expires. We do not use backups to bring back data you erased.',
       `When India’s DPDP rules apply, they may require some processing records to be kept for a year. We meet that with the security records above, kept for ${RETENTION.auditEventsMonths} months, not with your ledger.`,
     ],
@@ -107,7 +107,7 @@ const sections = [
     title: 'Withdrawing consent',
     body: [
       'Usage analytics: turn it off in Settings. Collection stops and your past usage events are deleted.',
-      'Ask the ledger: turn it off in Settings. Nothing more is sent and the conversation on your device is cleared. Whatever Anthropic already received ages out on its own schedule.',
+      'Ask the ledger: turn it off in Settings. Nothing more is sent and the conversation on your device is cleared. Whatever the AI vendor already received ages out on its own schedule.',
       'Health data: Settings › Withdraw consent. A ledger cannot be kept without this consent, so withdrawing it ends in one of two ways you choose: erase everything and keep your login, or delete the account. You can export a copy first.',
       'Withdrawing does not make earlier processing unlawful, and it is as easy as giving consent was.',
     ],
@@ -124,12 +124,12 @@ const sections = [
   {
     title: 'The AI feature, and no automated decisions',
     body: [
-      'Ask the ledger is in the web app and the mobile app, and off until you turn it on. On the web it is a small box at the bottom of the Dashboard, Trends, History, Goals and Settings pages (an “Ask” button on a phone); on mobile it is an “Ask” button on every tab except Log. It answers questions about your own ledger with an AI model run by Anthropic. Each answer is labelled “Written by AI”. It can be wrong, and it is not medical advice.',
-      `When you ask a question, our server reads up to ${GOAL_WINDOW_LOG_LIMIT.toLocaleString('en-US')} of your entries from the last 90 days, your daily totals for up to the past year, and all your goals, to work out the figures. Raw entries go to Anthropic only as described here.`,
-      `Anthropic receives: your question; up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of the conversation, your questions and its replies, so it can follow on; a short context line with today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, the kind and state of your active goals, and whether discreet mode is on; and the results of the lookups it asks for. Those results are figures such as totals and comparisons, savings and spend outlook, peak hours and weekdays, pairings of mood and trigger, share of spend by brand, goal progress and targets, your goal history (type, target, dates and outcome, including paused, completed and abandoned goals), your price history (brand, variant, unit price, pack size and date, taken from the prices you recorded on entries in the last 90 days), the dates you edited entries (never what they said before), and the app’s rules-based insights.`,
+      'Ask the ledger is in the web app and the mobile app, and off until you turn it on. On the web it is a small box at the bottom of the Dashboard, Trends, History, Goals and Settings pages (an “Ask” button on a phone); on mobile it is an “Ask” button on every tab except Log. It answers questions about your own ledger with an AI model run by Groq, Google or OpenRouter, tried in that order: when one is busy or down, the next answers. Each answer is labelled “Written by AI”. It can be wrong, and it is not medical advice.',
+      `When you ask a question, our server reads up to ${GOAL_WINDOW_LOG_LIMIT.toLocaleString('en-US')} of your entries from the last 90 days, your daily totals for up to the past year, and all your goals, to work out the figures. Raw entries go to the AI vendor that answers only as described here.`,
+      `Before any answer, Groq checks your question and the earlier turns for safety (prompt-injection and harmful-content checks); a question that fails is not answered and no ledger data is read for it. The AI vendor that answers receives: your question; up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of the conversation, your questions and its replies, so it can follow on; a short context line with today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, the kind and state of your active goals, and whether discreet mode is on; and the results of the lookups it asks for. Those results are figures such as totals and comparisons, savings and spend outlook, peak hours and weekdays, pairings of mood and trigger, share of spend by brand, goal progress and targets, your goal history (type, target, dates and outcome, including paused, completed and abandoned goals), your price history (brand, variant, unit price, pack size and date, taken from the prices you recorded on entries in the last 90 days), the dates you edited entries (never what they said before), and the app’s rules-based insights.`,
       `When a question needs the detail, it also receives up to ${RECENT_MAX_ROWS} individual entries from the last ${RECENT_MAX_DAYS} days: date, hour, quantity, trigger, mood before and after, craving, situation, brand, and the first ${NOTE_MAX_CHARS} characters of your note.`,
       'In discreet mode, brand names are replaced with aliases, and notes and variants are not sent. A brand name you type into a question is sent as you typed it. Your name, date of birth, gender, email, phone number and place are never sent.',
-      LEGAL_ENTITY.anthropicRetention,
+      LEGAL_ENTITY.aiVendorRetention,
       'On the web, the conversation is kept in your browser, under your Ask the ledger consent, until you choose Clear conversation, turn the feature off, sign out, erase your data, delete your account or turn discreet mode on. On mobile it is kept only in the app’s memory and is gone when you close the Ask screen. If your consent to this policy is out of date, Ask the ledger refuses until you accept the current one.',
       'Smoke Ledger makes no decision about you that has a legal or similarly significant effect. The app suggests goals and shows insights worked out from your entries; you can ignore any of them.',
     ],

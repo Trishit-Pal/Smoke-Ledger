@@ -18,7 +18,7 @@ The facts below are read from `src/lib/privacy/retention.ts`, `supabase/migratio
 | Brands cache | Vercel Data Cache, tag `brands:<uid>` | 600 seconds | Expiry, or revalidated on write, erase and reset | Revalidated rather than dropped, to protect free-tier egress |
 | Database backups | Supabase | Per Supabase plan | Provider schedule | Owner to confirm the exact window in the dashboard and state it in the policy |
 | Platform request logs | Vercel, Supabase | Provider defaults | Provider schedule | The app logs no personal data in them; IP addresses appear in platform logs. Owner to confirm the windows |
-| Chat question and reply | Anthropic API | Up to 30 days per Anthropic's terms, longer only if kept for safety or legal reasons | Anthropic | We store none. Not used for training per Anthropic's terms. Exact wording is a lawyer item |
+| Chat question and reply | Groq, Google or OpenRouter API (the one that answers) | Groq: none (Zero Data Retention). Google: a limited time for misuse detection (paid terms). OpenRouter: none (logging off; hosts that store data refused) | The vendor | We store none. Not used for training. Exact wording is a lawyer item |
 
 ## Daily purge job
 

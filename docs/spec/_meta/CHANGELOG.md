@@ -2,7 +2,13 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
+<!-- Format: ## 2026-11-06 — 10b4a9d (+ working tree)
+- security-privacy: Ask the ledger now runs on six ordered keys (Groq free first, then paid Gemini, then OpenRouter with data collection denied) through one AI SDK adapter; Anthropic removed; notice and retention text name the three vendors.
+- infra-ops: the Anthropic key and model vars replaced by the six key slots, per-vendor model overrides and the AI SDK packages; spend caps are OpenRouter credit plus the global daily cap.
+- security-privacy: Ask the ledger safety guardrails in five layers (rules on the question and on every earlier turn, the Groq Llama Guard 4 / Prompt Guard 2 classifier failing closed, a Safety block in the prompt, an answer check); one fixed beyond-scope reply, plus the emergency line for self-harm; notice and policy say Groq checks every question.
+- architecture: re-verified; `web/lib/server/ledgerChat/` gained `providers/aiSdk.ts` and lost `providers/langchain.ts`, with no structural change.
+
+## <date> — <commit> ; then a bullet per section changed. -->
 
 ## 2026-11-05 — 55afdcd
 - security-privacy: the runner shares the time budget only among providers that can run and skips a client() that throws; one limit line true for both caps; the bump paragraph and the history note now match decision O-MVP.

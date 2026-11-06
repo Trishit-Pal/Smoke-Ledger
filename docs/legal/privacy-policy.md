@@ -1,6 +1,6 @@
 # Smoke Ledger Privacy Policy
 
-Effective date: 2026-11-05
+Effective date: 2026-11-06
 
 > Mirror of `web/app/privacy/page.tsx`. The page renders operator facts from `src/lib/legalEntity.ts`, retention periods from `src/lib/privacy/retention.ts` and the promises from `src/lib/privacy/promises.ts`; the values below are those constants today. `src/tests/web-privacy-page.test.ts` fails if a page heading is missing here.
 
@@ -45,7 +45,7 @@ Each promise has a mechanism checker in `src/tests/privacy-promises.test.ts`.
 ## Who receives it
 - **Supabase** (US, AWS us-east-2, Ohio): database and sign-in; everything except the chat conversation.
 - **Vercel** (US): runs the web app; request logs under its own retention; brand names cached for up to 10 minutes (`BRANDS_CACHE_TTL_SECONDS`), cleared on erase and delete.
-- **Anthropic, PBC** (US): Ask the ledger answers, only when turned on (see the AI section).
+- **Groq, Inc.**, **Google LLC** and **OpenRouter, Inc.** (all US): Ask the ledger answers, only when turned on, tried in that order; only the one that answers receives the question and figures, and Groq also checks every question and the earlier turns for safety (see the AI section).
 - **MSG91** (India): SMS one-time codes for phone sign-in; receives the number and the code.
 - **Cloudflare Turnstile**, when switched on: checks sign-in and sign-up forms; sees browser and IP address.
 - **Resend** (`emailDeliveryProvider`): sign-in, confirmation and password-reset emails; receives the email address and the email.
@@ -53,7 +53,7 @@ Each promise has a mechanism checker in `src/tests/privacy-promises.test.ts`.
 - Used only to run the service; written data-processing agreements being confirmed with each. Nothing shared with advertisers or data brokers. Disclosure to authorities only when the law requires.
 
 ## Transfers outside India and the EU
-- Database, Vercel and Anthropic are in the US, so data is processed outside India and the EEA.
+- Database, Vercel, Groq, Google and OpenRouter are in the US, so data is processed outside India and the EEA.
 - EU transfers rely on the Commission's Standard Contractual Clauses used in the providers' data-processing terms; the agreements and a transfer assessment are being put in place. Copy on request.
 - Indian law currently restricts no country for these transfers.
 
@@ -81,7 +81,7 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 
 ## Withdrawing consent
 - Usage analytics off: collection stops and past usage events are deleted.
-- Ask the ledger off: nothing more is sent and the conversation on your device is cleared; Anthropic's copy ages out on its schedule.
+- Ask the ledger off: nothing more is sent and the conversation on your device is cleared; the AI vendor's copy ages out on its schedule.
 - Health data: Settings › Withdraw consent ends in erase (keep login) or delete, the reader's choice; export offered first.
 - Withdrawal does not affect earlier processing and is as easy as giving consent.
 
@@ -92,12 +92,13 @@ When DPDP applies, its one-year processing-record rule is met by the security re
 - Nothing in the terms waives the right to complain to a regulator.
 
 ## The AI feature, and no automated decisions
-- In the web and mobile apps, off until turned on. Web: a box at the bottom of Dashboard, Trends, History, Goals and Settings (an Ask button on a phone), not on Log. Mobile: an Ask button on every tab except Log. Answers from an Anthropic model, labelled "Written by AI"; can be wrong; not medical advice.
+- In the web and mobile apps, off until turned on. Web: a box at the bottom of Dashboard, Trends, History, Goals and Settings (an Ask button on a phone), not on Log. Mobile: an Ask button on every tab except Log. Answers from a Groq, Google or OpenRouter model (tried in that order), labelled "Written by AI"; can be wrong; not medical advice.
 - Our server reads up to 2,000 entries from the last 90 days (`GOAL_WINDOW_LOG_LIMIT`) daily totals for up to the past year, and all your goals to compute figures.
-- Anthropic receives: the question; up to 10 earlier turns (`CHAT_HISTORY_MAX_TURNS`), both sides; a context line (date, time zone, currency, locale, baseline, days with entries, kind and state of active goals, discreet flag); and requested lookup results (totals, comparisons, savings, spend outlook, peak hours and weekdays, mood/trigger pairings, brand share, goal progress and targets, goal history (type, target, dates and outcome, for paused, completed and abandoned goals too), price history (brand, variant, unit price, pack size and date, from the prices you recorded on entries in the last 90 days), the dates you edited entries (never what they said before), rules-based insights).
+- Before any answer, Groq checks the question and earlier turns for safety (Llama Guard 4, Prompt Guard 2); a failed check is answered with a fixed refusal and no ledger data is read.
+- The AI vendor that answers receives: the question; up to 10 earlier turns (`CHAT_HISTORY_MAX_TURNS`), both sides; a context line (date, time zone, currency, locale, baseline, days with entries, kind and state of active goals, discreet flag); and requested lookup results (totals, comparisons, savings, spend outlook, peak hours and weekdays, mood/trigger pairings, brand share, goal progress and targets, goal history (type, target, dates and outcome, for paused, completed and abandoned goals too), price history (brand, variant, unit price, pack size and date, from the prices you recorded on entries in the last 90 days), the dates you edited entries (never what they said before), rules-based insights).
 - When needed: up to 200 entries from the last 30 days (date, hour, quantity, trigger, moods, craving, situation, brand, first 120 characters of the note).
 - Discreet mode: aliased brands, no notes or variants; a brand typed into a question is sent as typed. Name, date of birth, gender, email, phone and place are never sent.
-- Anthropic's commercial terms say it may not train its models on this data. Anthropic says it deletes API inputs and outputs within 30 days, with exceptions (usage-policy flags, legal requirements). No shorter period has been arranged.
+- Groq: no training on this data; Zero Data Retention is on, so it keeps nothing. Google: paid Gemini API terms only, so no use to improve its products; kept for a limited time to detect misuse. OpenRouter: routed only to hosts that do not store or train on prompts (`data_collection: deny`); its own prompt logging is off. (`LEGAL_ENTITY.aiVendorRetention`)
 - Web: the conversation stays in the browser, under the chat consent, until Clear conversation, turning the feature off, sign-out, erase, delete or turning discreet mode on. Mobile: it stays in the app’s memory only and is gone when you close the Ask screen.
 - If your consent to the policy is out of date, Ask the ledger refuses until you accept the current one.
 - No decisions with legal or similarly significant effect. Goal suggestions and insights can be ignored.

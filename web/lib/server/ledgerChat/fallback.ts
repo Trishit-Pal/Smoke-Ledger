@@ -10,7 +10,7 @@ import { LEDGER_CHAT_DISCLOSED_PROVIDERS, LEDGER_CHAT_NOTICE_TEXT } from '@/doma
 import type { ChatHistoryTurn } from '@/domain/ledgerChat/types';
 import { runLedgerChatTurn, type ChatModelClient, type TurnResult } from './turn';
 
-/** One model vendor. Register it in providers.ts (Anthropic) or providers/langchain.ts (yours). */
+/** One key of one model vendor. Register it in providers.ts (the ordered slot table). */
 export interface ChatProvider {
   /** Stable id; must be listed in LEDGER_CHAT_DISCLOSED_PROVIDERS. */
   id: string;
@@ -80,9 +80,11 @@ class ProviderCallError extends Error {
 }
 
 function failureOf(providerId: string, error: unknown): ProviderFailure {
-  const cause = error as { name?: unknown; status?: unknown } | null;
+  // Vendor SDKs name the HTTP status differently: `status` (Anthropic-style), `statusCode` (AI SDK).
+  const cause = error as { name?: unknown; status?: unknown; statusCode?: unknown } | null;
   const failure: ProviderFailure = { providerId, errorName: typeof cause?.name === 'string' ? cause.name : 'Error' };
-  if (typeof cause?.status === 'number') failure.status = cause.status;
+  const status = cause?.status ?? cause?.statusCode;
+  if (typeof status === 'number') failure.status = status;
   return failure;
 }
 

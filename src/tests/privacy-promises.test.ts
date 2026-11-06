@@ -90,7 +90,7 @@ const CHECKERS: Record<DataPromiseKey, () => void> = {
       'web/lib/server/ledgerChat/turn.ts',
       'web/lib/server/ledgerChat/fallback.ts',
       'web/lib/server/ledgerChat/providers.ts',
-      'web/lib/server/ledgerChat/providers/langchain.ts',
+      'web/lib/server/ledgerChat/providers/aiSdk.ts',
     ]) {
       expect(read(rel)).not.toMatch(/\.(insert|upsert|update)\(/);
     }

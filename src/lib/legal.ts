@@ -2,14 +2,15 @@
 // cannot be opened from the app, so it falls back to the default origin.
 const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim() || 'https://smokeledger.app';
 
-// 2026-11-05: the Ask the ledger launch. Terms and privacy move together, so one /consent screen
+// 2026-11-06: the Ask the ledger launch (moved from 2026-11-05 when the AI vendors became Groq,
+// Google and OpenRouter in place of Anthropic). Terms and privacy move together, so one /consent screen
 // asks every live reader to accept the rewritten documents (and answer the chat Yes/No). Owner
 // decision: ship before an EU Art 27 representative is signed; the policy says "being appointed".
 // If this ships on a later day, change this date, both `Effective date:` lines in docs/legal/, and
 // nothing else (the gate tests read the constants).
 export const LEGAL_VERSIONS = {
-  terms: '2026-11-05',
-  privacy: '2026-11-05',
+  terms: '2026-11-06',
+  privacy: '2026-11-06',
   medicalDisclaimer: '2026-05-19',
 } as const;
 

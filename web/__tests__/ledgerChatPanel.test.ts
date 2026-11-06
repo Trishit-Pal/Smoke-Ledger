@@ -275,7 +275,7 @@ describe('chat consent notice', () => {
     expect(LEDGER_CHAT_NOTICE.sent).toContain('the kind and state of your active goals, and whether discreet mode is on.');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 200 of your entries from the last 30 days');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('first 120 characters of your note');
-    expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.anthropicRetention);
+    expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.aiVendorRetention);
     for (const exit of ['Clear conversation', 'turn this off', 'turn discreet mode on', 'sign out']) {
       expect(LEDGER_CHAT_NOTICE.device).toContain(exit);
     }

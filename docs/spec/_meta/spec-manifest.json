@@ -21,7 +21,7 @@
         "metro.config.js",
         "src/lib/routeGuard.ts"
       ],
-      "last_verified_commit": "55afdcd",
+      "last_verified_commit": "10b4a9d",
       "status": "current"
     },
     {
@@ -174,7 +174,7 @@
         "src/lib/askView.ts",
         "web/components/chat/**"
       ],
-      "last_verified_commit": "55afdcd",
+      "last_verified_commit": "10b4a9d",
       "status": "current"
     },
     {
@@ -191,7 +191,7 @@
         "docs/deployment/**",
         "docs/runbooks/**"
       ],
-      "last_verified_commit": "12e2d88",
+      "last_verified_commit": "10b4a9d",
       "status": "current"
     }
   ]

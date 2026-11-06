@@ -46,9 +46,13 @@ export const LEGAL_ENTITY = {
    * matches the live Supabase SMTP setting before the version bump.
    */
   emailDeliveryProvider: 'Resend',
-  /** From Anthropic's commercial terms and privacy centre (research notes, 2026-11-03). Re-check before each version. */
-  anthropicRetention:
-    'Anthropic’s commercial terms say it may not train its models on this data. Anthropic says it deletes what it receives through its API, and what it writes back, within 30 days, with exceptions: for example when a request is flagged under its usage policy, or when the law requires it to keep data longer. We have not arranged a shorter period with Anthropic.',
+  /**
+   * From Groq's "Your data" docs, the Gemini API Additional Terms (paid services) and OpenRouter's
+   * privacy docs (research notes, 2026-11-06). Re-check before each version. The Groq sentence is true
+   * only once Zero Data Retention is on in every Groq org whose key is set (owner-actions.md §8).
+   */
+  aiVendorRetention:
+    'Groq says it does not train models on this data, and we have turned on its Zero Data Retention setting, so it does not keep what it receives. Google receives it only under its paid Gemini API terms, which say Google does not use it to improve its products; Google keeps it for a limited time to detect misuse. OpenRouter is used only with hosts that do not store or train on what they receive, and OpenRouter does not keep the text of requests because we have not turned its prompt logging on.',
   helplines: {
     indiaQuitline: '1800-11-2356',
     emergencyIndia: '112',

@@ -199,7 +199,7 @@ jobs:
     env:
       # Ask the ledger on for this job's dev servers: the responsive sweep then
       # also checks the dock fits every viewport, and the chat specs below run.
-      # No Anthropic key: the specs mock /api/ledger-chat, so no model is called.
+      # No model key: the specs mock /api/ledger-chat, so no model is called.
       LEDGER_CHAT_ENABLED: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
