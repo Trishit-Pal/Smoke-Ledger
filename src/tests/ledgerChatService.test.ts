@@ -18,6 +18,7 @@ jest.mock('@/db/repositories/settings', () => ({ getSetting: jest.fn(), setSetti
 jest.mock('@/services/audit', () => ({ recordAuditEvent: jest.fn() }));
 
 const getSession = jest.fn();
+const refreshSession = jest.fn();
 const fetchMock = jest.fn();
 
 function reply(status: number, body: unknown) {
@@ -38,7 +39,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   process.env.EXPO_PUBLIC_WEB_BASE_URL = 'https://example.test';
   getSession.mockResolvedValue({ data: { session: { access_token: 'tok-123' } } });
-  (getSupabase as jest.Mock).mockReturnValue({ auth: { getSession } });
+  // By default a refresh yields no session: a 401 then means the reader really is signed out.
+  refreshSession.mockReset();
+  refreshSession.mockResolvedValue({ data: { session: null }, error: null });
+  (getSupabase as jest.Mock).mockReturnValue({ auth: { getSession, refreshSession } });
   (global as unknown as { fetch: jest.Mock }).fetch = fetchMock;
   fetchMock.mockReset();
 });
@@ -94,6 +98,56 @@ describe('askLedger', () => {
   ])('maps %i %s to %s', async (status, error, reason) => {
     fetchMock.mockReturnValueOnce(reply(status, { error }));
     expect(await askLedger('q', [])).toEqual({ ok: false, reason });
+  });
+
+  describe('a 401 retries once with a refreshed session', () => {
+    const unauthorized = () => reply(401, { error: 'unauthorized' });
+    const refreshed = (token: string) => ({ data: { session: { access_token: token } }, error: null });
+
+    it('refreshes, retries with the new token, and answers', async () => {
+      fetchMock.mockReturnValueOnce(unauthorized()).mockReturnValueOnce(reply(200, ANSWER));
+      refreshSession.mockResolvedValueOnce(refreshed('tok-new'));
+      expect(await askLedger('q', [])).toEqual({ ok: true, data: ANSWER });
+      expect(refreshSession).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok-123');
+      expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer tok-new');
+    });
+
+    it('does the same for the panel state GET', async () => {
+      fetchMock.mockReturnValueOnce(unauthorized()).mockReturnValueOnce(reply(200, STATE));
+      refreshSession.mockResolvedValueOnce(refreshed('tok-new'));
+      expect(await getChatState()).toEqual({ ok: true, data: STATE });
+      expect(fetchMock.mock.calls[1][1].method).toBe('GET');
+    });
+
+    it('gives up after one retry: a second 401 is signed_out, with one refresh and two requests', async () => {
+      fetchMock.mockReturnValueOnce(unauthorized()).mockReturnValueOnce(unauthorized());
+      refreshSession.mockResolvedValueOnce(refreshed('tok-new'));
+      expect(await askLedger('q', [])).toEqual({ ok: false, reason: 'signed_out' });
+      expect(refreshSession).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry when the refresh yields no session (really signed out)', async () => {
+      fetchMock.mockReturnValueOnce(unauthorized());
+      expect(await askLedger('q', [])).toEqual({ ok: false, reason: 'signed_out' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('a refresh that throws is signed_out, never a crash and never a second request', async () => {
+      fetchMock.mockReturnValueOnce(unauthorized());
+      refreshSession.mockRejectedValueOnce(new Error('offline'));
+      expect(await askLedger('q', [])).toEqual({ ok: false, reason: 'signed_out' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([403, 429, 500, 502, 503])('never refreshes or retries for a %i', async (status) => {
+      fetchMock.mockReturnValueOnce(reply(status, { error: 'rate_limited' }));
+      await askLedger('q', []);
+      expect(refreshSession).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('maps a bare status when the body is not JSON', async () => {

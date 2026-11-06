@@ -77,11 +77,14 @@ const COPY = {
   // Before opt-in the panel knows nothing of the ledger, so it claims nothing about it.
   invite: 'Ask about your week, your spend or your goals.',
   loading: 'Reading the ledger…',
-  rateLimited: "You've reached today's limit. The ledger is still here tomorrow.",
+  // A 429 can be the reader's own cap or the shared daily cap; this is true for both.
+  rateLimited: "Today's questions are used up. The ledger is still here tomorrow.",
   disabled: 'Ask the ledger is resting for now.',
   outdated: 'Your agreements changed. Review them to keep asking.',
   error: "The ledger couldn't be read just now. The charts behind this panel still can.",
   footnote: 'Not medical advice. A daily limit applies.',
+  // Not part of the pinned consent notice: it only tells a reader why the chat is waiting.
+  needsConsent: 'Off until you consent to AI processing of your ledger data. Type a question to see what is sent.',
 } as const;
 
 const LINK_BUTTON =
@@ -568,6 +571,9 @@ export function AskLedgerPanel({ open, onOpenChange, initialQuestion, returnFocu
               />
               <Button type="submit" title="Ask" size="sm" variant="ghost" disabled={busy || draft.trim().length === 0} />
             </div>
+            {state && !state.consented && status !== 'consent' && status !== 'loading' ? (
+              <p className="text-caption italic text-text-muted">{COPY.needsConsent}</p>
+            ) : null}
             <p className="text-caption italic text-text-faint">{COPY.footnote}</p>
           </form>
         </Dialog.Content>

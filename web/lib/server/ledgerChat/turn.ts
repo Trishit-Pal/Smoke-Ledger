@@ -6,17 +6,16 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ToolContext } from '@/domain/ledgerChat/context';
 import { allowedNumbers, findUnverifiedFigures, sanitizeNarration } from '@/domain/ledgerChat/guard';
+import { BEYOND_SCOPE_ANSWER, screenAnswer } from '@/domain/ledgerChat/safety';
 import { TOOL_DEFS, runTool, toolResultContent, type ToolOutcome } from '@/domain/ledgerChat/tools';
 import type { ChatHistoryTurn, ChatResponse, Row } from '@/domain/ledgerChat/types';
 import { SYSTEM_PROMPT, userContextBlock } from './prompt';
 
 /** Tool picks, narration, and one spare round; the guard retry is on top of this. */
 export const MAX_MODEL_CALLS = 3;
-/** Haiku thinks by default and thinking counts against the cap; 1024 would truncate ordinary tool turns. */
+/** Reasoning models (gpt-oss, Gemini) spend part of the cap thinking; 1024 would truncate ordinary tool turns. */
 export const MAX_OUTPUT_TOKENS = 4096;
 export const FALLBACK_ANSWER = 'Here is what the ledger shows.';
-export const REFUSAL_ANSWER =
-  "That isn't something the ledger can speak to. Ask about your own entries, spend, or patterns and I'll read them back.";
 
 export interface ChatModelClient {
   messages: {
@@ -123,6 +122,8 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   };
 
   const finish = (answer: string): TurnResult => ({ answer, rows, toolsUsed, usage });
+  // A refusal or an unsafe answer shows the fixed reply alone: no ledger rows beside it.
+  const refuse = (): TurnResult => ({ answer: BEYOND_SCOPE_ANSWER, rows: [], toolsUsed: [], usage });
 
   let narration: string | null = null;
   let last: Anthropic.Message | null = null;
@@ -130,7 +131,7 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   for (let i = 0; i < MAX_MODEL_CALLS; i++) {
     const res = await call();
     last = res;
-    if (res.stop_reason === 'refusal') return finish(REFUSAL_ANSWER);
+    if (res.stop_reason === 'refusal') return refuse();
     if (res.stop_reason === 'max_tokens') return finish(FALLBACK_ANSWER);
 
     const toolUses = toolUsesOf(res);
@@ -162,6 +163,8 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
   const allowedPhrases = ctx.logs.flatMap((l) => [l.brandNameSnap ?? '', l.variantSnap ?? '']);
   const figureOpts = { discreet: ctx.discreet, allowedPhrases };
   let answer = sanitizeNarration(narration);
+  // Unsafe narration is replaced outright, never retried: a retry would only give it another go.
+  if (screenAnswer(answer).blocked) return refuse();
   let unverified = findUnverifiedFigures(answer, allowed, figureOpts);
 
   if (unverified.length > 0) {
@@ -169,9 +172,10 @@ export async function runLedgerChatTurn(input: TurnInput): Promise<TurnResult> {
     messages.push({ role: 'assistant', content: last.content });
     messages.push({ role: 'user', content: retryInstruction(unverified) });
     const retry = await call();
-    if (retry.stop_reason === 'refusal') return finish(REFUSAL_ANSWER);
+    if (retry.stop_reason === 'refusal') return refuse();
     if (toolUsesOf(retry).length > 0) return finish(FALLBACK_ANSWER);
     answer = sanitizeNarration(textOf(retry));
+    if (screenAnswer(answer).blocked) return refuse();
     unverified = findUnverifiedFigures(answer, allowed, figureOpts);
     if (unverified.length > 0) return finish(FALLBACK_ANSWER);
   }

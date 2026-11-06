@@ -20,6 +20,7 @@ export const OUT_OF_SCOPE: readonly string[] = [
   'Health: medical advice, diagnosis, health claims or ways to quit.',
   'Judgement or pressure: praise, scolding, streak talk or nagging.',
   'Anything older than the windows above, and forecasts beyond the spend outlook.',
+  'Explicit, sexual, violent, hateful or illegal content of any kind, including anything illegal about tobacco: smuggling, counterfeit packs, avoiding duty or tax, or selling to minors.',
 ];
 
 /** The in-scope list in one sentence, for the consent notice. */

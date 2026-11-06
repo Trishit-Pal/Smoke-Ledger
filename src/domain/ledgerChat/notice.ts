@@ -13,17 +13,30 @@ import { IN_SCOPE_SUMMARY } from './scope';
 import { LEGAL_ENTITY } from '@/lib/legalEntity';
 
 export const LEDGER_CHAT_NOTICE = {
-  lead: 'Answers come from an AI model run by Anthropic in the United States.',
+  lead: 'Answers come from an AI model run by Groq, Google or OpenRouter in the United States, tried in that order: when one is busy or down, the next answers. Before any of them answers, Groq checks your question and the earlier turns for safety.',
   scope: IN_SCOPE_SUMMARY,
-  sent: `Each time you ask, Anthropic receives your question, up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of this conversation (your questions and its replies), and a short context line: today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, and the kind and state of your active goals, and whether discreet mode is on. It also receives the figures needed to answer: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger pairings, goal progress and targets, your goal history (type, target, dates and outcome), the prices you recorded on entries, last 90 days (brand, variant, unit price, pack size and date), the dates you edited entries, and the app’s rules-based insights. When a question needs them, so are up to ${RECENT_MAX_ROWS} of your entries from the last ${RECENT_MAX_DAYS} days: date, hour, quantity, trigger, moods, craving, situation, brand, and the first ${NOTE_MAX_CHARS} characters of your note.`,
+  sent: `Each time you ask, the one that answers receives your question, up to ${CHAT_HISTORY_MAX_TURNS} earlier turns of this conversation (your questions and its replies), and a short context line: today’s date, your time zone, currency and locale, your daily baseline, how many days have entries, and the kind and state of your active goals, and whether discreet mode is on. It also receives the figures needed to answer: totals, trends, spend by brand, time-of-day and weekday patterns, mood and trigger pairings, goal progress and targets, your goal history (type, target, dates and outcome), the prices you recorded on entries, last 90 days (brand, variant, unit price, pack size and date), the dates you edited entries, and the app’s rules-based insights. When a question needs them, so are up to ${RECENT_MAX_ROWS} of your entries from the last ${RECENT_MAX_DAYS} days: date, hour, quantity, trigger, moods, craving, situation, brand, and the first ${NOTE_MAX_CHARS} characters of your note.`,
   discreet:
     'In discreet mode, brand names are replaced with aliases, and notes and variant names are not sent. A brand name you type into a question is sent as you typed it. Your name, date of birth, gender, email, phone number and place are never sent.',
-  retention: LEGAL_ENTITY.anthropicRetention,
+  retention: LEGAL_ENTITY.aiVendorRetention,
   device:
     'We store no questions or replies on our servers. The conversation stays in this browser until you choose Clear conversation, turn this off, turn discreet mode on, sign out, erase your data or delete your account.',
 } as const;
 
 export const LEDGER_CHAT_NOTICE_TEXT = Object.values(LEDGER_CHAT_NOTICE).join(' ');
+
+/**
+ * The model vendors the notice above (and the privacy policy) name as receiving a reader's ledger
+ * figures. The server's provider list may only use a vendor listed here whose label the notice also
+ * contains (web/lib/server/ledgerChat/fallback.ts refuses the rest). Adding a vendor is a consent
+ * event: name it in LEDGER_CHAT_NOTICE and the privacy page, bump LEDGER_CHAT_NOTICE_VERSION, add the
+ * new hash in web/__tests__/ledgerChatScope.test.ts, and ship web and mobile together.
+ */
+export const LEDGER_CHAT_DISCLOSED_PROVIDERS = [
+  { id: 'groq', label: 'Groq' },
+  { id: 'google', label: 'Google' },
+  { id: 'openrouter', label: 'OpenRouter' },
+] as const;
 
 /**
  * The opt-in (settings_kv `consent.ledgerChatOptIn`) stores the version of the notice it was
@@ -33,7 +46,7 @@ export const LEDGER_CHAT_NOTICE_TEXT = Object.values(LEDGER_CHAT_NOTICE).join(' 
  * Web and mobile read this one constant but deploy separately: ship both when it changes, or an
  * older app build stores a version the route refuses. See docs/architecture/ledger-chat-consent-adr.md.
  */
-export const LEDGER_CHAT_NOTICE_VERSION = '2026-11-03';
+export const LEDGER_CHAT_NOTICE_VERSION = '2026-11-06';
 
 /** Consent only to the current notice: a pre-versioning `true` or an older version reads as off. */
 export function isCurrentChatOptIn(value: unknown): boolean {
@@ -47,4 +60,4 @@ export function chatOptInValue(enabled: boolean): typeof LEDGER_CHAT_NOTICE_VERS
 
 // Shown before opt-in on both platforms: bump LEDGER_CHAT_NOTICE_VERSION with any change here.
 export const LEDGER_CHAT_SETTINGS_SUBLABEL =
-  'Answers questions about your own ledger with an AI model run by Anthropic (United States). Off by default; you will see exactly what is sent before it turns on. Turning it off clears the conversation on this device.';
+  'Answers questions about your own ledger with an AI model run by Groq, Google or OpenRouter (United States). Off by default; you will see exactly what is sent before it turns on. Turning it off clears the conversation on this device.';

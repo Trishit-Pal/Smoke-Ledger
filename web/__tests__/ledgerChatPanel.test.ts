@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { LEDGER_CHAT_NOTICE_TEXT } from '@/domain/ledgerChat/notice';
 
 // Source-scan pins for the panel, in the repo's style for
 // components (no jsdom here). Each pin is a rule the design or privacy
@@ -153,6 +154,26 @@ describe('state from GET and the initial question', () => {
     expect(panel).toContain('{state?.consented ? COPY.empty : COPY.invite}');
   });
 
+  test('before opt-in, one quiet line under the box says consent is needed, outside the pinned notice', () => {
+    // Shown once the state says "not consented"; the consent card, when open, already says it, so no repeat there.
+    // Hidden while loading too: right after "Turn on and ask" the consent write is in flight and the state
+    // still says "not consented", so the line would flash "Off until you consent" at the reader who just did.
+    expect(panel).toContain("needsConsent: 'Off until you consent to AI processing of your ledger data. Type a question to see what is sent.'");
+    expect(panel).toMatch(
+      /state && !state\.consented && status !== 'consent' && status !== 'loading' \? \(\s*<p[^>]*>\{COPY\.needsConsent\}<\/p>/,
+    );
+    // The line sits under the input (after the form field), never inside the consent card.
+    expect(panel.indexOf('{COPY.needsConsent}')).toBeGreaterThan(panel.indexOf('placeholder="Ask your ledger…"'));
+    // It is not part of what readers consent to: the hash-pinned notice text does not contain it.
+    expect(LEDGER_CHAT_NOTICE_TEXT).not.toContain('Off until you consent');
+  });
+
+  test('the limit message is true for both caps: it never tells a reader they used up a limit they did not', () => {
+    // 429 comes from the reader's own cap or the shared daily cap; the route cannot tell the panel which.
+    expect(panel).toContain("rateLimited: \"Today's questions are used up. The ledger is still here tomorrow.\"");
+    expect(panel).not.toContain("You've reached today's limit");
+  });
+
   test('after Turn on and ask, the state is read again so starters appear without a reload', () => {
     const turnOn = panel.slice(panel.indexOf('const onTurnOnAndAsk'), panel.indexOf('const onNotNow'));
     expect(turnOn).toMatch(/await send\(pending\.question, pending\.starter\);\s*\/\/[^\n]*\n\s*const loaded = await loadChatState\(\);\s*\/\/[^\n]*\n\s*if \(loaded\.state && stateLoadRef\.current === openLoad\) setState\(loaded\.state\);/);
@@ -254,7 +275,7 @@ describe('chat consent notice', () => {
     expect(LEDGER_CHAT_NOTICE.sent).toContain('the kind and state of your active goals, and whether discreet mode is on.');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('up to 200 of your entries from the last 30 days');
     expect(LEDGER_CHAT_NOTICE.sent).toContain('first 120 characters of your note');
-    expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.anthropicRetention);
+    expect(LEDGER_CHAT_NOTICE.retention).toBe(LEGAL_ENTITY.aiVendorRetention);
     for (const exit of ['Clear conversation', 'turn this off', 'turn discreet mode on', 'sign out']) {
       expect(LEDGER_CHAT_NOTICE.device).toContain(exit);
     }

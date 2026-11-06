@@ -78,10 +78,20 @@ const CHECKERS: Record<DataPromiseKey, () => void> = {
     const route = read('web/app/api/ledger-chat/route.ts');
     const consentGate = route.indexOf("fail('consent_required', 403)");
     expect(consentGate).toBeGreaterThan(-1);
-    expect(consentGate).toBeLessThan(route.indexOf('new Anthropic('));
+    // The model is only called through the provider runner, and only after the consent gate.
+    const modelCall = route.indexOf('runWithFallback(');
+    expect(modelCall).toBeGreaterThan(-1);
+    expect(consentGate).toBeLessThan(modelCall);
+    expect(route).not.toContain('new Anthropic(');
   },
   chatNotStored: () => {
-    for (const rel of ['web/app/api/ledger-chat/route.ts', 'web/lib/server/ledgerChat/turn.ts']) {
+    for (const rel of [
+      'web/app/api/ledger-chat/route.ts',
+      'web/lib/server/ledgerChat/turn.ts',
+      'web/lib/server/ledgerChat/fallback.ts',
+      'web/lib/server/ledgerChat/providers.ts',
+      'web/lib/server/ledgerChat/providers/aiSdk.ts',
+    ]) {
       expect(read(rel)).not.toMatch(/\.(insert|upsert|update)\(/);
     }
     expect(read('web/components/chat/transcriptStore.ts')).toMatch(/localStorage/);

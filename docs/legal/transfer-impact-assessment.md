@@ -1,7 +1,7 @@
 # Transfer impact assessment
 
 Smoke Ledger. Controller: Trishit Pal, in India. Written 3 November 2026. Status: **draft, awaiting owner sign-off and a lawyer's read**.
-Research, not legal advice. Sources were secondary for the Data Privacy Framework (DPF) status of Vercel, Anthropic and Expo; they have not been checked against the DPF list.
+Research, not legal advice. Sources were secondary for the Data Privacy Framework (DPF) status of Vercel, Groq, Google, OpenRouter and Expo; they have not been checked against the DPF list.
 
 ## 1. What is being assessed
 
@@ -13,7 +13,7 @@ The controller is in India and collects directly from readers, including readers
 |---|---|---|---|
 | Supabase (AWS us-east-2) | US | The whole ledger, profile, sign-in record, audit, error and usage rows | Hosting the product |
 | Vercel | US | Requests in transit, IP addresses in logs, cached brand lists | Serving the web app |
-| Anthropic | US | Chat question and selected ledger data, only for readers who opt in | Writing chat replies |
+| Groq, Google, OpenRouter | US | Chat question and selected ledger data, only for readers who opt in, sent to the one vendor that answers | Writing chat replies |
 | Cloudflare Turnstile | Global | Browser signals, IP | Bot check |
 | Email provider | Depends on provider | Email address, link | Sign-in email |
 
@@ -24,7 +24,7 @@ Data subjects: adult readers. Data: includes health data (Art 9). Onward transfe
 | Importer | Tool | Notes |
 |---|---|---|
 | Supabase | EU SCCs (Decision 2021/914) Modules 2 and 3 in its DPA, March 2026 version | No DPF reliance. 48-hour breach notice, 30-day sub-processor notice. To accept (owner) |
-| Anthropic | SCCs Modules 2 and 3 in its DPA, part of the Commercial Terms | Sub-processor notice with 15-day objection. To accept (owner) |
+| Groq, Google, OpenRouter | Each vendor's DPA (Google: Cloud data processing terms with SCCs; Groq and OpenRouter: confirm) | To accept (owner) |
 | Vercel | SCCs and/or DPF, per its DPA | Not confirmed from a primary source. To accept (owner) |
 | Cloudflare | Customer DPA with SCCs, DPF | To accept (owner) |
 | Email provider | Provider DPA | Provider to be confirmed by the owner |
@@ -39,16 +39,16 @@ Reasoning used (EDPB Recommendations 01/2020 approach, simplified):
 
 - **US law that could reach the data:** FISA 702 and Executive Order 12333. The DPF adequacy decision found that Executive Order 14086 added necessity and proportionality limits and a redress route, and that assessment is widely reused as the basis for SCC transfer assessments to US importers.
 - **Likelihood of interest:** the controller is a one-person app for personal habit tracking. The data is of low interest to intelligence services. The controller knows of no government request to any importer concerning this service.
-- **Importer commitments:** each DPA binds the importer to challenge unlawful requests, notify the controller where lawful, and give breach notice within 48 hours (Supabase and Anthropic).
+- **Importer commitments:** each DPA binds the importer to challenge unlawful requests, notify the controller where lawful, and give breach notice within 48 hours (Supabase; confirm for the AI vendors).
 - **Supplementary measures in place:**
   - TLS in transit; encryption at rest by the host.
   - Row-level security and per-user scoping so a service-level bug does not widen access.
   - Minimisation: no location, contacts or ad identifiers; the chat sends only what a question needs, clips notes at 120 characters, and drops notes and brand names in discreet mode.
   - Hashed rate-limit keys; pepper-hashed audit rows after erase; redacted error text.
   - Strict retention (see `retention-schedule.md`).
-  - Opt-in for the only transfer that goes to a recipient with no hosting role (Anthropic).
+  - Opt-in for the only transfer that goes to recipients with no hosting role (the AI vendors).
   - No sale, no ads, no third-party tracking SDK.
-- **Not in place:** customer-held encryption keys (the host can read data it serves). This is the main gap; it is common to hosted Postgres and accepted for a small app. Moving the project to an EU region would remove the largest transfer but not Vercel or Anthropic.
+- **Not in place:** customer-held encryption keys (the host can read data it serves). This is the main gap; it is common to hosted Postgres and accepted for a small app. Moving the project to an EU region would remove the largest transfer but not Vercel or the AI vendors.
 
 ## 4. Indian side
 

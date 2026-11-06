@@ -4,7 +4,7 @@ import { canSeed, getAdmin, seedLogs, istYmdDaysAgo } from './_helpers/seed';
 import { LEDGER_CHAT_NOTICE_VERSION } from '../../src/domain/ledgerChat/notice';
 
 // Ask the ledger, end to end on the real UI with the model route mocked:
-// the route is a network boundary, so page.route stands in for Anthropic and
+// the route is a network boundary, so page.route stands in for the model vendors and
 // the server (GET state and POST answers), and the spec proves the panel, the
 // consent flow, the row rendering, the limit message, and discreet masking.
 const CHAT_ROUTE = '**/api/ledger-chat';
@@ -76,7 +76,7 @@ test.describe('ask the ledger', () => {
 
     await dialog.getByLabel('Ask your ledger').fill('And the month before?');
     await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
-    await expect(dialog.getByText(/reached today/)).toBeVisible();
+    await expect(dialog.getByText(/questions are used up/)).toBeVisible();
   });
 
   test('masks figures for a discreet reader and fits a 320px viewport', async ({ page, onboarded }) => {

@@ -64,10 +64,12 @@ describe('isLedgerChatEnabled release gate', () => {
     expect(isLedgerChatEnabled(NEW_PRIVACY)).toBe(false);
   });
 
-  it('defaults to the shipped privacy version', () => {
+  it('defaults to the shipped privacy version: on in Production once the launch bump is live', () => {
     stub('true', 'production');
-    // Reads the live LEGAL_VERSIONS.privacy (still '2026-11-02' until the owner names the EU
-    // representative). When the owner bumps it, this expectation must flip to true.
+    // Reads the live LEGAL_VERSIONS.privacy, bumped past '2026-11-02' with the chat launch.
+    expect(isLedgerChatEnabled()).toBe(true);
+    // Still needs the operator's flag: unsetting it is the kill switch.
+    stub('false', 'production');
     expect(isLedgerChatEnabled()).toBe(false);
   });
 });

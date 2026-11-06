@@ -1,6 +1,6 @@
 # Smoke Ledger Terms of Service
 
-Effective date: 2026-05-19
+Effective date: 2026-11-06
 
 > Mirror of `web/app/terms/page.tsx`, which renders operator facts from `src/lib/legalEntity.ts`. `src/tests/web-privacy-page.test.ts` fails if a page heading is missing here.
 
@@ -15,7 +15,7 @@ Effective date: 2026-05-19
 
 ## What the service is
 - A private ledger of cigarettes smoked and their cost: trends, goals to cut down or stop, optional reminders, and export, erase or delete at any time.
-- Ask the ledger (web and mobile): opt-in; answers about your own ledger from an Anthropic model; each answer labelled "Written by AI"; daily question limit; answers can be wrong.
+- Ask the ledger (web and mobile): opt-in; answers about your own ledger from a Groq, Google or OpenRouter model; each answer labelled "Written by AI"; daily question limit; answers can be wrong.
 - Features may change, as set out under changes.
 
 ## Not medical advice

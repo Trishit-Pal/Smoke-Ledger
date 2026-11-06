@@ -11,7 +11,7 @@ A personal data breach is a security failure that leads to accidental or unlawfu
 
 - A leaked Supabase service-role key, a database dump, or an export file.
 - A Row-Level Security failure that shows one reader another reader's rows.
-- A leaked `ANTHROPIC_API_KEY` or `AUDIT_PEPPER` (the pepper lets someone re-link hashed audit rows).
+- A leaked AI key (`GROQ_API_KEY_*`, `GEMINI_API_KEY_*`, `OPENROUTER_API_KEY`) or `AUDIT_PEPPER` (the pepper lets someone re-link hashed audit rows).
 - A processor telling you it had a breach.
 - A bad deploy that exposes the brands cache (`brands:<uid>`) to the wrong reader.
 
@@ -23,7 +23,7 @@ The logs hold smoking, craving, mood and note data. Treat all of it as health da
 |---|---|---|---|
 | GDPR Art 33 | You become "aware" of a breach | 72 hours, to the supervisory authority (SA) of each Member State where affected readers live | You (controller). The EU representative is the contact point once signed |
 | GDPR Art 34 | Same | "Without undue delay", to readers, when the breach is likely to be a high risk | You |
-| Processor to you | The processor becomes aware | Supabase and Anthropic DPAs: without undue delay, and within 48 hours | The processor |
+| Processor to you | The processor becomes aware | Supabase DPA: without undue delay, and within 48 hours; AI vendors per their DPAs (confirm) | The processor |
 | India before DPDP | Awareness | The SPDI Rules 2011 set no fixed breach deadline. Tell affected readers promptly and handle complaints through the Grievance Officer | You |
 | India, DPDP Act | About 13 May 2027 (computed, not stated; confirm) | Tell the Data Protection Board and each affected reader without delay, then send the detailed report within the period the Rules set | You |
 | CERT-In | Open question for a lawyer (decision O11) | Not built into these steps. Listed at the end | A lawyer decides if it applies |
@@ -34,7 +34,7 @@ The logs hold smoking, craving, mood and note data. Treat all of it as health da
 
 1. **Note the time.** Open a private incident note: date, time of awareness, who told you, how. Never paste personal data into it.
 2. **Contain.** Stop the leak first, investigate second.
-   - Rotate the leaked secret: Supabase service-role or anon key, `AUDIT_PEPPER` (see `docs/runbooks/audit-pepper-rotation.md`), MSG91 key, Anthropic key, email provider key, Turnstile secret.
+   - Rotate the leaked secret: Supabase service-role or anon key, `AUDIT_PEPPER` (see `docs/runbooks/audit-pepper-rotation.md`), MSG91 key, the AI keys (Groq, Gemini, OpenRouter), email provider key, Turnstile secret.
    - If the cause is a bad deploy, roll it back in Vercel.
    - If a table is exposed, tighten RLS or revoke the grant, then check with `npm run verify:backend`.
    - Keep evidence. Do not delete logs. Supabase and Vercel logs rotate, so export the relevant window now.
@@ -62,7 +62,7 @@ One row per incident, including those you decide not to report. Keep it outside 
 ## Contacts to fill before you need them
 
 - EU representative: name, email, phone (after signing; see `owner-actions.md`).
-- Security or support contact at Supabase, Vercel, Anthropic, MSG91, Cloudflare and the email provider.
+- Security or support contact at Supabase, Vercel, Groq, Google, OpenRouter, MSG91, Cloudflare and the email provider.
 - The SA for each EU country with readers. Start with the three largest by `user_profiles.country`.
 
 ## Open questions for a lawyer
