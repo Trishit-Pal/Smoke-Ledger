@@ -31,4 +31,13 @@ describe('Edge Function preview-origin allowlist', () => {
     expect(cors).toContain('PREVIEW_ORIGIN_REGEX');
     expect(cors).not.toMatch(/\[a-z0-9-\]\+\\\.vercel\\\.app/);
   });
+
+  it('cors.ts allows the canonical smokeledger.fyi origin, not the retired smokeledger.app', () => {
+    const cors = fs.readFileSync(
+      path.resolve(__dirname, '../../supabase/functions/_shared/cors.ts'),
+      'utf8',
+    );
+    expect(cors).toContain("'https://smokeledger.fyi'");
+    expect(cors).not.toContain('smokeledger.app');
+  });
 });

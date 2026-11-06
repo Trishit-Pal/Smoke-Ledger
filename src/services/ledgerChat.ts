@@ -20,7 +20,7 @@ export const LEDGER_CHAT_OPT_IN_KEY = 'consent.ledgerChatOptIn';
 
 /** The server's own turn budget is 25s; give it a little longer, then fail calmly. */
 const REQUEST_TIMEOUT_MS = 30_000;
-const DEFAULT_WEB_BASE_URL = 'https://smokeledger.app';
+const DEFAULT_WEB_BASE_URL = 'https://smokeledger.fyi';
 
 /**
  * The web origin the route lives on. Unset falls back to production (as legal.ts

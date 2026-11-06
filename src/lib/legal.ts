@@ -1,6 +1,6 @@
 // A blank value (eas.json ships the key as a placeholder) counts as unset: a relative legal link
 // cannot be opened from the app, so it falls back to the default origin.
-const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim() || 'https://smokeledger.app';
+const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim() || 'https://smokeledger.fyi';
 
 // 2026-11-06: the Ask the ledger launch (moved from 2026-11-05 when the AI vendors became Groq,
 // Google and OpenRouter in place of Anthropic). Terms and privacy move together, so one /consent screen

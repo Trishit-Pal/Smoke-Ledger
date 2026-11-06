@@ -2,13 +2,17 @@
 
 Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
-<!-- Format: ## 2026-11-06 — 10b4a9d (+ working tree)
+<!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
+
+## 2026-11-06 — 5d6e1af (+ working tree)
+- infra-ops: new "The domain" subsection: production is `smokeledger.fyi` on Cloudflare DNS (DNS-only records to Vercel); `smoke-ledger-beige.vercel.app` 308s to it from `web/next.config.mjs`, skipping `/api/*` so native Bearer calls survive; mobile web base URL falls back to `.fyi`. Gotcha added for the one-time sign-out on the host move. `web/next.config.mjs` added to the section's sources.
+- security-privacy: CORS paragraph names the `DEFAULT_PROD_ORIGINS` list (`smokeledger.fyi` + `www`, replacing `smokeledger.app`) and fixes the `originAllowed` line reference.
+
+## 2026-11-06 — 10b4a9d (+ working tree)
 - security-privacy: Ask the ledger now runs on six ordered keys (Groq free first, then paid Gemini, then OpenRouter with data collection denied) through one AI SDK adapter; Anthropic removed; notice and retention text name the three vendors.
 - infra-ops: the Anthropic key and model vars replaced by the six key slots, per-vendor model overrides and the AI SDK packages; spend caps are OpenRouter credit plus the global daily cap.
 - security-privacy: Ask the ledger safety guardrails in five layers (rules on the question and on every earlier turn, the Groq Llama Guard 4 / Prompt Guard 2 classifier failing closed, a Safety block in the prompt, an answer check); one fixed beyond-scope reply, plus the emergency line for self-harm; notice and policy say Groq checks every question.
 - architecture: re-verified; `web/lib/server/ledgerChat/` gained `providers/aiSdk.ts` and lost `providers/langchain.ts`, with no structural change.
-
-## <date> — <commit> ; then a bullet per section changed. -->
 
 ## 2026-11-05 — 55afdcd
 - security-privacy: the runner shares the time budget only among providers that can run and skips a client() that throws; one limit line true for both caps; the bump paragraph and the history note now match decision O-MVP.
