@@ -1,4 +1,4 @@
-const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? 'https://smokeledger.app';
+const baseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL ?? 'https://smokeledger.fyi';
 
 export const LEGAL_VERSIONS = {
   terms: '2026-05-19',
