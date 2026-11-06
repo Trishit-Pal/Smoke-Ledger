@@ -4,7 +4,7 @@ Append-only. Newest first. One entry per `/spec-update` or `/spec-generate` run.
 
 <!-- Format: ## <date> — <commit> ; then a bullet per section changed. -->
 
-## 2026-11-06 — 033f84c (+ working tree)
+## 2026-11-06 — 15595ca
 - infra-ops: new "The domain" subsection: production is `smokeledger.fyi` on Cloudflare DNS (DNS-only records to Vercel); `smoke-ledger-beige.vercel.app` 308s to it from `web/next.config.mjs`, skipping `/api/*` so native Bearer calls survive; mobile web base URL falls back to `.fyi`. Gotcha added for the one-time sign-out on the host move. `web/next.config.mjs` added to the section's sources.
 - security-privacy: CORS paragraph names the `DEFAULT_PROD_ORIGINS` list (`smokeledger.fyi` + `www`, replacing `smokeledger.app`) and fixes the `originAllowed` line reference.
 

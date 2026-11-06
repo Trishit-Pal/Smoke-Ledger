@@ -11,7 +11,7 @@ sources:
   - docs/deployment/**
   - docs/runbooks/**
   - web/next.config.mjs
-last_verified_commit: 033f84c
+last_verified_commit: 15595ca
 status: current
 ---
 
