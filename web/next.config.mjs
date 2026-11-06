@@ -68,6 +68,19 @@ const config = {
       { source: '/reset-password', headers: callbackSecurityHeaders },
     ];
   },
+  // Old Vercel alias -> canonical domain. Host-matched so preview URLs are untouched.
+  // /api/* is left out: a cross-host redirect drops the native app's Bearer token,
+  // and ledger-chat then answers 403.
+  async redirects() {
+    return [
+      {
+        source: '/:path((?!api/).*)',
+        has: [{ type: 'host', value: 'smoke-ledger-beige.vercel.app' }],
+        destination: 'https://smokeledger.fyi/:path',
+        permanent: true,
+      },
+    ];
+  },
   webpack(webpackConfig) {
     // Shared `../src` imports resolve modules from their file path upward, so on
     // Vercel (install only in web/) packages like dayjs/zod in web/node_modules

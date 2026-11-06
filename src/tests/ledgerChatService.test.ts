@@ -127,7 +127,7 @@ describe('base URL', () => {
   });
 
   it('falls back to production only when unset', () => {
-    expect(resolveWebBaseUrl(undefined)).toBe('https://smokeledger.app');
+    expect(resolveWebBaseUrl(undefined)).toBe('https://smokeledger.fyi');
   });
 
   it('is null when set but blank', () => {

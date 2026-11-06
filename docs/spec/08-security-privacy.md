@@ -29,7 +29,7 @@ sources:
   - app/ask.tsx
   - src/lib/askView.ts
   - web/components/chat/**
-last_verified_commit: 42f5db1
+last_verified_commit: 15595ca
 status: current
 ---
 
@@ -170,7 +170,7 @@ On `/consent` the way out is "Not now — export or delete my data". The one rea
 
 ### Origin allowlist and CORS
 
-Edge Functions check `req.headers.get('origin')` against an allowlist in `supabase/functions/_shared/cors.ts:38–49`. Non-browser clients (native mobile, curl) send no `Origin` header and are accepted — the bearer token is the real gate. In production, `ALLOWED_ORIGINS` must be a comma-separated list of explicit origins; the wildcard `*` is only accepted when `ENVIRONMENT != production`. Disallowed origins receive no `Access-Control-Allow-Origin` header rather than the literal string `'null'`.
+Edge Functions check `req.headers.get('origin')` against an allowlist in `supabase/functions/_shared/cors.ts:40–51`. An origin passes if it is in the `ALLOWED_ORIGINS` secret, in the hardcoded `DEFAULT_PROD_ORIGINS` (`cors.ts:26–31`: the canonical `https://smokeledger.fyi` and its `www`, plus the two `vercel.app` production aliases kept for the move), or matches this project's preview-URL pattern. The hardcoded list exists so a forgotten secret cannot 403 the production site. Non-browser clients (native mobile, curl) send no `Origin` header and are accepted — the bearer token is the real gate. In production, `ALLOWED_ORIGINS` must be a comma-separated list of explicit origins; the wildcard `*` is only accepted when `ENVIRONMENT != production`. Disallowed origins receive no `Access-Control-Allow-Origin` header rather than the literal string `'null'`.
 
 ### Re-authentication gate on account deletion
 

@@ -174,7 +174,7 @@
         "src/lib/askView.ts",
         "web/components/chat/**"
       ],
-      "last_verified_commit": "42f5db1",
+      "last_verified_commit": "15595ca",
       "status": "current"
     },
     {
@@ -189,9 +189,10 @@
         "eas.json",
         ".github/**",
         "docs/deployment/**",
-        "docs/runbooks/**"
+        "docs/runbooks/**",
+        "web/next.config.mjs"
       ],
-      "last_verified_commit": "42f5db1",
+      "last_verified_commit": "15595ca",
       "status": "current"
     }
   ]

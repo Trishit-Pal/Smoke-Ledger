@@ -10,7 +10,8 @@ sources:
   - .github/**
   - docs/deployment/**
   - docs/runbooks/**
-last_verified_commit: 42f5db1
+  - web/next.config.mjs
+last_verified_commit: 15595ca
 status: current
 ---
 
@@ -35,6 +36,14 @@ Users don't see any of this directly, but they feel it. If the Supabase free tie
 **EAS** builds the React Native / Expo mobile app. `eas.json` defines three profiles: `development` (internal APK with dev client), `preview` (internal APK on the `preview` channel), and `production` (AAB on the `production` channel, `autoIncrement: true`, targeting the internal track of the Play Store as a draft). iOS builds are configured in the native config but iOS distribution is not yet active. The `app.config.js` sets `runtimeVersion: { policy: 'appVersion' }`, which pins OTA update delivery to a specific native binary version — a JS-only fix can ship without a store review, but any change that touches native code requires a full build and store release. The app identifier is `app.smokeledger.india` on both platforms (`app.config.js:20,27`).
 
 The `metro.config.js` contains one noteworthy workaround: it forces `@supabase/supabase-js` to resolve to the CommonJS build (`dist/index.cjs`) instead of the ESM build. The ESM build uses a dynamic `import(variableSpecifier)` for optional OpenTelemetry support; Hermes cannot statically compile a dynamic import with a non-literal specifier and fails the EAS production build. This fix affects only that one package (`metro.config.js:19-31`).
+
+### The domain
+
+Production lives at `https://smokeledger.fyi`. The domain is registered with Cloudflare, which also keeps its DNS (Cloudflare Registrar does not allow other nameservers). The apex is a CNAME to the Vercel target the dashboard shows, and `www` is a CNAME that Vercel redirects to the apex. Both records are "DNS only" (grey cloud), because Vercel issues the certificate and an orange-cloud proxy would get in the way of that check.
+
+The old production alias, `smoke-ledger-beige.vercel.app`, still serves the same deployment. `web/next.config.mjs` sends every page request on that host to the same path on `smokeledger.fyi` with a permanent (308) redirect. The rule matches on the host, so preview URLs and local dev never redirect. It deliberately skips `/api/*`: a redirect to another host makes the native HTTP stack drop the `Authorization` header, and `/api/ledger-chat` would then answer 403 to a phone build still pointed at the old alias.
+
+The mobile app reaches the web through `EXPO_PUBLIC_WEB_BASE_URL`. When it is unset, both `src/services/ledgerChat.ts` and `src/lib/legal.ts` fall back to `https://smokeledger.fyi`.
 
 ### Email delivery
 
@@ -135,6 +144,8 @@ The rules here that must not quietly break:
 **`delete-account` rate limiter with Deno KV.** The per-IP and per-user rate limits use Deno KV as their backing store. If KV is unavailable (Supabase infrastructure issue), the function returns 429 rather than open-running. This is intentional fail-closed behaviour (`delete-account/index.ts:93-100`), but it means a KV outage blocks legitimate account deletions.
 
 **Play Store submission track.** `eas.json` submits to the `internal` track with `releaseStatus: draft` and `changesNotSentForReview: false`. This means the first submission will prompt for review. Changing `releaseStatus` to `completed` promotes the build to the full internal testing track, which requires the Play Console's internal testing track to be configured first.
+
+**Moving hosts signs people out once.** Session cookies and device settings belong to the host that set them, so a reader who arrives through the beige redirect lands on `smokeledger.fyi` signed out, with default settings. A tab left open on the old host can also fail once on its next lazy chunk or server-action POST, since the redirected request is now cross-origin. A reload fixes both, and no data is lost. The Supabase Auth Site URL and Redirect URLs must name `https://smokeledger.fyi` before the redirect ships, or new sign-in emails link back to the old host.
 
 **`SUPABASE_SERVICE_ROLE_KEY` on Vercel must stay server-only.** It is used by `/api/auth/login` and the delete-account edge function. If it were ever set as `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` it would be embedded in the client bundle and expose full admin access. The checklist item at `docs/deployment/production-ops-checklist.md:71` is explicit, but Vercel will not refuse the misconfiguration.
 
